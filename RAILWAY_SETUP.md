@@ -106,24 +106,38 @@ railway link
 
 ## Railway Configuration Files
 
-You can create `railway.json` or `railway.toml` file in the app directory for Railway-specific settings:
+We've created `railway.json` files for each app to configure Railway deployments. These files are located in each app directory:
 
-### Example: `apps/web/web-z0xm/railway.json`
+- `apps/web/web-z0xm/railway.json`
+- `apps/backend/api/railway.json`
+
+These configuration files:
+- Specify that Railway should use the Dockerfile for building
+- Configure restart policies for reliability
+- Ensure consistent deployments across environments
+
+### Configuration Details
+
+Each `railway.json` file contains:
 
 ```json
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "cd ../.. && bun install && bun run build --filter=@pocket-dimension/web-z0xm"
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "bun run start",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
 }
 ```
+
+When you connect your GitHub repository to Railway:
+1. Railway will automatically detect these configuration files
+2. Each service will use its respective `railway.json` for deployment settings
+3. The Dockerfiles will be used for building the applications
 
 ## Environment Variables
 
@@ -166,40 +180,46 @@ If you prefer Docker (which you mentioned earlier):
    CMD ["bun", "run", "start"]
    ```
 
-## GitHub Actions Integration
+## GitHub Integration
 
-We've already set up a GitHub Actions workflow (`.github/workflows/deploy.yml`) that can deploy to Railway. To use it:
+Railway's native GitHub integration automatically deploys your code when you push to your connected branch. This is the recommended approach and doesn't require any GitHub Actions workflows.
 
-1. **Get Railway Token**:
-   - Go to Railway Dashboard → Settings → Tokens
-   - Create a new token
+**To set up GitHub Auto-Deploy:**
 
-2. **Get Service IDs**:
-   - For each service, go to Settings → General
-   - Copy the Service ID
+1. **Connect Your Repository**:
+   - Go to Railway Dashboard → Your Project → New Service
+   - Select "GitHub Repo"
+   - Choose your repository
 
-3. **Add GitHub Secrets**:
-   - Go to your GitHub repo → Settings → Secrets and variables → Actions
-   - Add `RAILWAY_TOKEN` with your Railway token
-   - Add `RAILWAY_SERVICE_ID` with your primary service ID (or configure multiple services)
+2. **Configure Each Service**:
+   - For each app (web-z0xm, backend-api), create a separate service
+   - Set the root directory (e.g., `apps/web/web-z0xm` or `apps/backend/api`)
+   - Railway will automatically detect the `railway.json` configuration file and Dockerfile
+   - The configuration files handle all build and deploy settings automatically
+
+3. **Set Up Environment Variables**:
+   - Add environment variables in Railway dashboard for each service
+   - Copy values from `.env.example` files
 
 ## Recommended Approach
 
-For this monorepo, I recommend:
+For this monorepo, we recommend using **Railway's GitHub Auto-Deploy**:
 
-1. **Use GitHub Auto-Deploy** (easiest)
-   - Connect repo in Railway dashboard
-   - Configure each service separately
-   - Railway handles deployments automatically
+1. **GitHub Auto-Deploy** (Recommended)
+   - Connect your GitHub repository in Railway dashboard
+   - Railway automatically detects changes and deploys
+   - No GitHub Actions needed - Railway handles everything
+   - Supports Dockerfiles automatically
+   - Configure each service separately for your monorepo apps
 
-2. **Use Docker** (if you want more control)
-   - Create Dockerfiles for each app
-   - Railway will build and deploy from Dockerfiles
-   - Better for complex build processes
+2. **Docker Deployment**
+   - Dockerfiles are already configured for both apps
+   - Railway will automatically use them when detected
+   - No additional configuration needed
 
 3. **Skip the `railway link` command** unless you need local testing
    - The link command is mainly for local development/testing
-   - For production, GitHub auto-deploy is better
+   - For production, GitHub auto-deploy is the easiest option
 
 ## Next Steps
 
