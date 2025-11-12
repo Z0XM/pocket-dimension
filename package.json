@@ -29,7 +29,7 @@
   },
   "packageManager": "bun@1.1.38",
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/**",
+    "packages/**"
   ]
 }

@@ -10,13 +10,10 @@ A monorepo setup using Turborepo, Bun, and Biome.
 pocket-dimension/
 ├── apps/
 │   ├── web/          # Web applications
-│   │   ├── web-z0xm/
-│   │   └── web-app-2/
-│   └── backend/      # Backend applications
-│       ├── backend-app-1/
-│       └── backend-app-2/
+│   │   └── web-z0xm/
+│   └── backend/       # Backend applications
+│       └── api/
 ├── packages/         # Shared packages
-│   ├── shared/
 │   └── env-validation/  # Environment variable validation
 └── package.json      # Root package.json
 ```
@@ -95,11 +92,11 @@ Coverage reports are generated in the `coverage/` directory of each workspace wh
 Each app has a `.env.example` file that documents the required environment variables. Copy this file to `.env` and fill in the values:
 
 ```bash
-# For web apps
+# For web app
 cp apps/web/web-z0xm/.env.example apps/web/web-z0xm/.env
 
-# For backend apps
-cp apps/backend/backend-app-1/.env.example apps/backend/backend-app-1/.env
+# For backend API
+cp apps/backend/api/.env.example apps/backend/api/.env
 ```
 
 ### Type-Safe Environment Validation

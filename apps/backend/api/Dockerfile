@@ -16,13 +16,13 @@ RUN bun install --frozen-lockfile
 COPY . .
 
 # Build the application
-RUN bun run build --filter=@pocket-dimension/web-z0xm
+RUN bun run build --filter=@pocket-dimension/backend-api
 
 # Set working directory to the app
-WORKDIR /app/apps/web/web-z0xm
+WORKDIR /app/apps/backend/api
 
 # Expose port (Railway/Docker will set PORT env var)
-EXPOSE 3000
+EXPOSE 3001
 
 # Start the server
 CMD ["bun", "run", "start"]

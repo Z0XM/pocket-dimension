@@ -30,9 +30,3 @@ jobs:
         with:
           railway_token: ${{ secrets.RAILWAY_TOKEN }}
           service: ${{ secrets.RAILWAY_SERVICE_ID }}
-          # Uncomment and configure if you have multiple services
-          # services: |
-          #   web-app-1:${{ secrets.RAILWAY_WEB_APP_1_SERVICE_ID }}
-          #   web-app-2:${{ secrets.RAILWAY_WEB_APP_2_SERVICE_ID }}
-          #   backend-app-1:${{ secrets.RAILWAY_BACKEND_APP_1_SERVICE_ID }}
-          #   backend-app-2:${{ secrets.RAILWAY_BACKEND_APP_2_SERVICE_ID }}

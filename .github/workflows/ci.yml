@@ -162,6 +162,7 @@ jobs:
       matrix:
         app:
           - apps/web/web-z0xm
+          - apps/backend/api
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
