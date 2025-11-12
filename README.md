@@ -38,27 +38,38 @@ pocket-dimension/
    bun run build
    ```
 
-4. Lint all workspaces:
+4. Start all apps (production mode):
+   ```bash
+   bun run start
+   ```
+
+   Or start a specific app:
+   ```bash
+   cd apps/web/web-app-1
+   bun run start
+   ```
+
+5. Lint all workspaces:
    ```bash
    bun run lint
    ```
 
-5. Format code:
+6. Format code:
    ```bash
    bun run format
    ```
 
-6. Type check:
+7. Type check:
    ```bash
    bun run typecheck
    ```
 
-7. Run tests:
+8. Run tests:
    ```bash
    bun run test
    ```
 
-8. Run tests with coverage:
+9. Run tests with coverage:
    ```bash
    bun run test:coverage
    ```

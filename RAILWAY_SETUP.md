@@ -74,15 +74,37 @@ Since you have multiple apps, you'll need to configure each one separately in Ra
 
 1. **Create a service** in Railway for each web app
 2. **Set Root Directory**: `apps/web/web-app-1` (or `web-app-2`)
-3. **Build Command**: `cd ../.. && bun install && bun run build --filter=@pocket-dimension/web-app-1`
-4. **Start Command**: Depends on your framework (e.g., `bun run start` or `node dist/index.js`)
+3. **Build Command**:
+   ```bash
+   cd ../.. && bun install && bun run build --filter=@pocket-dimension/web-app-1
+   ```
+   Or if Railway runs from the app directory:
+   ```bash
+   cd ../.. && bun install && cd apps/web/web-app-1 && bun run build
+   ```
+4. **Start Command**:
+   ```bash
+   bun run start
+   ```
+   This runs: `bun run dist/index.js`
 
 ### For Backend Apps
 
 1. **Create a service** in Railway for each backend app
 2. **Set Root Directory**: `apps/backend/backend-app-1` (or `backend-app-2`)
-3. **Build Command**: `cd ../.. && bun install && bun run build --filter=@pocket-dimension/backend-app-1`
-4. **Start Command**: `bun run start` or `node dist/index.js`
+3. **Build Command**:
+   ```bash
+   cd ../.. && bun install && bun run build --filter=@pocket-dimension/backend-app-1
+   ```
+   Or if Railway runs from the app directory:
+   ```bash
+   cd ../.. && bun install && cd apps/backend/backend-app-1 && bun run build
+   ```
+4. **Start Command**:
+   ```bash
+   bun run start
+   ```
+   This runs: `bun run dist/index.js`
 
 ## Railway Configuration Files
 
@@ -193,9 +215,36 @@ For a monorepo, I recommend:
 4. Add environment variables
 5. Test deployment
 
+## Build and Start Commands Reference
+
+All apps now have build and start commands configured:
+
+### Build Commands
+- **Local (from root)**: `bun run build --filter=@pocket-dimension/web-app-1`
+- **From app directory**: `bun run build` (compiles TypeScript to `dist/`)
+
+### Start Commands
+- **Development**: `bun run dev` (runs TypeScript directly)
+- **Production**: `bun run start` (runs compiled `dist/index.js`)
+
+### Available Scripts (per app)
+- `build` - Compiles TypeScript to JavaScript
+- `dev` - Runs in development mode (direct TypeScript execution)
+- `start` - Runs production build
+- `lint` - Runs Biome linter
+- `typecheck` - Type checks without building
+- `test` - Runs tests
+- `test:coverage` - Runs tests with coverage
+
 ## Troubleshooting
 
-- **Build fails**: Check that root directory and build commands are correct
+- **Build fails**:
+  - Check that root directory and build commands are correct
+  - Ensure `bun install` runs from monorepo root first
+  - Verify TypeScript config is correct
+- **Start fails**:
+  - Make sure build completed successfully (`dist/` directory exists)
+  - Check that `dist/index.js` exists after build
 - **Service not found**: Make sure you've created the service in Railway dashboard first
 - **Environment variables missing**: Add them in Railway dashboard → Service → Variables
-- **Monorepo issues**: Ensure build commands use Turborepo filters correctly
+- **Monorepo issues**: Ensure build commands use Turborepo filters correctly or run from app directory

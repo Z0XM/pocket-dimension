@@ -3,8 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "echo 'Build script not implemented'",
-    "dev": "echo 'Dev script not implemented'",
+    "build": "tsc",
+    "dev": "bun run src/index.ts",
+    "start": "bun run dist/index.js",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

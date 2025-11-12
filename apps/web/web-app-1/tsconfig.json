@@ -4,6 +4,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "preserve",
     "baseUrl": ".",
+    "outDir": "./dist",
     "paths": {
       "@pocket-dimension/shared": ["../../../packages/shared/src"],
       "@pocket-dimension/shared/*": ["../../../packages/shared/src/*"],
