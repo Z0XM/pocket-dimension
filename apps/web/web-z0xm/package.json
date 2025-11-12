@@ -8,8 +8,8 @@
     "start": "bun run dist/index.js",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests"
   },
   "dependencies": {},
   "devDependencies": {

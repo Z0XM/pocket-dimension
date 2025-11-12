@@ -32,11 +32,11 @@ This is the easiest and most common approach:
    - Select your repository
    - Railway will automatically detect your services
 
-3. **Configure Each Service**:
-   For each app (web-z0xm, web-app-2, backend-app-1, backend-app-2):
+3. **Configure Services**:
+   For each app (web-z0xm and backend-api):
    - Create a new service in Railway
    - Connect it to your GitHub repo
-   - Set the root directory (e.g., `apps/web/web-z0xm`)
+   - Set the root directory (e.g., `apps/web/web-z0xm` or `apps/backend/api`)
    - Configure build and start commands
    - Add environment variables
 
@@ -68,12 +68,10 @@ railway link
 
 ## Monorepo Configuration
 
-Since you have multiple apps, you'll need to configure each one separately in Railway:
+### For Web App
 
-### For Web Apps
-
-1. **Create a service** in Railway for each web app
-2. **Set Root Directory**: `apps/web/web-z0xm` (or `web-app-2`)
+1. **Create a service** in Railway for the web app
+2. **Set Root Directory**: `apps/web/web-z0xm`
 3. **Build Command**:
    ```bash
    cd ../.. && bun install && bun run build --filter=@pocket-dimension/web-z0xm
@@ -88,17 +86,17 @@ Since you have multiple apps, you'll need to configure each one separately in Ra
    ```
    This runs: `bun run dist/index.js`
 
-### For Backend Apps
+### For Backend API
 
-1. **Create a service** in Railway for each backend app
-2. **Set Root Directory**: `apps/backend/backend-app-1` (or `backend-app-2`)
+1. **Create a service** in Railway for the backend API
+2. **Set Root Directory**: `apps/backend/api`
 3. **Build Command**:
    ```bash
-   cd ../.. && bun install && bun run build --filter=@pocket-dimension/backend-app-1
+   cd ../.. && bun install && bun run build --filter=@pocket-dimension/backend-api
    ```
    Or if Railway runs from the app directory:
    ```bash
-   cd ../.. && bun install && cd apps/backend/backend-app-1 && bun run build
+   cd ../.. && bun install && cd apps/backend/api && bun run build
    ```
 4. **Start Command**:
    ```bash
@@ -108,7 +106,7 @@ Since you have multiple apps, you'll need to configure each one separately in Ra
 
 ## Railway Configuration Files
 
-You can create `railway.json` or `railway.toml` files in each app directory for Railway-specific settings:
+You can create `railway.json` or `railway.toml` file in the app directory for Railway-specific settings:
 
 ### Example: `apps/web/web-z0xm/railway.json`
 
@@ -129,11 +127,11 @@ You can create `railway.json` or `railway.toml` files in each app directory for 
 
 ## Environment Variables
 
-For each service in Railway:
+For the service in Railway:
 
 1. Go to the service settings
 2. Click "Variables"
-3. Add all variables from the corresponding `.env.example` file
+3. Add all variables from the `.env.example` file
 4. Set production values (never commit these!)
 
 ## Docker Deployment (Alternative)
@@ -142,9 +140,7 @@ If you prefer Docker (which you mentioned earlier):
 
 1. **Create Dockerfiles** for each app:
    - `apps/web/web-z0xm/Dockerfile`
-   - `apps/web/web-app-2/Dockerfile`
-   - `apps/backend/backend-app-1/Dockerfile`
-   - `apps/backend/backend-app-2/Dockerfile`
+   - `apps/backend/api/Dockerfile`
 
 2. **Railway will automatically detect Dockerfiles** and use them for deployment
 
@@ -185,13 +181,11 @@ We've already set up a GitHub Actions workflow (`.github/workflows/deploy.yml`) 
 3. **Add GitHub Secrets**:
    - Go to your GitHub repo → Settings → Secrets and variables → Actions
    - Add `RAILWAY_TOKEN` with your Railway token
-   - Add service IDs as secrets (e.g., `RAILWAY_WEB_APP_1_SERVICE_ID`)
-
-4. **Update deploy.yml** if needed to use multiple service IDs
+   - Add `RAILWAY_SERVICE_ID` with your primary service ID (or configure multiple services)
 
 ## Recommended Approach
 
-For a monorepo, I recommend:
+For this monorepo, I recommend:
 
 1. **Use GitHub Auto-Deploy** (easiest)
    - Connect repo in Railway dashboard
@@ -217,10 +211,11 @@ For a monorepo, I recommend:
 
 ## Build and Start Commands Reference
 
-All apps now have build and start commands configured:
+All apps have build and start commands configured:
 
 ### Build Commands
-- **Local (from root)**: `bun run build --filter=@pocket-dimension/web-z0xm`
+- **Web App (from root)**: `bun run build --filter=@pocket-dimension/web-z0xm`
+- **Backend API (from root)**: `bun run build --filter=@pocket-dimension/backend-api`
 - **From app directory**: `bun run build` (compiles TypeScript to `dist/`)
 
 ### Start Commands
