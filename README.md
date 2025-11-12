@@ -10,7 +10,7 @@ A monorepo setup using Turborepo, Bun, and Biome.
 pocket-dimension/
 ├── apps/
 │   ├── web/          # Web applications
-│   │   ├── web-app-1/
+│   │   ├── web-z0xm/
 │   │   └── web-app-2/
 │   └── backend/      # Backend applications
 │       ├── backend-app-1/
@@ -45,7 +45,7 @@ pocket-dimension/
 
    Or start a specific app:
    ```bash
-   cd apps/web/web-app-1
+   cd apps/web/web-z0xm
    bun run start
    ```
 
@@ -96,7 +96,7 @@ Each app has a `.env.example` file that documents the required environment varia
 
 ```bash
 # For web apps
-cp apps/web/web-app-1/.env.example apps/web/web-app-1/.env
+cp apps/web/web-z0xm/.env.example apps/web/web-z0xm/.env
 
 # For backend apps
 cp apps/backend/backend-app-1/.env.example apps/backend/backend-app-1/.env

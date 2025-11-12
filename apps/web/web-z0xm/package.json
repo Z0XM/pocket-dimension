@@ -1,5 +1,5 @@
 {
-  "name": "@pocket-dimension/web-app-1",
+  "name": "@pocket-dimension/web-z0xm",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -13,6 +13,8 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "latest",
     "typescript": "^5.7.2"
   }
 }

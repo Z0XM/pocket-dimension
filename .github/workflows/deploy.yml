@@ -36,4 +36,3 @@ jobs:
           #   web-app-2:${{ secrets.RAILWAY_WEB_APP_2_SERVICE_ID }}
           #   backend-app-1:${{ secrets.RAILWAY_BACKEND_APP_1_SERVICE_ID }}
           #   backend-app-2:${{ secrets.RAILWAY_BACKEND_APP_2_SERVICE_ID }}
-
