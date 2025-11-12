@@ -15,9 +15,6 @@ RUN bun install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Build the application
-RUN bun run build --filter=@pocket-dimension/web-z0xm
-
 # Set working directory to the app
 WORKDIR /app/apps/web/web-z0xm
 
