@@ -1,0 +1,17 @@
+{
+  "name": "@pocket-dimension/web-app-2",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Build script not implemented'",
+    "dev": "echo 'Dev script not implemented'",
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

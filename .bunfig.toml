@@ -1,0 +1,11 @@
+# Bun configuration file
+[install]
+# Use workspaces
+workspaces = true
+
+# Auto install peer dependencies
+peer = true
+
+# Production mode by default
+production = false
+

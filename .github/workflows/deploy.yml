@@ -1,0 +1,39 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.1.38
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build all workspaces
+        run: bun run build
+
+      - name: Deploy to Railway
+        uses: bervProject/railway-deploy@v1.0.0
+        with:
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          service: ${{ secrets.RAILWAY_SERVICE_ID }}
+          # Uncomment and configure if you have multiple services
+          # services: |
+          #   web-app-1:${{ secrets.RAILWAY_WEB_APP_1_SERVICE_ID }}
+          #   web-app-2:${{ secrets.RAILWAY_WEB_APP_2_SERVICE_ID }}
+          #   backend-app-1:${{ secrets.RAILWAY_BACKEND_APP_1_SERVICE_ID }}
+          #   backend-app-2:${{ secrets.RAILWAY_BACKEND_APP_2_SERVICE_ID }}
+

@@ -1,0 +1,35 @@
+{
+  "name": "pocket-dimension",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "turbo run build --filter='[HEAD^1]' && changeset publish",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "latest",
+    "@changesets/cli": "latest",
+    "@vitest/coverage-v8": "latest",
+    "husky": "latest",
+    "lint-staged": "latest",
+    "turbo": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "packageManager": "bun@1.1.38",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

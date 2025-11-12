@@ -1,0 +1,16 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "@pocket-dimension/shared": ["../../../packages/shared/src"],
+      "@pocket-dimension/shared/*": ["../../../packages/shared/src/*"],
+      "@pocket-dimension/env-validation": ["../../../packages/env-validation/src"],
+      "@pocket-dimension/env-validation/*": ["../../../packages/env-validation/src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "build"]
+}

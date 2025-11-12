@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "biomejs.biome",
+    "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-typescript-next",
+    "orta.vscode-jest",
+    "firsttris.vscode-jest-runner",
+    "usernamehw.errorlens",
+    "streetsidesoftware.code-spell-checker",
+    "editorconfig.editorconfig"
+  ],
+  "unwantedRecommendations": ["esbenp.prettier-vscode"]
+}
