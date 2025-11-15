@@ -1,0 +1,22 @@
+{
+  "name": "@pocket-dimension/reminder",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'No build step needed - Bun runs TypeScript directly'",
+    "dev": "bun --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage --passWithNoTests"
+  },
+  "dependencies": {
+    "twilio": "^5.3.5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "latest",
+    "typescript": "^5.7.2"
+  }
+}
