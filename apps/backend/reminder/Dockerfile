@@ -1,4 +1,4 @@
-FROM oven/bun:latest AS base
+FROM oven/bun:1.3.1 AS base
 WORKDIR /app
 
 # Copy package files for dependency installation
@@ -9,6 +9,9 @@ COPY apps/backend/api/package.json ./apps/backend/api/
 
 # Copy packages directory for workspace dependencies
 COPY packages ./packages
+
+# Copy workspace config files that Bun might need
+COPY turbo.json ./
 
 # Install dependencies
 RUN bun install --frozen-lockfile
