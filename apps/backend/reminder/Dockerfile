@@ -1,26 +1,49 @@
-FROM oven/bun:1.3.1 AS base
+FROM oven/bun:1-alpine AS base
+
 WORKDIR /app
 
-# Copy package files for dependency installation
-COPY package.json bun.lock ./
-COPY apps/backend/reminder/package.json ./apps/backend/reminder/
-COPY apps/web/web-z0xm/package.json ./apps/web/web-z0xm/
-COPY apps/backend/api/package.json ./apps/backend/api/
+# --- install stage: full dev dependencies (for builds, tests, etc.) ---
+FROM base AS install
 
-# Copy packages directory for workspace dependencies
-COPY packages ./packages
+RUN mkdir -p /temp/dev
+COPY . /temp/dev
+RUN cd /temp/dev && bun install --frozen-lockfile
 
-# Copy workspace config files that Bun might need
-COPY turbo.json ./
+# --- production dependencies only (no devDependencies) ---
+FROM base AS prod-deps
 
-# Install dependencies
-RUN bun install --frozen-lockfile
+RUN mkdir -p /temp/prod
+COPY . /temp/prod
+RUN cd /temp/prod && bun install --frozen-lockfile --production
 
-# Copy source code
+# --- prerelease: assemble source + dev deps, run workspace build if needed ---
+FROM base AS prerelease
+
+WORKDIR /app
+
+# use dev node_modules here so any build tooling is available
+COPY --from=install /temp/dev/node_modules ./node_modules
 COPY . .
 
-# Set working directory to the app
+ENV NODE_ENV=production
+
+# runs the package build script (currently a no-op, but keeps the flow consistent)
+RUN bun run --filter "@pocket-dimension/reminder" build
+
+# --- runner: minimal runtime image with only prod deps + this app's code ---
+FROM base AS runner
+
+WORKDIR /app
+
+# only production dependencies
+COPY --from=prod-deps /temp/prod/node_modules ./node_modules
+
+# only copy this app into the final image
+COPY --from=prerelease /app/apps/backend/reminder ./apps/backend/reminder
+
 WORKDIR /app/apps/backend/reminder
 
+USER bun
+
 # Run the script (Railway cron will execute this)
-CMD ["bun", "run", "start"]
+ENTRYPOINT [ "bun", "run", "start" ]
