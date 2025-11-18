@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "apps/backend/reminder/Dockerfile",
+    "dockerfilePath": "apps/backend/api/Dockerfile",
     "watchPatterns": [
       "src/**",
       "package.json",
@@ -18,7 +18,16 @@
     "numReplicas": 1,
     "sleepApplication": false,
     "useLegacyStacker": false,
+    "multiRegionConfig": {
+      "asia-southeast1-eqsg3a": {
+        "numReplicas": 1
+      }
+    },
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
+  },
+  "cron": {
+    "schedule": "30 17 * * *",
+    "timezone": "UTC"
   }
 }

@@ -50,10 +50,13 @@ TWILIO_CONTENT_TEMPLATE_SID=your_content_template_sid  # Required for trial acco
 2. Add a new service → Select "Cron Job"
 3. Set the **Root Directory** to: `apps/backend/reminder`
 4. Configure the cron schedule:
-   - Daily at 12 AM (midnight): `0 0 * * *`
-   - Daily at 12:01 AM: `1 0 * * *`
+   - **Daily at 11 PM IST**: `30 17 * * *` (5:30 PM UTC, since IST is UTC+5:30)
+   - Daily at 12 AM (midnight UTC): `0 0 * * *`
+   - Daily at 12:01 AM UTC: `1 0 * * *`
    - Or any other time you prefer
 5. Railway will automatically run `bun run start` which executes `src/index.ts`
+
+**Note**: The cron schedule is also configured in `railway.json` with `"schedule": "30 17 * * *"` for 11 PM IST. Railway will use this configuration when you set up the cron job service.
 
 The script will:
 - Calculate days since last birthday
@@ -158,14 +161,19 @@ Make sure your template matches this structure with variables `{{1}}`, `{{2}}`, 
 
 ## Railway Cron Schedule Examples
 
-- Daily at 12 AM (midnight): `0 0 * * *`
-- Daily at 12:01 AM: `1 0 * * *`
-- Daily at 9 AM: `0 9 * * *`
-- Every day at 8:30 AM: `30 8 * * *`
+- **Daily at 11 PM IST** (5:30 PM UTC): `30 17 * * *` ⭐ (Configured)
+- Daily at 12 AM (midnight UTC): `0 0 * * *`
+- Daily at 12:01 AM UTC: `1 0 * * *`
+- Daily at 9 AM UTC: `0 9 * * *`
+- Every day at 8:30 AM UTC: `30 8 * * *`
+
+**Time Zone Note**: Railway cron schedules use UTC. To convert IST to UTC:
+- IST = UTC + 5:30
+- 11 PM IST = 5:30 PM UTC (17:30 UTC)
 
 ## How It Works
 
-1. Railway cron executes the script daily at the configured time (recommended: 12 AM)
+1. Railway cron executes the script daily at the configured time (11 PM IST / 5:30 PM UTC)
 2. The script calculates:
    - Days since the last birthday (based on BIRTHDAY_DAY and BIRTHDAY_MONTH)
    - Days until the next birthday
