@@ -14,7 +14,7 @@ FROM base AS prod-deps
 
 RUN mkdir -p /temp/prod
 COPY . /temp/prod
-RUN cd /temp/prod && HUSKY=0 bun install --frozen-lockfile --production
+RUN cd /temp/prod && bun install --frozen-lockfile --production
 
 # --- prerelease: assemble source + dev deps, run workspace build if needed ---
 FROM base AS prerelease

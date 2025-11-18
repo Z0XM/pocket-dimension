@@ -15,7 +15,7 @@
     "changeset": "changeset",
     "version": "changeset version",
     "release": "turbo run build --filter='[HEAD^1]' && changeset publish",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "@biomejs/biome": "latest",
