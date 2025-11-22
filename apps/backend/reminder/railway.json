@@ -27,7 +27,7 @@
     "restartPolicyMaxRetries": 10
   },
   "cron": {
-    "schedule": "30 18 * * *",
+    "schedule": "40 18 * * *",
     "timezone": "UTC"
   }
 }
