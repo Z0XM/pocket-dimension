@@ -10,7 +10,7 @@
       "tsconfig.json",
       "../../package.json",
       "../../bun.lock",
-      "../../packages/**"
+      "../../shared/**"
     ]
   },
   "deploy": {

@@ -45,20 +45,20 @@ jobs:
       - name: Check for changesets
         if: github.event_name == 'pull_request'
         run: |
-          # Check if any packages were modified
-          CHANGED_PACKAGES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^(apps|packages)/' | cut -d'/' -f1-2 | sort -u || true)
-          if [ -n "$CHANGED_PACKAGES" ]; then
+          # Check if any shared or apps were modified
+          CHANGED_SHARED_OR_APPS=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^(apps|shared)/' | cut -d'/' -f1-2 | sort -u || true)
+          if [ -n "$CHANGED_SHARED_OR_APPS" ]; then
             CHANGESETS=$(find .changeset -name '*.md' -not -name 'README.md' 2>/dev/null | wc -l)
             if [ "$CHANGESETS" -eq 0 ]; then
-              echo "⚠️  Packages were modified but no changesets found."
+              echo "⚠️  Shared or apps were modified but no changesets found."
               echo "Please add a changeset by running: bun run changeset"
-              echo "Modified packages: $CHANGED_PACKAGES"
+              echo "Modified shared or apps were: $CHANGED_SHARED_OR_APPS"
               exit 1
             else
               echo "✅ Found $CHANGESETS changeset(s)"
             fi
           else
-            echo "ℹ️  No package changes detected, skipping changeset check"
+            echo "ℹ️  No shared or apps changes detected, skipping changeset check"
           fi
 
   build:
@@ -103,10 +103,9 @@ jobs:
         with:
           name: build-artifacts
           path: |
-            apps/*/dist
-            apps/*/build
-            apps/*/.next
-            packages/*/dist
+            apps/**/dist
+            apps/**/build
+            shared/**/dist
           retention-days: 1
 
   test:
