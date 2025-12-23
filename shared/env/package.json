@@ -16,7 +16,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
-    "@types/node": "latest",
+    "@types/bun": "latest",
     "typescript": "latest"
   }
 }
