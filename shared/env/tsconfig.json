@@ -5,11 +5,8 @@
     "declarationMap": true,
     "outDir": "./dist",
     "baseUrl": ".",
-    "types": ["node"],
-    "paths": {
-      "@pocket-dimension/shared": ["../../packages/shared/src"],
-      "@pocket-dimension/shared/*": ["../../packages/shared/src/*"]
-    }
+    "types": ["bun"],
+    "paths": {}
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

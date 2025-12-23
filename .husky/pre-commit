@@ -1,1 +1,11 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "Running typecheck..."
+bun run typecheck || exit 1
+
+echo "Running build..."
+bun run build || exit 1
+
+echo "Running lint-staged..."
 bunx lint-staged

@@ -7,7 +7,7 @@ const server = Bun.serve({
 
     // Root API endpoint
     if (url.pathname === "/" || url.pathname === "/api") {
-      return new Response(JSON.stringify({ message: "hello world" }), {
+      return new Response(JSON.stringify({ message: "Hello world" }), {
         headers: {
           "Content-Type": "application/json",
         },

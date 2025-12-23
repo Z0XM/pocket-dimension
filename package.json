@@ -15,7 +15,7 @@
     "changeset": "changeset",
     "version": "changeset version",
     "release": "turbo run build --filter='[HEAD^1]' && changeset publish",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "@biomejs/biome": "latest",
@@ -30,6 +30,6 @@
   "packageManager": "bun@1.1.38",
   "workspaces": [
     "apps/**",
-    "packages/**"
+    "shared/**"
   ]
 }

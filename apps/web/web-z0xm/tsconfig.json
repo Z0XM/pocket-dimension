@@ -2,15 +2,13 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["bun-types"],
+    "types": ["bun"],
     "jsx": "preserve",
     "baseUrl": ".",
     "outDir": "./dist",
     "paths": {
-      "@pocket-dimension/shared": ["../../../packages/shared/src"],
-      "@pocket-dimension/shared/*": ["../../../packages/shared/src/*"],
-      "@pocket-dimension/env-validation": ["../../../packages/env-validation/src"],
-      "@pocket-dimension/env-validation/*": ["../../../packages/env-validation/src/*"]
+      "@pocket-dimension/env": ["../../../shared/env/src"],
+      "@pocket-dimension/env/*": ["../../../shared/env/src/*"]
     }
   },
   "include": ["src/**/*"],
