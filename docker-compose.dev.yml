@@ -6,10 +6,12 @@ services:
       context: .
       dockerfile: apps/backend/api/Dockerfile
       target: install  # Use install stage for dev
+    container_name: pocket-dimension-backend-api-dev
     working_dir: /app/apps/backend/api
     volumes:
       - .:/app
       - /app/node_modules  # Prevent overwriting node_modules
+      - /app/apps/backend/api/node_modules  # Prevent overwriting app node_modules
     command: bun --watch src/index.ts
     ports:
       - "3001:3001"
@@ -18,16 +20,19 @@ services:
       - PORT=3001
     networks:
       - pocket-dimension-network
+    restart: unless-stopped
 
   web-z0xm:
     build:
       context: .
       dockerfile: apps/web/web-z0xm/Dockerfile
       target: install
+    container_name: pocket-dimension-web-z0xm-dev
     working_dir: /app/apps/web/web-z0xm
     volumes:
       - .:/app
       - /app/node_modules
+      - /app/apps/web/web-z0xm/node_modules  # Prevent overwriting app node_modules
     command: bun --watch src/index.ts
     ports:
       - "3000:3000"
@@ -36,6 +41,9 @@ services:
       - PORT=3000
     networks:
       - pocket-dimension-network
+    depends_on:
+      - backend-api
+    restart: unless-stopped
 
 networks:
   pocket-dimension-network:

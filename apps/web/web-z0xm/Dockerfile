@@ -38,6 +38,16 @@ WORKDIR /app
 # only production dependencies
 COPY --from=prod-deps /temp/prod/node_modules ./node_modules
 
+# copy workspace root files needed for workspace resolution
+COPY --from=prerelease /app/package.json ./package.json
+COPY --from=prerelease /app/bun.lock ./bun.lock
+COPY --from=prerelease /app/tsconfig.json ./tsconfig.json
+COPY --from=prerelease /app/tsconfig.base.json ./tsconfig.base.json
+COPY --from=prerelease /app/turbo.json ./turbo.json
+
+# copy shared dependencies (needed for @pocket-dimension/env)
+COPY --from=prerelease /app/shared ./shared
+
 # only copy this app into the final image
 COPY --from=prerelease /app/apps/web/web-z0xm ./apps/web/web-z0xm
 
