@@ -5,6 +5,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:api": "turbo run dev --filter=@pocket-dimension/backend-api",
+    "dev:app": "turbo run dev --filter=@pocket-dimension/web-z0xm",
     "lint": "turbo run lint",
     "format": "biome format --write .",
     "format:check": "biome format .",
