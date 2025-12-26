@@ -1,0 +1,14 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "baseUrl": ".",
+    "outDir": "./dist",
+    "paths": {
+      "@pocket-dimension/env": ["../../../shared/env/src"],
+      "@pocket-dimension/env/*": ["../../../shared/env/src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "build"]
+}
