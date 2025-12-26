@@ -1,4 +1,4 @@
-const PORT = Number(Bun.env.PORT) || 3001;
+const PORT = Number(Bun.env.PORT) || 5000;
 
 const server = Bun.serve({
   port: PORT,

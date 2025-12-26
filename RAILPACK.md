@@ -6,7 +6,7 @@ This project uses Railpack for deployment via Dokploy. Railpack automatically de
 
 This monorepo contains multiple services that should be deployed as separate applications in Dokploy:
 
-1. **Backend API** (`apps/backend/api`) - Port 3001
+1. **Backend API** (`apps/backend/api`) - Port 5000
 2. **Web App** (`apps/web/web-z0xm`) - Port 3000
 
 ## Dokploy Configuration
@@ -28,7 +28,7 @@ When setting up each service in Dokploy:
   ```
   RAILPACK_BUILD_CMD=bun install --frozen-lockfile && bun run --filter "@pocket-dimension/backend-api" build
   RAILPACK_START_CMD=cd apps/backend/api && bun run start
-  PORT=3001
+  PORT=5000
   NODE_ENV=production
   ```
 
@@ -58,7 +58,7 @@ Both services may need:
 ### Service-Specific Variables
 
 **Backend API:**
-- `PORT=3001` (default, can be overridden)
+- `PORT=5000` (default, can be overridden)
 
 **Web App:**
 - `PORT=3000` (default, can be overridden)
