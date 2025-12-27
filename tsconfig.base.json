@@ -10,8 +10,12 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@pocket-dimension/env": ["./shared/env/src"],
-      "@pocket-dimension/env/*": ["./shared/env/src/*"]
+      "@pocket-dimension/utils": ["./shared/utils/src"],
+      "@pocket-dimension/utils/*": ["./shared/utils/src/*"],
+      "@pocket-dimension/db": ["./shared/db/src"],
+      "@pocket-dimension/db/*": ["./shared/db/src/*"],
+      "@pocket-dimension/auth": ["./shared/auth/src"],
+      "@pocket-dimension/auth/*": ["./shared/auth/src/*"]
     }
   }
 }

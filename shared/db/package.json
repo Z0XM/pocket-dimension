@@ -1,0 +1,32 @@
+{
+  "name": "@pocket-dimension/db",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:drop": "drizzle-kit drop",
+    "auth:generate": "better-auth generate --config ./src/lib/auth.ts"
+  },
+  "dependencies": {
+    "better-auth": "^1.4.9",
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.16.3",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.16.0",
+    "@better-auth/cli": "^1.4.9",
+    "drizzle-kit": "^0.31.8",
+    "typescript": "latest"
+  }
+}

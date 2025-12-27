@@ -8,6 +8,7 @@
     "dev:api": "turbo run dev --filter=@pocket-dimension/backend-api",
     "dev:auth": "turbo run dev --filter=@pocket-dimension/auth-service",
     "dev:app": "turbo run dev --filter=@pocket-dimension/web-z0xm",
+    "db:studio": "turbo run db:studio --filter=@pocket-dimension/db",
     "lint": "turbo run lint",
     "format": "biome format --write .",
     "format:check": "biome format .",
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@biomejs/biome": "latest",
     "@changesets/cli": "latest",
+    "@types/bun": "^1.3.5",
     "@vitest/coverage-v8": "latest",
     "husky": "latest",
     "lint-staged": "latest",
@@ -34,5 +36,10 @@
   "workspaces": [
     "apps/**",
     "shared/**"
-  ]
+  ],
+  "dependencies": {
+    "@elysiajs/cors": "^1.4.0",
+    "better-auth": "^1.4.9",
+    "elysia": "^1.4.19"
+  }
 }

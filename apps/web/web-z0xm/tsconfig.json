@@ -6,10 +6,7 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "outDir": "./dist",
-    "paths": {
-      "@pocket-dimension/env": ["../../../shared/env/src"],
-      "@pocket-dimension/env/*": ["../../../shared/env/src/*"]
-    }
+    "paths": {}
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "build"]

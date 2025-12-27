@@ -8,7 +8,10 @@ export const baseEnvSchema = z.object({
  * Validate environment variables
  * @returns Validated environment variables
  */
-export function validateEnv<T extends z.ZodRawShape>(appEnvSchema: z.ZodObject<T>) {
+export function validateEnv<T extends z.ZodRawShape>(
+  appEnvSchema: z.ZodObject<T>,
+  env: typeof Bun.env
+) {
   const schema = baseEnvSchema.extend(appEnvSchema);
-  return schema.parse(Bun.env) as z.infer<typeof baseEnvSchema> & z.infer<z.ZodObject<T>>;
+  return schema.parse(env) as z.infer<typeof baseEnvSchema> & z.infer<z.ZodObject<T>>;
 }
