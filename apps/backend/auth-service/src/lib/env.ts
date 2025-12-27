@@ -1,3 +1,4 @@
+import { validateEnv } from "@pocket-dimension/utils";
 import { z } from "zod";
 
 const schema = z.object({
@@ -6,4 +7,4 @@ const schema = z.object({
   BETTER_AUTH_URL: z.url(),
 });
 
-export const env = Bun.env as z.infer<typeof schema>;
+export const env = validateEnv("auth-service", schema, Bun.env);

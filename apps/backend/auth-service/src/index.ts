@@ -8,19 +8,16 @@ import { authHandler } from "./routes/auth";
 const app = new Elysia()
   .onRequest(({ request }) => {
     const url = new URL(request.url);
-    console.log(`[${new Date().toISOString()}] ${request.method} ${url.pathname}`);
+    console.log(`${request.method} ${url.pathname}`);
   })
   .onAfterHandle(({ request, response }) => {
     const url = new URL(request.url);
     const status = response instanceof Response ? response.status : 200;
-    console.log(`[${new Date().toISOString()}] ${request.method} ${url.pathname} - ${status}`);
+    console.log(`${request.method} ${url.pathname} - ${status}`);
   })
   .onError(({ code, error, request }) => {
     const url = new URL(request.url);
-    console.error(
-      `[${new Date().toISOString()}] Error ${code} on ${request.method} ${url.pathname}:`,
-      error
-    );
+    console.error(`Error ${code} on ${request.method} ${url.pathname}:`, error);
   })
   .use(
     cors({
