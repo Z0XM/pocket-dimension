@@ -37,6 +37,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# TanStack Router
+**/routeTree.gen.ts
+
 # IDE
 # Keep .vscode settings but ignore user-specific files
 .vscode/settings.json.local

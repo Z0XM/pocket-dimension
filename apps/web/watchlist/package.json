@@ -14,6 +14,8 @@
     "@fontsource-variable/nunito-sans": "^5.2.7",
     "@phosphor-icons/react": "^2.1.10",
     "@tailwindcss/vite": "^4.1.17",
+    "@tanstack/react-router": "^1.144.0",
+    "@tanstack/router-devtools": "^1.144.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "react": "^19.2.0",
@@ -25,6 +27,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@tanstack/router-plugin": "^1.144.0",
+    "@tanstack/router-vite-plugin": "^1.144.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
