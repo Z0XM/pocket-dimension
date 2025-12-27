@@ -11,6 +11,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    port: Number(Bun.env.PORT) || 3000,
+  },
   build: {
     outDir: "dist",
     emptyOutDir: true,

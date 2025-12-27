@@ -21,7 +21,8 @@
       "recommended": true,
       "a11y": {
         "useKeyWithClickEvents": "off",
-        "noLabelWithoutControl": "off"
+        "noLabelWithoutControl": "off",
+        "useSemanticElements": "off"
       }
     }
   },
