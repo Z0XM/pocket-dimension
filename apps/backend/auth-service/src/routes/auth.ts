@@ -26,7 +26,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
     async ({ body, headers }) => {
       return await auth.api.signInEmail({
         body,
-        headers,
+        headers: new Headers(headers as Record<string, string>),
       });
     },
     {
@@ -46,7 +46,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
     async ({ body, headers }) => {
       return await auth.api.signInUsername({
         body,
-        headers,
+        headers: new Headers(headers as Record<string, string>),
       });
     },
     {
@@ -66,7 +66,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
     async ({ body, headers }) => {
       return await auth.api.updateUser({
         body,
-        headers,
+        headers: new Headers(headers as Record<string, string>),
       });
     },
     {
@@ -100,7 +100,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
   .get(
     "/session",
     async ({ headers }) => {
-      return await auth.api.getSession({ headers });
+      return await auth.api.getSession({ headers: new Headers(headers as Record<string, string>) });
     },
     {
       detail: {
@@ -113,7 +113,10 @@ export const authHandler = new Elysia({ name: "better-auth" })
   .post(
     "/reset-password",
     async ({ body, headers }) => {
-      return await auth.api.resetPassword({ body, headers });
+      return await auth.api.resetPassword({
+        body,
+        headers: new Headers(headers as Record<string, string>),
+      });
     },
     {
       body: t.Object({
@@ -130,7 +133,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
   .post(
     "/sign-out",
     async ({ headers }) => {
-      return await auth.api.signOut({ headers });
+      return await auth.api.signOut({ headers: new Headers(headers as Record<string, string>) });
     },
     {
       detail: {

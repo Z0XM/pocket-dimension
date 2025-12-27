@@ -5,9 +5,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:api": "turbo run dev --filter=@pocket-dimension/backend-api",
     "dev:auth": "turbo run dev --filter=@pocket-dimension/auth-service",
-    "dev:app": "turbo run dev --filter=@pocket-dimension/web-z0xm",
+    "dev:watchlist": "turbo run dev --filter=@pocket-dimension/watchlist",
     "db:studio": "turbo run db:studio --filter=@pocket-dimension/db",
     "lint": "turbo run lint",
     "format": "biome format --write .",

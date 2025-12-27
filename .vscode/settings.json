@@ -79,10 +79,7 @@
   "[jsonc]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
-
-  // ESLint (if needed in future, disabled for now since we use Biome)
-  "eslint.enable": false,
-
-  // Prettier (disabled since we use Biome)
-  "prettier.enable": false
+  "[css]": {
+    "editor.defaultFormatter": null
+  }
 }

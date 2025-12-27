@@ -6,7 +6,8 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": false
+    "ignoreUnknown": false,
+    "includes": ["**", "!**/*.css"]
   },
   "formatter": {
     "enabled": true,
@@ -17,7 +18,11 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "a11y": {
+        "useKeyWithClickEvents": "off",
+        "noLabelWithoutControl": "off"
+      }
     }
   },
   "javascript": {

@@ -55,3 +55,6 @@ next-env.d.ts
 # Changesets
 .changeset/*.md
 !.changeset/README.md
+
+
+.svelte-kit/
