@@ -7,6 +7,14 @@ const config = {
 
   kit: {
     adapter: adapter(),
+    alias: {
+      "$lib/*": "./src/lib/*",
+      "$routes/*": "./src/routes/*",
+      "$components/*": "./src/lib/components/*",
+      $components: "./src/lib/components",
+      "@pocket-dimension/utils": "../../../shared/utils/src",
+      "@pocket-dimension/utils/*": "../../../shared/utils/src/*",
+    },
   },
 };
 
