@@ -10,7 +10,7 @@ export const Route = createFileRoute("/auth/sign-in")({
 });
 
 function SignInPage() {
-  const { redirect } = Route.useSearch();
+  // const { redirect } = Route.useSearch();
   return (
     <PublicAuthRoute>
       <SignInForm redirect="/" />
