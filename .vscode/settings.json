@@ -15,7 +15,7 @@
 
   // File associations
   "files.associations": {
-    "*.css": "css",
+    "*.css": "tailwindcss",
     "*.scss": "scss"
   },
 

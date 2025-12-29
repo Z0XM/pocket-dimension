@@ -1,31 +1,8 @@
-import path from "node:path";
+import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
-import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [tanstackRouter(), react(), tailwindcss()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  server: {
-    port: Number(Bun.env.PORT) || 3000,
-  },
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-    sourcemap: false,
-    minify: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ["react", "react-dom"],
-        },
-      },
-    },
-  },
+  server: { port: Number(Bun.env.PORT) || 3000 },
+  plugins: [tailwindcss(), sveltekit()],
 });

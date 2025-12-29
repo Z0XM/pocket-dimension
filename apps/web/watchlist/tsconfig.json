@@ -1,10 +1,14 @@
 {
-  "files": [],
-  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
+  "extends": ["../../../tsconfig.base.json", "./.svelte-kit/tsconfig.json"],
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "rewriteRelativeImportExtensions": true,
+    "allowJs": false,
+    "resolveJsonModule": true,
+    "sourceMap": true
   }
+  // Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
+  // except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
+  //
+  // To make changes to top-level options such as include and exclude, we recommend extending
+  // the generated config; see https://svelte.dev/docs/kit/configuration#typescript
 }
