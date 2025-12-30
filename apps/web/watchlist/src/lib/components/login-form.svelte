@@ -1,9 +1,11 @@
 <script lang="ts">
 import type { ComponentProps } from "svelte";
+import { goto } from "$app/navigation";
 import { Button } from "$components/ui/button/index.js";
 import * as Card from "$components/ui/card/index.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "$components/ui/field/index.js";
 import { Input } from "$components/ui/input/index.js";
+import { authClient } from "$lib/auth-client.js";
 
 const id = $props.id();
 
@@ -11,6 +13,36 @@ let {
   signupRoute = "/sign-up",
   ...restProps
 }: ComponentProps<typeof Card.Root> & { signupRoute: string } = $props();
+
+let email = $state("");
+let password = $state("");
+let error = $state<string | null>(null);
+let loading = $state(false);
+
+async function handleSubmit(e: SubmitEvent) {
+  e.preventDefault();
+  error = null;
+  loading = true;
+
+  try {
+    const result = await authClient.signIn.email({
+      email,
+      password,
+    });
+
+    if (result.error) {
+      error = result.error.message || "Invalid email or password";
+      loading = false;
+      return;
+    }
+
+    // Redirect to list page on success
+    await goto("/list");
+  } catch (err) {
+    error = err instanceof Error ? err.message : "An unexpected error occurred";
+    loading = false;
+  }
+}
 </script>
 
 <Card.Root {...restProps} class="mx-auto w-full max-w-sm">
@@ -19,11 +51,23 @@ let {
 		<Card.Description>Enter your email below to login to your account</Card.Description>
 	</Card.Header>
 	<Card.Content>
-		<form>
+		<form onsubmit={handleSubmit}>
+			{#if error}
+				<div class="mb-4 rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+					{error}
+				</div>
+			{/if}
 			<FieldGroup>
 				<Field>
 					<FieldLabel for="email-{id}">Email</FieldLabel>
-					<Input id="email-{id}" type="email" placeholder="m@example.com" required />
+					<Input
+						id="email-{id}"
+						type="email"
+						placeholder="m@example.com"
+						required
+						bind:value={email}
+						disabled={loading}
+					/>
 				</Field>
 				<Field>
 					<div class="flex items-center">
@@ -32,10 +76,18 @@ let {
 							Forgot your password?
 						</a>
 					</div>
-					<Input id="password-{id}" type="password" required />
+					<Input
+						id="password-{id}"
+						type="password"
+						required
+						bind:value={password}
+						disabled={loading}
+					/>
 				</Field>
 				<Field>
-					<Button type="submit" class="w-full">Login</Button>
+					<Button type="submit" class="w-full" disabled={loading}>
+						{loading ? "Logging in..." : "Login"}
+					</Button>
 					<!-- <Button variant="outline" class="w-full">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 							<path

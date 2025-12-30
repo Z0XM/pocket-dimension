@@ -1,11 +1,13 @@
 <script lang="ts">
-	import "./layout.css";
-	import { ModeWatcher } from "mode-watcher";
-	import favicon from "$lib/assets/favicon.svg";
+import "../app.css";
+import { ModeWatcher } from "mode-watcher";
+import { Toaster } from "$components/ui/sonner/index.js";
+import favicon from "$lib/assets/favicon.svg";
 
-	const { children } = $props();
+const { children } = $props();
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 <ModeWatcher />
+<Toaster />
 {@render children()}
