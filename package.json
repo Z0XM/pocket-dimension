@@ -5,8 +5,12 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "build:auth": "turbo run build --filter=@pocket-dimension/auth-service",
+    "build:watchlist:react": "turbo run build --filter=@pocket-dimension/watchlist-react",
+    "build:watchlist:svelte": "turbo run build --filter=@pocket-dimension/watchlist-svelte",
     "dev:auth": "turbo run dev --filter=@pocket-dimension/auth-service",
     "dev:watchlist:react": "turbo run dev --filter=@pocket-dimension/watchlist-react",
+    "dev:watchlist:svelte": "turbo run dev --filter=@pocket-dimension/watchlist-svelte",
     "db:studio": "turbo run db:studio --filter=@pocket-dimension/db",
     "lint": "turbo run lint",
     "format": "biome format --write .",

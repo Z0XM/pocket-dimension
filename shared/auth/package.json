@@ -17,6 +17,6 @@
     "better-auth": "^1.4.9"
   },
   "devDependencies": {
-    "@better-auth/cli": "^1.4.9"
+    "@better-auth/cli": "^1.4.10"
   }
 }
