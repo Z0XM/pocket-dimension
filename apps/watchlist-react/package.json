@@ -1,5 +1,5 @@
 {
-  "name": "@pocket-dimension/watchlist",
+  "name": "@pocket-dimension/watchlist-react",
   "private": true,
   "type": "module",
   "scripts": {
