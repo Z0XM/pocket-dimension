@@ -4,6 +4,8 @@
 @import "@fontsource-variable/nunito-sans";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant light (&:is(.light *));
+@custom-variant system (&:is(.system *));
 
 :root {
     --background: oklch(1 0 0);

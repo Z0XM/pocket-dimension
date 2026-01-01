@@ -53,7 +53,7 @@ const setupPreferredListener = createClientOnlyFn(() => {
 const themeScript = (() => {
   function themeFn() {
     try {
-      const storedTheme = localStorage.getItem(themeStorageKey) || "system";
+      const storedTheme = localStorage.getItem("watchlist-ui-theme") || "system";
       const validTheme = ["light", "dark", "system"].includes(storedTheme) ? storedTheme : "system";
 
       if (validTheme === "system") {
@@ -104,7 +104,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   return (
     <ThemeContext value={{ userTheme, appTheme, setTheme }}>
       <ScriptOnce>{themeScript}</ScriptOnce>
-
       {children}
     </ThemeContext>
   );
