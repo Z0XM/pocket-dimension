@@ -44,8 +44,8 @@
         "typescript": "latest",
       },
     },
-    "apps/web/watchlist": {
-      "name": "@pocket-dimension/watchlist",
+    "apps/watchlist-svelte": {
+      "name": "@pocket-dimension/watchlist-svelte",
       "version": "0.0.1",
       "dependencies": {
         "@fontsource-variable/nunito-sans": "^5.2.7",
@@ -429,7 +429,7 @@
 
     "@pocket-dimension/utils": ["@pocket-dimension/utils@workspace:shared/utils"],
 
-    "@pocket-dimension/watchlist": ["@pocket-dimension/watchlist@workspace:apps/web/watchlist"],
+    "@pocket-dimension/watchlist-svelte": ["@pocket-dimension/watchlist-svelte@workspace:apps/watchlist-svelte"],
 
     "@polka/url": ["@polka/url@1.0.0-next.29", "", {}, "sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww=="],
 
