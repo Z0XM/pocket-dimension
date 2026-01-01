@@ -19,6 +19,10 @@
     "*.scss": "scss"
   },
 
+  "files.readonlyInclude": {
+    "**/routeTree.gen.ts": true
+  },
+
   // TypeScript settings
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
@@ -45,7 +49,8 @@
     "**/build": true,
     "**/.next": true,
     "**/coverage": true,
-    "**/bun.lock": true
+    "**/bun.lock": true,
+    "**/routeTree.gen.ts": true
   },
 
   // Watcher exclusions
@@ -57,7 +62,8 @@
     "**/dist/**": true,
     "**/build/**": true,
     "**/.next/**": true,
-    "**/coverage/**": true
+    "**/coverage/**": true,
+    "**/routeTree.gen.ts": true
   },
 
   // Biome settings

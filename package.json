@@ -6,7 +6,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "dev:auth": "turbo run dev --filter=@pocket-dimension/auth-service",
-    "dev:watchlist": "turbo run dev --filter=@pocket-dimension/watchlist",
+    "dev:watchlist:react": "turbo run dev --filter=@pocket-dimension/watchlist-react",
     "db:studio": "turbo run db:studio --filter=@pocket-dimension/db",
     "lint": "turbo run lint",
     "format": "biome format --write .",
