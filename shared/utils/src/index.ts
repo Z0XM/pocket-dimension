@@ -15,5 +15,5 @@ export function validateEnv<T extends z.ZodRawShape>(
 ) {
   console.log(`Validating environment variables from ${source}`);
   const schema = baseEnvSchema.extend(appEnvSchema.shape);
-  return schema.parse(env) as z.infer<typeof baseEnvSchema> & z.infer<z.ZodObject<T>>;
+  return schema.parse(env);
 }

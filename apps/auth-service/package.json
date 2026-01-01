@@ -16,7 +16,7 @@
     "@pocket-dimension/auth": "workspace:*",
     "@pocket-dimension/db": "workspace:*",
     "elysia": "^1.4.19",
-    "zod": "^4.2.1"
+    "zod": "^4.3.4"
   },
   "devDependencies": {
     "@types/bun": "latest",
