@@ -21,7 +21,7 @@ const app = new Elysia()
   })
   .use(
     cors({
-      origin: "*",
+      origin: true, // Allow all origins (wildcard behavior) while supporting credentials
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       credentials: true,
       allowedHeaders: ["Content-Type", "Authorization"],

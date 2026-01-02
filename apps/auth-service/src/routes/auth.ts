@@ -5,7 +5,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
   .post(
     "/sign-up/email",
     async ({ body }) => {
-      return await auth.api.signUpEmail({ body });
+      return await auth.api.signUpEmail({ body, asResponse: true });
     },
     {
       body: t.Object({
@@ -25,6 +25,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
     "/sign-in/email",
     async ({ body, headers }) => {
       return await auth.api.signInEmail({
+        asResponse: true,
         body,
         headers: new Headers(headers as Record<string, string>),
       });
@@ -45,6 +46,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
     "/sign-in/username",
     async ({ body, headers }) => {
       return await auth.api.signInUsername({
+        asResponse: true,
         body,
         headers: new Headers(headers as Record<string, string>),
       });
@@ -67,6 +69,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
       return await auth.api.updateUser({
         body,
         headers: new Headers(headers as Record<string, string>),
+        asResponse: true,
       });
     },
     {
@@ -84,7 +87,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
   .post(
     "/is-username-available",
     async ({ body }) => {
-      return await auth.api.isUsernameAvailable({ body });
+      return await auth.api.isUsernameAvailable({ body, asResponse: true });
     },
     {
       body: t.Object({
@@ -116,6 +119,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
       return await auth.api.resetPassword({
         body,
         headers: new Headers(headers as Record<string, string>),
+        asResponse: true,
       });
     },
     {
@@ -133,7 +137,10 @@ export const authHandler = new Elysia({ name: "better-auth" })
   .post(
     "/sign-out",
     async ({ headers }) => {
-      return await auth.api.signOut({ headers: new Headers(headers as Record<string, string>) });
+      return await auth.api.signOut({
+        asResponse: true,
+        headers: new Headers(headers as Record<string, string>),
+      });
     },
     {
       detail: {
