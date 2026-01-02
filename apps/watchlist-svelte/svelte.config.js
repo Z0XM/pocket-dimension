@@ -12,10 +12,6 @@ const config = {
       "$routes/*": "./src/routes/*",
       "$components/*": "./src/lib/components/*",
       $components: "./src/lib/components",
-      "@pocket-dimension/utils": "../../shared/utils/src",
-      "@pocket-dimension/utils/*": "../../shared/utils/src/*",
-      "@pocket-dimension/auth": "../../shared/auth/src",
-      "@pocket-dimension/auth/*": "../../shared/auth/src/*",
     },
   },
 };

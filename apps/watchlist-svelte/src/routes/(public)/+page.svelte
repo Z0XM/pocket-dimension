@@ -1,7 +1,7 @@
 <script lang="ts">
-import * as Card from "$components/ui/card/index.js";
+import LogoutButton from "$components/logout-button.svelte";
 </script>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-  Home Page
+<div class="">
+  <LogoutButton class='absolute top-4 right-4'/>
 </div>

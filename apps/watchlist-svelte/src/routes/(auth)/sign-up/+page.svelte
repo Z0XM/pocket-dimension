@@ -49,7 +49,7 @@ async function handleSubmit(e: SubmitEvent) {
     }
 
     // Redirect to list page on success
-    await goto("/list");
+    await goto("/");
   } catch (err) {
     console.error(err);
     error = "Something went wrong!";

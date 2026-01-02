@@ -2,19 +2,27 @@
   "name": "@pocket-dimension/auth",
   "version": "0.0.0",
   "private": true,
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --format esm --target bun --external better-auth --external @pocket-dimension/utils --external @pocket-dimension/db",
+    "clean": "rm -rf dist",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
     "auth:generate": "better-auth generate --config ./src/index.ts",
     "auth:secret": "better-auth secret"
   },
   "dependencies": {
-    "better-auth": "^1.4.9"
+    "@pocket-dimension/db": "workspace:*",
+    "@pocket-dimension/utils": "workspace:*",
+    "better-auth": "^1.4.9",
+    "zod": "^4.3.4"
   },
   "devDependencies": {
     "@better-auth/cli": "^1.4.10"

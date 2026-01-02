@@ -1,8 +1,10 @@
 import { relations } from "drizzle-orm";
-import { boolean, index, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, pgEnum, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 import { id, timestamps } from "./common";
 
 export const authSchema = pgSchema("auth");
+
+export const userRole = pgEnum("user_role", ["user", "contributor", "admin"]);
 
 export const user = authSchema.table("user", {
   id,
@@ -13,6 +15,7 @@ export const user = authSchema.table("user", {
   image: text("image"),
   username: text("username").unique(),
   displayUsername: text("display_username"),
+  role: userRole("role").default("user").notNull(),
 });
 
 const userId = text("user_id")
