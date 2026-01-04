@@ -1,11 +1,13 @@
 import { sql } from "drizzle-orm";
-import { text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { timestamp, uuid } from "drizzle-orm/pg-core";
 import * as auth from "./auth";
 
 export const timestamps = {
-  createdAt: timestamp("created_at").notNull(),
+  createdAt: timestamp("created_at")
+    .$default(() => sql`now()`)
+    .notNull(),
   updatedAt: timestamp("updated_at")
-    .$onUpdate(() => new Date())
+    .$onUpdate(() => sql`now()`)
     .notNull(),
 };
 

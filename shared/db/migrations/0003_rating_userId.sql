@@ -1,0 +1,4 @@
+ALTER TABLE "watchlist"."watch_item_ratings" DROP CONSTRAINT "watch_item_ratings_watch_item_id_rating_unique";--> statement-breakpoint
+ALTER TABLE "watchlist"."watch_item_ratings" ADD COLUMN "user_id" uuid NOT NULL;--> statement-breakpoint
+ALTER TABLE "watchlist"."watch_item_ratings" ADD CONSTRAINT "watch_item_ratings_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "watchlist"."watch_item_ratings" ADD CONSTRAINT "watch_item_ratings_watch_item_id_user_id_unique" UNIQUE("watch_item_id","user_id");

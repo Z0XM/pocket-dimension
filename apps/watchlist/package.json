@@ -35,9 +35,10 @@
   "dependencies": {
     "@fontsource-variable/nunito-sans": "^5.2.7",
     "@pocket-dimension/auth": "workspace:*",
-    "@pocket-dimension/utils": "workspace:*",
     "@pocket-dimension/db": "workspace:*",
+    "@pocket-dimension/utils": "workspace:*",
     "better-auth": "^1.4.10",
+    "drizzle-orm": "^0.45.1",
     "mode-watcher": "^1.1.0",
     "svelte-sonner": "1.0.7"
   }

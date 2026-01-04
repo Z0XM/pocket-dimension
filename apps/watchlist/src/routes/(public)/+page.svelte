@@ -1,7 +1,14 @@
 <script lang="ts">
-import Overlay from "$lib/components/overlay.svelte";
+
+import type { PageProps } from './$types';
+
+let { data }: PageProps = $props();
+
+$effect(() => {
+  console.log("Page data", data);
+})
 </script>
 
 <div class="">
-  <Overlay />
+
 </div>

@@ -8,6 +8,34 @@
       "when": 1767432097104,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1767510423024,
+      "tag": "0001_minor_watchlist",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1767510730031,
+      "tag": "0002_numeric_rating",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1767511198853,
+      "tag": "0003_rating_userId",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1767511665679,
+      "tag": "0004_removed_default_recommendation",
+      "breakpoints": true
     }
   ]
 }

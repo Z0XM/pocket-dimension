@@ -1,11 +1,16 @@
 import { relations } from "drizzle-orm";
-import { boolean, integer, pgSchema, text, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, numeric, pgSchema, text, unique, uuid } from "drizzle-orm/pg-core";
 import * as auth from "./auth";
 import { actionsByUser, id, timestamps } from "./common";
 
 export const watchlistSchema = pgSchema("watchlist");
 
 export const watchItemType = watchlistSchema.enum("watch_item_type", ["movie", "series", "shorts"]);
+export const watchItemReleaseStatus = watchlistSchema.enum("watch_item_release_status", [
+  "released",
+  "on-going",
+  "coming-soon",
+]);
 
 export const watchItems = watchlistSchema.table(
   "watch_items",
@@ -19,6 +24,7 @@ export const watchItems = watchlistSchema.table(
     languageId: uuid("language_id")
       .notNull()
       .references(() => watchLanguages.id, { onDelete: "cascade" }),
+    releaseStatus: watchItemReleaseStatus("release_status").default("released"),
   },
   (table) => [unique("watch_items_title_unique").on(table.title)]
 );
@@ -73,6 +79,13 @@ export const watchRecommendations = watchlistSchema.enum("watch_recommendations"
   "skip_it",
 ]);
 
+export const watchProgressStatus = watchlistSchema.enum("watch_progress_status", [
+  "to_watch",
+  "watching",
+  "watched",
+  "dropped",
+]);
+
 export const watchItemRatings = watchlistSchema.table(
   "watch_item_ratings",
   {
@@ -82,14 +95,20 @@ export const watchItemRatings = watchlistSchema.table(
     watchItemId: uuid("watch_item_id")
       .notNull()
       .references(() => watchItems.id, { onDelete: "cascade" }),
-    rating: integer("rating"),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    rating: numeric("rating"),
     infinity: boolean("infinity").default(false),
     shitty: boolean("shitty").default(false),
-    recommendation: watchRecommendations("recommendation").default("go_for_it"),
+    recommendation: watchRecommendations("recommendation"),
     review: text("review").default(""),
+    progressStatus: watchProgressStatus("progress_status").default("watched"),
+    droppedAtSeason: integer("dropped_at_season"),
+    droppedAtEpisode: integer("dropped_at_episode"),
   },
   (table) => [
-    unique("watch_item_ratings_watch_item_id_rating_unique").on(table.watchItemId, table.rating),
+    unique("watch_item_ratings_watch_item_id_user_id_unique").on(table.watchItemId, table.userId),
   ]
 );
 
@@ -133,6 +152,10 @@ export const watchItemRatingRelations = relations(watchItemRatings, ({ one }) =>
   watchItem: one(watchItems, {
     fields: [watchItemRatings.watchItemId],
     references: [watchItems.id],
+  }),
+  user: one(auth.user, {
+    fields: [watchItemRatings.userId],
+    references: [auth.user.id],
   }),
   createdBy: one(auth.user, {
     fields: [watchItemRatings.createdById],

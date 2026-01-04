@@ -1,9 +1,11 @@
 <script lang="ts">
   import LogoutButton from "$components/logout-button.svelte";
   import { authClient } from "$lib/auth-client";
-  import { UserRoundIcon } from '@lucide/svelte'
+  import { LogInIcon, UserRoundIcon } from '@lucide/svelte'
   import { Button } from '$components/ui/button';
   import { Badge } from '$components/ui/badge';
+  import { goto } from "$app/navigation";
+  import { page } from "$app/state";
 
 
   const session = authClient.useSession();
@@ -24,6 +26,11 @@
     <Button variant="outline" class="flex items-center gap-2">
       <UserRoundIcon size={16} /> {user.username}
     </Button>
+    <LogoutButton class=''/>
   {/if}
-  <LogoutButton class=''/>
+  {#if !user && !page.route.id?.startsWith("/(auth)/")}
+    <Button variant="outline" class="flex items-center gap-2" onclick={() => goto("/login")}>
+      <LogInIcon size={16} /> Login
+    </Button>
+  {/if}
 </div>

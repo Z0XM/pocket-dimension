@@ -1,0 +1,1 @@
+ALTER TABLE "watchlist"."watch_item_ratings" ALTER COLUMN "recommendation" DROP DEFAULT;
