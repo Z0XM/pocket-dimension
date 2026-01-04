@@ -1,4 +1,5 @@
 import { auth } from "@pocket-dimension/auth";
+import type { schema } from "@pocket-dimension/db";
 import { redirect } from "@sveltejs/kit";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
@@ -12,7 +13,7 @@ export async function handle({ event, resolve }) {
   // Make session and user available on server
   if (session) {
     event.locals.session = session.session;
-    event.locals.user = session.user;
+    event.locals.user = session.user as typeof schema.user.$inferSelect;
   }
 
   if (event.route.id?.startsWith("/(auth)/")) {

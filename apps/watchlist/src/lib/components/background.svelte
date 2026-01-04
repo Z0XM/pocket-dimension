@@ -7,41 +7,153 @@ interface Props {
 
 const { enableFilter = true }: Props = $props();
 
+const animations = {
+	radialWave: () => {
+		const tiles = document.querySelectorAll(".tile");
+		const svgCenterX = 1762 / 2;
+		const svgCenterY = 1042 / 2;
+		const maxDistance = Math.sqrt(svgCenterX ** 2 + svgCenterY ** 2);
+
+		tiles.forEach((tile) => {
+			const rect = tile as SVGRectElement;
+			const x = parseFloat(rect.getAttribute("x") || "0") + 43; // tile center x (half of 86)
+			const y = parseFloat(rect.getAttribute("y") || "0") + 39; // tile center y (half of 78)
+
+			// Calculate distance from center
+			const distance = Math.sqrt((x - svgCenterX) ** 2 + (y - svgCenterY) ** 2);
+
+			// Normalize distance (0 to 1) and convert to delay (0 to 2 seconds)
+			const normalizedDistance = distance / maxDistance;
+			const delay = normalizedDistance * 2;
+
+			// Set animation delay
+			rect.style.animationDelay = `${delay}s`;
+		});
+	},
+	leftToRight:() => {
+		const tiles = document.querySelectorAll(".tile");
+		const svgWidth = 1762;
+
+		tiles.forEach((tile) => {
+			const rect = tile as SVGRectElement;
+			const x = parseFloat(rect.getAttribute("x") || "0") + 43;
+
+			// Normalize x position (0 to 1) and convert to delay
+			const normalizedX = x / svgWidth;
+			const delay = normalizedX * 4; // 4 second sweep
+
+			rect.style.animationDelay = `${delay}s`;
+		});
+	},
+	topToBottom:() => {
+		const tiles = document.querySelectorAll(".tile");
+		const svgHeight = 1042;
+
+		tiles.forEach((tile) => {
+			const rect = tile as SVGRectElement;
+			const y = parseFloat(rect.getAttribute("y") || "0") + 39;
+
+			const normalizedY = y / svgHeight;
+			const delay = normalizedY * 4;
+
+			rect.style.animationDelay = `${delay}s`;
+		});
+	},
+	diagonalWave:() => {
+		const tiles = document.querySelectorAll(".tile");
+		const svgWidth = 1762;
+		const svgHeight = 1042;
+
+		tiles.forEach((tile) => {
+			const rect = tile as SVGRectElement;
+			const x = parseFloat(rect.getAttribute("x") || "0") + 43;
+			const y = parseFloat(rect.getAttribute("y") || "0") + 39;
+
+			// Diagonal distance from top-left
+			const diagonal = (x + y) / (svgWidth + svgHeight);
+			const delay = diagonal * 4;
+
+			rect.style.animationDelay = `${delay}s`;
+		});
+	},
+	checkerboard:() => {
+		const tiles = document.querySelectorAll(".tile");
+
+		tiles.forEach((tile, index) => {
+			const rect = tile as SVGRectElement;
+			const x = parseFloat(rect.getAttribute("x") || "0");
+			const y = parseFloat(rect.getAttribute("y") || "0");
+
+			// Calculate grid position
+			const col = Math.floor(x / 86);
+			const row = Math.floor(y / 78);
+			const isEven = (col + row) % 2 === 0;
+
+			// Alternate delay for checkerboard effect
+			const delay = isEven ? 0 : 2;
+
+			rect.style.animationDelay = `${delay}s`;
+		});
+	},
+	spiral:() => {
+		const tiles = document.querySelectorAll(".tile");
+		const svgCenterX = 1762 / 2;
+		const svgCenterY = 1042 / 2;
+
+		tiles.forEach((tile) => {
+			const rect = tile as SVGRectElement;
+			const x = parseFloat(rect.getAttribute("x") || "0") + 43;
+			const y = parseFloat(rect.getAttribute("y") || "0") + 39;
+
+			// Calculate angle and distance
+			const dx = x - svgCenterX;
+			const dy = y - svgCenterY;
+			const angle = Math.atan2(dy, dx);
+			const distance = Math.sqrt(dx ** 2 + dy ** 2);
+
+			// Combine angle and distance for spiral effect
+			const delay = ((angle + Math.PI) / (2 * Math.PI) + distance / 2000) % 1 * 4;
+
+			rect.style.animationDelay = `${delay}s`;
+		});
+	},
+	randomStagger:() => {
+		const tiles = document.querySelectorAll(".tile");
+
+		tiles.forEach((tile) => {
+			const rect = tile as SVGRectElement;
+			const x = parseFloat(rect.getAttribute("x") || "0");
+			const y = parseFloat(rect.getAttribute("y") || "0");
+
+			// Use position as seed for pseudo-random
+			const seed = (x * 7919 + y * 9973) % 1000;
+			const delay = (seed / 1000) * 4;
+
+			rect.style.animationDelay = `${delay}s`;
+		});
+	},
+}
+
 onMount(() => {
-  const tiles = document.querySelectorAll(".tile");
-  const svgCenterX = 1762 / 2;
-  const svgCenterY = 1042 / 2;
-  const maxDistance = Math.sqrt(svgCenterX ** 2 + svgCenterY ** 2);
-
-  tiles.forEach((tile) => {
-    const rect = tile as SVGRectElement;
-    const x = parseFloat(rect.getAttribute("x") || "0") + 43; // tile center x (half of 86)
-    const y = parseFloat(rect.getAttribute("y") || "0") + 39; // tile center y (half of 78)
-
-    // Calculate distance from center
-    const distance = Math.sqrt((x - svgCenterX) ** 2 + (y - svgCenterY) ** 2);
-
-    // Normalize distance (0 to 1) and convert to delay (0 to 2 seconds)
-    const normalizedDistance = distance / maxDistance;
-    const delay = normalizedDistance * 2;
-
-    // Set animation delay
-    rect.style.animationDelay = `${delay}s`;
-  });
+	const animationKeys = Object.keys(animations);
+	const randomAnimation = animationKeys[Math.floor(Math.random() * animationKeys.length)];
+	const selectedAnimation = animations[randomAnimation as keyof typeof animations];
+	selectedAnimation();
 });
+
 </script>
 
 <div class="background-container">
 	<svg
 		width="1762"
 		height="1042"
-		viewBox="0 0 1762 1042"
+		viewBox="-100 -100 1862 1142"
 		fill="none"
 		xmlns="http://www.w3.org/2000/svg"
 		class="background-svg {enableFilter ? 'filter-enabled' : ''}"
-		preserveAspectRatio="xMidYMid slice"
+		preserveAspectRatio="xMidYMid meet"
 	>
-		<rect width="1762" height="1042" fill="#040211" />
+		<rect x="0" y="0" width="1762" height="1042" fill="#040211" />
 		<rect x="2" y="2" width="86" height="78" rx="4" fill="#050210" class="tile" />
 		<rect x="90" y="2" width="86" height="78" rx="4" fill="#070312" class="tile" />
 		<rect x="178" y="2" width="86" height="78" rx="4" fill="#070314" class="tile" />
@@ -365,21 +477,12 @@ onMount(() => {
 
 	:global(rect.tile) {
 		transform-origin: center;
-		animation: radialWave 4s ease-out infinite;
+		animation: radialWave 6s ease-out infinite;
 	}
 
 	@keyframes radialWave {
-		0% {
-			transform: scale(1);
-			opacity: 1;
-		}
-		50% {
-			transform: scale(1.1);
-			opacity: 0.9;
-		}
-		100% {
-			transform: scale(1);
-			opacity: 1;
-		}
+		0%, 100% { transform: scale(1); opacity: 1; transform: brightness(2); }
+		50% { transform: scale(1.2); opacity: 0.25; transform: brightness(0.5); }
 	}
+
 </style>

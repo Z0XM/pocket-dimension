@@ -1,11 +1,18 @@
 import { auth } from "@pocket-dimension/auth";
-import { Elysia, t } from "elysia";
+import { Elysia, status, t } from "elysia";
 
 export const authHandler = new Elysia({ name: "better-auth" })
   .post(
     "/sign-up/email",
     async ({ body }) => {
-      return await auth.api.signUpEmail({ body, asResponse: true });
+      try {
+        return await auth.api.signUpEmail({ body, asResponse: true });
+      } catch (error: any) {
+        if (error.statusCode && error.body) {
+          return status(error.statusCode, error.body);
+        }
+        return status(500, { error: "Something went wrong!" });
+      }
     },
     {
       body: t.Object({
@@ -101,7 +108,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
     }
   )
   .get(
-    "/session",
+    "/get-session",
     async ({ headers }) => {
       return await auth.api.getSession({ headers: new Headers(headers as Record<string, string>) });
     },

@@ -41,7 +41,8 @@
   "packageManager": "bun@1.1.38",
   "workspaces": [
     "apps/**",
-    "shared/**"
+    "shared/**",
+    "scripts/**"
   ],
   "dependencies": {
     "@elysiajs/cors": "^1.4.0",

@@ -1,0 +1,15 @@
+{
+  "name": "@pocket-dimension/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'No build step needed for scripts package'",
+    "watchlist": "bun run src/watchlist/index.ts"
+  },
+  "dependencies": {
+    "csv-parser": "^3.2.0"
+  },
+  "devDependencies": {
+    "@pocket-dimension/db": "workspace:*"
+  }
+}

@@ -1,4 +1,5 @@
-import { text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { text, timestamp, uuid } from "drizzle-orm/pg-core";
 import * as auth from "./auth";
 
 export const timestamps = {
@@ -9,10 +10,10 @@ export const timestamps = {
 };
 
 export const actionsByUser = {
-  createdById: text("created_by_id")
+  createdById: uuid("created_by_id")
     .notNull()
     .references(() => auth.user.id, { onDelete: "cascade" }),
-  updatedById: text("updated_by_id").references(() => auth.user.id, { onDelete: "cascade" }),
+  updatedById: uuid("updated_by_id").references(() => auth.user.id, { onDelete: "cascade" }),
 };
 
-export const id = text("id").primaryKey();
+export const id = uuid("id").primaryKey().default(sql`uuidv7()`).notNull();

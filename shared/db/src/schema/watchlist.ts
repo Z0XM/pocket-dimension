@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { boolean, integer, pgSchema, text, unique } from "drizzle-orm/pg-core";
+import { boolean, integer, pgSchema, text, unique, uuid } from "drizzle-orm/pg-core";
 import * as auth from "./auth";
 import { actionsByUser, id, timestamps } from "./common";
 
@@ -16,6 +16,9 @@ export const watchItems = watchlistSchema.table(
     title: text("title").notNull(),
     type: watchItemType("type").notNull(),
     seasons: integer("seasons"),
+    languageId: uuid("language_id")
+      .notNull()
+      .references(() => watchLanguages.id, { onDelete: "cascade" }),
   },
   (table) => [unique("watch_items_title_unique").on(table.title)]
 );
@@ -26,10 +29,10 @@ export const watchItemTags = watchlistSchema.table(
     id,
     ...timestamps,
     ...actionsByUser,
-    watchItemId: text("watch_item_id")
+    watchItemId: uuid("watch_item_id")
       .notNull()
       .references(() => watchItems.id, { onDelete: "cascade" }),
-    watchTagId: text("watch_tag_id")
+    watchTagId: uuid("watch_tag_id")
       .notNull()
       .references(() => watchTags.id, { onDelete: "cascade" }),
   },
@@ -50,27 +53,6 @@ export const watchTags = watchlistSchema.table(
     name: text("name").notNull(),
   },
   (table) => [unique("watch_tags_name_unique").on(table.name)]
-);
-
-export const watchItemLanguages = watchlistSchema.table(
-  "watch_item_languages",
-  {
-    id,
-    ...timestamps,
-    ...actionsByUser,
-    watchItemId: text("watch_item_id")
-      .notNull()
-      .references(() => watchItems.id, { onDelete: "cascade" }),
-    watchLanguageId: text("watch_language_id")
-      .notNull()
-      .references(() => watchLanguages.id, { onDelete: "cascade" }),
-  },
-  (table) => [
-    unique("watch_item_languages_watch_item_id_watch_language_id_unique").on(
-      table.watchItemId,
-      table.watchLanguageId
-    ),
-  ]
 );
 
 export const watchLanguages = watchlistSchema.table(
@@ -97,7 +79,7 @@ export const watchItemRatings = watchlistSchema.table(
     id,
     ...timestamps,
     ...actionsByUser,
-    watchItemId: text("watch_item_id")
+    watchItemId: uuid("watch_item_id")
       .notNull()
       .references(() => watchItems.id, { onDelete: "cascade" }),
     rating: integer("rating"),
@@ -113,7 +95,10 @@ export const watchItemRatings = watchlistSchema.table(
 
 export const watchItemRelations = relations(watchItems, ({ many, one }) => ({
   tags: many(watchItemTags),
-  languages: many(watchItemLanguages),
+  language: one(watchLanguages, {
+    fields: [watchItems.languageId],
+    references: [watchLanguages.id],
+  }),
   ratings: many(watchItemRatings),
   createdBy: one(auth.user, {
     fields: [watchItems.createdById],
@@ -140,25 +125,6 @@ export const watchItemTagRelations = relations(watchItemTags, ({ one }) => ({
   }),
   updatedBy: one(auth.user, {
     fields: [watchItemTags.updatedById],
-    references: [auth.user.id],
-  }),
-}));
-
-export const watchItemLanguageRelations = relations(watchItemLanguages, ({ one }) => ({
-  watchItem: one(watchItems, {
-    fields: [watchItemLanguages.watchItemId],
-    references: [watchItems.id],
-  }),
-  watchLanguage: one(watchLanguages, {
-    fields: [watchItemLanguages.watchLanguageId],
-    references: [watchLanguages.id],
-  }),
-  createdBy: one(auth.user, {
-    fields: [watchItemLanguages.createdById],
-    references: [auth.user.id],
-  }),
-  updatedBy: one(auth.user, {
-    fields: [watchItemLanguages.updatedById],
     references: [auth.user.id],
   }),
 }));
@@ -191,7 +157,7 @@ export const watchTagRelations = relations(watchTags, ({ many, one }) => ({
 }));
 
 export const watchLanguageRelations = relations(watchLanguages, ({ many, one }) => ({
-  watchItemLanguages: many(watchItemLanguages),
+  watchItems: many(watchItems),
   createdBy: one(auth.user, {
     fields: [watchLanguages.createdById],
     references: [auth.user.id],

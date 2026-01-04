@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "@pocket-dimension/scripts",
+      "dependencies": {
+        "csv-parser": "^3.2.0",
+      },
+    },
+  },
+  "packages": {
+    "csv-parser": ["csv-parser@3.2.0", "", { "bin": { "csv-parser": "bin/csv-parser" } }, "sha512-fgKbp+AJbn1h2dcAHKIdKNSSjfp43BZZykXsCjzALjKy80VXQNHPFJ6T9Afwdzoj24aMkq8GwDS7KGcDPpejrA=="],
+  }
+}

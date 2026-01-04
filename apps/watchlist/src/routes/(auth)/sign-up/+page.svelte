@@ -16,6 +16,9 @@ let confirmPassword = $state("");
 let error = $state<string | null>(null);
 let loading = $state(false);
 
+// Strong password regex: at least 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
 async function handleSubmit(e: SubmitEvent) {
   e.preventDefault();
   error = null;
@@ -26,9 +29,9 @@ async function handleSubmit(e: SubmitEvent) {
     return;
   }
 
-  // Validate password length
-  if (password.length < 8) {
-    error = "Password must be at least 8 characters long";
+  // Validate strong password pattern
+  if (!strongPasswordRegex.test(password)) {
+    error = "Password must be at least 8 characters and contain uppercase, lowercase, number, and special character";
     return;
   }
 
@@ -58,7 +61,7 @@ async function handleSubmit(e: SubmitEvent) {
 }
 </script>
 
-<form class="p-6 md:p-8">
+<form class="p-6 md:p-8" onsubmit={handleSubmit}>
   {#if error}
   <div class="mb-4 rounded-md bg-destructive/15 p-3 text-sm text-destructive">
     {error}
@@ -82,6 +85,18 @@ async function handleSubmit(e: SubmitEvent) {
     <Field.Field>
       <Field.Field class="grid grid-cols-2 gap-4">
         <Field.Field>
+          <Field.Label for="name-{id}">Name</Field.Label>
+          <Input id="name-{id}" type="text" required bind:value={name} disabled={loading} />
+        </Field.Field>
+        <Field.Field>
+          <Field.Label for="username-{id}">Username</Field.Label>
+          <Input id="username-{id}" type="text" required bind:value={username} disabled={loading} />
+        </Field.Field>
+      </Field.Field>
+    </Field.Field>
+    <Field.Field>
+      <Field.Field class="grid grid-cols-2 gap-4">
+        <Field.Field>
           <Field.Label for="password-{id}">Password</Field.Label>
           <Input id="password-{id}" type="password" required bind:value={password} disabled={loading} />
         </Field.Field>
@@ -90,7 +105,7 @@ async function handleSubmit(e: SubmitEvent) {
           <Input id="confirm-password-{id}" type="password" required bind:value={confirmPassword} disabled={loading} />
         </Field.Field>
       </Field.Field>
-      <Field.Description>Must be at least 8 characters long.</Field.Description>
+      <Field.Description>Choose a strong password.</Field.Description>
     </Field.Field>
     <Field.Field>
       <Button type="submit" disabled={loading}>

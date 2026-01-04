@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1766817608065,
-      "tag": "0000_auth-init",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1766819672280,
-      "tag": "0001_auth-username",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1767387552564,
-      "tag": "0002_watchlist",
+      "when": 1767432097104,
+      "tag": "0000_init",
       "breakpoints": true
     }
   ]

@@ -8,7 +8,9 @@ import { authClient } from "$lib/auth-client.js";
 
 const id = $props.id();
 
+let loginBy = $state<"email" | "username">("email");
 let email = $state("");
+let username = $state("");
 let password = $state("");
 let error = $state<string | null>(null);
 let loading = $state(false);
@@ -19,13 +21,16 @@ async function handleSubmit(e: SubmitEvent) {
   loading = true;
 
   try {
-    const result = await authClient.signIn.email({
+
+    const result = loginBy === "email" ? await authClient.signIn.email({
       email,
       password,
       rememberMe: true,
+    }) : await authClient.signIn.username({
+      username,
+      password,
+      rememberMe: true,
     });
-
-    console.log(result);
 
     if (result.error) {
       error = result.error.message ?? "Unable to login";
@@ -41,6 +46,7 @@ async function handleSubmit(e: SubmitEvent) {
     loading = false;
   }
 }
+
 </script>
 
 
@@ -58,8 +64,19 @@ async function handleSubmit(e: SubmitEvent) {
       </p>
     </div>
     <Field>
-      <FieldLabel for="email-{id}">Email</FieldLabel>
+    <div class="flex items-center gap-2">
+      <Button variant='link' class='p-0' onclick={() => loginBy = "email"} disabled={loading}>
+        <FieldLabel class='cursor-pointer {loginBy === "email" ? "text-primary" : "text-muted-foreground"}' for="email-{id}">Email</FieldLabel>
+      </Button>
+      <Button variant="link" class='p-0' onclick={() => loginBy = "username"} disabled={loading}>
+        <FieldLabel class='cursor-pointer {loginBy === "username" ? "text-primary" : "text-muted-foreground"}' for="username-{id}">Username</FieldLabel>
+      </Button>
+    </div>
+    {#if loginBy === "email"}
       <Input id="email-{id}" type="email" placeholder="m@z0xm.com" bind:value={email} required disabled={loading} />
+    {:else}
+      <Input id="username-{id}" type="text" placeholder="z0xm" bind:value={username} required disabled={loading} />
+    {/if}
     </Field>
     <Field>
       <div class="flex items-center">

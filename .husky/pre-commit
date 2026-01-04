@@ -1,11 +1,11 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-echo "Running typecheck..."
-bun run typecheck || exit 1
-
-echo "Running build..."
-bun run build || exit 1
-
 echo "Running lint-staged..."
-bunx lint-staged
+bunx lint-staged || exit 1
+
+echo "Running typecheck on changed packages..."
+bunx turbo run typecheck --filter='[HEAD^1]' || exit 1
+
+echo "Running build on changed packages..."
+bunx turbo run build --filter='[HEAD^1]' --filter='!@pocket-dimension/scripts' || exit 1

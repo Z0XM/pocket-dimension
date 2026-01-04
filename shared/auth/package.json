@@ -15,7 +15,7 @@
     "clean": "rm -rf dist",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
-    "auth:generate": "better-auth generate --config ./src/index.ts",
+    "auth:generate": "bunx --bun better-auth generate --config ./src/index.ts",
     "auth:secret": "better-auth secret"
   },
   "dependencies": {
