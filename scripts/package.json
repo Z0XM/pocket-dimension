@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "echo 'No build step needed for scripts package'",
-    "watchlist": "bun run src/watchlist/index.ts"
+    "build": "echo 'No build step needed for scripts package'"
   },
   "dependencies": {
-    "csv-parser": "^3.2.0"
+    "csv-parser": "^3.2.0",
+    "drizzle-orm": "^0.45.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@pocket-dimension/db": "workspace:*"
