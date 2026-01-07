@@ -13,13 +13,14 @@
   },
   "devDependencies": {
     "@internationalized/date": "^3.10.0",
-    "@lucide/svelte": "^0.562.0",
+    "@lucide/svelte": "^0.561.0",
     "@sveltejs/adapter-auto": "^7.0.0",
     "@sveltejs/kit": "^2.49.1",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.17",
+    "@tanstack/table-core": "^8.21.3",
     "bits-ui": "^2.14.4",
     "clsx": "^2.1.1",
     "svelte": "^5.45.6",
@@ -34,12 +35,16 @@
   },
   "dependencies": {
     "@fontsource-variable/nunito-sans": "^5.2.7",
+    "@fontsource-variable/victor-mono": "^5.2.8",
+    "@fontsource/fira-mono": "^5.2.7",
+    "@fontsource/poiret-one": "^5.2.8",
     "@pocket-dimension/auth": "workspace:*",
     "@pocket-dimension/db": "workspace:*",
     "@pocket-dimension/utils": "workspace:*",
     "better-auth": "^1.4.10",
     "drizzle-orm": "^0.45.1",
     "mode-watcher": "^1.1.0",
+    "svelte-inview": "^4.0.4",
     "svelte-sonner": "1.0.7"
   }
 }

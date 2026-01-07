@@ -87,5 +87,8 @@
   },
   "[css]": {
     "editor.defaultFormatter": null
+  },
+  "[svelte]": {
+    "editor.defaultFormatter": "svelte.svelte-vscode"
   }
 }
