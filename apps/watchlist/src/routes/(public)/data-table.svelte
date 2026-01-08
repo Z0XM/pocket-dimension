@@ -45,6 +45,10 @@
     columns,
     getCoreRowModel: getCoreRowModel(),
     onColumnVisibilityChange: (updater) => {
+      // TODO: Local storage for column visibility
+      // TODO: Add column reordering
+      // TODO: Add filtering
+      // TODO: Add sorting
       if (typeof updater === "function") {
         columnVisibility = updater(columnVisibility);
       } else {
