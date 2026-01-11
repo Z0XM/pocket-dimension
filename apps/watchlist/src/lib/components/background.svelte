@@ -3,486 +3,2587 @@ import { onMount } from "svelte";
 
 interface Props {
   enableFilter?: boolean;
+  enableAnimation?: boolean;
 }
 
-const { enableFilter = true }: Props = $props();
+const { enableFilter = true, enableAnimation = true }: Props = $props();
 
 const animations = {
-	radialWave: () => {
-		const tiles = document.querySelectorAll(".tile");
-		const svgCenterX = 1762 / 2;
-		const svgCenterY = 1042 / 2;
-		const maxDistance = Math.sqrt(svgCenterX ** 2 + svgCenterY ** 2);
+  radialWave: () => {
+    const tiles = document.querySelectorAll(".tile");
+    const svgCenterX = 1762 / 2;
+    const svgCenterY = 1042 / 2;
+    const maxDistance = Math.sqrt(svgCenterX ** 2 + svgCenterY ** 2);
 
-		tiles.forEach((tile) => {
-			const rect = tile as SVGRectElement;
-			const x = parseFloat(rect.getAttribute("x") || "0") + 43; // tile center x (half of 86)
-			const y = parseFloat(rect.getAttribute("y") || "0") + 39; // tile center y (half of 78)
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0") + 43; // tile center x (half of 86)
+      const y = parseFloat(rect.getAttribute("y") || "0") + 39; // tile center y (half of 78)
 
-			// Calculate distance from center
-			const distance = Math.sqrt((x - svgCenterX) ** 2 + (y - svgCenterY) ** 2);
+      // Calculate distance from center
+      const distance = Math.sqrt((x - svgCenterX) ** 2 + (y - svgCenterY) ** 2);
 
-			// Normalize distance (0 to 1) and convert to delay (0 to 2 seconds)
-			const normalizedDistance = distance / maxDistance;
-			const delay = normalizedDistance * 2;
+      // Normalize distance (0 to 1) and convert to delay (0 to 2 seconds)
+      const normalizedDistance = distance / maxDistance;
+      const delay = normalizedDistance * 2;
 
-			// Set animation delay
-			rect.style.animationDelay = `${delay}s`;
-		});
-	},
-	leftToRight:() => {
-		const tiles = document.querySelectorAll(".tile");
-		const svgWidth = 1762;
+      // Set animation delay
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  leftToRight: () => {
+    const tiles = document.querySelectorAll(".tile");
+    const svgWidth = 1762;
 
-		tiles.forEach((tile) => {
-			const rect = tile as SVGRectElement;
-			const x = parseFloat(rect.getAttribute("x") || "0") + 43;
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0") + 43;
 
-			// Normalize x position (0 to 1) and convert to delay
-			const normalizedX = x / svgWidth;
-			const delay = normalizedX * 4; // 4 second sweep
+      // Normalize x position (0 to 1) and convert to delay
+      const normalizedX = x / svgWidth;
+      const delay = normalizedX * 4; // 4 second sweep
 
-			rect.style.animationDelay = `${delay}s`;
-		});
-	},
-	topToBottom:() => {
-		const tiles = document.querySelectorAll(".tile");
-		const svgHeight = 1042;
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  topToBottom: () => {
+    const tiles = document.querySelectorAll(".tile");
+    const svgHeight = 1042;
 
-		tiles.forEach((tile) => {
-			const rect = tile as SVGRectElement;
-			const y = parseFloat(rect.getAttribute("y") || "0") + 39;
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const y = parseFloat(rect.getAttribute("y") || "0") + 39;
 
-			const normalizedY = y / svgHeight;
-			const delay = normalizedY * 4;
+      const normalizedY = y / svgHeight;
+      const delay = normalizedY * 4;
 
-			rect.style.animationDelay = `${delay}s`;
-		});
-	},
-	diagonalWave:() => {
-		const tiles = document.querySelectorAll(".tile");
-		const svgWidth = 1762;
-		const svgHeight = 1042;
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  diagonalWave: () => {
+    const tiles = document.querySelectorAll(".tile");
+    const svgWidth = 1762;
+    const svgHeight = 1042;
 
-		tiles.forEach((tile) => {
-			const rect = tile as SVGRectElement;
-			const x = parseFloat(rect.getAttribute("x") || "0") + 43;
-			const y = parseFloat(rect.getAttribute("y") || "0") + 39;
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0") + 43;
+      const y = parseFloat(rect.getAttribute("y") || "0") + 39;
 
-			// Diagonal distance from top-left
-			const diagonal = (x + y) / (svgWidth + svgHeight);
-			const delay = diagonal * 4;
+      // Diagonal distance from top-left
+      const diagonal = (x + y) / (svgWidth + svgHeight);
+      const delay = diagonal * 4;
 
-			rect.style.animationDelay = `${delay}s`;
-		});
-	},
-	checkerboard:() => {
-		const tiles = document.querySelectorAll(".tile");
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  checkerboard: () => {
+    const tiles = document.querySelectorAll(".tile");
 
-		tiles.forEach((tile, index) => {
-			const rect = tile as SVGRectElement;
-			const x = parseFloat(rect.getAttribute("x") || "0");
-			const y = parseFloat(rect.getAttribute("y") || "0");
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0");
+      const y = parseFloat(rect.getAttribute("y") || "0");
 
-			// Calculate grid position
-			const col = Math.floor(x / 86);
-			const row = Math.floor(y / 78);
-			const isEven = (col + row) % 2 === 0;
+      // Calculate grid position
+      const col = Math.floor(x / 86);
+      const row = Math.floor(y / 78);
+      const isEven = (col + row) % 2 === 0;
 
-			// Alternate delay for checkerboard effect
-			const delay = isEven ? 0 : 2;
+      // Alternate delay for checkerboard effect
+      const delay = isEven ? 0 : 2;
 
-			rect.style.animationDelay = `${delay}s`;
-		});
-	},
-	spiral:() => {
-		const tiles = document.querySelectorAll(".tile");
-		const svgCenterX = 1762 / 2;
-		const svgCenterY = 1042 / 2;
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  spiral: () => {
+    const tiles = document.querySelectorAll(".tile");
+    const svgCenterX = 1762 / 2;
+    const svgCenterY = 1042 / 2;
 
-		tiles.forEach((tile) => {
-			const rect = tile as SVGRectElement;
-			const x = parseFloat(rect.getAttribute("x") || "0") + 43;
-			const y = parseFloat(rect.getAttribute("y") || "0") + 39;
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0") + 43;
+      const y = parseFloat(rect.getAttribute("y") || "0") + 39;
 
-			// Calculate angle and distance
-			const dx = x - svgCenterX;
-			const dy = y - svgCenterY;
-			const angle = Math.atan2(dy, dx);
-			const distance = Math.sqrt(dx ** 2 + dy ** 2);
+      // Calculate angle and distance
+      const dx = x - svgCenterX;
+      const dy = y - svgCenterY;
+      const angle = Math.atan2(dy, dx);
+      const distance = Math.sqrt(dx ** 2 + dy ** 2);
 
-			// Combine angle and distance for spiral effect
-			const delay = ((angle + Math.PI) / (2 * Math.PI) + distance / 2000) % 1 * 4;
+      // Combine angle and distance for spiral effect
+      const delay = (((angle + Math.PI) / (2 * Math.PI) + distance / 2000) % 1) * 4;
 
-			rect.style.animationDelay = `${delay}s`;
-		});
-	},
-	randomStagger:() => {
-		const tiles = document.querySelectorAll(".tile");
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  randomStagger: () => {
+    const tiles = document.querySelectorAll(".tile");
 
-		tiles.forEach((tile) => {
-			const rect = tile as SVGRectElement;
-			const x = parseFloat(rect.getAttribute("x") || "0");
-			const y = parseFloat(rect.getAttribute("y") || "0");
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0");
+      const y = parseFloat(rect.getAttribute("y") || "0");
 
-			// Use position as seed for pseudo-random
-			const seed = (x * 7919 + y * 9973) % 1000;
-			const delay = (seed / 1000) * 4;
+      // Use position as seed for pseudo-random
+      const seed = (x * 7919 + y * 9973) % 1000;
+      const delay = (seed / 1000) * 4;
 
-			rect.style.animationDelay = `${delay}s`;
-		});
-	},
-}
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+};
 
 onMount(() => {
-	const animationKeys = Object.keys(animations);
-	const randomAnimation = animationKeys[Math.floor(Math.random() * animationKeys.length)];
-	const selectedAnimation = animations[randomAnimation as keyof typeof animations];
-	selectedAnimation();
+  if (enableAnimation) {
+    const animationKeys = Object.keys(animations);
+    const randomAnimation = animationKeys[Math.floor(Math.random() * animationKeys.length)];
+    const selectedAnimation = animations[randomAnimation as keyof typeof animations];
+    selectedAnimation();
+  }
 });
-
 </script>
 
 <div class="background-container">
-	<svg
-		width="1762"
-		height="1042"
-		viewBox="-100 -100 1862 1142"
-		fill="none"
-		xmlns="http://www.w3.org/2000/svg"
-		class="background-svg {enableFilter ? 'filter-enabled' : ''}"
-		preserveAspectRatio="xMidYMid meet"
-	>
-		<rect x="0" y="0" width="1762" height="1042" fill="#040211" />
-		<rect x="2" y="2" width="86" height="78" rx="4" fill="#050210" class="tile" />
-		<rect x="90" y="2" width="86" height="78" rx="4" fill="#070312" class="tile" />
-		<rect x="178" y="2" width="86" height="78" rx="4" fill="#070314" class="tile" />
-		<rect x="266" y="2" width="86" height="78" rx="4" fill="#0A0316" class="tile" />
-		<rect x="354" y="2" width="86" height="78" rx="4" fill="#080214" class="tile" />
-		<rect x="442" y="2" width="86" height="78" rx="4" fill="#090316" class="tile" />
-		<rect x="530" y="2" width="86" height="78" rx="4" fill="#0B0419" class="tile" />
-		<rect x="618" y="2" width="86" height="78" rx="4" fill="#0A0318" class="tile" />
-		<rect x="706" y="2" width="86" height="78" rx="4" fill="#0C051C" class="tile" />
-		<rect x="794" y="2" width="86" height="78" rx="4" fill="#0A0218" class="tile" />
-		<rect x="882" y="2" width="86" height="78" rx="4" fill="#0B031A" class="tile" />
-		<rect x="970" y="2" width="86" height="78" rx="4" fill="#0D031D" class="tile" />
-		<rect x="1058" y="2" width="86" height="78" rx="4" fill="#0A0217" class="tile" />
-		<rect x="1146" y="2" width="86" height="78" rx="4" fill="#0A0319" class="tile" />
-		<rect x="1234" y="2" width="86" height="78" rx="4" fill="#0B0319" class="tile" />
-		<rect x="1322" y="2" width="86" height="78" rx="4" fill="#0C041B" class="tile" />
-		<rect x="1410" y="2" width="86" height="78" rx="4" fill="#0C031E" class="tile" />
-		<rect x="1498" y="2" width="86" height="78" rx="4" fill="#0E0521" class="tile" />
-		<rect x="1586" y="2" width="86" height="78" rx="4" fill="#080417" class="tile" />
-		<rect x="1674" y="2" width="86" height="78" rx="4" fill="#050212" class="tile" />
-		<rect x="2" y="82" width="86" height="78" rx="4" fill="#060212" class="tile" />
-		<rect x="90" y="82" width="86" height="78" rx="4" fill="#0B0316" class="tile" />
-		<rect x="178" y="82" width="86" height="78" rx="4" fill="#0D031B" class="tile" />
-		<rect x="354" y="82" width="86" height="78" rx="4" fill="#0A0418" class="tile" />
-		<rect x="442" y="82" width="86" height="78" rx="4" fill="#0C021B" class="tile" />
-		<rect x="530" y="82" width="86" height="78" rx="4" fill="#150627" class="tile" />
-		<rect x="618" y="82" width="86" height="78" rx="4" fill="#0E041E" class="tile" />
-		<rect x="706" y="82" width="86" height="78" rx="4" fill="#0D021C" class="tile" />
-		<rect x="794" y="82" width="86" height="78" rx="4" fill="#0F021F" class="tile" />
-		<rect x="882" y="82" width="86" height="78" rx="4" fill="#120426" class="tile" />
-		<rect x="970" y="82" width="86" height="78" rx="4" fill="#1E083C" class="tile" />
-		<rect x="1058" y="82" width="86" height="78" rx="4" fill="#110424" class="tile" />
-		<rect x="1146" y="82" width="86" height="78" rx="4" fill="#0D021F" class="tile" />
-		<rect x="1234" y="82" width="86" height="78" rx="4" fill="#100425" class="tile" />
-		<rect x="1322" y="82" width="86" height="78" rx="4" fill="#1A083D" class="tile" />
-		<rect x="1410" y="82" width="86" height="78" rx="4" fill="#110529" class="tile" />
-		<rect x="1498" y="82" width="86" height="78" rx="4" fill="#0A0319" class="tile" />
-		<rect x="1586" y="82" width="86" height="78" rx="4" fill="#070216" class="tile" />
-		<rect x="1674" y="82" width="86" height="78" rx="4" fill="#0A0317" class="tile" />
-		<rect x="2" y="162" width="86" height="78" rx="4" fill="#090213" class="tile" />
-		<rect x="90" y="162" width="86" height="78" rx="4" fill="#070213" class="tile" />
-		<rect x="178" y="162" width="86" height="78" rx="4" fill="#0A0317" class="tile" />
-		<rect x="266" y="162" width="86" height="78" rx="4" fill="#0F031E" class="tile" />
-		<rect x="354" y="162" width="86" height="78" rx="4" fill="#140524" class="tile" />
-		<rect x="442" y="162" width="86" height="78" rx="4" fill="#1F0836" class="tile" />
-		<rect x="530" y="162" width="86" height="78" rx="4" fill="#0E021C" class="tile" />
-		<rect x="618" y="162" width="86" height="78" rx="4" fill="#150428" class="tile" />
-		<rect x="706" y="162" width="86" height="78" rx="4" fill="#1B0632" class="tile" />
-		<rect x="794" y="162" width="86" height="78" rx="4" fill="#25083F" class="tile" />
-		<rect x="882" y="162" width="86" height="78" rx="4" fill="#16052B" class="tile" />
-		<rect x="970" y="162" width="86" height="78" rx="4" fill="#15042B" class="tile" />
-		<rect x="1058" y="162" width="86" height="78" rx="4" fill="#180530" class="tile" />
-		<rect x="1146" y="162" width="86" height="78" rx="4" fill="#1D073D" class="tile" />
-		<rect x="1234" y="162" width="86" height="78" rx="4" fill="#301162" class="tile" />
-		<rect x="1322" y="162" width="86" height="78" rx="4" fill="#3A1577" class="tile" />
-		<rect x="1410" y="162" width="86" height="78" rx="4" fill="#160735" class="tile" />
-		<rect x="1498" y="162" width="86" height="78" rx="4" fill="#0E0320" class="tile" />
-		<rect x="1586" y="162" width="86" height="78" rx="4" fill="#0B041D" class="tile" />
-		<rect x="1674" y="162" width="86" height="78" rx="4" fill="#0C041E" class="tile" />
-		<rect x="2" y="242" width="86" height="78" rx="4" fill="#0C0217" class="tile" />
-		<rect x="90" y="242" width="86" height="78" rx="4" fill="#10041E" class="tile" />
-		<rect x="178" y="242" width="86" height="78" rx="4" fill="#110420" class="tile" />
-		<rect x="266" y="242" width="86" height="78" rx="4" fill="#0E031B" class="tile" />
-		<rect x="354" y="242" width="86" height="78" rx="4" fill="#10021D" class="tile" />
-		<rect x="442" y="242" width="86" height="78" rx="4" fill="#150426" class="tile" />
-		<rect x="530" y="242" width="86" height="78" rx="4" fill="#200636" class="tile" />
-		<rect x="618" y="242" width="86" height="78" rx="4" fill="#22073D" class="tile" />
-		<rect x="706" y="242" width="86" height="78" rx="4" fill="#16022A" class="tile" />
-		<rect x="794" y="242" width="86" height="78" rx="4" fill="#22053C" class="tile" />
-		<rect x="882" y="242" width="86" height="78" rx="4" fill="#280749" class="tile" />
-		<rect x="970" y="242" width="86" height="78" rx="4" fill="#390A5E" class="tile" />
-		<rect x="1058" y="242" width="86" height="78" rx="4" fill="#5B1891" class="tile" />
-		<rect x="1146" y="242" width="86" height="78" rx="4" fill="#310C5F" class="tile" />
-		<rect x="1234" y="242" width="86" height="78" rx="4" fill="#1A063D" class="tile" />
-		<rect x="1322" y="242" width="86" height="78" rx="4" fill="#1F0946" class="tile" />
-		<rect x="1410" y="242" width="86" height="78" rx="4" fill="#13042F" class="tile" />
-		<rect x="1498" y="242" width="86" height="78" rx="4" fill="#15062E" class="tile" />
-		<rect x="1586" y="242" width="86" height="78" rx="4" fill="#1F0B45" class="tile" />
-		<rect x="1674" y="242" width="86" height="78" rx="4" fill="#100525" class="tile" />
-		<rect x="2" y="322" width="86" height="78" rx="4" fill="#090214" class="tile" />
-		<rect x="90" y="322" width="86" height="78" rx="4" fill="#10031D" class="tile" />
-		<rect x="178" y="322" width="86" height="78" rx="4" fill="#1D082D" class="tile" />
-		<rect x="266" y="322" width="86" height="78" rx="4" fill="#160525" class="tile" />
-		<rect x="354" y="322" width="86" height="78" rx="4" fill="#150323" class="tile" />
-		<rect x="442" y="322" width="86" height="78" rx="4" fill="#180328" class="tile" />
-		<rect x="530" y="322" width="86" height="78" rx="4" fill="#1D0531" class="tile" />
-		<rect x="618" y="322" width="86" height="78" rx="4" fill="#270740" class="tile" />
-		<rect x="706" y="322" width="86" height="78" rx="4" fill="#340952" class="tile" />
-		<rect x="794" y="322" width="86" height="78" rx="4" fill="#3F0961" class="tile" />
-		<rect x="882" y="322" width="86" height="78" rx="4" fill="#57128D" class="tile" />
-		<rect x="970" y="322" width="86" height="78" rx="4" fill="#7C23B2" class="tile" />
-		<rect x="1058" y="322" width="86" height="78" rx="4" fill="#571490" class="tile" />
-		<rect x="1146" y="322" width="86" height="78" rx="4" fill="#4A168A" class="tile" />
-		<rect x="1234" y="322" width="86" height="78" rx="4" fill="#22084B" class="tile" />
-		<rect x="1322" y="322" width="86" height="78" rx="4" fill="#180539" class="tile" />
-		<rect x="1410" y="322" width="86" height="78" rx="4" fill="#1C0840" class="tile" />
-		<rect x="1498" y="322" width="86" height="78" rx="4" fill="#2B0F5A" class="tile" />
-		<rect x="1586" y="322" width="86" height="78" rx="4" fill="#190839" class="tile" />
-		<rect x="1674" y="322" width="86" height="78" rx="4" fill="#0C041E" class="tile" />
-		<rect x="2" y="402" width="86" height="78" rx="4" fill="#0B0215" class="tile" />
-		<rect x="90" y="402" width="86" height="78" rx="4" fill="#0F021A" class="tile" />
-		<rect x="178" y="402" width="86" height="78" rx="4" fill="#130420" class="tile" />
-		<rect x="266" y="402" width="86" height="78" rx="4" fill="#1D052D" class="tile" />
-		<rect x="354" y="402" width="86" height="78" rx="4" fill="#260739" class="tile" />
-		<rect x="442" y="402" width="86" height="78" rx="4" fill="#3C0D58" class="tile" />
-		<rect x="530" y="402" width="86" height="78" rx="4" fill="#2B0644" class="tile" />
-		<rect x="618" y="402" width="86" height="78" rx="4" fill="#62188C" class="tile" />
-		<rect x="706" y="402" width="86" height="78" rx="4" fill="#53107C" class="tile" />
-		<rect x="794" y="402" width="86" height="78" rx="4" fill="#8A23B4" class="tile" />
-		<rect x="882" y="402" width="86" height="78" rx="4" fill="#9C36D6" class="tile" />
-		<rect x="970" y="402" width="86" height="78" rx="4" fill="#771FB0" class="tile" />
-		<rect x="1058" y="402" width="86" height="78" rx="4" fill="#460C85" class="tile" />
-		<rect x="1234" y="402" width="86" height="78" rx="4" fill="#1F0746" class="tile" />
-		<rect x="1322" y="402" width="86" height="78" rx="4" fill="#2E1061" class="tile" />
-		<rect x="1410" y="402" width="86" height="78" rx="4" fill="#341368" class="tile" />
-		<rect x="1498" y="402" width="86" height="78" rx="4" fill="#190839" class="tile" />
-		<rect x="1586" y="402" width="86" height="78" rx="4" fill="#100426" class="tile" />
-		<rect x="1674" y="402" width="86" height="78" rx="4" fill="#0B0419" class="tile" />
-		<rect x="2" y="482" width="86" height="78" rx="4" fill="#0F0319" class="tile" />
-		<rect x="90" y="482" width="86" height="78" rx="4" fill="#140421" class="tile" />
-		<rect x="178" y="482" width="86" height="78" rx="4" fill="#180426" class="tile" />
-		<rect x="266" y="482" width="86" height="78" rx="4" fill="#200631" class="tile" />
-		<rect x="354" y="482" width="86" height="78" rx="4" fill="#27083C" class="tile" />
-		<rect x="442" y="482" width="86" height="78" rx="4" fill="#55156F" class="tile" />
-		<rect x="530" y="482" width="86" height="78" rx="4" fill="#782198" class="tile" />
-		<rect x="618" y="482" width="86" height="78" rx="4" fill="#510D74" class="tile" />
-		<rect x="706" y="482" width="86" height="78" rx="4" fill="#902BB3" class="tile" />
-		<rect x="794" y="482" width="86" height="78" rx="4" fill="#B13CDD" class="tile" />
-		<rect x="882" y="482" width="86" height="78" rx="4" fill="#8621BF" class="tile" />
-		<rect x="970" y="482" width="86" height="78" rx="4" fill="#5C18A6" class="tile" />
-		<rect x="1058" y="482" width="86" height="78" rx="4" fill="#601AA6" class="tile" />
-		<rect x="1146" y="482" width="86" height="78" rx="4" fill="#4D1591" class="tile" />
-		<rect x="1234" y="482" width="86" height="78" rx="4" fill="#571F9D" class="tile" />
-		<rect x="1322" y="482" width="86" height="78" rx="4" fill="#220949" class="tile" />
-		<rect x="1410" y="482" width="86" height="78" rx="4" fill="#1A073A" class="tile" />
-		<rect x="1498" y="482" width="86" height="78" rx="4" fill="#120428" class="tile" />
-		<rect x="1586" y="482" width="86" height="78" rx="4" fill="#13062C" class="tile" />
-		<rect x="1674" y="482" width="86" height="78" rx="4" fill="#0D051E" class="tile" />
-		<rect x="2" y="562" width="86" height="78" rx="4" fill="#0A0215" class="tile" />
-		<rect x="90" y="562" width="86" height="78" rx="4" fill="#130320" class="tile" />
-		<rect x="178" y="562" width="86" height="78" rx="4" fill="#190426" class="tile" />
-		<rect x="266" y="562" width="86" height="78" rx="4" fill="#330C47" class="tile" />
-		<rect x="354" y="562" width="86" height="78" rx="4" fill="#48115F" class="tile" />
-		<rect x="442" y="562" width="86" height="78" rx="4" fill="#300846" class="tile" />
-		<rect x="530" y="562" width="86" height="78" rx="4" fill="#4C1169" class="tile" />
-		<rect x="618" y="562" width="86" height="78" rx="4" fill="#6B1B91" class="tile" />
-		<rect x="706" y="562" width="86" height="78" rx="4" fill="#691795" class="tile" />
-		<rect x="794" y="562" width="86" height="78" rx="4" fill="#6B169F" class="tile" />
-		<rect x="882" y="562" width="86" height="78" rx="4" fill="#5A0E9E" class="tile" />
-		<rect x="970" y="562" width="86" height="78" rx="4" fill="#6B21B1" class="tile" />
-		<rect x="1058" y="562" width="86" height="78" rx="4" fill="#611A9E" class="tile" />
-		<rect x="1146" y="562" width="86" height="78" rx="4" fill="#330C69" class="tile" />
-		<rect x="1234" y="562" width="86" height="78" rx="4" fill="#210847" class="tile" />
-		<rect x="1322" y="562" width="86" height="78" rx="4" fill="#160434" class="tile" />
-		<rect x="1410" y="562" width="86" height="78" rx="4" fill="#1D0942" class="tile" />
-		<rect x="1498" y="562" width="86" height="78" rx="4" fill="#220D4B" class="tile" />
-		<rect x="1586" y="562" width="86" height="78" rx="4" fill="#100526" class="tile" />
-		<rect x="1674" y="562" width="86" height="78" rx="4" fill="#0A0419" class="tile" />
-		<rect x="2" y="642" width="86" height="78" rx="4" fill="#0C0216" class="tile" />
-		<rect x="90" y="642" width="86" height="78" rx="4" fill="#180627" class="tile" />
-		<rect x="178" y="642" width="86" height="78" rx="4" fill="#160424" class="tile" />
-		<rect x="266" y="642" width="86" height="78" rx="4" fill="#1A0429" class="tile" />
-		<rect x="354" y="642" width="86" height="78" rx="4" fill="#220734" class="tile" />
-		<rect x="442" y="642" width="86" height="78" rx="4" fill="#380E50" class="tile" />
-		<rect x="530" y="642" width="86" height="78" rx="4" fill="#25073B" class="tile" />
-		<rect x="618" y="642" width="86" height="78" rx="4" fill="#380B57" class="tile" />
-		<rect x="706" y="642" width="86" height="78" rx="4" fill="#4C1271" class="tile" />
-		<rect x="794" y="642" width="86" height="78" rx="4" fill="#380C60" class="tile" />
-		<rect x="882" y="642" width="86" height="78" rx="4" fill="#32095F" class="tile" />
-		<rect x="970" y="642" width="86" height="78" rx="4" fill="#4D1383" class="tile" />
-		<rect x="1058" y="642" width="86" height="78" rx="4" fill="#230846" class="tile" />
-		<rect x="1146" y="642" width="86" height="78" rx="4" fill="#210844" class="tile" />
-		<rect x="1234" y="642" width="86" height="78" rx="4" fill="#1A063A" class="tile" />
-		<rect x="1322" y="642" width="86" height="78" rx="4" fill="#240C4E" class="tile" />
-		<rect x="1410" y="642" width="86" height="78" rx="4" fill="#290F57" class="tile" />
-		<rect x="1498" y="642" width="86" height="78" rx="4" fill="#170732" class="tile" />
-		<rect x="1586" y="642" width="86" height="78" rx="4" fill="#0D0420" class="tile" />
-		<rect x="1674" y="642" width="86" height="78" rx="4" fill="#080417" class="tile" />
-		<rect x="2" y="722" width="86" height="78" rx="4" fill="#090313" class="tile" />
-		<rect x="90" y="722" width="86" height="78" rx="4" fill="#0D0217" class="tile" />
-		<rect x="178" y="722" width="86" height="78" rx="4" fill="#11041E" class="tile" />
-		<rect x="266" y="722" width="86" height="78" rx="4" fill="#160623" class="tile" />
-		<rect x="354" y="722" width="86" height="78" rx="4" fill="#1F0931" class="tile" />
-		<rect x="442" y="722" width="86" height="78" rx="4" fill="#150424" class="tile" />
-		<rect x="530" y="722" width="86" height="78" rx="4" fill="#1D052F" class="tile" />
-		<rect x="618" y="722" width="86" height="78" rx="4" fill="#320D4D" class="tile" />
-		<rect x="706" y="722" width="86" height="78" rx="4" fill="#1D0533" class="tile" />
-		<rect x="794" y="722" width="86" height="78" rx="4" fill="#23073D" class="tile" />
-		<rect x="882" y="722" width="86" height="78" rx="4" fill="#2A0B48" class="tile" />
-		<rect x="970" y="722" width="86" height="78" rx="4" fill="#18052E" class="tile" />
-		<rect x="1058" y="722" width="86" height="78" rx="4" fill="#1F083B" class="tile" />
-		<rect x="1146" y="722" width="86" height="78" rx="4" fill="#2A0E54" class="tile" />
-		<rect x="1234" y="722" width="86" height="78" rx="4" fill="#300F54" class="tile" />
-		<rect x="1322" y="722" width="86" height="78" rx="4" fill="#15072F" class="tile" />
-		<rect x="1410" y="722" width="86" height="78" rx="4" fill="#0F0522" class="tile" />
-		<rect x="1498" y="722" width="86" height="78" rx="4" fill="#0D041E" class="tile" />
-		<rect x="1586" y="722" width="86" height="78" rx="4" fill="#0A0318" class="tile" />
-		<rect x="1674" y="722" width="86" height="78" rx="4" fill="#080416" class="tile" />
-		<rect x="2" y="802" width="86" height="78" rx="4" fill="#080313" class="tile" />
-		<rect x="90" y="802" width="86" height="78" rx="4" fill="#0D0318" class="tile" />
-		<rect x="178" y="802" width="86" height="78" rx="4" fill="#130622" class="tile" />
-		<rect x="266" y="802" width="86" height="78" rx="4" fill="#0F031A" class="tile" />
-		<rect x="354" y="802" width="86" height="78" rx="4" fill="#0B0216" class="tile" />
-		<rect x="442" y="802" width="86" height="78" rx="4" fill="#10031E" class="tile" />
-		<rect x="530" y="802" width="86" height="78" rx="4" fill="#140524" class="tile" />
-		<rect x="618" y="802" width="86" height="78" rx="4" fill="#130526" class="tile" />
-		<rect x="706" y="802" width="86" height="78" rx="4" fill="#1A062E" class="tile" />
-		<rect x="794" y="802" width="86" height="78" rx="4" fill="#2B0D47" class="tile" />
-		<rect x="882" y="802" width="86" height="78" rx="4" fill="#120424" class="tile" />
-		<rect x="970" y="802" width="86" height="78" rx="4" fill="#130428" class="tile" />
-		<rect x="1058" y="802" width="86" height="78" rx="4" fill="#1A0730" class="tile" />
-		<rect x="1146" y="802" width="86" height="78" rx="4" fill="#260D43" class="tile" />
-		<rect x="1234" y="802" width="86" height="78" rx="4" fill="#14072A" class="tile" />
-		<rect x="1322" y="802" width="86" height="78" rx="4" fill="#0D041F" class="tile" />
-		<rect x="1410" y="802" width="86" height="78" rx="4" fill="#0C041B" class="tile" />
-		<rect x="1498" y="802" width="86" height="78" rx="4" fill="#090317" class="tile" />
-		<rect x="1586" y="802" width="86" height="78" rx="4" fill="#0E0620" class="tile" />
-		<rect x="1674" y="802" width="86" height="78" rx="4" fill="#080213" class="tile" />
-		<rect x="2" y="882" width="86" height="78" rx="4" fill="#060211" class="tile" />
-		<rect x="90" y="882" width="86" height="78" rx="4" fill="#070313" class="tile" />
-		<rect x="178" y="882" width="86" height="78" rx="4" fill="#0A0317" class="tile" />
-		<rect x="266" y="882" width="86" height="78" rx="4" fill="#0C0318" class="tile" />
-		<rect x="354" y="882" width="86" height="78" rx="4" fill="#130622" class="tile" />
-		<rect x="442" y="882" width="86" height="78" rx="4" fill="#0F041D" class="tile" />
-		<rect x="530" y="882" width="86" height="78" rx="4" fill="#0C0318" class="tile" />
-		<rect x="618" y="882" width="86" height="78" rx="4" fill="#0D031B" class="tile" />
-		<rect x="706" y="882" width="86" height="78" rx="4" fill="#10041F" class="tile" />
-		<rect x="794" y="882" width="86" height="78" rx="4" fill="#110422" class="tile" />
-		<rect x="882" y="882" width="86" height="78" rx="4" fill="#120526" class="tile" />
-		<rect x="970" y="882" width="86" height="78" rx="4" fill="#18072E" class="tile" />
-		<rect x="1058" y="882" width="86" height="78" rx="4" fill="#0E041E" class="tile" />
-		<rect x="1146" y="882" width="86" height="78" rx="4" fill="#0E051F" class="tile" />
-		<rect x="1234" y="882" width="86" height="78" rx="4" fill="#090419" class="tile" />
-		<rect x="1322" y="882" width="86" height="78" rx="4" fill="#090318" class="tile" />
-		<rect x="1410" y="882" width="86" height="78" rx="4" fill="#0A051A" class="tile" />
-		<rect x="1498" y="882" width="86" height="78" rx="4" fill="#0D061E" class="tile" />
-		<rect x="1586" y="882" width="86" height="78" rx="4" fill="#080416" class="tile" />
-		<rect x="1674" y="882" width="86" height="78" rx="4" fill="#070413" class="tile" />
-		<rect x="2" y="962" width="86" height="78" rx="4" fill="#060311" class="tile" />
-		<rect x="90" y="962" width="86" height="78" rx="4" fill="#070412" class="tile" />
-		<rect x="178" y="962" width="86" height="78" rx="4" fill="#070312" class="tile" />
-		<rect x="266" y="962" width="86" height="78" rx="4" fill="#070313" class="tile" />
-		<rect x="354" y="962" width="86" height="78" rx="4" fill="#080416" class="tile" />
-		<rect x="442" y="962" width="86" height="78" rx="4" fill="#090517" class="tile" />
-		<rect x="530" y="962" width="86" height="78" rx="4" fill="#0A0418" class="tile" />
-		<rect x="618" y="962" width="86" height="78" rx="4" fill="#0C051A" class="tile" />
-		<rect x="706" y="962" width="86" height="78" rx="4" fill="#0B0519" class="tile" />
-		<rect x="794" y="962" width="86" height="78" rx="4" fill="#0B0418" class="tile" />
-		<rect x="882" y="962" width="86" height="78" rx="4" fill="#0C051A" class="tile" />
-		<rect x="970" y="962" width="86" height="78" rx="4" fill="#0D061E" class="tile" />
-		<rect x="1058" y="962" width="86" height="78" rx="4" fill="#0B0418" class="tile" />
-		<rect x="1146" y="962" width="86" height="78" rx="4" fill="#080417" class="tile" />
-		<rect x="1234" y="962" width="86" height="78" rx="4" fill="#080315" class="tile" />
-		<rect x="1322" y="962" width="86" height="78" rx="4" fill="#090417" class="tile" />
-		<rect x="1410" y="962" width="86" height="78" rx="4" fill="#070416" class="tile" />
-		<rect x="1498" y="962" width="86" height="78" rx="4" fill="#070415" class="tile" />
-		<rect x="1586" y="962" width="86" height="78" rx="4" fill="#050212" class="tile" />
-		<rect x="1674" y="962" width="86" height="78" rx="4" fill="#040211" class="tile" />
-		<rect x="266" y="82" width="86" height="78" rx="4" fill="#090216" class="tile" />
-		<rect x="1146" y="402" width="86" height="78" rx="4" fill="#270755" class="tile" />
-		<defs>
-			<filter
-				id="texture-filter"
-				x="-2.47955e-05"
-				y="9.72748e-05"
-				width="1802.2"
-				height="1082.2"
-				filterUnits="userSpaceOnUse"
-				color-interpolation-filters="sRGB"
-			>
-				<feFlood flood-opacity="0" result="BackgroundImageFix" />
-				<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-				<feTurbulence
-					id="turbulence-filter"
-					type="fractalNoise"
-					baseFrequency="0.1190476268529892 0.1190476268529892"
-					numOctaves="3"
-					seed="2977"
-				/>
-				<feDisplacementMap
-					id="displacement-filter"
-					in="shape"
-					scale="40.200000762939453"
-					xChannelSelector="R"
-					yChannelSelector="G"
-					result="displacedImage"
-					width="100%"
-					height="100%"
-				/>
-				<feMerge result="effect1_texture">
-					<feMergeNode in="displacedImage" />
-				</feMerge>
-			</filter>
-		</defs>
-	</svg>
+  <svg
+    width="1762"
+    height="1042"
+    viewBox="-100 -100 1862 1142"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    class="background-svg {enableFilter
+      ? 'filter-enabled'
+      : ''} {enableAnimation ? '' : 'no-animation'}"
+    preserveAspectRatio="xMidYMid meet"
+  >
+    <rect x="0" y="0" width="1762" height="1042" fill="#040211" />
+    <rect
+      x="2"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#050210"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070312"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070314"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0316"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#080214"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#090316"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B0419"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0318"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C051C"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0218"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B031A"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D031D"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0217"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0319"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B0319"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C041B"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C031E"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0E0521"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#080417"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="2"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#050212"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#060212"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B0316"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D031B"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0418"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C021B"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#150627"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0E041E"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D021C"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0F021F"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#120426"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1E083C"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#110424"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D021F"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#100425"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1A083D"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#110529"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0319"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070216"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0317"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#090213"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070213"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0317"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0F031E"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#140524"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1F0836"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0E021C"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#150428"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1B0632"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#25083F"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#16052B"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#15042B"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#180530"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1D073D"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#301162"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#3A1577"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#160735"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0E0320"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B041D"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="162"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C041E"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C0217"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#10041E"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#110420"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0E031B"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#10021D"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#150426"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#200636"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#22073D"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#16022A"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#22053C"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#280749"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#390A5E"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#5B1891"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#310C5F"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1A063D"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1F0946"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#13042F"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#15062E"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1F0B45"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="242"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#100525"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#090214"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#10031D"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1D082D"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#160525"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#150323"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#180328"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1D0531"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#270740"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#340952"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#3F0961"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#57128D"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#7C23B2"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#571490"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#4A168A"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#22084B"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#180539"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1C0840"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#2B0F5A"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#190839"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="322"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C041E"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B0215"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0F021A"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#130420"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1D052D"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#260739"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#3C0D58"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#2B0644"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#62188C"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#53107C"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#8A23B4"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#9C36D6"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#771FB0"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#460C85"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1F0746"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#2E1061"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#341368"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#190839"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#100426"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B0419"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0F0319"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#140421"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#180426"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#200631"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#27083C"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#55156F"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#782198"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#510D74"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#902BB3"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#B13CDD"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#8621BF"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#5C18A6"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#601AA6"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#4D1591"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#571F9D"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#220949"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1A073A"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#120428"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#13062C"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="482"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D051E"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0215"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#130320"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#190426"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#330C47"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#48115F"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#300846"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#4C1169"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#6B1B91"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#691795"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#6B169F"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#5A0E9E"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#6B21B1"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#611A9E"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#330C69"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#210847"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#160434"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1D0942"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#220D4B"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#100526"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="562"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0419"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C0216"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#180627"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#160424"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1A0429"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#220734"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#380E50"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#25073B"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#380B57"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#4C1271"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#380C60"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#32095F"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#4D1383"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#230846"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#210844"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1A063A"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#240C4E"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#290F57"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#170732"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D0420"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="642"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#080417"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#090313"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D0217"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#11041E"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#160623"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1F0931"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#150424"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1D052F"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#320D4D"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1D0533"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#23073D"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#2A0B48"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#18052E"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1F083B"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#2A0E54"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#300F54"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#15072F"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0F0522"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D041E"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0318"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="722"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#080416"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#080313"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D0318"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#130622"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0F031A"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B0216"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#10031E"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#140524"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#130526"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1A062E"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#2B0D47"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#120424"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#130428"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#1A0730"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#260D43"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#14072A"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D041F"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C041B"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#090317"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0E0620"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="802"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#080213"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#060211"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070313"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0317"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C0318"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#130622"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0F041D"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C0318"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D031B"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#10041F"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#110422"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#120526"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#18072E"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0E041E"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0E051F"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#090419"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#090318"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A051A"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D061E"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#080416"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="882"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070413"
+      class="tile"
+    />
+    <rect
+      x="2"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#060311"
+      class="tile"
+    />
+    <rect
+      x="90"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070412"
+      class="tile"
+    />
+    <rect
+      x="178"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070312"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070313"
+      class="tile"
+    />
+    <rect
+      x="354"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#080416"
+      class="tile"
+    />
+    <rect
+      x="442"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#090517"
+      class="tile"
+    />
+    <rect
+      x="530"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0A0418"
+      class="tile"
+    />
+    <rect
+      x="618"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C051A"
+      class="tile"
+    />
+    <rect
+      x="706"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B0519"
+      class="tile"
+    />
+    <rect
+      x="794"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B0418"
+      class="tile"
+    />
+    <rect
+      x="882"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0C051A"
+      class="tile"
+    />
+    <rect
+      x="970"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0D061E"
+      class="tile"
+    />
+    <rect
+      x="1058"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#0B0418"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#080417"
+      class="tile"
+    />
+    <rect
+      x="1234"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#080315"
+      class="tile"
+    />
+    <rect
+      x="1322"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#090417"
+      class="tile"
+    />
+    <rect
+      x="1410"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070416"
+      class="tile"
+    />
+    <rect
+      x="1498"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#070415"
+      class="tile"
+    />
+    <rect
+      x="1586"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#050212"
+      class="tile"
+    />
+    <rect
+      x="1674"
+      y="962"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#040211"
+      class="tile"
+    />
+    <rect
+      x="266"
+      y="82"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#090216"
+      class="tile"
+    />
+    <rect
+      x="1146"
+      y="402"
+      width="86"
+      height="78"
+      rx="4"
+      fill="#270755"
+      class="tile"
+    />
+    <defs>
+      <filter
+        id="texture-filter"
+        x="-2.47955e-05"
+        y="9.72748e-05"
+        width="1802.2"
+        height="1082.2"
+        filterUnits="userSpaceOnUse"
+        color-interpolation-filters="sRGB"
+      >
+        <feFlood flood-opacity="0" result="BackgroundImageFix" />
+        <feBlend
+          mode="normal"
+          in="SourceGraphic"
+          in2="BackgroundImageFix"
+          result="shape"
+        />
+        <feTurbulence
+          id="turbulence-filter"
+          type="fractalNoise"
+          baseFrequency="0.1190476268529892 0.1190476268529892"
+          numOctaves="3"
+          seed="2977"
+        />
+        <feDisplacementMap
+          id="displacement-filter"
+          in="shape"
+          scale="40.200000762939453"
+          xChannelSelector="R"
+          yChannelSelector="G"
+          result="displacedImage"
+          width="100%"
+          height="100%"
+        />
+        <feMerge result="effect1_texture">
+          <feMergeNode in="displacedImage" />
+        </feMerge>
+      </filter>
+    </defs>
+  </svg>
 </div>
 
 <style>
-	.background-container {
-		position: fixed;
-		top: 0;
-		left: 0;
-		width: 100vw;
-		height: 100vh;
-		min-width: 100%;
-		min-height: 100%;
-		z-index: -1;
-		overflow: hidden;
-	}
+  .background-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    min-width: 100%;
+    min-height: 100%;
+    z-index: -1;
+    overflow: hidden;
+  }
 
-	.background-svg {
-		width: 100%;
-		height: 100%;
-		min-width: 100%;
-		min-height: 100%;
-	}
+  .background-svg {
+    width: 100%;
+    height: 100%;
+    min-width: 100%;
+    min-height: 100%;
+  }
 
-	.background-svg.filter-enabled {
-		filter: url(#texture-filter);
-	}
+  .background-svg.filter-enabled {
+    filter: url(#texture-filter);
+  }
 
-	:global(rect.tile) {
-		transform-origin: center;
-		animation: radialWave 6s ease-out infinite;
-	}
+  :global(rect.tile) {
+    transform-origin: center;
+    animation: radialWave 6s ease-out infinite;
+  }
 
-	@keyframes radialWave {
-		0%, 100% { transform: scale(1); opacity: 1; transform: brightness(2); }
-		50% { transform: scale(1.2); opacity: 0.25; transform: brightness(0.5); }
-	}
+  .background-svg.no-animation :global(rect.tile) {
+    animation: none;
+  }
 
+  @keyframes radialWave {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+      transform: brightness(2);
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 0.25;
+      transform: brightness(0.5);
+    }
+  }
 </style>

@@ -1,0 +1,1 @@
+ALTER TABLE "watchlist"."watch_items" ADD COLUMN "order" serial NOT NULL;

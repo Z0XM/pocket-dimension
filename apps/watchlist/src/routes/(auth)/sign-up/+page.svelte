@@ -1,5 +1,5 @@
 <script lang="ts">
-import { LoaderCircle } from "@lucide/svelte";
+import { LoaderCircleIcon } from "@lucide/svelte";
 import { goto } from "$app/navigation";
 import { Button } from "$components/ui/button/index.js";
 import * as Field from "$components/ui/field/index.js";
@@ -110,7 +110,7 @@ async function handleSubmit(e: SubmitEvent) {
     <Field.Field>
       <Button type="submit" disabled={loading}>
         {#if loading}
-          <LoaderCircle class="animate-spin"/>
+          <LoaderCircleIcon class="animate-spin"/>
         {:else}
           Create Account
         {/if}

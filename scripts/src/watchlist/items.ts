@@ -2,7 +2,12 @@ import { db, schema } from "@pocket-dimension/db";
 import { v7 as uuidv7 } from "uuid";
 import { getAdminUser, parseWatchlistCsv } from "./base";
 
-const watchlistJson = await parseWatchlistCsv();
+const watchlistJson = (await parseWatchlistCsv()).sort((a, b) => {
+  const aIndex = parseInt(a.index, 10);
+  const bIndex = parseInt(b.index, 10);
+  return aIndex - bIndex;
+});
+
 const adminUser = await getAdminUser();
 
 const watchItems: (typeof schema.watchItems.$inferInsert)[] = [];
@@ -14,9 +19,7 @@ const existingLanguages = await db.query.watchLanguages.findMany({
     language: true,
   },
 });
-const existingLanguagesMap = new Map(
-  existingLanguages.map((language) => [language.language, language.id])
-);
+const existingLanguagesMap = new Map(existingLanguages.map((language) => [language.language, language.id]));
 
 const existingTags = await db.query.watchTags.findMany({
   columns: {
@@ -63,20 +66,16 @@ watchlistJson.forEach((item) => {
   watchItems.push({
     id: watchItemId,
     title: item.title,
-    type: item.type.includes("Movie")
-      ? "movie"
-      : item.type.includes("Series")
-        ? "series"
-        : "shorts",
+    type: item.type.includes("Movie") ? "movie" : item.type.includes("Series") ? "series" : "shorts",
     languageId,
-    seasons: item.seasons ? parseInt(item.seasons) : null,
+    seasons: item.seasons ? parseInt(item.seasons, 10) : null,
     createdById: adminUser.id,
     updatedById: adminUser.id,
   });
 });
 
-Bun.write("watchlist-items.json", JSON.stringify(watchItems, null, 2));
-Bun.write("watchlist-item-tags.json", JSON.stringify(watchItemTags, null, 2));
+// Bun.write("watchlist-items.json", JSON.stringify(watchItems, null, 2));
+// Bun.write("watchlist-item-tags.json", JSON.stringify(watchItemTags, null, 2));
 
 await db.transaction(async (tx) => {
   const insertedWatchItems = await tx.insert(schema.watchItems).values(watchItems);

@@ -34,7 +34,7 @@
     "@vitest/coverage-v8": "latest",
     "husky": "latest",
     "lint-staged": "latest",
-    "turbo": "latest",
+    "turbo": "^2.7.2",
     "typescript": "latest",
     "vitest": "latest"
   },

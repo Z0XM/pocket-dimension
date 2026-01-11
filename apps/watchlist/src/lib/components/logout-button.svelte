@@ -1,5 +1,5 @@
 <script lang="ts">
-import { LoaderCircle, LogOutIcon } from "@lucide/svelte";
+import { LoaderCircleIcon, LogOutIcon } from "@lucide/svelte";
 import { goto } from "$app/navigation";
 import { Button } from "$components/ui/button/index.js";
 import { authClient } from "$lib/auth-client.js";
@@ -23,7 +23,7 @@ const { class: className } = $props();
 
 <Button variant='outline' onclick={handleLogout} disabled={loading} class={cn("flex items-center gap-2 px-4 py-2", className)}>
   {#if loading}
-    <LoaderCircle class="animate-spin" />
+    <LoaderCircleIcon class="animate-spin" />
   {:else}
   Logout <LogOutIcon  />
   {/if}

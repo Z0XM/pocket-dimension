@@ -1,96 +1,164 @@
-import { db, schema } from "@pocket-dimension/db";
-import { asc, eq, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { db, type schema } from "@pocket-dimension/db";
+import { sql } from "drizzle-orm";
 
 export const getWatchlistForUser = async (
   user?: typeof schema.user.$inferSelect,
   options?: {
     pageIndex?: number;
+    searchQuery?: string;
+    sorting?: Array<{ column: string; direction: "asc" | "desc" }>;
+    filters?: Array<{ column: string; values: string[] }>;
   }
 ) => {
-  const dbItems = alias(schema.watchItems, "items");
-  const dbItemTags = alias(schema.watchItemTags, "item_tags");
-  const dbWatchTags = alias(schema.watchTags, "watch_tags");
-  const dbAggRatings = alias(schema.watchItemRatings, "agg_ratings");
-  const dbMyRatings = alias(schema.watchItemRatings, "my_ratings");
+  const searchQuery = options?.searchQuery;
+  const sorting = options?.sorting;
+  const filters = options?.filters;
 
-  const tags_sub = db
-    .select({
-      watchItemId: dbItemTags.watchItemId,
-      tags: sql<string[]>`array_agg(${dbWatchTags.name})`.as("tags"),
-    })
-    .from(dbItemTags)
-    .leftJoin(dbWatchTags, eq(dbWatchTags.id, dbItemTags.watchTagId))
-    .groupBy(dbItemTags.watchItemId)
-    .as("tags_sub");
+  const globalAggQuery = sql`
+    select
+      r.watch_item_id,
+      avg(case when r.infinity or r.shitty then null else r.rating end) as avg_rating,
+      sum(case when r.infinity then 1 else 0 end) as infinity_counts,
+      sum(case when r.shitty then 1 else 0 end) as shitty_counts
+    from watchlist.watch_item_ratings r
+    group by r.watch_item_id
+  `;
 
-  const agg_ratings_sub = db
-    .select({
-      watchItemId: dbAggRatings.watchItemId,
-      avgRating:
-        sql<number>`avg(case when ${dbAggRatings.infinity} then 10 when ${dbAggRatings.shitty} then 0 else ${dbAggRatings.rating} end)`.as(
-          "avg_ating"
-        ),
-      infinityCounts: sql<number>`sum(case when ${dbAggRatings.infinity} then 1 else 0 end)`.as(
-        "infinity_counts"
-      ),
-      shittyCounts: sql<number>`sum(case when ${dbAggRatings.shitty} then 1 else 0 end)`.as(
-        "shitty_counts"
-      ),
-    })
-    .from(dbAggRatings)
-    .groupBy(dbAggRatings.watchItemId)
-    .as("agg_ratings_sub");
+  const myAggQuery = sql`
+    select
+      r.watch_item_id,
+      r.rating as my_rating,
+      r.infinity as my_infinity,
+      r.shitty as my_shitty,
+      r.progress_status as my_progress_status
+    from watchlist.watch_item_ratings r
+    where r.user_id = ${user?.id ?? null}::uuid
+  `;
 
-  const my_ratings_sub = db
-    .select({
-      watchItemId: dbMyRatings.watchItemId,
-      myRating: dbMyRatings.rating,
-      myInfinity: dbMyRatings.infinity,
-      myShitty: dbMyRatings.shitty,
-      myWatchProgress: dbMyRatings.progressStatus,
-      myDroppedAtSeason: dbMyRatings.droppedAtSeason,
-      myDroppedAtEpisode: dbMyRatings.droppedAtEpisode,
-      // myReview: dbMyRatings.review,
-      // myRecommendation: dbMyRatings.recommendation,
-    })
-    .from(dbMyRatings)
-    .where(
-      sql`${user?.id ?? null}::uuid is not null and ${dbMyRatings.userId} = ${user?.id ?? null}::uuid`
-    )
-    .as("my_ratings_sub");
+  const connectedTagsQuery = sql`
+    select
+      wt.watch_item_id,
+      string_agg(t.name, ', ' order by t.name asc) as tags
+    from watchlist.watch_item_tags wt
+    left join watchlist.watch_tags t on wt.watch_tag_id = t.id
+    group by wt.watch_item_id
+  `;
 
-  const watchItems = await db
-    .select({
-      id: dbItems.id,
-      title: dbItems.title,
-      releaseStatus: dbItems.releaseStatus,
-      seasons: dbItems.seasons,
-      type: dbItems.type,
-      language: schema.watchLanguages.language,
-      tags: tags_sub.tags,
-      avgRating: agg_ratings_sub.avgRating,
-      infinityCounts: agg_ratings_sub.infinityCounts,
-      shittyCounts: agg_ratings_sub.shittyCounts,
-      myRating: my_ratings_sub.myRating,
-      myInfinity: my_ratings_sub.myInfinity,
-      myShitty: my_ratings_sub.myShitty,
-      myWatchProgress: my_ratings_sub.myWatchProgress,
-      myDroppedAtSeason: my_ratings_sub.myDroppedAtSeason,
-      myDroppedAtEpisode: my_ratings_sub.myDroppedAtEpisode,
-      // myReview: my_ratings_sub.myReview,
-      // myRecommendation: my_ratings_sub.myRecommendation,
-    })
-    .from(dbItems)
-    .leftJoin(schema.watchLanguages, eq(dbItems.languageId, schema.watchLanguages.id))
-    .leftJoin(tags_sub, eq(tags_sub.watchItemId, dbItems.id))
-    .leftJoin(agg_ratings_sub, eq(agg_ratings_sub.watchItemId, dbItems.id))
-    .leftJoin(my_ratings_sub, eq(my_ratings_sub.watchItemId, dbItems.id))
-    .orderBy(asc(dbItems.title))
-    .limit(25)
-    .offset((options?.pageIndex ?? 0) * 25);
+  const withQuery = sql`
+    with global_agg as (${globalAggQuery}),
+    my_agg as (${myAggQuery}),
+    tags as (${connectedTagsQuery})
+  `;
+
+  const languageFilterValues = filters?.find((filter) => filter.column === "language")?.values;
+  const progressStatusFilterValues = filters?.find((filter) => filter.column === "my_progress_status")?.values;
+  const tagsFilterValues = filters?.find((filter) => filter.column === "tags")?.values;
+  const typeFilterValues = filters?.find((filter) => filter.column === "type")?.values;
+
+  const languageFilterQuery =
+    languageFilterValues && languageFilterValues.length > 0
+      ? sql`l.language = any(array[${sql.join(languageFilterValues, sql`, `)}]::text[])`
+      : sql`true`;
+  const progressStatusFilterQuery =
+    progressStatusFilterValues && progressStatusFilterValues.length > 0
+      ? sql`mr.my_progress_status = any(array[${sql.join(progressStatusFilterValues, sql`, `)}]::text[])`
+      : sql`true`;
+  const tagsFilterQuery =
+    tagsFilterValues && tagsFilterValues.length > 0
+      ? sql`(${sql.join(
+          tagsFilterValues.map((tag) => sql`t.tags ilike ${`%${tag}%`}`),
+          sql` or `
+        )})`
+      : sql`true`;
+  const typeFilterQuery =
+    typeFilterValues && typeFilterValues.length > 0 ? sql`w.type::text = any(array[${sql.join(typeFilterValues, sql`, `)}]::text[])` : sql`true`;
+
+  const baseQuery = sql`
+    from watchlist.watch_items w
+    left join watchlist.watch_languages l on l.id = w.language_id
+    left join global_agg gr on gr.watch_item_id = w.id
+    left join my_agg mr on mr.watch_item_id = w.id
+    left join tags t on t.watch_item_id = w.id
+    where ${searchQuery ? sql`w.title ilike ${`%${searchQuery}%`}` : sql`true`}
+  `;
+
+  // Build ORDER BY clause
+  // Reverse the sorting array so the most re cently clicked column is primary sort
+  const orderByClause =
+    sorting && sorting.length > 0
+      ? (() => {
+          const reversedSorting = [...sorting].reverse();
+          const orderByParts = reversedSorting.map((sort) => {
+            const direction = sort.direction === "desc" ? sql`desc nulls last` : sql`asc nulls first`;
+            switch (sort.column) {
+              case "order":
+                return sql`w.order ${direction}`;
+              case "title":
+                return sql`w.title ${direction}`;
+              case "type":
+                return sql`w.type ${direction}`;
+              case "language":
+                return sql`l.language ${direction}`;
+              case "my_rating":
+                return sql`
+                case
+                  when mr.my_infinity = true then 100
+                  when mr.my_shitty = true then -100
+                  else mr.my_rating
+                end ${direction}
+              `;
+              case "avg_rating":
+                return sql`
+                (coalesce(gr.avg_rating, 0) +
+                coalesce(gr.infinity_counts, 0) * 100 +
+                coalesce(gr.shitty_counts, 0) * -100)
+                ${direction}
+              `;
+              case "my_progress_status":
+                return sql`mr.my_progress_status ${direction}`;
+              default:
+                return sql`w.title ${direction}`;
+            }
+          });
+          return sql`order by ${sql.join(orderByParts, sql`, `)}`;
+        })()
+      : // Default sorting: title ascending
+        sql`order by w.order desc nulls last`;
+
+  const tableQuery = sql`
+    ${withQuery}
+    select
+      w.order,
+      w.title,
+      w.type,
+      l.language,
+      t.tags,
+      gr.avg_rating,
+      gr.infinity_counts,
+      gr.shitty_counts,
+      mr.my_rating,
+      mr.my_infinity,
+      mr.my_shitty,
+      mr.my_progress_status
+    ${baseQuery}
+    and ${languageFilterQuery}
+    and ${progressStatusFilterQuery}
+    and ${tagsFilterQuery}
+    and ${typeFilterQuery}
+    ${orderByClause}
+    limit 25
+    offset ${(options?.pageIndex ?? 0) * 25}
+  `;
+
+  const watchItems = (await db.execute(tableQuery)).rows;
 
   return {
     watchItems,
+    withQuery,
+    baseQuery,
+    languageFilterQuery,
+    progressStatusFilterQuery,
+    tagsFilterQuery,
+    typeFilterQuery,
   };
 };

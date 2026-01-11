@@ -1,16 +1,12 @@
 import { relations } from "drizzle-orm";
-import { boolean, integer, numeric, pgSchema, text, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, numeric, pgSchema, serial, text, unique, uuid } from "drizzle-orm/pg-core";
 import * as auth from "./auth";
 import { actionsByUser, id, timestamps } from "./common";
 
 export const watchlistSchema = pgSchema("watchlist");
 
 export const watchItemType = watchlistSchema.enum("watch_item_type", ["movie", "series", "shorts"]);
-export const watchItemReleaseStatus = watchlistSchema.enum("watch_item_release_status", [
-  "released",
-  "on-going",
-  "coming-soon",
-]);
+export const watchItemReleaseStatus = watchlistSchema.enum("watch_item_release_status", ["released", "on-going", "coming-soon"]);
 
 export const watchItems = watchlistSchema.table(
   "watch_items",
@@ -25,6 +21,7 @@ export const watchItems = watchlistSchema.table(
       .notNull()
       .references(() => watchLanguages.id, { onDelete: "cascade" }),
     releaseStatus: watchItemReleaseStatus("release_status").default("released"),
+    order: serial("order").notNull(),
   },
   (table) => [unique("watch_items_title_unique").on(table.title)]
 );
@@ -42,12 +39,7 @@ export const watchItemTags = watchlistSchema.table(
       .notNull()
       .references(() => watchTags.id, { onDelete: "cascade" }),
   },
-  (table) => [
-    unique("watch_item_tags_watch_item_id_watch_tag_id_unique").on(
-      table.watchItemId,
-      table.watchTagId
-    ),
-  ]
+  (table) => [unique("watch_item_tags_watch_item_id_watch_tag_id_unique").on(table.watchItemId, table.watchTagId)]
 );
 
 export const watchTags = watchlistSchema.table(
@@ -72,19 +64,9 @@ export const watchLanguages = watchlistSchema.table(
   (table) => [unique("watch_languages_language_unique").on(table.language)]
 );
 
-export const watchRecommendations = watchlistSchema.enum("watch_recommendations", [
-  "must_watch",
-  "go_for_it",
-  "one_time_watch",
-  "skip_it",
-]);
+export const watchRecommendations = watchlistSchema.enum("watch_recommendations", ["must_watch", "go_for_it", "one_time_watch", "skip_it"]);
 
-export const watchProgressStatus = watchlistSchema.enum("watch_progress_status", [
-  "to_watch",
-  "watching",
-  "watched",
-  "dropped",
-]);
+export const watchProgressStatus = watchlistSchema.enum("watch_progress_status", ["to_watch", "watching", "watched", "dropped"]);
 
 export const watchItemRatings = watchlistSchema.table(
   "watch_item_ratings",
@@ -107,9 +89,7 @@ export const watchItemRatings = watchlistSchema.table(
     droppedAtSeason: integer("dropped_at_season"),
     droppedAtEpisode: integer("dropped_at_episode"),
   },
-  (table) => [
-    unique("watch_item_ratings_watch_item_id_user_id_unique").on(table.watchItemId, table.userId),
-  ]
+  (table) => [unique("watch_item_ratings_watch_item_id_user_id_unique").on(table.watchItemId, table.userId)]
 );
 
 export const watchItemRelations = relations(watchItems, ({ many, one }) => ({

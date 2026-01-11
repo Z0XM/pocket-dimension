@@ -1,5 +1,5 @@
 <script lang="ts">
-import { LoaderCircle } from "@lucide/svelte";
+import { LoaderCircleIcon } from "@lucide/svelte";
 import { goto } from "$app/navigation";
 import { Button } from "$components/ui/button/index.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "$components/ui/field/index.js";
@@ -21,16 +21,18 @@ async function handleSubmit(e: SubmitEvent) {
   loading = true;
 
   try {
-
-    const result = loginBy === "email" ? await authClient.signIn.email({
-      email,
-      password,
-      rememberMe: true,
-    }) : await authClient.signIn.username({
-      username,
-      password,
-      rememberMe: true,
-    });
+    const result =
+      loginBy === "email"
+        ? await authClient.signIn.email({
+            email,
+            password,
+            rememberMe: true,
+          })
+        : await authClient.signIn.username({
+            username,
+            password,
+            rememberMe: true,
+          });
 
     if (result.error) {
       error = result.error.message ?? "Unable to login";
@@ -46,7 +48,6 @@ async function handleSubmit(e: SubmitEvent) {
     loading = false;
   }
 }
-
 </script>
 
 
@@ -90,7 +91,7 @@ async function handleSubmit(e: SubmitEvent) {
     <Field>
       <Button type="submit" disabled={loading}>
         {#if loading}
-          <LoaderCircle class="animate-spin"/>
+          <LoaderCircleIcon class="animate-spin"/>
         {:else}
           Login
         {/if}

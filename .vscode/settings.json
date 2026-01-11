@@ -89,6 +89,8 @@
     "editor.defaultFormatter": null
   },
   "[svelte]": {
-    "editor.defaultFormatter": "svelte.svelte-vscode"
-  }
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "todo-tree.tree.showBadges": true,
+  "todo-tree.tree.disableCompactFolders": false
 }
