@@ -22,6 +22,7 @@ import { Badge } from "$components/ui/badge";
 import { Button } from "$components/ui/button";
 import * as DropdownMenu from "$components/ui/dropdown-menu";
 import { Input } from "$components/ui/input";
+import icon from "$lib/assets/icon.svg";
 import { authClient } from "$lib/auth-client";
 
 const session = authClient.useSession();
@@ -426,6 +427,7 @@ $effect(() => {
   {#if !page.route.id?.startsWith("/(auth)/")}
   <div class="flex items-center gap-4 md:gap-8 w-full md:w-auto md:justify-start">
   <div class="flex items-center gap-2">
+    <img src={icon} alt="Watchlist" class="size-6" />
     {#if isEditingName && !isDefaultView(selectedViewName)}
       <Input
         bind:ref={nameInputRef}
