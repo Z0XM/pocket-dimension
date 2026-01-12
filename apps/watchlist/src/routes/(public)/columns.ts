@@ -1,9 +1,10 @@
-import type { schema } from "@pocket-dimension/db";
 import type { ColumnDef } from "@tanstack/table-core";
 import { createRawSnippet } from "svelte";
 import { renderComponent, renderSnippet } from "$lib/components/ui/data-table/index.js";
 import ClickableCell from "./data-table-helpers/clickable-cell.svelte";
 import ClickableTagsCell from "./data-table-helpers/clickable-tags-cell.svelte";
+
+export type WatchProgressStatus = "watch_later" | "watching" | "watched" | "dropped";
 
 export type Watchlist = {
   id: string;
@@ -20,7 +21,7 @@ export type Watchlist = {
   my_rating: string | null;
   my_infinity: boolean | null;
   my_shitty: boolean | null;
-  my_progress_status: (typeof schema.watchProgressStatus.enumValues)[number] | null;
+  my_progress_status: WatchProgressStatus | null;
 };
 
 export const columns: ColumnDef<Watchlist>[] = [

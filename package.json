@@ -38,6 +38,9 @@
     "typescript": "latest",
     "vitest": "latest"
   },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "packageManager": "bun@1.1.38",
   "workspaces": [
     "apps/**",
