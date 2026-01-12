@@ -1,6 +1,7 @@
 <script lang="ts" generics="TData, TValue">
 import { ArrowDownIcon, ArrowUpIcon, Columns2Icon, FilterIcon, GripVerticalIcon, XIcon } from "@lucide/svelte";
 import { type ColumnDef, getCoreRowModel, type SortingState, type VisibilityState } from "@tanstack/table-core";
+import { setContext } from "svelte";
 import { dndzone } from "svelte-dnd-action";
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
@@ -270,6 +271,23 @@ function handleFilterChange(filterType: "language" | "tags" | "progress" | "type
   goto(url.toString(), { keepFocus: true, invalidateAll: true });
 }
 
+// Add a filter value (used by clickable cells)
+function addFilterValue(filterType: "language" | "tags" | "progress" | "type", value: string) {
+  const currentValues = filters[filterType];
+  // Don't add if already in filter
+  if (currentValues.includes(value)) {
+    return;
+  }
+  handleFilterChange(filterType, [...currentValues, value]);
+}
+
+// Provide filter context for child components
+setContext("filterContext", {
+  handleFilterChange,
+  addFilterValue,
+  filters: () => filters,
+});
+
 // Remove a single filter value
 function removeFilter(filterType: "language" | "tags" | "progress" | "type", value: string) {
   const currentValues = filters[filterType];
@@ -287,7 +305,8 @@ let tagOptions = $derived.by(() => {
 });
 
 let progressOptions = $derived.by(() => {
-  return filterOptions?.progressStatuses?.map((p) => p.my_progress_status).filter(Boolean) ?? [];
+  const statuses = filterOptions?.progressStatuses?.map((p) => p.my_progress_status).filter(Boolean) ?? [];
+  return ["Unmarked", ...statuses];
 });
 
 let typeOptions = $derived.by(() => {
@@ -480,6 +499,8 @@ $effect(() => {
   };
 });
 </script>
+
+<!-- TODO: CRUD -->
 
 {#if renderTable}
   <div>

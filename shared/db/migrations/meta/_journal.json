@@ -43,6 +43,34 @@
       "when": 1768123857367,
       "tag": "0005_serial watch items",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1768206160350,
+      "tag": "0006_watchlist views",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1768217041989,
+      "tag": "0007_fav view",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1768217304748,
+      "tag": "0008_fav date",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1768219017321,
+      "tag": "0009_watch later",
+      "breakpoints": true
     }
   ]
 }

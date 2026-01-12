@@ -9,6 +9,15 @@ import { Toaster as Sonner, type ToasterProps as SonnerProps } from "svelte-sonn
 
 let { ...restProps }: SonnerProps = $props();
 </script>
+
+<style>
+  :global([data-sonner-toast]) {
+    background: rgba(184, 96, 255, 0.1) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+  }
+</style>
+
 <Sonner
   theme={mode.current}
   class="toaster group"

@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { boolean, integer, numeric, pgSchema, serial, text, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, json, numeric, pgSchema, serial, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import * as auth from "./auth";
 import { actionsByUser, id, timestamps } from "./common";
 
@@ -66,7 +66,7 @@ export const watchLanguages = watchlistSchema.table(
 
 export const watchRecommendations = watchlistSchema.enum("watch_recommendations", ["must_watch", "go_for_it", "one_time_watch", "skip_it"]);
 
-export const watchProgressStatus = watchlistSchema.enum("watch_progress_status", ["to_watch", "watching", "watched", "dropped"]);
+export const watchProgressStatus = watchlistSchema.enum("watch_progress_status", ["watch_later", "watching", "watched", "dropped"]);
 
 export const watchItemRatings = watchlistSchema.table(
   "watch_item_ratings",
@@ -90,6 +90,23 @@ export const watchItemRatings = watchlistSchema.table(
     droppedAtEpisode: integer("dropped_at_episode"),
   },
   (table) => [unique("watch_item_ratings_watch_item_id_user_id_unique").on(table.watchItemId, table.userId)]
+);
+
+export const watchlistViews = watchlistSchema.table(
+  "watchlist_views",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    filters: json("filters").notNull().default({}),
+    isFavorite: boolean("is_favorite").notNull().default(false),
+    favoriteDate: timestamp("favorite_date"),
+  },
+  (table) => [unique("watchlist_views_user_id_name_unique").on(table.userId, table.name)]
 );
 
 export const watchItemRelations = relations(watchItems, ({ many, one }) => ({

@@ -1,0 +1,1 @@
+ALTER TABLE "watchlist"."watchlist_views" ADD COLUMN "favorite_date" timestamp;

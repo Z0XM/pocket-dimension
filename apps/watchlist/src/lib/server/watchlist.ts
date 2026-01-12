@@ -61,13 +61,27 @@ export const getWatchlistForUser = async (
       : sql`true`;
   const progressStatusFilterQuery =
     progressStatusFilterValues && progressStatusFilterValues.length > 0
-      ? sql`mr.my_progress_status = any(array[${sql.join(progressStatusFilterValues, sql`, `)}]::text[])`
+      ? (() => {
+          const hasUnmarked = progressStatusFilterValues.includes("Unmarked");
+          const otherValues = progressStatusFilterValues.filter((v) => v !== "Unmarked");
+
+          if (hasUnmarked && otherValues.length > 0) {
+            // Both "Unmarked" and other values selected
+            return sql`(mr.my_progress_status is null or mr.my_progress_status::text = any(array[${sql.join(otherValues, sql`, `)}]::text[]))`;
+          } else if (hasUnmarked) {
+            // Only "Unmarked" selected
+            return sql`mr.my_progress_status is null`;
+          } else {
+            // Only other values selected
+            return sql`mr.my_progress_status::text = any(array[${sql.join(otherValues, sql`, `)}]::text[])`;
+          }
+        })()
       : sql`true`;
   const tagsFilterQuery =
     tagsFilterValues && tagsFilterValues.length > 0
       ? sql`(${sql.join(
           tagsFilterValues.map((tag) => sql`t.tags ilike ${`%${tag}%`}`),
-          sql` or `
+          sql` and `
         )})`
       : sql`true`;
   const typeFilterQuery =

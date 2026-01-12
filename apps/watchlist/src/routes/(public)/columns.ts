@@ -1,7 +1,9 @@
 import type { schema } from "@pocket-dimension/db";
 import type { ColumnDef } from "@tanstack/table-core";
 import { createRawSnippet } from "svelte";
-import { renderSnippet } from "$lib/components/ui/data-table/index.js";
+import { renderComponent, renderSnippet } from "$lib/components/ui/data-table/index.js";
+import ClickableCell from "./data-table-helpers/clickable-cell.svelte";
+import ClickableTagsCell from "./data-table-helpers/clickable-tags-cell.svelte";
 
 export type Watchlist = {
   id: string;
@@ -37,13 +39,7 @@ export const columns: ColumnDef<Watchlist>[] = [
     header: "Tags",
     enableSorting: false,
     cell: ({ row }) => {
-      const tagsCellSnippet = createRawSnippet<[{ tags: string }]>((getTags) => {
-        const { tags } = getTags();
-        return {
-          render: () => `<div class="capitalize">${tags}</div>`,
-        };
-      });
-      return renderSnippet(tagsCellSnippet, { tags: row.original.tags });
+      return renderComponent(ClickableTagsCell, { tags: row.original.tags });
     },
   },
   {
@@ -51,32 +47,26 @@ export const columns: ColumnDef<Watchlist>[] = [
     header: "Type",
     enableSorting: true,
     cell: ({ row }) => {
-      const typeCellSnippet = createRawSnippet<[{ type: string }]>((getType) => {
-        const { type } = getType();
-        return {
-          render: () => `<div class="capitalize">${type}</div>`,
-        };
-      });
-      return renderSnippet(typeCellSnippet, { type: row.original.type });
+      return renderComponent(ClickableCell, { value: row.original.type, filterType: "type" });
     },
   },
   {
     accessorKey: "language",
     header: "Language",
     enableSorting: true,
+    cell: ({ row }) => {
+      return renderComponent(ClickableCell, { value: row.original.language, filterType: "language" });
+    },
   },
   {
     accessorKey: "my_progress_status",
     header: "Progress",
     enableSorting: true,
     cell: ({ row }) => {
-      const progressStatusCellSnippet = createRawSnippet<[{ my_progress_status: string | null }]>((getProgressStatus) => {
-        const { my_progress_status } = getProgressStatus();
-        return {
-          render: () => `<div class="capitalize">${my_progress_status ?? ""}</div>`,
-        };
+      return renderComponent(ClickableCell, {
+        value: row.original.my_progress_status ?? null,
+        filterType: "progress",
       });
-      return renderSnippet(progressStatusCellSnippet, { my_progress_status: row.original.my_progress_status });
     },
   },
   {

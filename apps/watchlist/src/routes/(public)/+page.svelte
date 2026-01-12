@@ -13,14 +13,19 @@ let { data }: PageProps = $props();
 const session = authClient.useSession();
 const isSignedIn = $derived(!!$session.data?.user);
 
-// Filter columns to exclude "myRating" if user is not signed in
+// Filter columns to exclude "my_rating" and "my_progress_status" if user is not signed in
 const filteredColumns = $derived(
   isSignedIn
     ? columns
     : columns.filter((col) => {
         const id = "id" in col ? col.id : null;
         const accessorKey = "accessorKey" in col ? col.accessorKey : null;
-        return id !== "myRating" && accessorKey !== "myRating";
+        return (
+          id !== "my_rating" &&
+          accessorKey !== "my_rating" &&
+          id !== "my_progress_status" &&
+          accessorKey !== "my_progress_status"
+        );
       })
 );
 
