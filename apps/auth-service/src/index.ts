@@ -27,23 +27,23 @@ const app = new Elysia()
       allowedHeaders: ["Content-Type", "Authorization"],
     })
   )
-  .use(
-    swagger({
-      documentation: {
-        info: {
-          title: "Auth Service API",
-          version: "1.0.0",
-          description: "Authentication service API documentation",
-        },
-        tags: [
-          {
-            name: "auth",
-            description: "Authentication endpoints",
-          },
-        ],
-      },
-    })
-  )
+  // .use(
+  //   swagger({
+  //     documentation: {
+  //       info: {
+  //         title: "Auth Service API",
+  //         version: "1.0.0",
+  //         description: "Authentication service API documentation",
+  //       },
+  //       tags: [
+  //         {
+  //           name: "auth",
+  //           description: "Authentication endpoints",
+  //         },
+  //       ],
+  //     },
+  //   })
+  // )
   .use(authHandler)
   .use(authMiddleware)
   .get(
