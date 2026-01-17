@@ -5,49 +5,25 @@ import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
 
 export async function handle({ event, resolve }) {
-  const routeId = event.route.id || "unknown";
-  const pathname = event.url.pathname;
-  let session = null;
+  // Fetch current session from Better Auth
+  const session = await auth.api.getSession({
+    headers: event.request.headers,
+  });
 
-  try {
-    console.log(event.request.headers.toJSON());
-    // Fetch current session from Better Auth
+  // Make session and user available on server
+  if (session) {
+    event.locals.session = session.session;
+    event.locals.user = session.user as typeof schema.user.$inferSelect;
+  }
 
-    const x = await auth.api.ok({
-      headers: event.request.headers,
-    });
-    console.log("x", x);
-
-    session = await auth.api.getSession({
-      headers: event.request.headers,
-    });
-
-    console.log(session);
-
-    // Make session and user available on server
+  if (event.route.id?.startsWith("/(auth)/")) {
     if (session) {
-      event.locals.session = session.session;
-      event.locals.user = session.user as typeof schema.user.$inferSelect;
-      console.log(`[Auth] Session found for user ${session.user.id} (${session.user.email}) - Route: ${routeId} - Path: ${pathname}`);
-    } else {
-      console.log(`[Auth] No session found - Route: ${routeId} - Path: ${pathname}`);
+      return redirect(307, "/");
     }
-
-    if (event.route.id?.startsWith("/(auth)/")) {
-      if (session) {
-        console.log(`[Auth] Redirecting authenticated user from auth route to home - User: ${session.user.email}`);
-        return redirect(307, "/");
-      }
-    } else if (event.route.id?.startsWith("/(protected)/")) {
-      if (!session) {
-        console.log(`[Auth] Redirecting unauthenticated user from protected route to login - Route: ${routeId}`);
-        return redirect(307, "/login");
-      }
+  } else if (event.route.id?.startsWith("/(protected)/")) {
+    if (!session) {
+      return redirect(307, "/login");
     }
-  } catch (error) {
-    console.error(`[Auth] Error during authentication check - Route: ${routeId} - Path: ${pathname}`, error);
-    // Continue without session if there's an error
-    // This allows the request to proceed, but protected routes will still be handled by svelteKitHandler
   }
 
   return svelteKitHandler({ event, resolve, auth, building });

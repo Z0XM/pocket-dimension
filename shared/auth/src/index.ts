@@ -2,8 +2,11 @@ import { db } from "@pocket-dimension/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username } from "better-auth/plugins";
+import { env } from "./lib/env";
 
 export const auth = betterAuth({
+  baseURL: env.BETTER_AUTH_URL,
+  trustedOrigins: env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()),
   user: {
     additionalFields: {
       role: {
@@ -27,6 +30,17 @@ export const auth = betterAuth({
     database: {
       generateId: false,
     },
+    cookiePrefix: "better-auth",
+    crossSubDomainCookies: {
+      enabled: true,
+      domain: env.BETTER_AUTH_COOKIE_DOMAIN,
+    },
+    defaultCookieAttributes: {
+      secure: true,
+      httpOnly: true,
+      sameSite: "none",
+    },
+    useSecureCookies: true,
   },
   plugins: [
     username({
