@@ -400,16 +400,40 @@
     return filterOptions?.tags?.map((t) => t.tag).filter(Boolean) ?? [];
   });
 
+  // Helper function to format progress status for display
+  function formatProgressStatus(status: string | null): string {
+    if (!status) return "Unmarked";
+    return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  // Helper function to convert formatted progress back to raw value
+  function unformatProgressStatus(formatted: string): string {
+    if (formatted === "Unmarked") return "";
+    return formatted.replace(/\s+/g, "_").toLowerCase();
+  }
+
   let progressOptions = $derived.by(() => {
     const statuses =
       filterOptions?.progressStatuses
         ?.map((p) => p.my_progress_status)
         .filter(Boolean) ?? [];
-    return ["Unmarked", ...statuses];
+    // Format status values for display (e.g., "watch_later" -> "Watch Later")
+    const formattedStatuses = statuses.map((s) => formatProgressStatus(s));
+    return ["Unmarked", ...formattedStatuses];
   });
 
+  // Helper function to capitalize type values
+  function capitalizeType(type: string): string {
+    if (!type) return type;
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+
   let typeOptions = $derived.by(() => {
-    return filterOptions?.types?.map((t) => t.type).filter(Boolean) ?? [];
+    const rawTypes =
+      filterOptions?.types?.map((t) => t.type).filter(Boolean) ?? [];
+    // Format type values for display (e.g., "movie" -> "Movie")
+    const formattedTypes = rawTypes.map((t) => capitalizeType(t));
+    return formattedTypes;
   });
 
   // Combine original data with new rows from edit mode
@@ -736,7 +760,11 @@
 
     // Validate new rows have required fields
     for (const newItem of changeset.newItems) {
-      if (!newItem.title || !newItem.languageId || !newItem.type) {
+      if (
+        !newItem.title?.trim() ||
+        !newItem.languageId?.trim() ||
+        !newItem.type?.trim()
+      ) {
         toast.error("New rows must have Title, Language, and Type filled in.");
         return;
       }
@@ -845,6 +873,7 @@
 
       if (!response.ok) {
         toast.error(result.error || "Failed to save changes.");
+        isSaving = false;
         return;
       }
 
@@ -855,19 +884,6 @@
         }
       }
 
-      // Clear successful changes
-      if (result.results) {
-        for (const id of result.results.updated || []) {
-          editMode.clearRowEdits(id);
-        }
-        for (const { tempId } of result.results.created || []) {
-          editMode.clearNewRow(tempId);
-        }
-        for (const id of result.results.deleted || []) {
-          editMode.clearDeletedRow(id);
-        }
-      }
-
       const successCount =
         (result.results?.updated?.length || 0) +
         (result.results?.created?.length || 0) +
@@ -875,18 +891,30 @@
 
       if (successCount > 0) {
         toast.success(`Successfully saved ${successCount} change(s).`);
-        // Refresh the page to get updated data
-        goto(page.url.toString(), { invalidateAll: true });
-      }
 
-      // Exit edit mode if no more changes
-      if (!editMode.hasChanges) {
-        editMode.exitEditMode();
+        // DON'T clear edit state or exit edit mode before navigation
+        // This keeps the edited data visible during the save/reload process
+        // preventing the glitch where old data is shown
+
+        // Refresh the page to get updated data
+        // Keep isSaving true during navigation to show loading overlay
+        // The page reload will cause component remount with fresh data from server
+        await goto(page.url.toString(), { invalidateAll: true });
+
+        // After navigation completes (component remounts with fresh state)
+        // Edit mode will be off and data will be fresh from server
+        // So no need to clear edit state or exit edit mode here
+      } else {
+        // No changes saved, exit edit mode if no more changes
+        if (!editMode.hasChanges) {
+          editMode.exitEditMode();
+        }
       }
     } catch (error) {
       console.error("Save error:", error);
       toast.error("An unexpected error occurred while saving.");
     } finally {
+      // Clear saving state after navigation completes
       isSaving = false;
     }
   }
@@ -942,7 +970,7 @@
                 aria-label="Remove filter"
                 disabled={editMode.isEditMode}
               >
-                {value}
+                {formatProgressStatus(value)}
                 <XIcon class="size-3" />
               </Button>
             {/each}
@@ -954,7 +982,7 @@
                 aria-label="Remove filter"
                 disabled={editMode.isEditMode}
               >
-                {value}
+                {capitalizeType(value)}
                 <XIcon class="size-3" />
               </Button>
             {/each}
@@ -972,7 +1000,7 @@
               size="icon"
               onclick={handleEnterEditMode}
               title="Enter edit mode"
-              class="flex items-center justify-center"
+              class="flex items-center dark:hover:bg-white/70 hover:text-accent justify-center"
             >
               <PencilIcon class="size-4" />
             </Button>
@@ -1116,7 +1144,24 @@
         </DropdownMenu.Root>
       </div>
     </div>
-    <div class="rounded-md">
+    <div class="rounded-md relative">
+      <!-- Loading overlay during save -->
+      {#if isSaving}
+        <div
+          class="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-md"
+          role="status"
+          aria-label="Saving changes..."
+        >
+          <div class="flex flex-col items-center gap-3">
+            <div
+              class="size-8 border-4 border-t-transparent border-primary rounded-full animate-spin"
+            ></div>
+            <p class="text-sm font-medium text-muted-foreground">
+              Saving changes...
+            </p>
+          </div>
+        </div>
+      {/if}
       <Table.Root class="border-separate border-spacing-y-2">
         <Table.Header>
           {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}

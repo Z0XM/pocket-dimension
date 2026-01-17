@@ -463,14 +463,39 @@ export function createEditModeState() {
       }
     }
 
-    // Process new rows
-    const newItems = newRows.map((row) => ({
-      tempId: row.tempId,
-      title: row.title,
-      languageId: row.languageId,
-      type: row.type,
-      tags: row.tags,
-    }));
+    // Process new rows - merge with any edits from editedRows
+    const newItems = newRows.map((row) => {
+      const edits = editedRows.get(row.tempId);
+      // Get tags from addedTagsByRow for this new row
+      const addedTags = getAddedTags(row.tempId);
+      // Merge edits from editedRows into the base row data
+      const progressStatus = edits?.my_progress_status !== undefined ? edits.my_progress_status : null;
+      // Ratings are only allowed when progress is "watched" or "dropped"
+      const canHaveRating = progressStatus === "watched" || progressStatus === "dropped";
+
+      const baseItem = {
+        tempId: row.tempId,
+        title: edits?.title ?? row.title,
+        languageId: edits?.languageId ?? row.languageId,
+        language: edits?.language ?? row.language,
+        type: edits?.type ?? row.type,
+        tags: addedTags.length > 0 ? addedTags : row.tags, // Use added tags if any, otherwise base tags
+        progressStatus: progressStatus !== null ? progressStatus : undefined,
+      };
+
+      // Only include rating fields if progress is "watched" or "dropped" and they were edited
+      if (canHaveRating) {
+        return {
+          ...baseItem,
+          rating: edits?.my_rating !== undefined ? (edits.my_rating ? parseFloat(edits.my_rating) : null) : undefined,
+          infinity: edits?.my_infinity !== undefined ? (edits.my_infinity ?? false) : undefined,
+          shitty: edits?.my_shitty !== undefined ? (edits.my_shitty ?? false) : undefined,
+        };
+      }
+
+      // Don't include rating fields if progress is not "watched" or "dropped"
+      return baseItem;
+    });
 
     // Process deleted rows
     const deleteIds = Array.from(deletedRowIds);

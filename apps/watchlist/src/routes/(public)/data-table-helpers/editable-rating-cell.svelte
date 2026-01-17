@@ -34,14 +34,14 @@
     return editedValue !== undefined ? editedValue : progressStatus;
   });
 
-  // Check if progress exists - ratings are only editable when progress is set
-  const hasProgress = $derived(
-    currentProgressStatus !== null && currentProgressStatus !== undefined,
+  // Check if progress is "watched" or "dropped" - ratings are only editable for these statuses
+  const canRate = $derived(
+    currentProgressStatus === "watched" || currentProgressStatus === "dropped",
   );
 
-  // All users can edit their own rating, but only if progress is set
+  // All users can edit their own rating, but only if progress is "watched" or "dropped"
   const canEdit = $derived(
-    editMode.canEditField(editOptions.userRole(), "my_rating") && hasProgress,
+    editMode.canEditField(editOptions.userRole(), "my_rating") && canRate,
   );
 
   // Get current values (edited or original)
@@ -200,12 +200,12 @@
     </div>
   {:else}
     <div
-      class="text-end font-medium {!hasProgress
+      class="text-end font-medium {!canRate
         ? 'text-muted-foreground/50'
         : ''}"
     >
-      {#if !hasProgress}
-        <span title="Set progress to enable rating">-</span>
+      {#if !canRate}
+        <span title="Set progress to 'Watched' or 'Dropped' to enable rating">-</span>
       {:else if currentInfinity}
         <span title="Infinity" class="text-lg">♾️</span>
       {:else if currentShitty}

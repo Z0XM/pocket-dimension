@@ -22,6 +22,10 @@ interface NewItem {
   languageId: string;
   type: string;
   tags?: string[];
+  rating?: number | null;
+  infinity?: boolean;
+  shitty?: boolean;
+  progressStatus?: string | null;
 }
 
 interface BulkUpdateRequest {
@@ -144,6 +148,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 };
 
 async function processUpdate(update: UpdateItem, user: NonNullable<App.Locals["user"]>, errors: BulkUpdateError[], results: { updated: string[] }) {
+  // Check if item exists first
+  const existingItem = await db.select({ id: schema.watchItems.id }).from(schema.watchItems).where(eq(schema.watchItems.id, update.id)).limit(1);
+
+  if (existingItem.length === 0) {
+    errors.push({ id: update.id, message: "Item not found" });
+    return;
+  }
+
   const watchItemUpdates: Partial<typeof schema.watchItems.$inferInsert> = {};
   let hasWatchItemUpdates = false;
 
@@ -164,7 +176,13 @@ async function processUpdate(update: UpdateItem, user: NonNullable<App.Locals["u
   // Update watch item if there are changes
   if (hasWatchItemUpdates) {
     watchItemUpdates.updatedById = user.id;
-    await db.update(schema.watchItems).set(watchItemUpdates).where(eq(schema.watchItems.id, update.id));
+    const result = await db.update(schema.watchItems).set(watchItemUpdates).where(eq(schema.watchItems.id, update.id));
+
+    // Only mark as updated if the update actually affected rows
+    if (result.rowCount === 0) {
+      errors.push({ id: update.id, message: "Failed to update item" });
+      return;
+    }
   }
 
   // Handle rating updates
@@ -179,21 +197,76 @@ async function processUpdate(update: UpdateItem, user: NonNullable<App.Locals["u
       .where(and(eq(schema.watchItemRatings.watchItemId, update.id), eq(schema.watchItemRatings.userId, user.id)))
       .limit(1);
 
+    // Determine the effective progress status (updated value or existing value)
+    let effectiveProgressStatus: string | null = null;
+    if (update.progressStatus !== undefined) {
+      // Validate progressStatus is one of the valid enum values
+      const validStatuses = ["watch_later", "watching", "watched", "dropped"] as const;
+      if (update.progressStatus && !validStatuses.includes(update.progressStatus as (typeof validStatuses)[number])) {
+        errors.push({ id: update.id, field: "progressStatus", message: "Invalid progress status" });
+        return;
+      }
+      effectiveProgressStatus = update.progressStatus as (typeof validStatuses)[number] | null;
+    } else if (existingRating.length > 0) {
+      // Use existing progress status if not being updated
+      effectiveProgressStatus = existingRating[0].progressStatus;
+    }
+
+    // Ratings are only allowed when progress is "watched" or "dropped"
+    const canHaveRating = effectiveProgressStatus === "watched" || effectiveProgressStatus === "dropped";
+
+    // Validate: if rating fields are provided but progress is not "watched" or "dropped", reject them
+    // Exception: if progress is being updated to something other than "watched" or "dropped", we'll clear ratings instead of rejecting
+    if (
+      !canHaveRating &&
+      update.progressStatus === undefined &&
+      (update.rating !== undefined || update.infinity !== undefined || update.shitty !== undefined)
+    ) {
+      errors.push({
+        id: update.id,
+        field: "my_rating",
+        message: "Ratings are only allowed when progress is 'Watched' or 'Dropped'",
+      });
+      return;
+    }
+
     const ratingData: Partial<typeof schema.watchItemRatings.$inferInsert> = {
       updatedById: user.id,
     };
 
-    if (update.rating !== undefined) {
-      ratingData.rating = update.rating?.toString() ?? null;
-    }
-    if (update.infinity !== undefined) {
-      ratingData.infinity = update.infinity;
-    }
-    if (update.shitty !== undefined) {
-      ratingData.shitty = update.shitty;
-    }
     if (update.progressStatus !== undefined) {
-      ratingData.progressStatus = update.progressStatus as any;
+      ratingData.progressStatus = effectiveProgressStatus;
+
+      // If progress is being set to something other than "watched" or "dropped", always clear rating fields
+      if (!canHaveRating) {
+        ratingData.rating = null;
+        ratingData.infinity = false;
+        ratingData.shitty = false;
+      } else {
+        // Progress is "watched" or "dropped" - allow rating fields to be updated
+        if (update.rating !== undefined) {
+          ratingData.rating = update.rating?.toString() ?? null;
+        }
+        if (update.infinity !== undefined) {
+          ratingData.infinity = update.infinity;
+        }
+        if (update.shitty !== undefined) {
+          ratingData.shitty = update.shitty;
+        }
+      }
+    } else {
+      // Progress not being updated - only allow rating fields if current progress is "watched" or "dropped"
+      if (canHaveRating) {
+        if (update.rating !== undefined) {
+          ratingData.rating = update.rating?.toString() ?? null;
+        }
+        if (update.infinity !== undefined) {
+          ratingData.infinity = update.infinity;
+        }
+        if (update.shitty !== undefined) {
+          ratingData.shitty = update.shitty;
+        }
+      }
     }
 
     if (existingRating.length > 0) {
@@ -215,8 +288,11 @@ async function processUpdate(update: UpdateItem, user: NonNullable<App.Locals["u
 
   // Handle tag removals
   if (update.removeTags && update.removeTags.length > 0) {
+    // Deduplicate removeTags (case-insensitive)
+    const uniqueRemoveTags = Array.from(new Map(update.removeTags.map((tag) => [tag.trim().toLowerCase(), tag.trim()])).values());
+
     // Get tag IDs for the tag names
-    const tagsToRemove = await db.select({ id: schema.watchTags.id }).from(schema.watchTags).where(inArray(schema.watchTags.name, update.removeTags));
+    const tagsToRemove = await db.select({ id: schema.watchTags.id }).from(schema.watchTags).where(inArray(schema.watchTags.name, uniqueRemoveTags));
 
     if (tagsToRemove.length > 0) {
       const tagIds = tagsToRemove.map((t) => t.id);
@@ -228,12 +304,45 @@ async function processUpdate(update: UpdateItem, user: NonNullable<App.Locals["u
 
   // Handle tag additions
   if (update.addTags && update.addTags.length > 0) {
-    for (const tagName of update.addTags) {
+    // Deduplicate addTags (case-insensitive) and filter out empty tags
+    const uniqueAddTags = Array.from(
+      new Map(
+        update.addTags
+          .map((tag) => tag?.trim())
+          .filter((tag): tag is string => !!tag && tag.length > 0)
+          .map((tag) => [tag.toLowerCase(), tag])
+      ).values()
+    );
+
+    // Check for conflicts: tags that are both being added and removed
+    const removeTagsLower = (update.removeTags || []).map((tag) => tag.trim().toLowerCase());
+    const conflictingTags = uniqueAddTags.filter((tag) => removeTagsLower.includes(tag.toLowerCase()));
+
+    if (conflictingTags.length > 0) {
+      errors.push({
+        id: update.id,
+        field: "tags",
+        message: `Cannot add and remove the same tags: ${conflictingTags.join(", ")}`,
+      });
+    }
+
+    // Filter out conflicting tags from additions
+    const tagsToAdd = uniqueAddTags.filter((tag) => !conflictingTags.includes(tag));
+
+    for (const tagName of tagsToAdd) {
       await addTagToItem(update.id, tagName, user.id);
     }
   }
 
-  results.updated.push(update.id);
+  // Only mark as updated if at least one operation was performed
+  if (
+    hasWatchItemUpdates ||
+    hasRatingUpdates ||
+    (update.removeTags && update.removeTags.length > 0) ||
+    (update.addTags && update.addTags.length > 0)
+  ) {
+    results.updated.push(update.id);
+  }
 }
 
 async function processNewItem(
@@ -256,7 +365,7 @@ async function processNewItem(
     return;
   }
 
-  // Check title uniqueness
+  // Check title uniqueness (within transaction would be better, but this is a check)
   const existingTitle = await db
     .select({ id: schema.watchItems.id })
     .from(schema.watchItems)
@@ -269,28 +378,102 @@ async function processNewItem(
   }
 
   // Create the watch item
-  const [created] = await db
-    .insert(schema.watchItems)
-    .values({
-      title: newItem.title.trim(),
-      languageId: newItem.languageId,
-      type: newItem.type as "movie" | "series" | "shorts",
-      createdById: user.id,
-      updatedById: user.id,
-    })
-    .returning({ id: schema.watchItems.id });
+  let created: { id: string } | undefined;
+  try {
+    [created] = await db
+      .insert(schema.watchItems)
+      .values({
+        title: newItem.title.trim(),
+        languageId: newItem.languageId,
+        type: newItem.type as "movie" | "series" | "shorts",
+        createdById: user.id,
+        updatedById: user.id,
+      })
+      .returning({ id: schema.watchItems.id });
+  } catch (error) {
+    // Handle unique constraint violation (race condition)
+    if (error instanceof Error && (error.message.includes("unique") || error.message.includes("duplicate"))) {
+      errors.push({ id: newItem.tempId, field: "title", message: "A watch item with this title already exists" });
+      return;
+    }
+    throw error; // Re-throw if it's a different error
+  }
+
+  if (!created) {
+    errors.push({ id: newItem.tempId, message: "Failed to create item" });
+    return;
+  }
 
   // Add tags if any
   if (newItem.tags && newItem.tags.length > 0) {
-    for (const tagName of newItem.tags) {
+    // Deduplicate tags (case-insensitive) and filter out empty tags
+    const uniqueTags = Array.from(
+      new Map(
+        newItem.tags
+          .map((tag) => tag?.trim())
+          .filter((tag): tag is string => !!tag && tag.length > 0)
+          .map((tag) => [tag.toLowerCase(), tag])
+      ).values()
+    );
+
+    for (const tagName of uniqueTags) {
       await addTagToItem(created.id, tagName, user.id);
     }
+  }
+
+  // Handle rating fields for new items
+  const hasRatingFields =
+    newItem.rating !== undefined || newItem.infinity !== undefined || newItem.shitty !== undefined || newItem.progressStatus !== undefined;
+
+  if (hasRatingFields) {
+    // Validate progressStatus if provided
+    let effectiveProgressStatus: string | null = null;
+    if (newItem.progressStatus !== undefined) {
+      const validStatuses = ["watch_later", "watching", "watched", "dropped"] as const;
+      if (newItem.progressStatus && !validStatuses.includes(newItem.progressStatus as (typeof validStatuses)[number])) {
+        errors.push({
+          id: newItem.tempId,
+          field: "progressStatus",
+          message: "Invalid progress status",
+        });
+        return;
+      }
+      effectiveProgressStatus = newItem.progressStatus as (typeof validStatuses)[number] | null;
+    }
+
+    // Ratings are only allowed when progress is "watched" or "dropped"
+    const canHaveRating = effectiveProgressStatus === "watched" || effectiveProgressStatus === "dropped";
+
+    // Validate: if rating fields are provided but progress is not "watched" or "dropped", reject them
+    if (!canHaveRating && (newItem.rating !== undefined || newItem.infinity !== undefined || newItem.shitty !== undefined)) {
+      errors.push({
+        id: newItem.tempId,
+        field: "my_rating",
+        message: "Ratings are only allowed when progress is 'Watched' or 'Dropped'",
+      });
+      return;
+    }
+
+    const ratingData: typeof schema.watchItemRatings.$inferInsert = {
+      watchItemId: created.id,
+      userId: user.id,
+      createdById: user.id,
+      updatedById: user.id,
+      // Only set rating fields if progress is "watched" or "dropped"
+      rating: canHaveRating && newItem.rating !== undefined ? (newItem.rating?.toString() ?? null) : null,
+      infinity: canHaveRating && newItem.infinity !== undefined ? (newItem.infinity ?? false) : false,
+      shitty: canHaveRating && newItem.shitty !== undefined ? (newItem.shitty ?? false) : false,
+      progressStatus: effectiveProgressStatus,
+    };
+
+    // Create rating record for the new item
+    await db.insert(schema.watchItemRatings).values(ratingData);
   }
 
   results.created.push({ tempId: newItem.tempId, newId: created.id });
 }
 
-async function processDelete(deleteId: string, user: NonNullable<App.Locals["user"]>, errors: BulkUpdateError[], results: { deleted: string[] }) {
+async function processDelete(deleteId: string, _user: NonNullable<App.Locals["user"]>, errors: BulkUpdateError[], results: { deleted: string[] }) {
   // Delete the watch item (cascades to ratings and tags due to ON DELETE CASCADE)
   const deleted = await db.delete(schema.watchItems).where(eq(schema.watchItems.id, deleteId)).returning({ id: schema.watchItems.id });
 
@@ -302,8 +485,14 @@ async function processDelete(deleteId: string, user: NonNullable<App.Locals["use
 }
 
 async function addTagToItem(watchItemId: string, tagName: string, userId: string) {
+  // Validate tag name
+  const trimmedTagName = tagName.trim();
+  if (!trimmedTagName) {
+    throw new Error("Tag name cannot be empty");
+  }
+
   // Get or create the tag
-  const tag = await db.select({ id: schema.watchTags.id }).from(schema.watchTags).where(eq(schema.watchTags.name, tagName.trim())).limit(1);
+  const tag = await db.select({ id: schema.watchTags.id }).from(schema.watchTags).where(eq(schema.watchTags.name, trimmedTagName)).limit(1);
 
   let tagId: string;
   if (tag.length === 0) {
@@ -311,7 +500,7 @@ async function addTagToItem(watchItemId: string, tagName: string, userId: string
     const [newTag] = await db
       .insert(schema.watchTags)
       .values({
-        name: tagName.trim(),
+        name: trimmedTagName,
         createdById: userId,
         updatedById: userId,
       })

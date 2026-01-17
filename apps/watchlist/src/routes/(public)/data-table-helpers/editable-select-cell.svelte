@@ -92,12 +92,17 @@
       value as EditableFields[typeof field],
     );
 
-    // If progress is being cleared, also clear the rating fields
-    if (field === "my_progress_status" && !valueToSave) {
-      editMode.markFieldEdited(rowId, "my_rating", null, null);
-      editMode.markFieldEdited(rowId, "my_infinity", false, null);
-      editMode.markFieldEdited(rowId, "my_shitty", false, null);
-      editMode.clearValidationError(rowId, "my_rating");
+    // If progress is being changed to something other than "watched" or "dropped", clear rating fields
+    // Ratings are only allowed when progress is "watched" or "dropped"
+    if (field === "my_progress_status") {
+      const canHaveRating =
+        valueToSave === "watched" || valueToSave === "dropped";
+      if (!canHaveRating) {
+        editMode.markFieldEdited(rowId, "my_rating", null, null);
+        editMode.markFieldEdited(rowId, "my_infinity", false, null);
+        editMode.markFieldEdited(rowId, "my_shitty", false, null);
+        editMode.clearValidationError(rowId, "my_rating");
+      }
     }
 
     // Validate required
@@ -133,7 +138,9 @@
             class="min-w-[120px] py-2 px-4 text-xs justify-between"
           >
             <span
-              class="truncate {currentValue === null
+              class="truncate {currentValue === null ||
+              currentValue === undefined ||
+              currentValue === ''
                 ? 'text-muted-foreground'
                 : ''}"
             >

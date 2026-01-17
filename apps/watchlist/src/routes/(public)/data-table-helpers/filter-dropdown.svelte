@@ -19,6 +19,17 @@ let tempSelected = $state<string[]>(selectedValues);
 let isOpen = $state(false);
 let dropdownContentRef: HTMLDivElement | null = $state(null);
 
+// Helper function to format option for display
+function formatOptionForDisplay(option: string): string {
+  if (!option) return option;
+  // If it contains underscores (like progress status), replace with spaces and capitalize
+  if (option.includes("_")) {
+    return option.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  // Otherwise, just capitalize first letter (for types like "movie" -> "Movie")
+  return option.charAt(0).toUpperCase() + option.slice(1);
+}
+
 // Filter options based on search input
 let filteredOptions = $derived.by(() => {
   if (!searchValue.trim()) {
@@ -123,12 +134,13 @@ function handleOpenChange(open: boolean) {
         {:else}
           {#each filteredOptions as option}
             {@const isChecked = tempSelected.includes(option)}
+            {@const displayText = formatOptionForDisplay(option)}
             <Button
               variant="ghost"
               class="px-4 flex items-center text-start gap-2 rounded-md w-full hover:bg-accent dark:hover:bg-accent cursor-pointer"
               onclick={() => handleToggle(option)}
             >
-            <span class="text-xs flex-1 capitalize">{option}</span>
+            <span class="text-xs flex-1">{displayText}</span>
             {#if isChecked}
             <CheckIcon class="size-4" />
             {/if}
