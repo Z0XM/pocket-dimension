@@ -52,7 +52,9 @@
     const visible = originalTags.filter(
       (t) => !editMode.isTagDeleted(rowId, t),
     );
-    return [...visible, ...addedTags];
+    // Combine visible and added tags, removing duplicates
+    const combined = [...visible, ...addedTags];
+    return [...new Set(combined)];
   });
 
   // Available tags for autocomplete (excluding current tags)

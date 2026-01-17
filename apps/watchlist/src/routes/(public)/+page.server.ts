@@ -121,12 +121,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     `;
     const allLanguages = (await db.execute(allLanguagesQuery)).rows as Array<{ id: string; language: string }>;
 
-    // Get ALL watch item types for edit mode dropdowns
+    const allTagsQuery = sql`
+      select name as tag from watchlist.watch_tags order by name asc
+    `;
+    const allTags = (await db.execute(allTagsQuery)).rows as Array<{ tag: string }>;
+
     const allTypesQuery = sql`
       select unnest(enum_range(null::watchlist.watch_item_type))::text as type
     `;
-    const allTypesResult = (await db.execute(allTypesQuery)).rows as Array<{ type: string }>;
-    const allTypes = allTypesResult.map((r) => r.type);
+    const allTypes = (await db.execute(allTypesQuery)).rows as Array<{ type: string }>;
 
     return {
       watchItems,
@@ -135,6 +138,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
       progressStatuses,
       types,
       allLanguages,
+      allTags,
       allTypes,
       userRole: user?.role ?? "user",
     };
@@ -147,6 +151,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
       progressStatuses: [],
       types: [],
       allLanguages: [],
+      allTags: [],
       allTypes: [],
       userRole: "user" as const,
     };

@@ -80,6 +80,7 @@ export const columns: ColumnDef<Watchlist>[] = [
         value: row.original.title,
         placeholder: "Enter title...",
         required: true,
+        class: "max-w-[400px] truncate",
       });
     },
   },
@@ -104,11 +105,7 @@ export const columns: ColumnDef<Watchlist>[] = [
         field: "type",
         value: row.original.type,
         displayValue: row.original.type,
-        options: [
-          { value: "movie", label: "Movie" },
-          { value: "series", label: "Series" },
-          { value: "shorts", label: "Shorts" },
-        ],
+        options: [], // Will be populated from context
         placeholder: "Select...",
         required: true,
         filterType: "type",
@@ -125,7 +122,7 @@ export const columns: ColumnDef<Watchlist>[] = [
       return renderComponent(EditableSelectCell, {
         rowId: row.original.id,
         field: "languageId",
-        value: row.original.language_id,
+        value: row.original.language,
         displayValue: row.original.language,
         options: [], // Will be populated from context
         placeholder: "Select...",

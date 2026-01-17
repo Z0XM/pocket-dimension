@@ -54,13 +54,14 @@
     isLoading?: boolean;
     userRole?: UserRole;
     filterOptions?: {
-      languages: Array<{ language: string; id?: string }>;
+      languages: Array<{ language: string }>;
       tags: Array<{ tag: string }>;
       progressStatuses: Array<{ my_progress_status: string }>;
       types: Array<{ type: string }>;
+      allLanguages: Array<{ id: string; language: string }>;
+      allTags: Array<{ tag: string }>;
+      allTypes: Array<{ type: string }>;
     };
-    allLanguages?: Array<{ language: string; id: string }>;
-    allTypes?: string[];
   };
 
   let {
@@ -70,8 +71,6 @@
     isLoading = false,
     userRole = "user",
     filterOptions,
-    allLanguages = [],
-    allTypes = [],
   }: DataTableProps<TData, TValue> = $props();
 
   // Create and provide edit mode context
@@ -79,11 +78,11 @@
   setEditModeContext(editMode);
 
   // Provide edit options context for editable cells
+
   setContext("editOptions", {
-    languages: () => allLanguages,
-    types: () => allTypes,
-    tags: () => filterOptions?.tags?.map((t) => t.tag).filter(Boolean) ?? [],
-    progressStatuses: ["watch_later", "watching", "watched", "dropped"],
+    languages: () => filterOptions?.allLanguages ?? [],
+    types: () => filterOptions?.allTypes.map((t) => t.type) ?? [],
+    tags: () => filterOptions?.allTags.map((t) => t.tag) ?? [],
     userRole: () => userRole,
   });
 
@@ -142,7 +141,7 @@
     });
     // Hide avg_rating column when in edit mode
     if (editMode.isEditMode) {
-      visibility["avg_rating"] = false;
+      visibility.avg_rating = false;
     }
     return visibility;
   });
@@ -393,7 +392,9 @@
 
   // Get filter options arrays
   let languageOptions = $derived.by(() => {
-    return filterOptions?.languages?.map((l) => l.language) ?? [];
+    return (
+      filterOptions?.languages?.map((l) => l.language).filter(Boolean) ?? []
+    );
   });
 
   let tagOptions = $derived.by(() => {
@@ -406,34 +407,22 @@
     return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
-  // Helper function to convert formatted progress back to raw value
-  function unformatProgressStatus(formatted: string): string {
-    if (formatted === "Unmarked") return "";
-    return formatted.replace(/\s+/g, "_").toLowerCase();
-  }
-
-  let progressOptions = $derived.by(() => {
-    const statuses =
-      filterOptions?.progressStatuses
-        ?.map((p) => p.my_progress_status)
-        .filter(Boolean) ?? [];
-    // Format status values for display (e.g., "watch_later" -> "Watch Later")
-    const formattedStatuses = statuses.map((s) => formatProgressStatus(s));
-    return ["Unmarked", ...formattedStatuses];
-  });
-
   // Helper function to capitalize type values
   function capitalizeType(type: string): string {
     if (!type) return type;
     return type.charAt(0).toUpperCase() + type.slice(1);
   }
 
+  let progressOptions = $derived.by(() => {
+    return (
+      filterOptions?.progressStatuses?.map(
+        (p) => p.my_progress_status ?? "Unmarked",
+      ) ?? []
+    );
+  });
+
   let typeOptions = $derived.by(() => {
-    const rawTypes =
-      filterOptions?.types?.map((t) => t.type).filter(Boolean) ?? [];
-    // Format type values for display (e.g., "movie" -> "Movie")
-    const formattedTypes = rawTypes.map((t) => capitalizeType(t));
-    return formattedTypes;
+    return filterOptions?.types?.map((t) => t.type).filter(Boolean) ?? [];
   });
 
   // Combine original data with new rows from edit mode
@@ -892,18 +881,13 @@
       if (successCount > 0) {
         toast.success(`Successfully saved ${successCount} change(s).`);
 
-        // DON'T clear edit state or exit edit mode before navigation
-        // This keeps the edited data visible during the save/reload process
-        // preventing the glitch where old data is shown
-
         // Refresh the page to get updated data
         // Keep isSaving true during navigation to show loading overlay
-        // The page reload will cause component remount with fresh data from server
         await goto(page.url.toString(), { invalidateAll: true });
 
-        // After navigation completes (component remounts with fresh state)
-        // Edit mode will be off and data will be fresh from server
-        // So no need to clear edit state or exit edit mode here
+        // Clear edit state after successful save to reset the undo tracker
+        // This ensures changes are cleared even if component doesn't fully remount
+        editMode.exitEditMode();
       } else {
         // No changes saved, exit edit mode if no more changes
         if (!editMode.hasChanges) {
@@ -944,7 +928,6 @@
                 onclick={() => removeFilter("language", value)}
                 class="rounded-full capitalize h-5 py-0 w-fit cursor-pointer text-[0.625rem] font-medium flex items-center gap-1 px-2"
                 aria-label="Remove filter"
-                disabled={editMode.isEditMode}
               >
                 {value}
                 <XIcon class="size-3" />
@@ -956,7 +939,6 @@
                 onclick={() => removeFilter("tags", value)}
                 class="rounded-full capitalize h-5 py-0 w-fit cursor-pointer text-[0.625rem] font-medium flex items-center gap-1 px-2"
                 aria-label="Remove filter"
-                disabled={editMode.isEditMode}
               >
                 {value}
                 <XIcon class="size-3" />
@@ -968,7 +950,6 @@
                 onclick={() => removeFilter("progress", value)}
                 class="rounded-full capitalize h-5 py-0 w-fit cursor-pointer text-[0.625rem] font-medium flex items-center gap-1 px-2"
                 aria-label="Remove filter"
-                disabled={editMode.isEditMode}
               >
                 {formatProgressStatus(value)}
                 <XIcon class="size-3" />
@@ -980,7 +961,6 @@
                 onclick={() => removeFilter("type", value)}
                 class="rounded-full capitalize h-5 py-0 w-fit cursor-pointer text-[0.625rem] font-medium flex items-center gap-1 px-2"
                 aria-label="Remove filter"
-                disabled={editMode.isEditMode}
               >
                 {capitalizeType(value)}
                 <XIcon class="size-3" />
@@ -1146,9 +1126,9 @@
     </div>
     <div class="rounded-md relative">
       <!-- Loading overlay during save -->
-      {#if isSaving}
+      <!-- {#if isSaving}
         <div
-          class="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-md"
+          class="absolute inset-0 bg-white/1 backdrop-blur-md z-50 flex items-center justify-center rounded-md"
           role="status"
           aria-label="Saving changes..."
         >
@@ -1161,7 +1141,7 @@
             </p>
           </div>
         </div>
-      {/if}
+      {/if} -->
       <Table.Root class="border-separate border-spacing-y-2">
         <Table.Header>
           {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
