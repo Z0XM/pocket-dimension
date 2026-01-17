@@ -110,6 +110,9 @@
       tags: (data as any)?.tags ?? [],
       progressStatuses: (data as any)?.progressStatuses ?? [],
       types: (data as any)?.types ?? [],
+      allLanguages: (data as any)?.allLanguages ?? [],
+      allTags: (data as any)?.allTags ?? [],
+      allTypes: (data as any)?.allTypes ?? [],
     }}
   />
 </div>

@@ -58,6 +58,9 @@
       tags: Array<{ tag: string }>;
       progressStatuses: Array<{ my_progress_status: string }>;
       types: Array<{ type: string }>;
+      allLanguages: Array<{ id: string; language: string }>;
+      allTags: Array<{ tag: string }>;
+      allTypes: Array<{ type: string }>;
     };
   };
 
@@ -75,14 +78,11 @@
   setEditModeContext(editMode);
 
   // Provide edit options context for editable cells
+
   setContext("editOptions", {
-    languages: () => filterOptions?.languages ?? [],
-    types: () => filterOptions?.types ?? [],
-    tags: () => filterOptions?.tags?.map((t) => t.tag).filter(Boolean) ?? [],
-    progressStatuses: () =>
-      filterOptions?.progressStatuses
-        ?.map((p) => p.my_progress_status)
-        .filter(Boolean) ?? [],
+    languages: () => filterOptions?.allLanguages ?? [],
+    types: () => filterOptions?.allTypes.map((t) => t.type) ?? [],
+    tags: () => filterOptions?.allTags.map((t) => t.tag) ?? [],
     userRole: () => userRole,
   });
 
@@ -933,7 +933,6 @@
                 onclick={() => removeFilter("language", value)}
                 class="rounded-full capitalize h-5 py-0 w-fit cursor-pointer text-[0.625rem] font-medium flex items-center gap-1 px-2"
                 aria-label="Remove filter"
-                disabled={editMode.isEditMode}
               >
                 {value}
                 <XIcon class="size-3" />
@@ -945,7 +944,6 @@
                 onclick={() => removeFilter("tags", value)}
                 class="rounded-full capitalize h-5 py-0 w-fit cursor-pointer text-[0.625rem] font-medium flex items-center gap-1 px-2"
                 aria-label="Remove filter"
-                disabled={editMode.isEditMode}
               >
                 {value}
                 <XIcon class="size-3" />
@@ -957,7 +955,6 @@
                 onclick={() => removeFilter("progress", value)}
                 class="rounded-full capitalize h-5 py-0 w-fit cursor-pointer text-[0.625rem] font-medium flex items-center gap-1 px-2"
                 aria-label="Remove filter"
-                disabled={editMode.isEditMode}
               >
                 {formatProgressStatus(value)}
                 <XIcon class="size-3" />
@@ -969,7 +966,6 @@
                 onclick={() => removeFilter("type", value)}
                 class="rounded-full capitalize h-5 py-0 w-fit cursor-pointer text-[0.625rem] font-medium flex items-center gap-1 px-2"
                 aria-label="Remove filter"
-                disabled={editMode.isEditMode}
               >
                 {capitalizeType(value)}
                 <XIcon class="size-3" />
@@ -1135,9 +1131,9 @@
     </div>
     <div class="rounded-md relative">
       <!-- Loading overlay during save -->
-      {#if isSaving}
+      <!-- {#if isSaving}
         <div
-          class="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-md"
+          class="absolute inset-0 bg-white/1 backdrop-blur-md z-50 flex items-center justify-center rounded-md"
           role="status"
           aria-label="Saving changes..."
         >
@@ -1150,7 +1146,7 @@
             </p>
           </div>
         </div>
-      {/if}
+      {/if} -->
       <Table.Root class="border-separate border-spacing-y-2">
         <Table.Header>
           {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}

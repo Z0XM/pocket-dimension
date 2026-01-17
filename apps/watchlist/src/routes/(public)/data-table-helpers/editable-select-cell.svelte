@@ -45,6 +45,7 @@
   const editOptions = getContext<{
     userRole: () => UserRole;
     languages: () => Array<{ id: string; language: string }>;
+    types: () => string[];
   }>("editOptions");
   const filterContext = getContext<
     { addFilterValue: (type: string, value: string) => void } | undefined
@@ -58,6 +59,13 @@
         label: l.language,
       }));
     }
+    if (field === "type") {
+      return editOptions.types().map((t) => ({
+        value: t,
+        label: t.charAt(0).toUpperCase() + t.slice(1),
+      }));
+    }
+
     return propOptions;
   });
 

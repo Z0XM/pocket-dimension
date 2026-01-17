@@ -105,11 +105,7 @@ export const columns: ColumnDef<Watchlist>[] = [
         field: "type",
         value: row.original.type,
         displayValue: row.original.type,
-        options: [
-          { value: "movie", label: "Movie" },
-          { value: "series", label: "Series" },
-          { value: "shorts", label: "Shorts" },
-        ],
+        options: [], // Will be populated from context
         placeholder: "Select...",
         required: true,
         filterType: "type",
