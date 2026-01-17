@@ -881,18 +881,13 @@
       if (successCount > 0) {
         toast.success(`Successfully saved ${successCount} change(s).`);
 
-        // DON'T clear edit state or exit edit mode before navigation
-        // This keeps the edited data visible during the save/reload process
-        // preventing the glitch where old data is shown
-
         // Refresh the page to get updated data
         // Keep isSaving true during navigation to show loading overlay
-        // The page reload will cause component remount with fresh data from server
         await goto(page.url.toString(), { invalidateAll: true });
 
-        // After navigation completes (component remounts with fresh state)
-        // Edit mode will be off and data will be fresh from server
-        // So no need to clear edit state or exit edit mode here
+        // Clear edit state after successful save to reset the undo tracker
+        // This ensures changes are cleared even if component doesn't fully remount
+        editMode.exitEditMode();
       } else {
         // No changes saved, exit edit mode if no more changes
         if (!editMode.hasChanges) {

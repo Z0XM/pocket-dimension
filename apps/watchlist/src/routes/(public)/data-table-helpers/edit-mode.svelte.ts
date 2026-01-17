@@ -335,17 +335,21 @@ export function createEditModeState() {
   }
 
   function addTagToRow(rowId: string, tag: string) {
-    const currentAdded = addedTagsByRow.get(rowId) || [];
-    if (!currentAdded.includes(tag)) {
-      addedTagsByRow = new Map(addedTagsByRow).set(rowId, [...currentAdded, tag]);
-    }
-    // If this tag was previously deleted, remove it from deleted
     const currentDeleted = deletedTagsByRow.get(rowId) || [];
+
+    // If tag was previously deleted (meaning it was originally in the tags),
+    // just remove it from deleted list (don't add to added list)
     if (currentDeleted.includes(tag)) {
       deletedTagsByRow = new Map(deletedTagsByRow).set(
         rowId,
         currentDeleted.filter((t) => t !== tag)
       );
+    } else {
+      // Tag wasn't deleted, so it's a new tag - add it to added tags
+      const currentAdded = addedTagsByRow.get(rowId) || [];
+      if (!currentAdded.includes(tag)) {
+        addedTagsByRow = new Map(addedTagsByRow).set(rowId, [...currentAdded, tag]);
+      }
     }
   }
 
