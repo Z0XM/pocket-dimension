@@ -123,11 +123,13 @@ export function useColumnSettings(
   setColumnSettings: (value: ColumnSettings) => void,
   getIsSettingsLoaded: () => boolean,
   setIsSettingsLoaded: (value: boolean) => void,
-  defaultColumnOrder: string[]
+  getDefaultColumnOrder: () => string[]
 ) {
-  // Load columnSettings from localStorage on mount
+  // Load columnSettings from localStorage on mount (and when defaultColumnOrder changes)
   $effect(() => {
-    setColumnSettings(loadColumnSettingsFromStorage(defaultColumnOrder));
+    const defaultColumnOrder = getDefaultColumnOrder(); // Access reactively via getter
+    const loaded = loadColumnSettingsFromStorage(defaultColumnOrder);
+    setColumnSettings(loaded);
     setIsSettingsLoaded(true);
   });
 

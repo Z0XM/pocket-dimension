@@ -1,8 +1,12 @@
 import type { ColumnDef } from "@tanstack/table-core";
 import { createRawSnippet } from "svelte";
 import { renderComponent, renderSnippet } from "$lib/components/ui/data-table/index.js";
-import ClickableCell from "./data-table-helpers/clickable-cell.svelte";
-import ClickableTagsCell from "./data-table-helpers/clickable-tags-cell.svelte";
+import EditableRatingCell from "./data-table-helpers/editable-rating-cell.svelte";
+import EditableSelectCell from "./data-table-helpers/editable-select-cell.svelte";
+import EditableTagsCell from "./data-table-helpers/editable-tags-cell.svelte";
+import EditableTextCell from "./data-table-helpers/editable-text-cell.svelte";
+import RowActionsCell from "./data-table-helpers/row-actions-cell.svelte";
+import SelectRowCell from "./data-table-helpers/select-row-cell.svelte";
 
 export type WatchProgressStatus = "watch_later" | "watching" | "watched" | "dropped";
 
@@ -13,6 +17,7 @@ export type Watchlist = {
   releaseStatus: string;
   seasons: number | null;
   type: string;
+  language_id: string;
   language: string;
   tags: string;
   avg_rating: string;
@@ -24,23 +29,69 @@ export type Watchlist = {
   my_progress_status: WatchProgressStatus | null;
 };
 
+// Column definitions with editable cells
 export const columns: ColumnDef<Watchlist>[] = [
+  // Selection column (first, only visible in edit mode)
+  {
+    id: "select",
+    header: ({ table }) => {
+      const allRowIds = table.getRowModel().rows.map((row) => row.original.id);
+      return renderComponent(SelectRowCell, {
+        rowId: "",
+        rowIndex: -1,
+        allRowIds,
+        isHeader: true,
+      });
+    },
+    cell: ({ row, table }) => {
+      const allRowIds = table.getRowModel().rows.map((r) => r.original.id);
+      const rowIndex = table.getRowModel().rows.findIndex((r) => r.id === row.id);
+      return renderComponent(SelectRowCell, {
+        rowId: row.original.id,
+        rowIndex,
+        allRowIds,
+        isHeader: false,
+      });
+    },
+    enableSorting: false,
+    enableHiding: false,
+    size: 40,
+  },
   {
     accessorKey: "order",
     header: "Order",
     enableSorting: true,
+    cell: ({ row }) => {
+      // Don't show order for new rows (temp IDs)
+      if (row.original.id.startsWith("temp-")) {
+        return renderSnippet(createRawSnippet(() => ({ render: () => `<span class="text-muted-foreground">-</span>` })));
+      }
+      return row.original.order;
+    },
   },
   {
     accessorKey: "title",
     header: "Title",
     enableSorting: true,
+    cell: ({ row }) => {
+      return renderComponent(EditableTextCell, {
+        rowId: row.original.id,
+        field: "title",
+        value: row.original.title,
+        placeholder: "Enter title...",
+        required: true,
+      });
+    },
   },
   {
     accessorKey: "tags",
     header: "Tags",
     enableSorting: false,
     cell: ({ row }) => {
-      return renderComponent(ClickableTagsCell, { tags: row.original.tags });
+      return renderComponent(EditableTagsCell, {
+        rowId: row.original.id,
+        tags: row.original.tags,
+      });
     },
   },
   {
@@ -48,7 +99,21 @@ export const columns: ColumnDef<Watchlist>[] = [
     header: "Type",
     enableSorting: true,
     cell: ({ row }) => {
-      return renderComponent(ClickableCell, { value: row.original.type, filterType: "type" });
+      return renderComponent(EditableSelectCell, {
+        rowId: row.original.id,
+        field: "type",
+        value: row.original.type,
+        displayValue: row.original.type,
+        options: [
+          { value: "movie", label: "Movie" },
+          { value: "series", label: "Series" },
+          { value: "shorts", label: "Shorts" },
+        ],
+        placeholder: "Select type...",
+        required: true,
+        filterType: "type",
+        class: "flex justify-start items-center",
+      });
     },
   },
   {
@@ -56,7 +121,18 @@ export const columns: ColumnDef<Watchlist>[] = [
     header: "Language",
     enableSorting: true,
     cell: ({ row }) => {
-      return renderComponent(ClickableCell, { value: row.original.language, filterType: "language" });
+      // Note: Options are injected via context from data-table.svelte
+      return renderComponent(EditableSelectCell, {
+        rowId: row.original.id,
+        field: "languageId",
+        value: row.original.language_id,
+        displayValue: row.original.language,
+        options: [], // Will be populated from context
+        placeholder: "Select language...",
+        required: true,
+        filterType: "language",
+        class: "flex justify-start items-center",
+      });
     },
   },
   {
@@ -64,9 +140,21 @@ export const columns: ColumnDef<Watchlist>[] = [
     header: "Progress",
     enableSorting: true,
     cell: ({ row }) => {
-      return renderComponent(ClickableCell, {
-        value: row.original.my_progress_status ?? null,
+      return renderComponent(EditableSelectCell, {
+        rowId: row.original.id,
+        field: "my_progress_status",
+        value: row.original.my_progress_status,
+        displayValue: row.original.my_progress_status,
+        options: [
+          { value: "watch_later", label: "Watch Later" },
+          { value: "watching", label: "Watching" },
+          { value: "watched", label: "Watched" },
+          { value: "dropped", label: "Dropped" },
+        ],
+        placeholder: "Select progress...",
+        required: false,
         filterType: "progress",
+        class: "flex justify-start items-center",
       });
     },
   },
@@ -75,7 +163,7 @@ export const columns: ColumnDef<Watchlist>[] = [
     accessorKey: "my_rating",
     header: () => {
       const myRatingHeaderSnippet = createRawSnippet(() => ({
-        render: () => `<div class="text-end">My Rating</div>`,
+        render: () => `<div>My Rating</div>`,
       }));
       return renderSnippet(myRatingHeaderSnippet);
     },
@@ -85,32 +173,12 @@ export const columns: ColumnDef<Watchlist>[] = [
     enableSorting: true,
     enableHiding: true,
     cell: ({ row }) => {
-      const myRatingCellSnippet = createRawSnippet<[{ my_rating: string | null; my_infinity: boolean | null; my_shitty: boolean | null }]>(
-        (getMyRating) => {
-          const { my_rating, my_infinity, my_shitty } = getMyRating();
-
-          if (my_infinity) {
-            return {
-              render: () => `<div class="text-end font-medium">♾️</div>`,
-            };
-          }
-          if (my_shitty) {
-            return {
-              render: () => `<div class="text-end font-medium">💩</div>`,
-            };
-          }
-
-          const formatted = my_rating ? parseFloat(my_rating).toFixed(1) : "";
-          return {
-            render: () => `<div class="text-end font-medium">${formatted}</div>`,
-          };
-        }
-      );
-
-      return renderSnippet(myRatingCellSnippet, {
-        my_rating: row.original.my_rating,
-        my_infinity: row.original.my_infinity,
-        my_shitty: row.original.my_shitty,
+      return renderComponent(EditableRatingCell, {
+        rowId: row.original.id,
+        rating: row.original.my_rating,
+        infinity: row.original.my_infinity,
+        shitty: row.original.my_shitty,
+        progressStatus: row.original.my_progress_status,
       });
     },
   },
@@ -119,7 +187,7 @@ export const columns: ColumnDef<Watchlist>[] = [
     accessorKey: "avg_rating",
     header: () => {
       const avgRatingHeaderSnippet = createRawSnippet(() => ({
-        render: () => `<div class="text-end">Avg Rating</div>`,
+        render: () => `<div>Avg Rating</div>`,
       }));
       return renderSnippet(avgRatingHeaderSnippet);
     },
@@ -134,12 +202,12 @@ export const columns: ColumnDef<Watchlist>[] = [
         const formatted = avg_rating ? parseFloat(avg_rating).toFixed(2) : "";
         if (Number(infinity_counts) > 0) {
           return {
-            render: () => `<div class="text-end font-medium">♾️<sup>${infinity_counts}</sup></div>`,
+            render: () => `<div class="text-end text-lg font-medium">♾️<sup class="text-[0.620rem]">${infinity_counts}</sup></div>`,
           };
         }
         if (Number(shitty_counts) > 0) {
           return {
-            render: () => `<div class="text-end font-medium">💩<sup>${shitty_counts}</sup></div>`,
+            render: () => `<div class="text-end text-lg font-medium">💩<sup class="text-[0.620rem]">${shitty_counts}</sup></div>`,
           };
         }
         return {
@@ -153,5 +221,19 @@ export const columns: ColumnDef<Watchlist>[] = [
         shitty_counts: row.original.shitty_counts,
       });
     },
+  },
+  // Row actions column (last, only visible in edit mode)
+  {
+    id: "actions",
+    header: "",
+    cell: ({ row }) => {
+      return renderComponent(RowActionsCell, {
+        rowId: row.original.id,
+        isNewRow: row.original.id.startsWith("temp-"),
+      });
+    },
+    enableSorting: false,
+    enableHiding: false,
+    size: 50,
   },
 ];

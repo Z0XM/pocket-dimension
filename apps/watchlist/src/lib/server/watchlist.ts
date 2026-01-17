@@ -57,23 +57,32 @@ export const getWatchlistForUser = async (
 
   const languageFilterQuery =
     languageFilterValues && languageFilterValues.length > 0
-      ? sql`l.language = any(array[${sql.join(languageFilterValues, sql`, `)}]::text[])`
+      ? sql`lower(l.language) = any(array[${sql.join(
+          languageFilterValues.map((v) => v.toLowerCase()),
+          sql`, `
+        )}]::text[])`
       : sql`true`;
   const progressStatusFilterQuery =
     progressStatusFilterValues && progressStatusFilterValues.length > 0
       ? (() => {
-          const hasUnmarked = progressStatusFilterValues.includes("Unmarked");
-          const otherValues = progressStatusFilterValues.filter((v) => v !== "Unmarked");
+          const hasUnmarked = progressStatusFilterValues.map((v) => v.toLowerCase()).includes("unmarked");
+          const otherValues = progressStatusFilterValues.filter((v) => v.toLowerCase() !== "unmarked");
 
           if (hasUnmarked && otherValues.length > 0) {
             // Both "Unmarked" and other values selected
-            return sql`(mr.my_progress_status is null or mr.my_progress_status::text = any(array[${sql.join(otherValues, sql`, `)}]::text[]))`;
+            return sql`(mr.my_progress_status is null or lower(mr.my_progress_status::text) = any(array[${sql.join(
+              otherValues.map((v) => v.toLowerCase()),
+              sql`, `
+            )}]::text[]))`;
           } else if (hasUnmarked) {
             // Only "Unmarked" selected
             return sql`mr.my_progress_status is null`;
           } else {
             // Only other values selected
-            return sql`mr.my_progress_status::text = any(array[${sql.join(otherValues, sql`, `)}]::text[])`;
+            return sql`lower(mr.my_progress_status::text) = any(array[${sql.join(
+              otherValues.map((v) => v.toLowerCase()),
+              sql`, `
+            )}]::text[])`;
           }
         })()
       : sql`true`;
@@ -85,7 +94,12 @@ export const getWatchlistForUser = async (
         )})`
       : sql`true`;
   const typeFilterQuery =
-    typeFilterValues && typeFilterValues.length > 0 ? sql`w.type::text = any(array[${sql.join(typeFilterValues, sql`, `)}]::text[])` : sql`true`;
+    typeFilterValues && typeFilterValues.length > 0
+      ? sql`lower(w.type::text) = any(array[${sql.join(
+          typeFilterValues.map((v) => v.toLowerCase()),
+          sql`, `
+        )}]::text[])`
+      : sql`true`;
 
   const baseQuery = sql`
     from watchlist.watch_items w
@@ -142,9 +156,11 @@ export const getWatchlistForUser = async (
   const tableQuery = sql`
     ${withQuery}
     select
+      w.id,
       w.order,
       w.title,
       w.type,
+      l.id as language_id,
       l.language,
       t.tags,
       gr.avg_rating,
