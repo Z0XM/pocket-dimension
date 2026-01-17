@@ -115,8 +115,9 @@
 
   function handleClick() {
     // If not in edit mode and filterContext exists, add to filter
-    if (!editMode.isEditMode && filterContext && filterType && currentLabel) {
-      filterContext.addFilterValue(filterType, currentLabel);
+
+    if (!editMode.isEditMode && filterContext && filterType && currentValue) {
+      filterContext.addFilterValue(filterType, currentValue);
     }
   }
 

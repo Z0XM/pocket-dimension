@@ -54,13 +54,11 @@
     isLoading?: boolean;
     userRole?: UserRole;
     filterOptions?: {
-      languages: Array<{ language: string; id?: string }>;
+      languages: Array<{ language: string }>;
       tags: Array<{ tag: string }>;
       progressStatuses: Array<{ my_progress_status: string }>;
       types: Array<{ type: string }>;
     };
-    allLanguages?: Array<{ language: string; id: string }>;
-    allTypes?: string[];
   };
 
   let {
@@ -70,8 +68,6 @@
     isLoading = false,
     userRole = "user",
     filterOptions,
-    allLanguages = [],
-    allTypes = [],
   }: DataTableProps<TData, TValue> = $props();
 
   // Create and provide edit mode context
@@ -80,10 +76,13 @@
 
   // Provide edit options context for editable cells
   setContext("editOptions", {
-    languages: () => allLanguages,
-    types: () => allTypes,
+    languages: () => filterOptions?.languages ?? [],
+    types: () => filterOptions?.types ?? [],
     tags: () => filterOptions?.tags?.map((t) => t.tag).filter(Boolean) ?? [],
-    progressStatuses: ["watch_later", "watching", "watched", "dropped"],
+    progressStatuses: () =>
+      filterOptions?.progressStatuses
+        ?.map((p) => p.my_progress_status)
+        .filter(Boolean) ?? [],
     userRole: () => userRole,
   });
 
@@ -142,7 +141,7 @@
     });
     // Hide avg_rating column when in edit mode
     if (editMode.isEditMode) {
-      visibility["avg_rating"] = false;
+      visibility.avg_rating = false;
     }
     return visibility;
   });
@@ -393,7 +392,9 @@
 
   // Get filter options arrays
   let languageOptions = $derived.by(() => {
-    return filterOptions?.languages?.map((l) => l.language) ?? [];
+    return (
+      filterOptions?.languages?.map((l) => l.language).filter(Boolean) ?? []
+    );
   });
 
   let tagOptions = $derived.by(() => {
@@ -406,34 +407,22 @@
     return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
-  // Helper function to convert formatted progress back to raw value
-  function unformatProgressStatus(formatted: string): string {
-    if (formatted === "Unmarked") return "";
-    return formatted.replace(/\s+/g, "_").toLowerCase();
-  }
-
-  let progressOptions = $derived.by(() => {
-    const statuses =
-      filterOptions?.progressStatuses
-        ?.map((p) => p.my_progress_status)
-        .filter(Boolean) ?? [];
-    // Format status values for display (e.g., "watch_later" -> "Watch Later")
-    const formattedStatuses = statuses.map((s) => formatProgressStatus(s));
-    return ["Unmarked", ...formattedStatuses];
-  });
-
   // Helper function to capitalize type values
   function capitalizeType(type: string): string {
     if (!type) return type;
     return type.charAt(0).toUpperCase() + type.slice(1);
   }
 
+  let progressOptions = $derived.by(() => {
+    return (
+      filterOptions?.progressStatuses?.map(
+        (p) => p.my_progress_status ?? "Unmarked",
+      ) ?? []
+    );
+  });
+
   let typeOptions = $derived.by(() => {
-    const rawTypes =
-      filterOptions?.types?.map((t) => t.type).filter(Boolean) ?? [];
-    // Format type values for display (e.g., "movie" -> "Movie")
-    const formattedTypes = rawTypes.map((t) => capitalizeType(t));
-    return formattedTypes;
+    return filterOptions?.types?.map((t) => t.type).filter(Boolean) ?? [];
   });
 
   // Combine original data with new rows from edit mode
