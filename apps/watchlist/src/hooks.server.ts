@@ -10,10 +10,19 @@ export async function handle({ event, resolve }) {
   let session = null;
 
   try {
+    console.log(event.request.headers.toJSON());
     // Fetch current session from Better Auth
+
+    const x = await auth.api.ok({
+      headers: event.request.headers,
+    });
+    console.log("x", x);
+
     session = await auth.api.getSession({
       headers: event.request.headers,
     });
+
+    console.log(session);
 
     // Make session and user available on server
     if (session) {
