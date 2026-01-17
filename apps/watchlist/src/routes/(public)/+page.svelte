@@ -104,7 +104,7 @@
     columns={filteredColumns}
     {onSentinelMount}
     {isLoading}
-    userRole={(data as any)?.userRole ?? "user"}
+    userRole={(data as any)?.userRole}
     filterOptions={{
       languages: (data as any)?.languages ?? [],
       tags: (data as any)?.tags ?? [],
@@ -114,7 +114,5 @@
       allTags: (data as any)?.allTags ?? [],
       allTypes: (data as any)?.allTypes ?? [],
     }}
-    allLanguages={(data as any)?.allLanguages ?? []}
-    allTypes={(data as any)?.allTypes ?? []}
   />
 </div>

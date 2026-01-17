@@ -69,7 +69,7 @@
     columns,
     onSentinelMount,
     isLoading = false,
-    userRole = "user",
+    userRole,
     filterOptions,
   }: DataTableProps<TData, TValue> = $props();
 
@@ -728,7 +728,7 @@
   }
 
   function handleAddNewRow() {
-    if (!editMode.canAddRows(userRole)) return;
+    if (!userRole || !editMode.canAddRows(userRole)) return;
     const tempId = editMode.addNewRow();
     toast.success("New row added. Fill in the required fields.");
   }

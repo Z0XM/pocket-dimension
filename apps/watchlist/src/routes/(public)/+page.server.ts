@@ -140,7 +140,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
       allLanguages,
       allTags,
       allTypes,
-      userRole: user?.role ?? "user",
+      userRole: user?.role,
     };
   } catch (error) {
     console.error(error);
@@ -153,7 +153,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
       allLanguages: [],
       allTags: [],
       allTypes: [],
-      userRole: "user" as const,
+      userRole: undefined,
     };
   }
 };
