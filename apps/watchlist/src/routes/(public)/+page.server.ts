@@ -115,12 +115,28 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     const progressStatuses = (await db.execute(progressQuery)).rows;
     const types = (await db.execute(typesQuery)).rows;
 
+    // Get ALL languages with IDs for edit mode dropdowns (not filtered)
+    const allLanguagesQuery = sql`
+      select id, language from watchlist.watch_languages order by language asc
+    `;
+    const allLanguages = (await db.execute(allLanguagesQuery)).rows as Array<{ id: string; language: string }>;
+
+    // Get ALL watch item types for edit mode dropdowns
+    const allTypesQuery = sql`
+      select unnest(enum_range(null::watchlist.watch_item_type))::text as type
+    `;
+    const allTypesResult = (await db.execute(allTypesQuery)).rows as Array<{ type: string }>;
+    const allTypes = allTypesResult.map((r) => r.type);
+
     return {
       watchItems,
       languages,
       tags,
       progressStatuses,
       types,
+      allLanguages,
+      allTypes,
+      userRole: user?.role ?? "user",
     };
   } catch (error) {
     console.error(error);
@@ -130,6 +146,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
       tags: [],
       progressStatuses: [],
       types: [],
+      allLanguages: [],
+      allTypes: [],
+      userRole: "user" as const,
     };
   }
 };

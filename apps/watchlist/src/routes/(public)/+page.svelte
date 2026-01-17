@@ -95,11 +95,14 @@ const { isLoading, onSentinelMount } = useInfiniteScroll({
     columns={filteredColumns}
     {onSentinelMount}
     {isLoading}
+    userRole={(data as any)?.userRole ?? "user"}
     filterOptions={{
       languages: (data as any)?.languages ?? [],
       tags: (data as any)?.tags ?? [],
       progressStatuses: (data as any)?.progressStatuses ?? [],
       types: (data as any)?.types ?? [],
     }}
+    allLanguages={(data as any)?.allLanguages ?? []}
+    allTypes={(data as any)?.allTypes ?? []}
   />
 </div>
