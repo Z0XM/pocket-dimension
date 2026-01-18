@@ -289,14 +289,44 @@ export const authHandler = new Elysia({ name: "better-auth" })
       const redirectURL = new URL(callbackURL);
 
       try {
-        await auth.api.verifyEmail({
+        const response = await auth.api.verifyEmail({
           query: { token, callbackURL },
-          asResponse: false,
+          asResponse: true,
         });
 
-        // Success - redirect without error
-        return redirect(redirectURL.toString());
+        // Check if response is a redirect (302) - Better Auth redirects on success
+        if (response instanceof Response && response.status === 302) {
+          // Check if Better Auth redirected to our callbackURL (success) or somewhere else (error)
+          const location = response.headers.get("location");
+          if (location?.includes(callbackURL)) {
+            // Verification successful - redirect to callbackURL without error
+            return redirect(redirectURL.toString());
+          } else {
+            // Better Auth redirected elsewhere, might be an error redirect
+            // Follow Better Auth's redirect
+            return redirect(location || redirectURL.toString());
+          }
+        }
+
+        // If not a redirect, return the response as-is
+        return response;
       } catch (error: any) {
+        // Handle redirect responses that are thrown as errors
+        // Better Auth might throw redirects as errors in some cases
+        if (error.statusCode === 302 || error.status === "FOUND") {
+          // Check if there's a Location header in the error
+          const location = error.headers?.get?.("location") || error.headers?.location;
+          if (location?.includes(callbackURL)) {
+            // Verification likely succeeded - redirect to callbackURL without error
+            return redirect(redirectURL.toString());
+          } else if (location) {
+            // Follow Better Auth's redirect
+            return redirect(location);
+          }
+          // Default to our callbackURL
+          return redirect(redirectURL.toString());
+        }
+
         // Extract error code from error message
         let errorCode = "unknown";
         let errorMessage = "";
@@ -323,12 +353,31 @@ export const authHandler = new Elysia({ name: "better-auth" })
           } else if (messageLower.includes("not found") || messageLower.includes("user")) {
             errorCode = "user_not_found";
           }
+        } else if (error.message) {
+          // Try to extract error message from error.message if error.body is undefined
+          const messageLower = error.message.toLowerCase();
+          if (messageLower.includes("expired")) {
+            errorCode = "token_expired";
+          } else if (messageLower.includes("invalid")) {
+            errorCode = "token_invalid";
+          } else if (messageLower.includes("already") && messageLower.includes("used")) {
+            errorCode = "token_already_used";
+          } else if (messageLower.includes("already") && messageLower.includes("verified")) {
+            errorCode = "email_already_verified";
+          } else if (messageLower.includes("not found") || messageLower.includes("user")) {
+            errorCode = "user_not_found";
+          }
         }
 
+        // Log full error details to understand what's happening
         console.error(`[verify-email] Email verification failed`, {
           statusCode: error.statusCode,
+          status: error.status,
           errorCode,
           errorMessage: errorMessage || error.message || error,
+          errorBody: error.body,
+          errorHeaders: error.headers ? Object.fromEntries(error.headers.entries?.() || []) : error.headers,
+          fullError: error,
           token: token.substring(0, 8) + "...",
           callbackURL,
         });
