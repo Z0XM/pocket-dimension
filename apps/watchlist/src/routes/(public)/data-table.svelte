@@ -691,13 +691,15 @@
     // Set new timer
     debounceTimer = setTimeout(() => {
       const url = new URL(page.url);
+      // Only trim when checking if query is empty, but preserve spaces in the actual query
       const trimmedQuery = query.trim();
       if (trimmedQuery) {
-        url.searchParams.set("q", trimmedQuery);
+        // Store the full query with spaces preserved
+        url.searchParams.set("q", query);
       } else {
         url.searchParams.delete("q");
       }
-      const newQuery = trimmedQuery || null;
+      const newQuery = trimmedQuery ? query : null;
 
       // Set pending query BEFORE calling goto - this prevents sync effect from running with old URL
       pendingQuery = newQuery;

@@ -12,7 +12,7 @@ export type ColumnSettings = {
 
 /**
  * Generates the default column order based on the user's requirements:
- * Order, Title, Tags, Type, Language, Progress, MyRating, UserXRating.., AvgRating
+ * Order, Title, Tags, Type, Language, Progress, MyRating, AvgRating, UserXRating..
  */
 export function getDefaultColumnOrder(availableColumns: string[]): string[] {
   // Define the preferred order (excluding order which is always first)
@@ -23,8 +23,8 @@ export function getDefaultColumnOrder(availableColumns: string[]): string[] {
     "language",
     "my_progress_status", // Progress
     "my_rating", // MyRating
-    // User rating columns will be inserted here
     "avg_rating", // AvgRating
+    // User rating columns will be inserted here (after avg_rating)
   ];
 
   // Separate columns into categories
@@ -57,21 +57,15 @@ export function getDefaultColumnOrder(availableColumns: string[]): string[] {
   // Sort user rating columns alphabetically
   userRatingCols.sort();
 
-  // Find where to insert user rating columns (after my_rating, before avg_rating)
-  const myRatingIndex = preferredCols.indexOf("my_rating");
+  // Find where to insert user rating columns (after avg_rating)
   const avgRatingIndex = preferredCols.indexOf("avg_rating");
 
-  // Insert user rating columns between my_rating and avg_rating
-  if (myRatingIndex !== -1 && avgRatingIndex !== -1) {
-    preferredCols.splice(avgRatingIndex, 0, ...userRatingCols);
-  } else if (myRatingIndex !== -1) {
-    // If my_rating exists but avg_rating doesn't, add user ratings after my_rating
-    preferredCols.splice(myRatingIndex + 1, 0, ...userRatingCols);
-  } else if (avgRatingIndex !== -1) {
-    // If avg_rating exists but my_rating doesn't, add user ratings before avg_rating
-    preferredCols.splice(avgRatingIndex, 0, ...userRatingCols);
+  // Insert user rating columns after avg_rating
+  if (avgRatingIndex !== -1) {
+    // Insert after avg_rating
+    preferredCols.splice(avgRatingIndex + 1, 0, ...userRatingCols);
   } else {
-    // Neither exists, just append user ratings
+    // If avg_rating doesn't exist, append user ratings at the end of preferred columns
     preferredCols.push(...userRatingCols);
   }
 

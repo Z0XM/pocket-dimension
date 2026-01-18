@@ -27,10 +27,11 @@
   );
 
   // Combine static columns with dynamic user rating columns
-  // Insert user columns before the "actions" column (which is last)
+  // User rating columns should appear after avg_rating but before actions column
   const allColumns = $derived(() => {
     const staticCols = [...columns];
     const actionsCol = staticCols.pop(); // Remove actions column
+    // Insert user rating columns after all static columns (which includes avg_rating)
     const combinedCols = [...staticCols, ...userRatingColumns];
     if (actionsCol) {
       combinedCols.push(actionsCol); // Add actions column back at the end
