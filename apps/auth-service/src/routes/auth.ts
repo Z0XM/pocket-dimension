@@ -13,6 +13,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
             statusCode: error.statusCode,
             error: error.body,
             username: body.username || "not provided",
+            callbackURL: body.callbackURL || "not provided",
           });
           return status(error.statusCode, error.body);
         }
@@ -29,6 +30,7 @@ export const authHandler = new Elysia({ name: "better-auth" })
         password: t.Required(t.String()),
         name: t.Required(t.String()),
         username: t.Optional(t.String()),
+        callbackURL: t.Optional(t.String()),
       }),
       detail: {
         summary: "Sign up",
@@ -151,10 +153,14 @@ export const authHandler = new Elysia({ name: "better-auth" })
       const { token } = params;
       const { callbackURL } = query;
 
-      // Always redirect, even if callbackURL is missing (frontend will handle error)
-      if (!callbackURL) {
-        console.error(`[reset-password/:token] Missing callbackURL for token reset`, {
+      // Validate callbackURL - must be a valid absolute URL
+      const isValidCallbackURL = callbackURL && (callbackURL.startsWith("http://") || callbackURL.startsWith("https://"));
+
+      // Always redirect, even if callbackURL is missing or invalid (frontend will handle error)
+      if (!isValidCallbackURL) {
+        console.error(`[reset-password/:token] Missing or invalid callbackURL for token reset`, {
           token: token.substring(0, 8) + "...",
+          callbackURL: callbackURL || "missing",
           origin: request.headers.get("origin"),
           referer: request.headers.get("referer"),
         });
@@ -272,10 +278,14 @@ export const authHandler = new Elysia({ name: "better-auth" })
     async ({ query, request }) => {
       const { token, callbackURL } = query;
 
-      // Always redirect, even if callbackURL is missing (frontend will handle error)
-      if (!callbackURL) {
-        console.error(`[verify-email] Missing callbackURL for email verification`, {
-          token: token.substring(0, 8) + "...",
+      // Validate callbackURL - must be a valid absolute URL
+      const isValidCallbackURL = callbackURL && (callbackURL.startsWith("http://") || callbackURL.startsWith("https://"));
+
+      // Always redirect, even if callbackURL is missing or invalid (frontend will handle error)
+      if (!isValidCallbackURL) {
+        console.error(`[verify-email] Missing or invalid callbackURL for email verification`, {
+          token: token?.substring(0, 8) + "...",
+          callbackURL: callbackURL || "missing",
           origin: request.headers.get("origin"),
           referer: request.headers.get("referer"),
         });

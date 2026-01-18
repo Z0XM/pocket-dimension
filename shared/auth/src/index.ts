@@ -39,6 +39,12 @@ export const auth = betterAuth({
   },
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) => {
+      // Log the URL to debug callbackURL issues
+      console.log(`[emailVerification] Sending verification email for ${user.email}`, {
+        url,
+        hasCallbackURL: url.includes("callbackURL"),
+      });
+
       void sendVerificationEmail({
         email: user.email,
         name: user.name || user.email.split("@")[0],
