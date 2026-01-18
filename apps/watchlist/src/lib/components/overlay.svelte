@@ -2,6 +2,7 @@
   import {
     CheckIcon,
     ChevronDownIcon,
+    CircleQuestionMarkIcon,
     CopyIcon,
     LoaderCircleIcon,
     LogInIcon,
@@ -509,6 +510,13 @@
             class="text-xl font-bold hover:underline"
             >{selectedView?.name || "Watchlist"}</a
           >
+          <a
+            href="/about"
+            class="inline-flex items-center justify-center h-6 w-6 hover:text-accent transition-colors"
+            title="About"
+          >
+            <CircleQuestionMarkIcon class="size-4" />
+          </a>
           {#if !isDefaultView(selectedViewName) && user}
             <Button
               variant="ghost"
