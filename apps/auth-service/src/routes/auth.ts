@@ -9,8 +9,17 @@ export const authHandler = new Elysia({ name: "better-auth" })
         return await auth.api.signUpEmail({ body, asResponse: true });
       } catch (error: any) {
         if (error.statusCode && error.body) {
+          console.error(`[sign-up/email] Sign up failed for email: ${body.email}`, {
+            statusCode: error.statusCode,
+            error: error.body,
+            username: body.username || "not provided",
+          });
           return status(error.statusCode, error.body);
         }
+        console.error(`[sign-up/email] Unexpected error during sign up for email: ${body.email}`, {
+          error: error.message || error,
+          stack: error.stack,
+        });
         return status(500, { error: "Something went wrong!" });
       }
     },
@@ -31,11 +40,19 @@ export const authHandler = new Elysia({ name: "better-auth" })
   .post(
     "/sign-in/email",
     async ({ body, headers }) => {
-      return await auth.api.signInEmail({
-        asResponse: true,
-        body,
-        headers: new Headers(headers as Record<string, string>),
-      });
+      try {
+        return await auth.api.signInEmail({
+          asResponse: true,
+          body,
+          headers: new Headers(headers as Record<string, string>),
+        });
+      } catch (error: any) {
+        console.error(`[sign-in/email] Sign in failed for email: ${body.email}`, {
+          statusCode: error.statusCode,
+          error: error.body || error.message || error,
+        });
+        throw error;
+      }
     },
     {
       body: t.Object({
@@ -52,11 +69,19 @@ export const authHandler = new Elysia({ name: "better-auth" })
   .post(
     "/sign-in/username",
     async ({ body, headers }) => {
-      return await auth.api.signInUsername({
-        asResponse: true,
-        body,
-        headers: new Headers(headers as Record<string, string>),
-      });
+      try {
+        return await auth.api.signInUsername({
+          asResponse: true,
+          body,
+          headers: new Headers(headers as Record<string, string>),
+        });
+      } catch (error: any) {
+        console.error(`[sign-in/username] Sign in failed for username: ${body.username}`, {
+          statusCode: error.statusCode,
+          error: error.body || error.message || error,
+        });
+        throw error;
+      }
     },
     {
       body: t.Object({
@@ -128,6 +153,11 @@ export const authHandler = new Elysia({ name: "better-auth" })
 
       // Always redirect, even if callbackURL is missing (frontend will handle error)
       if (!callbackURL) {
+        console.error(`[reset-password/:token] Missing callbackURL for token reset`, {
+          token: token.substring(0, 8) + "...",
+          origin: request.headers.get("origin"),
+          referer: request.headers.get("referer"),
+        });
         // Try to extract origin from request headers as fallback
         const origin = request.headers.get("origin") || request.headers.get("referer")?.split("/").slice(0, 3).join("/") || "http://localhost:3002";
         const errorURL = new URL("/reset-password", origin);
@@ -158,11 +188,20 @@ export const authHandler = new Elysia({ name: "better-auth" })
   .post(
     "/reset-password",
     async ({ body, headers }) => {
-      return await auth.api.resetPassword({
-        body,
-        headers: new Headers(headers as Record<string, string>),
-        asResponse: true,
-      });
+      try {
+        return await auth.api.resetPassword({
+          body,
+          headers: new Headers(headers as Record<string, string>),
+          asResponse: true,
+        });
+      } catch (error: any) {
+        console.error(`[reset-password] Password reset failed`, {
+          statusCode: error.statusCode,
+          error: error.body || error.message || error,
+          token: body.token.substring(0, 8) + "...",
+        });
+        throw error;
+      }
     },
     {
       body: t.Object({
@@ -202,8 +241,17 @@ export const authHandler = new Elysia({ name: "better-auth" })
         });
       } catch (error: any) {
         if (error.statusCode && error.body) {
+          console.error(`[forgot-password] Password reset request failed for email: ${body.email}`, {
+            statusCode: error.statusCode,
+            error: error.body,
+            redirectTo: body.redirectTo,
+          });
           return status(error.statusCode, error.body);
         }
+        console.error(`[forgot-password] Unexpected error during password reset request for email: ${body.email}`, {
+          error: error.message || error,
+          stack: error.stack,
+        });
         return status(500, { error: "Something went wrong!" });
       }
     },
@@ -226,6 +274,11 @@ export const authHandler = new Elysia({ name: "better-auth" })
 
       // Always redirect, even if callbackURL is missing (frontend will handle error)
       if (!callbackURL) {
+        console.error(`[verify-email] Missing callbackURL for email verification`, {
+          token: token.substring(0, 8) + "...",
+          origin: request.headers.get("origin"),
+          referer: request.headers.get("referer"),
+        });
         // Try to extract origin from request headers as fallback
         const origin = request.headers.get("origin") || request.headers.get("referer")?.split("/").slice(0, 3).join("/") || "http://localhost:3002";
         const errorURL = new URL("/verify-email", origin);
@@ -246,9 +299,9 @@ export const authHandler = new Elysia({ name: "better-auth" })
       } catch (error: any) {
         // Extract error code from error message
         let errorCode = "unknown";
+        let errorMessage = "";
 
         if (error.statusCode && error.body) {
-          let errorMessage = "";
           if (typeof error.body === "string") {
             errorMessage = error.body;
           } else if (error.body.message) {
@@ -271,6 +324,14 @@ export const authHandler = new Elysia({ name: "better-auth" })
             errorCode = "user_not_found";
           }
         }
+
+        console.error(`[verify-email] Email verification failed`, {
+          statusCode: error.statusCode,
+          errorCode,
+          errorMessage: errorMessage || error.message || error,
+          token: token.substring(0, 8) + "...",
+          callbackURL,
+        });
 
         // Redirect with error code as query parameter
         redirectURL.searchParams.set("error", errorCode);
@@ -299,8 +360,17 @@ export const authHandler = new Elysia({ name: "better-auth" })
         });
       } catch (error: any) {
         if (error.statusCode && error.body) {
+          console.error(`[send-verification-email] Failed to send verification email for: ${body.email}`, {
+            statusCode: error.statusCode,
+            error: error.body,
+            callbackURL: body.callbackURL,
+          });
           return status(error.statusCode, error.body);
         }
+        console.error(`[send-verification-email] Unexpected error sending verification email for: ${body.email}`, {
+          error: error.message || error,
+          stack: error.stack,
+        });
         return status(500, { error: "Something went wrong!" });
       }
     },
