@@ -75,6 +75,80 @@
     filterOptions,
   }: DataTableProps<TData, TValue> = $props();
 
+  // Mobile detection - check if window width is less than 768px (md breakpoint)
+  let isMobile = $state(false);
+
+  // Update mobile state on mount and resize
+  $effect(() => {
+    const checkMobile = () => {
+      isMobile = window.innerWidth < 768;
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+
+    return () => {
+      window.removeEventListener("resize", checkMobile);
+    };
+  });
+
+  // Scroll to top functionality
+  let showScrollToTop = $state(false);
+  const scrollThreshold = 300; // Show button after scrolling 300px
+  let scrollContainer: HTMLElement | null = $state(null);
+
+  // Track scroll position on the table container
+  $effect(() => {
+    if (!renderTable) return;
+
+    // Find the scroll container (the div with data-slot="table-container")
+    const findScrollContainer = async () => {
+      await tick(); // Wait for DOM to be ready
+      return document.querySelector(
+        '[data-slot="table-container"]',
+      ) as HTMLElement;
+    };
+
+    let container: HTMLElement | null = null;
+    let scrollHandler: (() => void) | null = null;
+
+    // Initialize scroll tracking
+    findScrollContainer().then((foundContainer) => {
+      if (!foundContainer) return;
+
+      container = foundContainer;
+      scrollContainer = container;
+
+      scrollHandler = () => {
+        if (container) {
+          showScrollToTop = container.scrollTop > scrollThreshold;
+        }
+      };
+
+      container.addEventListener("scroll", scrollHandler, { passive: true });
+      scrollHandler(); // Check initial scroll position
+    });
+
+    return () => {
+      if (container && scrollHandler) {
+        container.removeEventListener("scroll", scrollHandler);
+      }
+    };
+  });
+
+  // Scroll to top function
+  function scrollToTop() {
+    const container =
+      scrollContainer ||
+      (document.querySelector('[data-slot="table-container"]') as HTMLElement);
+    if (container) {
+      container.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  // Effective role: force "mobile" role on mobile devices
+  const effectiveUserRole = $derived(isMobile ? "mobile" : userRole);
+
   // Create and provide edit mode context
   const editMode = createEditModeState();
   setEditModeContext(editMode);
@@ -85,7 +159,7 @@
     languages: () => filterOptions?.allLanguages ?? [],
     types: () => filterOptions?.allTypes.map((t) => t.type) ?? [],
     tags: () => filterOptions?.allTags.map((t) => t.tag) ?? [],
-    userRole: () => userRole,
+    userRole: () => effectiveUserRole,
   });
 
   // Get default column order (excluding index which will always be first)
@@ -144,6 +218,26 @@
     // Hide avg_rating column when in edit mode
     if (editMode.isEditMode) {
       visibility.avg_rating = false;
+    }
+    // On mobile, only show: order, title, my_progress_status, my_rating, avg_rating
+    if (isMobile) {
+      Object.keys(visibility).forEach((columnId) => {
+        if (
+          ![
+            "order",
+            "title",
+            "my_progress_status",
+            "my_rating",
+            "avg_rating",
+          ].includes(columnId)
+        ) {
+          visibility[columnId] = false;
+        }
+      });
+      // Hide select column on mobile (multi-select disabled)
+      visibility.select = false;
+      // Hide actions column on mobile
+      visibility.actions = false;
     }
     return visibility;
   });
@@ -730,7 +824,7 @@
   }
 
   function handleAddNewRow() {
-    if (!userRole || !editMode.canAddRows(userRole)) return;
+    if (!effectiveUserRole || !editMode.canAddRows(effectiveUserRole)) return;
     const tempId = editMode.addNewRow();
     toast.success("New row added. Fill in the required fields.");
   }
@@ -795,14 +889,18 @@
   // Check if user can edit (must be signed in with verified email)
   const canEdit = $derived(
     isEmailVerified &&
-      (userRole === "user" ||
-        userRole === "contributor" ||
-        userRole === "admin"),
+      (effectiveUserRole === "user" ||
+        effectiveUserRole === "mobile" ||
+        effectiveUserRole === "contributor" ||
+        effectiveUserRole === "admin"),
   );
   const canAddRows = $derived(
-    isEmailVerified && (userRole === "contributor" || userRole === "admin"),
+    isEmailVerified &&
+      (effectiveUserRole === "contributor" || effectiveUserRole === "admin"),
   );
-  const canDeleteRows = $derived(isEmailVerified && userRole === "admin");
+  const canDeleteRows = $derived(
+    isEmailVerified && effectiveUserRole === "admin",
+  );
 
   // Handle delete confirmation
   function handleDeleteConfirm() {
@@ -912,7 +1010,7 @@
 {#if renderTable}
   <div>
     <div
-      class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-0 pt-4 px-4 sm:px-8 md:px-16"
+      class="flex items-start sm:items-center gap-3 sm:gap-0 pt-4 px-4 sm:px-8 md:px-16"
     >
       <div
         class="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0"
@@ -920,10 +1018,12 @@
         <Input
           bind:ref={searchInputRef}
           id="search-input"
-          placeholder="(Ctrl + Q) to search by title..."
+          placeholder={isMobile
+            ? "Search by title..."
+            : "(Ctrl + Q) to search by title..."}
           value={searchValue}
           oninput={handleSearchInput}
-          class="max-w-sm w-full"
+          class="max-w-sm w-full text-xs"
         />
         {#if filters.language.length > 0 || filters.tags.length > 0 || filters.progress.length > 0 || filters.type.length > 0}
           <div class="flex items-center gap-2 flex-wrap">
@@ -976,7 +1076,7 @@
       </div>
 
       <!-- Edit Mode Toolbar -->
-      <div class="flex items-center gap-2 sm:ms-auto">
+      <div class="flex items-center justify-end gap-2 sm:ms-auto">
         {#if !editMode.isEditMode && !isEnteringEditMode}
           <!-- Normal mode: Show pencil icon to enter edit mode -->
           {#if canEdit}
@@ -1064,13 +1164,14 @@
           </div>
         {/if}
 
+        <!-- Column settings button - hidden on mobile -->
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
               <Button
                 {...props}
                 variant="outline"
-                class="sm:ms-auto flex items-center gap-2 w-full sm:w-auto"
+                class="hidden md:flex sm:ms-auto items-center gap-2 w-full sm:w-auto"
                 ><Columns2Icon /> Columns</Button
               >
             {/snippet}
@@ -1130,23 +1231,6 @@
       </div>
     </div>
     <div class="rounded-md relative">
-      <!-- Loading overlay during save -->
-      <!-- {#if isSaving}
-        <div
-          class="absolute inset-0 bg-white/1 backdrop-blur-md z-50 flex items-center justify-center rounded-md"
-          role="status"
-          aria-label="Saving changes..."
-        >
-          <div class="flex flex-col items-center gap-3">
-            <div
-              class="size-8 border-4 border-t-transparent border-primary rounded-full animate-spin"
-            ></div>
-            <p class="text-sm font-medium text-muted-foreground">
-              Saving changes...
-            </p>
-          </div>
-        </div>
-      {/if} -->
       <Table.Root class="border-separate border-spacing-y-2">
         <Table.Header>
           {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
@@ -1261,6 +1345,8 @@
             {@const isNewRow = (row.original as Watchlist).id.startsWith(
               "temp-",
             )}
+            {@const hasInfinityCount =
+              Number((row.original as Watchlist).infinity_counts) > 0}
             <Table.Row
               data-state={row.getIsSelected() && "selected"}
               class="{isEditMode
@@ -1269,7 +1355,7 @@
                 ? 'opacity-50 line-through bg-red-500/10'
                 : ''} {isSelected ? 'bg-blue-500/10' : ''} {isNewRow
                 ? 'bg-green-500/5 border-l-2 border-l-green-500'
-                : ''}"
+                : ''} {hasInfinityCount ? 'shimmer-infinity' : ''}"
             >
               {#each row.getVisibleCells() as cell (cell.id)}
                 {@const isCellRightAligned =
@@ -1355,4 +1441,18 @@
     onConfirm={confirmUndoAll}
     onCancel={() => (showUndoAllDialog = false)}
   />
+
+  <!-- Scroll to Top Button -->
+  {#if showScrollToTop}
+    <Button
+      variant="outline"
+      size="icon"
+      onclick={scrollToTop}
+      class="fixed bottom-6 right-6 z-50 rounded-full shadow-lg bg-background/80 backdrop-blur-sm hover:bg-background transition-all duration-300"
+      title="Scroll to top"
+      aria-label="Scroll to top"
+    >
+      <ArrowUpIcon class="size-5" />
+    </Button>
+  {/if}
 {/if}

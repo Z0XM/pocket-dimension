@@ -149,6 +149,26 @@
     const num = parseFloat(r);
     return Number.isNaN(num) ? "" : num.toFixed(1);
   }
+
+  // Get color style based on rating value
+  function getRatingColor(rating: string | null): string {
+    if (!rating) return "";
+    const num = parseFloat(rating);
+    if (Number.isNaN(num)) return "";
+
+    // Map rating ranges to hex colors
+    if (num >= 10) return "color: #61ED51;";
+    if (num >= 9) return "color: #80EC51;";
+    if (num >= 8) return "color: #9EEA4E;";
+    if (num >= 7) return "color: #BAE84C;";
+    if (num >= 6) return "color: #DAE54A;";
+    if (num >= 5) return "color: #E2CC45;";
+    if (num >= 4) return "color: #DCA93D;";
+    if (num >= 3) return "color: #D58235;";
+    if (num >= 2) return "color: #CE5A2C;";
+    if (num >= 1) return "color: #C73024;";
+    return "color: #880A00;";
+  }
 </script>
 
 <EditableCellWrapper
@@ -200,18 +220,20 @@
     </div>
   {:else}
     <div
-      class="text-end font-medium {!canRate
-        ? 'text-muted-foreground/50'
-        : ''}"
+      class="text-end font-medium {!canRate ? 'text-muted-foreground/50' : ''}"
     >
       {#if !canRate}
-        <span title="Set progress to 'Watched' or 'Dropped' to enable rating">-</span>
+        <span title="Set progress to 'Watched' or 'Dropped' to enable rating"
+          >-</span
+        >
       {:else if currentInfinity}
         <span title="Infinity" class="text-lg">♾️</span>
       {:else if currentShitty}
         <span title="Shitty" class="text-lg">💩</span>
       {:else}
-        {formatRating(currentRating)}
+        <span style={getRatingColor(currentRating)}
+          >{formatRating(currentRating)}</span
+        >
       {/if}
     </div>
   {/if}

@@ -94,7 +94,7 @@
 	}
 
 	body {
-		@apply font-mono bg-[#040211] text-foreground;
+		@apply font-mono bg-[#040211] text-foreground overflow-y-hidden;
 		position: relative;
 	}
 
@@ -109,6 +109,34 @@
 
 	::-webkit-scrollbar-thumb {
 		@apply rounded-full bg-secondary-foreground/75;
+	}
+
+	.shimmer-infinity {
+		 background: linear-gradient(
+			90deg,
+			rgba(0, 0, 0, 0) 0%,
+			rgba(0, 0, 0, 0.0) 30%,
+			rgba(133, 42, 207, 0.05) 40%,
+			rgba(133, 42, 207, 0.1) 45%,
+			rgba(151, 64, 223, 0.2) 50%,
+			rgba(133, 42, 207, 0.1) 55%,
+			rgba(133, 42, 207, 0.05) 60%,
+			rgba(0, 0, 0, 0.0) 70%,
+			rgba(0, 0, 0, 0) 100%
+		);
+		background-size: 200% 100%;
+		animation: shimmer 5s ease-in-out infinite;
+	}
+
+
+
+	@keyframes shimmer {
+		0% {
+			background-position: -100% 0;
+		}
+		100% {
+			background-position: 100% 0;
+		}
 	}
 
 }

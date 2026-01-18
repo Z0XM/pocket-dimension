@@ -32,6 +32,26 @@
   let role = $derived((user as any)?.role as "admin" | "contributor" | "user");
   let isEmailVerified = $derived(!!(user as any)?.emailVerified);
 
+  // Mobile detection - check if window width is less than 768px (md breakpoint)
+  let isMobile = $state(false);
+
+  // Update mobile state on mount and resize
+  $effect(() => {
+    const checkMobile = () => {
+      isMobile = window.innerWidth < 768;
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+
+    return () => {
+      window.removeEventListener("resize", checkMobile);
+    };
+  });
+
+  // Effective role: force "mobile" role on mobile devices
+  const effectiveRole = $derived(isMobile ? "mobile" : role);
+
   let mobileMenuOpen = $state(false);
 
   type View = {
@@ -638,7 +658,7 @@
                 return [...defaultViews, ...views].filter((v) => v.name !== selectedViewName);
               })() as view}
                 <DropdownMenu.Item
-                  class="flex items-center justify-between text-[0.625rem] gap-1 py-0 cursor-default"
+                  class="flex items-center text-[0.625rem] gap-1 py-0 cursor-default"
                 >
                   <a
                     href={view.href}
@@ -652,53 +672,6 @@
                   >
                     {view.name}
                   </a>
-                  {#if !view.isDefault}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      class="dark:hover:bg-transparent p-0 group"
-                      onclick={async (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (!user) return;
-                        const viewName = view.name;
-                        const isCurrentlyFavorite = view.isFavorite;
-                        try {
-                          const response = await fetch(
-                            `/api/views/${encodeURIComponent(viewName)}`,
-                            {
-                              method: "PUT",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                setFavorite: !isCurrentlyFavorite,
-                              }),
-                            },
-                          );
-                          if (response.ok) {
-                            await fetchViews();
-                            toast.success(
-                              isCurrentlyFavorite
-                                ? `Removed "${viewName}" from favorites`
-                                : `Added "${viewName}" to favorites`,
-                            );
-                          } else {
-                            const error = await response.json();
-                            console.error("Error setting favorite:", error);
-                            toast.error(
-                              error.error || "Failed to update favorite",
-                            );
-                          }
-                        } catch (error) {
-                          console.error("Error setting favorite:", error);
-                          toast.error("Failed to update favorite");
-                        }
-                      }}
-                    >
-                      <StarIcon
-                        class={`size-3.5 ${view.isFavorite ? "fill-primary" : "fill-transparent"} group-dark:hover:fill-primary group-hover:fill-primary`}
-                      />
-                    </Button>
-                  {/if}
                 </DropdownMenu.Item>
               {/each}
             </DropdownMenu.Content>
@@ -759,81 +732,17 @@
         </Button>
       </div>
 
-      <!-- Mobile: Show actions in dropdown -->
+      <!-- Mobile: Show copy button only (CRUD buttons hidden on mobile) -->
       <div class="md:hidden">
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger>
-            {#snippet child({ props })}
-              <Button
-                variant="outline"
-                size="icon"
-                {...props}
-                class="flex items-center justify-center"
-                aria-label="Actions Menu"
-              >
-                <MenuIcon class="size-4" />
-              </Button>
-            {/snippet}
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content class="bg-white/1 backdrop-blur-md" align="end">
-            {#if user}
-              <DropdownMenu.Item
-                class="flex items-center gap-2 cursor-pointer text-[0.625rem]"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  if (!selectedViewName || isDefaultView(selectedViewName))
-                    return;
-                  handleSave();
-                }}
-                disabled={!selectedViewName || isDefaultView(selectedViewName)}
-              >
-                <span>Save</span>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                class="flex items-center gap-2 cursor-pointer text-[0.625rem]"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  handleClear();
-                }}
-                disabled={!selectedView}
-              >
-                <span>Clear</span>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                class="flex items-center gap-2 cursor-pointer text-[0.625rem]"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  handleCreate();
-                }}
-                disabled={!user || isLoadingViews}
-              >
-                <PlusIcon class="size-4" />
-                <span>New View</span>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                class="flex items-center gap-2 cursor-pointer text-[0.625rem] text-destructive"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  openDeleteDialog();
-                }}
-                disabled={!selectedViewName || isDefaultView(selectedViewName)}
-              >
-                <TrashIcon class="size-4" />
-                <span>Delete</span>
-              </DropdownMenu.Item>
-            {/if}
-            <DropdownMenu.Item
-              class="flex items-center gap-2 cursor-pointer text-[0.625rem]"
-              onSelect={(e) => {
-                e.preventDefault();
-                handleCopyUrl();
-              }}
-            >
-              <CopyIcon class="size-4" />
-              <span>Copy URL</span>
-            </DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>
+        <Button
+          variant="outline"
+          size="icon"
+          onclick={handleCopyUrl}
+          title="Copy URL"
+          class="flex items-center justify-center"
+        >
+          <CopyIcon class="size-4" />
+        </Button>
       </div>
     </div>
   {/if}
@@ -868,7 +777,7 @@
     {/if}
   </div>
 
-  <!-- Mobile/Tablet menu button - visible only on mobile/tablet -->
+  <!-- Mobile/Tablet kebab menu - visible only on mobile/tablet -->
   <div class="md:hidden">
     <DropdownMenu.Root bind:open={mobileMenuOpen}>
       <DropdownMenu.Trigger>
@@ -878,18 +787,18 @@
             size="icon"
             {...props}
             class="flex items-center justify-center"
-            aria-label="Menu"
+            aria-label="User Menu"
           >
-            {#if mobileMenuOpen}
-              <XIcon size={20} />
-            {:else}
-              <MenuIcon size={20} />
-            {/if}
+            <MenuIcon size={20} />
           </Button>
         {/snippet}
       </DropdownMenu.Trigger>
       <DropdownMenu.Content class="bg-white/1 backdrop-blur-md" align="end">
-        {#if role === "admin" || role === "contributor"}
+        {#if effectiveRole === "mobile"}
+          <div class="px-2 py-1.5">
+            <Badge variant="outline" class="border-accent">Mobile</Badge>
+          </div>
+        {:else if role === "admin" || role === "contributor"}
           <div class="px-2 py-1.5">
             <Badge variant="outline" class="border-accent">
               {role[0].toUpperCase() + role.slice(1)}

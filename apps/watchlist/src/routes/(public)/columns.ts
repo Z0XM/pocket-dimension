@@ -80,7 +80,7 @@ export const columns: ColumnDef<Watchlist>[] = [
         value: row.original.title,
         placeholder: "Enter title...",
         required: true,
-        class: "max-w-[400px] truncate",
+        class: "max-w-[180px] md:max-w-[400px] truncate",
       });
     },
   },
@@ -197,6 +197,29 @@ export const columns: ColumnDef<Watchlist>[] = [
       const avgRatingCellSnippet = createRawSnippet<[{ avg_rating: string; infinity_counts: string; shitty_counts: string }]>((getAvgRating) => {
         const { avg_rating, infinity_counts, shitty_counts } = getAvgRating();
         const formatted = avg_rating ? parseFloat(avg_rating).toFixed(2) : "";
+
+        // Helper function to get color style based on rating
+        const getRatingColor = (rating: string): string => {
+          if (!rating) return "";
+          const num = parseFloat(rating);
+          if (Number.isNaN(num)) return "";
+
+          // Map rating ranges to hex colors
+          if (num >= 10) return "color: #61ED51;";
+          if (num >= 9) return "color: #80EC51;";
+          if (num >= 8) return "color: #9EEA4E;";
+          if (num >= 7) return "color: #BAE84C;";
+          if (num >= 6) return "color: #DAE54A;";
+          if (num >= 5) return "color: #E2CC45;";
+          if (num >= 4) return "color: #DCA93D;";
+          if (num >= 3) return "color: #D58235;";
+          if (num >= 2) return "color: #CE5A2C;";
+          if (num >= 1) return "color: #C73024;";
+          return "color: #880A00;";
+        };
+
+        const colorStyle = getRatingColor(avg_rating);
+
         if (Number(infinity_counts) > 0) {
           return {
             render: () => `<div class="text-end text-lg font-medium">♾️<sup class="text-[0.620rem]">${infinity_counts}</sup></div>`,
@@ -208,7 +231,7 @@ export const columns: ColumnDef<Watchlist>[] = [
           };
         }
         return {
-          render: () => `<div class="text-end font-medium">${formatted}</div>`,
+          render: () => `<div class="text-end font-medium" style="${colorStyle}">${formatted}</div>`,
         };
       });
 

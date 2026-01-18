@@ -187,11 +187,29 @@
     </DropdownMenu.Root>
   {:else}
     <!-- biome-ignore lint/a11y/useKeyWithClickEvents: clickable cell for filtering -->
+    {@const textColorMap = {
+      my_progress_status: {
+        watched: "text-green-400 font-bold",
+        dropped: "text-rose-400 font-bold",
+        watching: "text-yellow-300 font-bold",
+        watch_later: "text-indigo-300 font-bold",
+      },
+      // type: {
+      //   movie: "text-amber-500 font-bold",
+      //   series: "text-pink-500 font-bold",
+      //   shorts: "text-emerald-500 font-bold",
+      // },
+      languageId: {
+        English: "text-blue-200",
+        Japanese: "text-green-200",
+        Hindi: "text-amber-200",
+      },
+    } as { [key: string]: { [key: string]: string } }}
     <span
       class="capitalize cursor-pointer hover:underline truncate {currentValue ===
       null
         ? 'text-muted-foreground'
-        : ''}"
+        : ''} {textColorMap[field]?.[currentValue ?? ''] ?? ''}"
       onclick={handleClick}
       role={filterType ? "button" : undefined}
     >

@@ -24,6 +24,7 @@
 
   const userRole = $derived(editOptions.userRole());
   const canDelete = $derived(editMode.canDeleteRows(userRole));
+  // Only contributor and admin can edit contributor fields; "user" and "mobile" cannot
   const canEditContributorFields = $derived(
     userRole === "contributor" || userRole === "admin",
   );

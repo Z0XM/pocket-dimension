@@ -107,7 +107,7 @@
       class="min-w-[150px] px-4 text-sm"
     />
   {:else}
-    <span class="truncate" title={currentValue ?? ""}
+    <span class="font-medium truncate" title={currentValue ?? ""}
       >{currentValue || "-"}</span
     >
   {/if}

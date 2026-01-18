@@ -1,7 +1,7 @@
 import { getContext, setContext } from "svelte";
 import type { Watchlist, WatchProgressStatus } from "../columns";
 
-export type UserRole = "user" | "contributor" | "admin";
+export type UserRole = "user" | "contributor" | "admin" | "mobile";
 
 export interface EditableFields {
   title?: string;
@@ -562,6 +562,7 @@ export function createEditModeState() {
       return contributorEditableFields.includes(field);
     }
 
+    // Both "user" and "mobile" roles can only edit user-specific fields
     return userEditableFields.includes(field);
   }
 
@@ -569,6 +570,7 @@ export function createEditModeState() {
    * Check if user can add new rows
    */
   function canAddRows(role: UserRole): boolean {
+    // Only admin and contributor can add rows; "user" and "mobile" cannot
     return role === "admin" || role === "contributor";
   }
 
@@ -576,6 +578,7 @@ export function createEditModeState() {
    * Check if user can delete rows
    */
   function canDeleteRows(role: UserRole): boolean {
+    // Only admin can delete rows; "user", "mobile", and "contributor" cannot
     return role === "admin";
   }
 

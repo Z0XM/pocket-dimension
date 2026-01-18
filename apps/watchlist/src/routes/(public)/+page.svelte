@@ -101,7 +101,7 @@
   });
 </script>
 
-<div class="px-4">
+<div class="md:px-4">
   <DataTable
     data={watchlist}
     columns={filteredColumns}
