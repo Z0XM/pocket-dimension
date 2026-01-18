@@ -12,7 +12,7 @@
 
 <div
   data-slot="table-container"
-  class="md:px-8 relative w-full overflow-x-auto h-screen overflow-y-scroll"
+  class="md:px-8 relative w-full overflow-x-auto h-[90vh] overflow-y-scroll"
 >
   <table
     bind:this={ref}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getContext } from "svelte";
   import { Input } from "$lib/components/ui/input";
+  import ClickableTitle from "./clickable-title.svelte";
   import { getEditModeContext, type UserRole } from "./edit-mode.svelte.js";
   import EditableCellWrapper from "./editable-cell-wrapper.svelte";
 
@@ -106,6 +107,8 @@
       {placeholder}
       class="min-w-[150px] px-4 text-sm"
     />
+  {:else if field === "title"}
+    <ClickableTitle title={currentValue ?? ""} />
   {:else}
     <span class="font-medium truncate" title={currentValue ?? ""}
       >{currentValue || "-"}</span

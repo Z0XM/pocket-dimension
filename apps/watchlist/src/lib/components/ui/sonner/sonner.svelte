@@ -1,25 +1,20 @@
 <script lang="ts">
-import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
-import InfoIcon from "@lucide/svelte/icons/info";
-import Loader2Icon from "@lucide/svelte/icons/loader-2";
-import OctagonXIcon from "@lucide/svelte/icons/octagon-x";
-import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
-import { mode } from "mode-watcher";
-import { Toaster as Sonner, type ToasterProps as SonnerProps } from "svelte-sonner";
+  import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
+  import InfoIcon from "@lucide/svelte/icons/info";
+  import Loader2Icon from "@lucide/svelte/icons/loader-2";
+  import OctagonXIcon from "@lucide/svelte/icons/octagon-x";
+  import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
+  // import { mode } from "mode-watcher";
+  import {
+    Toaster as Sonner,
+    type ToasterProps as SonnerProps,
+  } from "svelte-sonner";
 
-let { ...restProps }: SonnerProps = $props();
+  let { ...restProps }: SonnerProps = $props();
 </script>
 
-<style>
-  :global([data-sonner-toast]) {
-    background: rgba(184, 96, 255, 0.1) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-  }
-</style>
-
 <Sonner
-  theme={mode.current}
+  theme="dark"
   class="toaster group"
   style="--normal-bg: var(--color-popover); --normal-text: var(--color-popover-foreground); --normal-border: var(--color-border);"
   {...restProps}
@@ -39,3 +34,11 @@ let { ...restProps }: SonnerProps = $props();
     <TriangleAlertIcon class="size-4" />
   {/snippet}
 </Sonner>
+
+<style>
+  :global([data-sonner-toast]) {
+    background: rgba(184, 96, 255, 0.1) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+  }
+</style>

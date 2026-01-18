@@ -10,24 +10,124 @@ export type ColumnSettings = {
   };
 };
 
-function migrateOldVisibilityFormat(oldVisibility: VisibilityState, defaultOrder: string[]): ColumnSettings {
+/**
+ * Generates the default column order based on the user's requirements:
+ * Order, Title, Tags, Type, Language, Progress, MyRating, UserXRating.., AvgRating
+ */
+export function getDefaultColumnOrder(availableColumns: string[]): string[] {
+  // Define the preferred order (excluding order which is always first)
+  const preferredOrder = [
+    "title",
+    "tags",
+    "type",
+    "language",
+    "my_progress_status", // Progress
+    "my_rating", // MyRating
+    // User rating columns will be inserted here
+    "avg_rating", // AvgRating
+  ];
+
+  // Separate columns into categories
+  const orderCol = availableColumns.filter((id) => id === "order");
+  const preferredCols: string[] = [];
+  const userRatingCols: string[] = [];
+  const otherCols: string[] = [];
+
+  // Categorize columns
+  availableColumns.forEach((id) => {
+    if (id === "order") {
+      // Already handled
+    } else if (preferredOrder.includes(id)) {
+      preferredCols.push(id);
+    } else if (id.startsWith("user_") && id.endsWith("_rating")) {
+      userRatingCols.push(id);
+    } else {
+      // Other columns like select, actions, etc.
+      otherCols.push(id);
+    }
+  });
+
+  // Sort preferred columns according to preferredOrder
+  preferredCols.sort((a, b) => {
+    const indexA = preferredOrder.indexOf(a);
+    const indexB = preferredOrder.indexOf(b);
+    return indexA - indexB;
+  });
+
+  // Sort user rating columns alphabetically
+  userRatingCols.sort();
+
+  // Find where to insert user rating columns (after my_rating, before avg_rating)
+  const myRatingIndex = preferredCols.indexOf("my_rating");
+  const avgRatingIndex = preferredCols.indexOf("avg_rating");
+
+  // Insert user rating columns between my_rating and avg_rating
+  if (myRatingIndex !== -1 && avgRatingIndex !== -1) {
+    preferredCols.splice(avgRatingIndex, 0, ...userRatingCols);
+  } else if (myRatingIndex !== -1) {
+    // If my_rating exists but avg_rating doesn't, add user ratings after my_rating
+    preferredCols.splice(myRatingIndex + 1, 0, ...userRatingCols);
+  } else if (avgRatingIndex !== -1) {
+    // If avg_rating exists but my_rating doesn't, add user ratings before avg_rating
+    preferredCols.splice(avgRatingIndex, 0, ...userRatingCols);
+  } else {
+    // Neither exists, just append user ratings
+    preferredCols.push(...userRatingCols);
+  }
+
+  // Combine: order first, then preferred columns, then other columns
+  // Filter out select and actions from other columns as they're handled separately
+  const selectCol = otherCols.filter((id) => id === "select");
+  const actionsCol = otherCols.filter((id) => id === "actions");
+  const remainingOtherCols = otherCols.filter((id) => id !== "select" && id !== "actions");
+
+  return [...orderCol, ...selectCol, ...preferredCols, ...remainingOtherCols, ...actionsCol];
+}
+
+function migrateOldVisibilityFormat(oldVisibility: VisibilityState, orderedDefaultOrder: string[]): ColumnSettings {
   const settings: ColumnSettings = {};
+  let orderCounter = 0;
+
+  // Handle select separately (order -1, comes before everything)
+  if (orderedDefaultOrder.includes("select")) {
+    settings["select"] = {
+      order: -1,
+      visible: oldVisibility["select"] !== false,
+    };
+  }
+
+  // Filter out select and actions from the order calculation
+  const columnsToOrder = orderedDefaultOrder.filter((id) => id !== "select" && id !== "actions");
+
+  // Ensure order is first in the array
+  const normalizedOrder = columnsToOrder[0] === "order" ? columnsToOrder : ["order", ...columnsToOrder.filter((id) => id !== "order")];
 
   // Create settings with default order, preserving visibility state
-  defaultOrder.forEach((columnId, index) => {
-    // Order column is always visible and first
+  normalizedOrder.forEach((columnId) => {
+    // Order column is always visible and first with order 0
     if (columnId === "order") {
       settings[columnId] = {
         order: 0,
         visible: true,
       };
-    } else {
-      settings[columnId] = {
-        order: index,
-        visible: oldVisibility[columnId] !== false, // Default to true unless explicitly false
-      };
+      return;
     }
+
+    orderCounter++;
+    settings[columnId] = {
+      order: orderCounter,
+      visible: oldVisibility[columnId] !== false, // Default to true unless explicitly false
+    };
   });
+
+  // Handle actions separately (comes last)
+  if (orderedDefaultOrder.includes("actions")) {
+    const maxOrder = Math.max(...Object.values(settings).map((s) => s.order), 0);
+    settings["actions"] = {
+      order: maxOrder + 1,
+      visible: oldVisibility["actions"] !== false,
+    };
+  }
 
   return settings;
 }
@@ -37,41 +137,138 @@ function loadColumnSettingsFromStorage(defaultOrder: string[]): ColumnSettings {
     return {};
   }
 
+  // Get the properly ordered default column order
+  const orderedDefaultOrder = getDefaultColumnOrder(defaultOrder);
+
   // Try new format first
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      // Validate structure
-      if (typeof parsed === "object" && parsed !== null) {
+      // Validate structure - check if it's a valid non-empty settings object
+      if (typeof parsed === "object" && parsed !== null && Object.keys(parsed).length > 0) {
         const settings = parsed as ColumnSettings;
-        // Ensure all columns from defaultOrder exist in settings
-        defaultOrder.forEach((columnId, index) => {
-          if (!settings[columnId]) {
-            if (columnId === "order") {
-              settings[columnId] = {
-                order: 0,
-                visible: true,
-              };
-            } else {
-              settings[columnId] = {
-                order: index,
-                visible: true,
+        // Check if settings have valid structure (at least one column with order/visible)
+        const hasValidStructure = Object.values(settings).some((s) => typeof s === "object" && s !== null && typeof s.order === "number");
+
+        if (!hasValidStructure) {
+          // Settings exist but are invalid/empty, clear them and treat as no settings
+          localStorage.removeItem(STORAGE_KEY);
+          // Fall through to create defaults
+        } else {
+          // Valid settings exist - check if order is malformed (avg_rating before my_rating)
+          // If so, regenerate with correct order
+          const avgRatingOrder = settings["avg_rating"]?.order ?? Infinity;
+          const myRatingOrder = settings["my_rating"]?.order ?? Infinity;
+          const myProgressOrder = settings["my_progress_status"]?.order ?? Infinity;
+          const hasMalformedOrder = avgRatingOrder < myRatingOrder || avgRatingOrder < myProgressOrder;
+
+          // If order is malformed or if many columns are missing, regenerate order
+          const missingColumns = orderedDefaultOrder.filter((id) => !settings[id]);
+          const shouldRegenerate = hasMalformedOrder || missingColumns.length > orderedDefaultOrder.length / 2;
+
+          if (shouldRegenerate) {
+            // Regenerate order completely
+            const defaultSettings: ColumnSettings = {};
+
+            // Handle select separately
+            if (orderedDefaultOrder.includes("select")) {
+              defaultSettings["select"] = {
+                order: -1,
+                visible: settings["select"]?.visible ?? true,
               };
             }
-          } else if (columnId === "order") {
-            // Ensure order column is always visible and first
-            settings[columnId] = {
-              ...settings[columnId],
-              order: 0,
+
+            // Filter out select and actions from the order calculation
+            const columnsToOrder = orderedDefaultOrder.filter((id) => id !== "select" && id !== "actions");
+
+            // Ensure order is first
+            const normalizedOrder = columnsToOrder[0] === "order" ? columnsToOrder : ["order", ...columnsToOrder.filter((id) => id !== "order")];
+
+            let orderCounter = 0;
+            normalizedOrder.forEach((columnId) => {
+              if (columnId === "order") {
+                defaultSettings[columnId] = {
+                  order: 0,
+                  visible: true,
+                };
+                return;
+              }
+              orderCounter++;
+              defaultSettings[columnId] = {
+                order: orderCounter,
+                visible: settings[columnId]?.visible ?? true,
+              };
+            });
+
+            // Handle actions separately
+            if (orderedDefaultOrder.includes("actions")) {
+              const maxOrder = Math.max(...Object.values(defaultSettings).map((s) => s.order), 0);
+              defaultSettings["actions"] = {
+                order: maxOrder + 1,
+                visible: settings["actions"]?.visible ?? true,
+              };
+            }
+
+            return defaultSettings;
+          }
+
+          // Otherwise, just add missing columns and fix order column
+          // Handle select separately
+          if (orderedDefaultOrder.includes("select") && !settings["select"]) {
+            settings["select"] = {
+              order: -1,
               visible: true,
             };
           }
-        });
-        return settings;
+
+          // Filter out select and actions from the order calculation
+          const columnsToOrder = orderedDefaultOrder.filter((id) => id !== "select" && id !== "actions");
+
+          // Ensure order is first
+          const normalizedOrder = columnsToOrder[0] === "order" ? columnsToOrder : ["order", ...columnsToOrder.filter((id) => id !== "order")];
+
+          let orderCounter = 0;
+          normalizedOrder.forEach((columnId) => {
+            if (!settings[columnId]) {
+              // Column is missing, add it with correct order
+              if (columnId === "order") {
+                settings[columnId] = {
+                  order: 0,
+                  visible: true,
+                };
+              } else {
+                orderCounter++;
+                settings[columnId] = {
+                  order: orderCounter,
+                  visible: true,
+                };
+              }
+            } else if (columnId === "order") {
+              // Ensure order column is always visible and first
+              settings[columnId] = {
+                ...settings[columnId],
+                order: 0,
+                visible: true,
+              };
+            }
+            // For existing columns (except order), preserve their current order
+          });
+
+          // Handle actions separately
+          if (orderedDefaultOrder.includes("actions") && !settings["actions"]) {
+            const maxOrder = Math.max(...Object.values(settings).map((s) => s.order), 0);
+            settings["actions"] = {
+              order: maxOrder + 1,
+              visible: true,
+            };
+          }
+
+          return settings;
+        }
       }
     } catch {
-      // Invalid JSON, fall through to migration
+      // Invalid JSON, fall through to create defaults
     }
   }
 
@@ -80,7 +277,7 @@ function loadColumnSettingsFromStorage(defaultOrder: string[]): ColumnSettings {
   if (oldStored) {
     try {
       const oldVisibility = JSON.parse(oldStored) as VisibilityState;
-      const migrated = migrateOldVisibilityFormat(oldVisibility, defaultOrder);
+      const migrated = migrateOldVisibilityFormat(oldVisibility, orderedDefaultOrder);
       // Save migrated format
       localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
       // Remove old key
@@ -91,22 +288,52 @@ function loadColumnSettingsFromStorage(defaultOrder: string[]): ColumnSettings {
     }
   }
 
-  // No stored data, return defaults
+  // No stored data, return defaults with proper order
   const defaultSettings: ColumnSettings = {};
-  defaultOrder.forEach((columnId, index) => {
-    // Index column is always visible and first
+  let orderCounter = 0;
+
+  // Handle select separately (order -1, comes before everything)
+  if (orderedDefaultOrder.includes("select")) {
+    defaultSettings["select"] = {
+      order: -1,
+      visible: true,
+    };
+  }
+
+  // Filter out select and actions from the order calculation
+  const columnsToOrder = orderedDefaultOrder.filter((id) => id !== "select" && id !== "actions");
+
+  // Ensure order is first in the array
+  const normalizedOrder = columnsToOrder[0] === "order" ? columnsToOrder : ["order", ...columnsToOrder.filter((id) => id !== "order")];
+
+  normalizedOrder.forEach((columnId) => {
+    // Order column is always visible and first with order 0
     if (columnId === "order") {
       defaultSettings[columnId] = {
         order: 0,
         visible: true,
       };
-    } else {
-      defaultSettings[columnId] = {
-        order: index,
-        visible: true,
-      };
+      // Don't increment counter for order
+      return;
     }
+
+    // All other columns get sequential order starting from 1
+    orderCounter++;
+    defaultSettings[columnId] = {
+      order: orderCounter,
+      visible: true,
+    };
   });
+
+  // Handle actions separately (comes last)
+  if (orderedDefaultOrder.includes("actions")) {
+    const maxOrder = Math.max(...Object.values(defaultSettings).map((s) => s.order), 0);
+    defaultSettings["actions"] = {
+      order: maxOrder + 1,
+      visible: true,
+    };
+  }
+
   return defaultSettings;
 }
 

@@ -458,16 +458,19 @@
   }
 
   // Add a filter value (used by clickable cells)
+  // Toggles the filter: removes if already present, adds if not present
   function addFilterValue(
     filterType: "language" | "tags" | "progress" | "type",
     value: string,
   ) {
     const currentValues = filters[filterType];
-    // Don't add if already in filter
+    // Toggle: remove if already in filter, add if not
     if (currentValues.includes(value)) {
-      return;
+      const newValues = currentValues.filter((v) => v !== value);
+      handleFilterChange(filterType, newValues);
+    } else {
+      handleFilterChange(filterType, [...currentValues, value]);
     }
-    handleFilterChange(filterType, [...currentValues, value]);
   }
 
   // Provide filter context for child components
@@ -475,6 +478,12 @@
     handleFilterChange,
     addFilterValue,
     filters: () => filters,
+  });
+
+  // Provide search context for child components
+  setContext("searchContext", {
+    updateSearchQuery,
+    currentSearchQuery: () => searchValue,
   });
 
   // Remove a single filter value
