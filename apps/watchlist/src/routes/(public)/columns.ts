@@ -27,6 +27,10 @@ export type Watchlist = {
   my_infinity: boolean | null;
   my_shitty: boolean | null;
   my_progress_status: WatchProgressStatus | null;
+  // Dynamic user rating fields - indexed by username
+  [key: `user_${string}_rating`]: string | null | undefined;
+  [key: `user_${string}_infinity`]: boolean | null | undefined;
+  [key: `user_${string}_shitty`]: boolean | null | undefined;
 };
 
 // Column definitions with editable cells
@@ -257,3 +261,85 @@ export const columns: ColumnDef<Watchlist>[] = [
     size: 50,
   },
 ];
+
+// Function to create dynamic user rating columns
+export function createUserRatingColumns(usernames: string[]): ColumnDef<Watchlist>[] {
+  return usernames.map((username) => {
+    const safeUsername = username.replace(/[^a-zA-Z0-9_]/g, "_");
+    const columnId = `user_${safeUsername}_rating`;
+
+    return {
+      id: columnId,
+      accessorKey: columnId as keyof Watchlist,
+      header: () => {
+        const headerSnippet = createRawSnippet(() => ({
+          render: () => `<div>${username}</div>`,
+        }));
+        return renderSnippet(headerSnippet);
+      },
+      meta: {
+        displayName: username,
+      },
+      enableSorting: true,
+      enableHiding: true,
+      cell: ({ row }) => {
+        const ratingKey = `user_${safeUsername}_rating` as keyof Watchlist;
+        const infinityKey = `user_${safeUsername}_infinity` as keyof Watchlist;
+        const shittyKey = `user_${safeUsername}_shitty` as keyof Watchlist;
+
+        const rating = row.original[ratingKey] as string | null | undefined;
+        const infinity = row.original[infinityKey] as boolean | null | undefined;
+        const shitty = row.original[shittyKey] as boolean | null | undefined;
+
+        const cellSnippet = createRawSnippet<
+          [{ rating: string | null | undefined; infinity: boolean | null | undefined; shitty: boolean | null | undefined }]
+        >((getData) => {
+          const { rating, infinity, shitty } = getData();
+          const formatted = rating ? parseFloat(rating).toFixed(2) : "";
+
+          // Helper function to get color style based on rating
+          const getRatingColor = (rating: string): string => {
+            if (!rating) return "";
+            const num = parseFloat(rating);
+            if (Number.isNaN(num)) return "";
+
+            // Map rating ranges to hex colors
+            if (num >= 10) return "color: #61ED51;";
+            if (num >= 9) return "color: #80EC51;";
+            if (num >= 8) return "color: #9EEA4E;";
+            if (num >= 7) return "color: #BAE84C;";
+            if (num >= 6) return "color: #DAE54A;";
+            if (num >= 5) return "color: #E2CC45;";
+            if (num >= 4) return "color: #DCA93D;";
+            if (num >= 3) return "color: #D58235;";
+            if (num >= 2) return "color: #CE5A2C;";
+            if (num >= 1) return "color: #C73024;";
+            return "color: #880A00;";
+          };
+
+          const colorStyle = getRatingColor(rating ?? "");
+
+          if (infinity) {
+            return {
+              render: () => `<div class="text-end text-lg font-medium">♾️</div>`,
+            };
+          }
+          if (shitty) {
+            return {
+              render: () => `<div class="text-end text-lg font-medium">💩</div>`,
+            };
+          }
+          return {
+            render: () => `<div class="text-end font-medium" style="${colorStyle}">${formatted}</div>`,
+          };
+        });
+
+        return renderSnippet(cellSnippet, {
+          rating,
+          infinity,
+          shitty,
+        });
+      },
+    };
+  });
+}

@@ -2,7 +2,7 @@
   import { page } from "$app/state";
   import { authClient } from "$lib/auth-client";
   import type { PageProps } from "./$types";
-  import { columns, type Watchlist } from "./columns";
+  import { columns, createUserRatingColumns, type Watchlist } from "./columns";
   import DataTable from "./data-table.svelte";
   import { useDataFetch } from "./data-table-helpers/data-fetch.svelte";
   import { useInfiniteScroll } from "./data-table-helpers/infinite-scroll.svelte";
@@ -16,11 +16,33 @@
     !!($session.data?.user as any)?.emailVerified,
   );
 
+  // Get preferred users from server data
+  const preferredUsers = $derived((data as any)?.preferredUsers ?? []);
+
+  // Create dynamic user rating columns
+  const userRatingColumns = $derived(
+    preferredUsers.length > 0
+      ? createUserRatingColumns(preferredUsers.map((u: any) => u.username))
+      : []
+  );
+
+  // Combine static columns with dynamic user rating columns
+  // Insert user columns before the "actions" column (which is last)
+  const allColumns = $derived(() => {
+    const staticCols = [...columns];
+    const actionsCol = staticCols.pop(); // Remove actions column
+    const combinedCols = [...staticCols, ...userRatingColumns];
+    if (actionsCol) {
+      combinedCols.push(actionsCol); // Add actions column back at the end
+    }
+    return combinedCols;
+  });
+
   // Filter columns to exclude "my_rating" and "my_progress_status" if user is not signed in
   const filteredColumns = $derived(
     isSignedIn
-      ? columns
-      : columns.filter((col) => {
+      ? allColumns()
+      : allColumns().filter((col) => {
           const id = "id" in col ? col.id : null;
           const accessorKey = "accessorKey" in col ? col.accessorKey : null;
           return (

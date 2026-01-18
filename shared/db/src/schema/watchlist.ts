@@ -109,6 +109,22 @@ export const watchlistViews = watchlistSchema.table(
   (table) => [unique("watchlist_views_user_id_name_unique").on(table.userId, table.name)]
 );
 
+export const userRatingPreferences = watchlistSchema.table(
+  "user_rating_preferences",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    preferredUserId: uuid("preferred_user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+  },
+  (table) => [unique("user_rating_preferences_user_id_preferred_user_id_unique").on(table.userId, table.preferredUserId)]
+);
+
 export const watchItemRelations = relations(watchItems, ({ many, one }) => ({
   tags: many(watchItemTags),
   language: one(watchLanguages, {
@@ -184,6 +200,25 @@ export const watchLanguageRelations = relations(watchLanguages, ({ many, one }) 
   }),
   updatedBy: one(auth.user, {
     fields: [watchLanguages.updatedById],
+    references: [auth.user.id],
+  }),
+}));
+
+export const userRatingPreferencesRelations = relations(userRatingPreferences, ({ one }) => ({
+  user: one(auth.user, {
+    fields: [userRatingPreferences.userId],
+    references: [auth.user.id],
+  }),
+  preferredUser: one(auth.user, {
+    fields: [userRatingPreferences.preferredUserId],
+    references: [auth.user.id],
+  }),
+  createdBy: one(auth.user, {
+    fields: [userRatingPreferences.createdById],
+    references: [auth.user.id],
+  }),
+  updatedBy: one(auth.user, {
+    fields: [userRatingPreferences.updatedById],
     references: [auth.user.id],
   }),
 }));

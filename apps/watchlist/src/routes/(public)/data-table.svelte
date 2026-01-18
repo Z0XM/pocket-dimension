@@ -46,6 +46,7 @@
   } from "./data-table-helpers/edit-mode.svelte.js";
   import FilterDropdown from "./data-table-helpers/filter-dropdown.svelte";
   import UnsavedChangesDialog from "./data-table-helpers/unsaved-changes-dialog.svelte";
+  import UserRatingSelector from "./data-table-helpers/user-rating-selector.svelte";
 
   type DataTableProps<TData, TValue> = {
     columns: ColumnDef<TData, TValue>[];
@@ -1162,6 +1163,11 @@
               <XIcon class="size-4" />
             </Button>
           </div>
+        {/if}
+
+        <!-- User Rating Selector - hidden on mobile, only shown when signed in and email verified -->
+        {#if userRole && isEmailVerified}
+          <UserRatingSelector />
         {/if}
 
         <!-- Column settings button - hidden on mobile -->

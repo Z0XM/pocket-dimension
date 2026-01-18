@@ -1,4 +1,6 @@
+import { db, schema } from "@pocket-dimension/db";
 import { json } from "@sveltejs/kit";
+import { eq, inArray } from "drizzle-orm";
 import { getWatchlistForUser } from "$lib/server/watchlist";
 import type { RequestHandler } from "./$types";
 
@@ -52,6 +54,38 @@ export const GET: RequestHandler = async ({ url, locals }) => {
         .filter(Boolean)
     : [];
 
+  // Fetch user rating preferences if user is logged in
+  let preferredUsers: Array<{ id: string; username: string }> = [];
+  if (user) {
+    try {
+      const preferences = await db
+        .select({
+          preferredUserId: schema.userRatingPreferences.preferredUserId,
+        })
+        .from(schema.userRatingPreferences)
+        .where(eq(schema.userRatingPreferences.userId, user.id));
+
+      const preferredUserIds = preferences.map((p) => p.preferredUserId);
+
+      if (preferredUserIds.length > 0) {
+        const users = await db
+          .select({
+            id: schema.user.id,
+            username: schema.user.username,
+          })
+          .from(schema.user)
+          .where(inArray(schema.user.id, preferredUserIds));
+
+        preferredUsers = users
+          .filter((u): u is { id: string; username: string } => u.username !== null && u.id !== user.id)
+          .map((u) => ({ id: u.id, username: u.username }));
+      }
+    } catch (error) {
+      console.error("Error fetching user rating preferences:", error);
+      // Continue without preferred users if there's an error
+    }
+  }
+
   const { watchItems } = await getWatchlistForUser(user, {
     pageIndex,
     searchQuery,
@@ -62,6 +96,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
       { column: "tags", values: tagsValues },
       { column: "type", values: typeValues },
     ],
+    preferredUsers,
   });
 
   return json({ watchItems });
