@@ -41,6 +41,11 @@ export const GET: RequestHandler = async ({ locals }) => {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Check email verification for views (users can only access views after verification)
+  if (!user.emailVerified) {
+    return json({ error: "Email not verified. Please verify your email to access views." }, { status: 403 });
+  }
+
   try {
     const views = await db
       .select()
@@ -76,6 +81,11 @@ export const POST: RequestHandler = async ({ url, locals, request }) => {
 
   if (!user) {
     return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Check email verification
+  if (!user.emailVerified) {
+    return json({ error: "Email not verified. Please verify your email to create views." }, { status: 403 });
   }
 
   try {

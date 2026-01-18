@@ -9,9 +9,12 @@
 
   let { data }: PageProps = $props();
 
-  // Check if user is signed in
+  // Check if user is signed in and verified
   const session = authClient.useSession();
   const isSignedIn = $derived(!!$session.data?.user);
+  const isEmailVerified = $derived(
+    !!($session.data?.user as any)?.emailVerified,
+  );
 
   // Filter columns to exclude "my_rating" and "my_progress_status" if user is not signed in
   const filteredColumns = $derived(
@@ -105,6 +108,7 @@
     {onSentinelMount}
     {isLoading}
     userRole={(data as any)?.userRole}
+    {isEmailVerified}
     filterOptions={{
       languages: (data as any)?.languages ?? [],
       tags: (data as any)?.tags ?? [],

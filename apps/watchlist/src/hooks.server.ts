@@ -16,13 +16,29 @@ export async function handle({ event, resolve }) {
     event.locals.user = session.user as typeof schema.user.$inferSelect;
   }
 
+  // Auth routes - redirect to home if already logged in
+  // But allow verify-email, check-email pages for logged-in users who need to verify
   if (event.route.id?.startsWith("/(auth)/")) {
-    if (session) {
-      return redirect(307, "/");
+    const allowedAuthRoutes = ["/(auth)/verify-email", "/(auth)/check-email"];
+    const isAllowedAuthRoute = allowedAuthRoutes.some((route) => event.route.id?.startsWith(route));
+
+    if (session && !isAllowedAuthRoute) {
+      // If user is logged in and verified, redirect to home
+      if (session.user.emailVerified) {
+        return redirect(307, "/");
+      }
+      // If not verified, allow access to verification-related pages
     }
-  } else if (event.route.id?.startsWith("/(protected)/")) {
+  }
+
+  // Protected routes - require authenticated AND verified user
+  if (event.route.id?.startsWith("/(protected)/")) {
     if (!session) {
       return redirect(307, "/login");
+    }
+    // Check email verification
+    if (!session.user.emailVerified) {
+      return redirect(307, "/check-email?reason=verify");
     }
   }
 

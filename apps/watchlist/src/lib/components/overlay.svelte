@@ -30,6 +30,7 @@
   let isPending = $derived($session.isPending);
   let user = $derived($session.data?.user);
   let role = $derived((user as any)?.role as "admin" | "contributor" | "user");
+  let isEmailVerified = $derived(!!(user as any)?.emailVerified);
 
   let mobileMenuOpen = $state(false);
 
@@ -137,7 +138,7 @@
   });
 
   async function fetchViews() {
-    if (!user) return;
+    if (!user || !isEmailVerified) return;
 
     isLoadingViews = true;
     try {

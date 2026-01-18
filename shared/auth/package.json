@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --format esm --target bun --external better-auth --external @pocket-dimension/utils --external @pocket-dimension/db",
+    "build": "bun build ./src/index.ts --outdir ./dist --format esm --target bun --external better-auth --external @pocket-dimension/utils --external @pocket-dimension/db --external resend",
     "clean": "rm -rf dist",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
@@ -21,6 +21,7 @@
   "dependencies": {
     "@pocket-dimension/db": "workspace:*",
     "@pocket-dimension/utils": "workspace:*",
+    "resend": "^6.7.0",
     "zod": "^4.3.4"
   },
   "devDependencies": {

@@ -51,6 +51,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Check email verification
+  if (!user.emailVerified) {
+    return json({ error: "Email not verified. Please verify your email to make edits." }, { status: 403 });
+  }
+
   const userRole = user.role;
   const isContributor = userRole === "contributor" || userRole === "admin";
   const isAdmin = userRole === "admin";
@@ -235,7 +240,7 @@ async function processUpdate(update: UpdateItem, user: NonNullable<App.Locals["u
     };
 
     if (update.progressStatus !== undefined) {
-      ratingData.progressStatus = effectiveProgressStatus;
+      ratingData.progressStatus = effectiveProgressStatus as (typeof schema.watchItemRatings.$inferInsert)["progressStatus"];
 
       // If progress is being set to something other than "watched" or "dropped", always clear rating fields
       if (!canHaveRating) {
@@ -463,7 +468,7 @@ async function processNewItem(
       rating: canHaveRating && newItem.rating !== undefined ? (newItem.rating?.toString() ?? null) : null,
       infinity: canHaveRating && newItem.infinity !== undefined ? (newItem.infinity ?? false) : false,
       shitty: canHaveRating && newItem.shitty !== undefined ? (newItem.shitty ?? false) : false,
-      progressStatus: effectiveProgressStatus,
+      progressStatus: effectiveProgressStatus as (typeof schema.watchItemRatings.$inferInsert)["progressStatus"],
     };
 
     // Create rating record for the new item

@@ -42,6 +42,11 @@ export const PUT: RequestHandler = async ({ params, locals, request, url }) => {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Check email verification
+  if (!user.emailVerified) {
+    return json({ error: "Email not verified. Please verify your email to update views." }, { status: 403 });
+  }
+
   if (!viewName) {
     return json({ error: "View name is required" }, { status: 400 });
   }
@@ -212,6 +217,11 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 
   if (!user) {
     return json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Check email verification
+  if (!user.emailVerified) {
+    return json({ error: "Email not verified. Please verify your email to delete views." }, { status: 403 });
   }
 
   if (!viewName) {

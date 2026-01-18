@@ -2,10 +2,12 @@ import { db } from "@pocket-dimension/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username } from "better-auth/plugins";
+import { sendResetPasswordEmail, sendVerificationEmail } from "./lib/emails";
 import { env } from "./lib/env";
 
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
+  basePath: env.BETTER_AUTH_PATH,
   trustedOrigins: env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()),
   user: {
     additionalFields: {
@@ -25,6 +27,27 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: true,
+    sendResetPassword: async ({ user, url }) => {
+      void sendResetPasswordEmail({
+        email: user.email,
+        name: user.name || user.email.split("@")[0],
+        url,
+      });
+    },
+    resetPasswordTokenExpiresIn: 60 * 60, // 1 hour
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      void sendVerificationEmail({
+        email: user.email,
+        name: user.name || user.email.split("@")[0],
+        url,
+      });
+    },
+    sendOnSignUp: true,
+    expiresIn: 60 * 60, // 1 hour
+    autoSignInAfterVerification: true,
   },
   advanced: {
     database: {

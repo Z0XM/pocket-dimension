@@ -53,6 +53,7 @@
     onSentinelMount: (element: HTMLElement) => void;
     isLoading?: boolean;
     userRole?: UserRole;
+    isEmailVerified?: boolean;
     filterOptions?: {
       languages: Array<{ language: string }>;
       tags: Array<{ tag: string }>;
@@ -70,6 +71,7 @@
     onSentinelMount,
     isLoading = false,
     userRole,
+    isEmailVerified = false,
     filterOptions,
   }: DataTableProps<TData, TValue> = $props();
 
@@ -790,14 +792,17 @@
     return titles;
   });
 
-  // Check if user can edit
+  // Check if user can edit (must be signed in with verified email)
   const canEdit = $derived(
-    userRole === "user" || userRole === "contributor" || userRole === "admin",
+    isEmailVerified &&
+      (userRole === "user" ||
+        userRole === "contributor" ||
+        userRole === "admin"),
   );
   const canAddRows = $derived(
-    userRole === "contributor" || userRole === "admin",
+    isEmailVerified && (userRole === "contributor" || userRole === "admin"),
   );
-  const canDeleteRows = $derived(userRole === "admin");
+  const canDeleteRows = $derived(isEmailVerified && userRole === "admin");
 
   // Handle delete confirmation
   function handleDeleteConfirm() {

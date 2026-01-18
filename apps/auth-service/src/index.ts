@@ -27,23 +27,23 @@ const app = new Elysia()
       allowedHeaders: ["Content-Type", "Authorization"],
     })
   )
-  // .use(
-  //   swagger({
-  //     documentation: {
-  //       info: {
-  //         title: "Auth Service API",
-  //         version: "1.0.0",
-  //         description: "Authentication service API documentation",
-  //       },
-  //       tags: [
-  //         {
-  //           name: "auth",
-  //           description: "Authentication endpoints",
-  //         },
-  //       ],
-  //     },
-  //   })
-  // )
+  .use(
+    swagger({
+      documentation: {
+        info: {
+          title: "Auth Service API",
+          version: "1.0.0",
+          description: "Authentication service API documentation",
+        },
+        tags: [
+          {
+            name: "auth",
+            description: "Authentication endpoints",
+          },
+        ],
+      },
+    })
+  )
   .use(authHandler)
   .use(authMiddleware)
   .get(
@@ -80,5 +80,5 @@ const app = new Elysia()
   )
   .listen(Number(env.PORT));
 
-console.log(`\n🚀 Backend Auth running at http://localhost:${app.server?.port}`);
+console.log(`\n🚀 Auth Service running at http://localhost:${app.server?.port}`);
 console.log(`📚 Swagger documentation available at http://localhost:${app.server?.port}/swagger\n`);
