@@ -1,6 +1,6 @@
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
-import { Elysia } from "elysia";
+import { Elysia, StatusMap, status } from "elysia";
 import { env } from "./lib/env";
 import { authMiddleware } from "./middlewares/auth";
 import { authHandler } from "./routes/auth";
@@ -57,6 +57,31 @@ const app = new Elysia()
       detail: {
         summary: "Health check",
         description: "Check if the service is running",
+        tags: [],
+      },
+    }
+  )
+  .get(
+    "/anurag?policyKey=:policyKey",
+    ({ query }) => {
+      const { policyKey } = query;
+      if (policyKey !== "anurag") {
+        return status(StatusMap.Unauthorized, {
+          message: "Invalid policy key",
+          data: null,
+        });
+      }
+      return status(StatusMap.OK, {
+        message: "User Validated",
+        data: {
+          sessionId: "655a2984-98e1-4765-8372-58fad83d2ac7",
+        },
+      });
+    },
+    {
+      detail: {
+        summary: "Anurag",
+        description: "Anurag",
         tags: [],
       },
     }
