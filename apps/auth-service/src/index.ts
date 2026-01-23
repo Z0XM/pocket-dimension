@@ -62,31 +62,6 @@ const app = new Elysia()
     }
   )
   .get(
-    "/anurag?policyKey=:policyKey",
-    ({ query }) => {
-      const { policyKey } = query;
-      if (policyKey !== "anurag") {
-        return status(StatusMap.Unauthorized, {
-          message: "Invalid policy key",
-          data: null,
-        });
-      }
-      return status(StatusMap.OK, {
-        message: "User Validated",
-        data: {
-          sessionId: "655a2984-98e1-4765-8372-58fad83d2ac7",
-        },
-      });
-    },
-    {
-      detail: {
-        summary: "Anurag",
-        description: "Anurag",
-        tags: [],
-      },
-    }
-  )
-  .get(
     "/check",
     ({ user, session }) => {
       return {
