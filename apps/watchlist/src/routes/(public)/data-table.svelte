@@ -6,6 +6,7 @@
     Columns2Icon,
     FilterIcon,
     GripVerticalIcon,
+    ListFilterIcon,
     PencilIcon,
     PlusIcon,
     RotateCcwIcon,
@@ -32,6 +33,7 @@
   import { Input } from "$lib/components/ui/input";
   import * as Table from "$lib/components/ui/table/index.js";
   import type { Watchlist } from "./columns";
+  import AddItemDialog from "./data-table-helpers/add-item-dialog.svelte";
   import BulkEditPanel from "./data-table-helpers/bulk-edit-panel.svelte";
   import {
     type ColumnSettings,
@@ -45,6 +47,8 @@
     type UserRole,
   } from "./data-table-helpers/edit-mode.svelte.js";
   import FilterDropdown from "./data-table-helpers/filter-dropdown.svelte";
+  import MobileFilterDialog from "./data-table-helpers/mobile-filter-dialog.svelte";
+  import RowDetailsDialog from "./data-table-helpers/row-details-dialog.svelte";
   import UnsavedChangesDialog from "./data-table-helpers/unsaved-changes-dialog.svelte";
   import UserRatingSelector from "./data-table-helpers/user-rating-selector.svelte";
 
@@ -884,6 +888,10 @@
   let showUnsavedChangesDialog = $state(false);
   let showCancelEditDialog = $state(false);
   let showUndoAllDialog = $state(false);
+  let showAddItemDialog = $state(false);
+  let showMobileFilterDialog = $state(false);
+  let showRowDetailsDialog = $state(false);
+  let selectedRowForDetails = $state<Watchlist | null>(null);
   let pendingServerAction = $state<(() => void) | null>(null);
 
   // Get titles for delete confirmation
@@ -906,9 +914,10 @@
         effectiveUserRole === "contributor" ||
         effectiveUserRole === "admin"),
   );
+  // Check actual user role (not effectiveRole) for adding rows
+  // This allows mobile users with admin/contributor roles to add items
   const canAddRows = $derived(
-    isEmailVerified &&
-      (effectiveUserRole === "contributor" || effectiveUserRole === "admin"),
+    isEmailVerified && (userRole === "contributor" || userRole === "admin"),
   );
   const canDeleteRows = $derived(
     isEmailVerified && effectiveUserRole === "admin",
@@ -1364,6 +1373,7 @@
             )}
             {@const hasInfinityCount =
               Number((row.original as Watchlist).infinity_counts) > 0}
+            {@const rowData = row.original as Watchlist}
             <Table.Row
               data-state={row.getIsSelected() && "selected"}
               class="{isEditMode
@@ -1373,6 +1383,44 @@
                 : ''} {isSelected ? 'bg-blue-500/10' : ''} {isNewRow
                 ? 'bg-green-500/5 border-l-2 border-l-green-500'
                 : ''} {hasInfinityCount ? 'shimmer-infinity' : ''}"
+              oncontextmenu={(e) => {
+                // Prevent default context menu on mobile long press
+                if (isMobile) {
+                  e.preventDefault();
+                }
+              }}
+              ontouchstart={(e) => {
+                if (!isMobile || isEditMode) return;
+                const touch = e.touches[0];
+                const target = e.currentTarget;
+                const longPressTimer = setTimeout(() => {
+                  selectedRowForDetails = rowData;
+                  showRowDetailsDialog = true;
+                  // Add haptic feedback if available
+                  if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                  }
+                }, 500); // 500ms for long press
+
+                const handleTouchEnd = () => {
+                  clearTimeout(longPressTimer);
+                  target.removeEventListener("touchend", handleTouchEnd);
+                  target.removeEventListener("touchmove", handleTouchMove);
+                };
+
+                const handleTouchMove = () => {
+                  clearTimeout(longPressTimer);
+                  target.removeEventListener("touchend", handleTouchEnd);
+                  target.removeEventListener("touchmove", handleTouchMove);
+                };
+
+                target.addEventListener("touchend", handleTouchEnd, {
+                  once: true,
+                });
+                target.addEventListener("touchmove", handleTouchMove, {
+                  once: true,
+                });
+              }}
             >
               {#each row.getVisibleCells() as cell (cell.id)}
                 {@const isCellRightAligned =
@@ -1459,17 +1507,81 @@
     onCancel={() => (showUndoAllDialog = false)}
   />
 
+  <!-- Floating Add Button -->
+  {#if canAddRows}
+    <Button
+      variant="ghost"
+      size="icon"
+      onclick={() => (showAddItemDialog = true)}
+      class="fixed bottom-6 backdrop-blur-md border-accent bg-white/1 right-6 z-50 rounded-full h-14 w-14 transition-all duration-300 hover:bg-primary/10"
+      title="Add new watch item"
+      aria-label="Add new watch item"
+    >
+      <PlusIcon class="size-6" />
+    </Button>
+  {/if}
+
+  <!-- Mobile Filter Button (only visible on mobile) -->
+  {#if isMobile}
+    <Button
+      variant="ghost"
+      size="icon"
+      onclick={() => (showMobileFilterDialog = true)}
+      class="fixed bottom-6 backdrop-blur-md border-accent bg-white/1 left-6 z-50 rounded-full h-14 w-14 transition-all duration-300 hover:bg-primary/10"
+      title="Filters"
+      aria-label="Open filters"
+    >
+      <div class="relative">
+        <ListFilterIcon class="size-6" />
+        {#if filters.language.length > 0 || filters.tags.length > 0 || filters.type.length > 0}
+          <span class="absolute -top-1 -right-1 size-2 rounded-full bg-primary"
+          ></span>
+        {/if}
+      </div>
+    </Button>
+  {/if}
+
   <!-- Scroll to Top Button -->
   {#if showScrollToTop}
     <Button
       variant="outline"
       size="icon"
       onclick={scrollToTop}
-      class="fixed bottom-6 right-6 z-50 rounded-full shadow-lg bg-background/80 backdrop-blur-sm hover:bg-background transition-all duration-300"
+      class="fixed right-6 z-50 rounded-full shadow-lg bg-background/80 backdrop-blur-sm hover:bg-background transition-all duration-300 bottom-24"
       title="Scroll to top"
       aria-label="Scroll to top"
     >
       <ArrowUpIcon class="size-5" />
     </Button>
+  {/if}
+
+  <!-- Add Item Dialog -->
+  <AddItemDialog bind:open={showAddItemDialog} />
+
+  <!-- Mobile Filter Dialog -->
+  {#if isMobile}
+    <MobileFilterDialog
+      bind:open={showMobileFilterDialog}
+      {languageOptions}
+      {tagOptions}
+      {typeOptions}
+      selectedLanguages={filters.language}
+      selectedTags={filters.tags}
+      selectedTypes={filters.type}
+      onApply={(newFilters) => {
+        // Apply each filter type separately to trigger URL updates
+        handleFilterChange("language", newFilters.language);
+        handleFilterChange("tags", newFilters.tags);
+        handleFilterChange("type", newFilters.type);
+      }}
+    />
+  {/if}
+
+  <!-- Row Details Dialog (Mobile only) -->
+  {#if isMobile}
+    <RowDetailsDialog
+      bind:open={showRowDetailsDialog}
+      row={selectedRowForDetails}
+    />
   {/if}
 {/if}

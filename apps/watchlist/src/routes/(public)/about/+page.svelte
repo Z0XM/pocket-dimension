@@ -2,7 +2,7 @@
   import * as Card from "$lib/components/ui/card";
 </script>
 
-<div class="h-screen overflow-y-scroll pb-20">
+<div class="h-screen overflow-y-scroll pb-24">
   <div class="max-w-4xl mx-auto px-4 py-8 space-y-6">
     <!-- Page Title -->
     <div class="text-center space-y-2 mb-8">
