@@ -1569,10 +1569,42 @@
       selectedTags={filters.tags}
       selectedTypes={filters.type}
       onApply={(newFilters) => {
-        // Apply each filter type separately to trigger URL updates
-        handleFilterChange("language", newFilters.language);
-        handleFilterChange("tags", newFilters.tags);
-        handleFilterChange("type", newFilters.type);
+        // Apply all filters at once by updating the URL with all filter params
+        const url = new URL(page.url);
+
+        // Set or delete language filter
+        if (newFilters.language.length > 0) {
+          url.searchParams.set("filterLanguage", newFilters.language.join(","));
+        } else {
+          url.searchParams.delete("filterLanguage");
+        }
+
+        // Set or delete tags filter
+        if (newFilters.tags.length > 0) {
+          url.searchParams.set("filterTags", newFilters.tags.join(","));
+        } else {
+          url.searchParams.delete("filterTags");
+        }
+
+        // Set or delete type filter
+        if (newFilters.type.length > 0) {
+          url.searchParams.set("filterType", newFilters.type.join(","));
+        } else {
+          url.searchParams.delete("filterType");
+        }
+
+        // Update filters state
+        isFilterChanging = true;
+        filters = {
+          language: newFilters.language,
+          tags: newFilters.tags,
+          type: newFilters.type,
+          progress: filters.progress, // Keep existing progress filter
+        };
+
+        const expectedFilters = JSON.stringify(filters);
+        pendingFilters = expectedFilters;
+        goto(url.toString(), { keepFocus: true, invalidateAll: true });
       }}
     />
   {/if}

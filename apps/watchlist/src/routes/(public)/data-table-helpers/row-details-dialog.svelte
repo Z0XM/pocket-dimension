@@ -74,20 +74,12 @@
 
 <Dialog.Root bind:open>
   <Dialog.Content class="max-w-sm">
-    <Dialog.Header>
-      <Dialog.Title>Row Details</Dialog.Title>
-    </Dialog.Header>
-
     {#if row}
-      <div class="space-y-4 py-4">
-        <!-- Title -->
-        <div class="space-y-2">
-          <span class="text-[0.625rem] text-muted-foreground font-medium"
-            >Title</span
-          >
-          <div class="text-xs font-medium">{row.title}</div>
-        </div>
+      <Dialog.Header>
+        <Dialog.Title>{row.title}</Dialog.Title>
+      </Dialog.Header>
 
+      <div class="space-y-4 py-4">
         <!-- Type -->
         {#if row.type}
           <div class="space-y-2">
@@ -97,7 +89,7 @@
             <button
               onclick={handleTypeClick}
               class="text-xs cursor-pointer hover:underline capitalize px-2 py-1 rounded-md hover:bg-accent transition-colors {isTypeFiltered
-                ? 'text-primary font-medium bg-primary/10'
+                ? 'text-primary font-medium border-white border'
                 : ''}"
             >
               {capitalizeType(row.type)}
@@ -114,7 +106,7 @@
             <button
               onclick={handleLanguageClick}
               class="text-xs cursor-pointer hover:underline px-2 py-1 rounded-md hover:bg-accent transition-colors {isLanguageFiltered
-                ? 'text-primary font-medium bg-primary/10'
+                ? 'text-primary font-medium border-white border'
                 : ''}"
             >
               {row.language}
@@ -135,7 +127,7 @@
                   class="text-xs cursor-pointer hover:underline capitalize px-2 py-1 rounded-md hover:bg-accent transition-colors {isTagFiltered(
                     tag,
                   )
-                    ? 'text-primary font-medium bg-primary/10'
+                    ? 'text-primary font-medium border-white border'
                     : ''}"
                 >
                   {tag}
