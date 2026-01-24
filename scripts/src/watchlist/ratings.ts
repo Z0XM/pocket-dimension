@@ -16,13 +16,9 @@ const existingWatchItemsMap = new Map(existingWatchItems.map((item) => [item.tit
 
 const watchItemRatings: (typeof schema.watchItemRatings.$inferInsert)[] = [];
 
-const usernames = ["z0xm", "lordsparos", "legend", "DeadPoOl", "lights"];
+const usernames = ["deadpool"];
 const userColumnMap: Record<string, string> = {
-  z0xm: "z0xm",
-  lordsparos: "imtiyaz",
-  legend: "legend",
-  DeadPoOl: "deadpool",
-  lights: "lights",
+  deadpool: "deadpool",
 };
 
 const users = await db.query.user.findMany({
