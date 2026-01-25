@@ -7,7 +7,6 @@
   },
   "dependencies": {
     "csv-parser": "^3.2.0",
-    "drizzle-orm": "^0.45.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

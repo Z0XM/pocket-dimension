@@ -1,0 +1,41 @@
+@import "tailwindcss";
+@import '@fontsource/playwrite-us-modern-guides';
+@import '@fontsource/playwrite-de-grund-guides';
+
+@theme {
+    --color-theme-light-pink-1:#FFE4FA;
+    --color-theme-pink-1:#FB3A84;
+    --color-theme-pink-2:#C51260;
+    --color-theme-pink-3:#870940;
+    --color-theme-pink-4:#4E0322;
+    --color-theme-pink-5:#2A010F;
+    --color-theme-peach-1:#FCEAEE;
+    --color-theme-peach-2:#FFC8D3;
+    --color-theme-peach-3:#FF9BA7;
+    --color-theme-red-1:#DA0045;
+    --color-theme-red-2:#99002E;
+
+    --font-content: 'Playwrite US Modern Guides', cursive;
+    --font-heading: 'Playwrite DE Grund Guides', cursive;
+}
+
+html,
+body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+
+    background: linear-gradient(to bottom, var(--color-theme-pink-3), var(--color-theme-pink-4), var(--color-theme-pink-5));
+
+    font-family: var(--font-content);
+
+    overflow: hidden;
+}
+
+::-webkit-scrollbar {
+    @apply w-[3px] h-[3px] bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    @apply bg-theme-pink-1;
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@pocket-dimension/rhymes",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev --port 3003",
+    "build": "astro build",
+    "preview": "astro preview --port 3003",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/svelte": "^7.2.5",
+    "@astrojs/ts-plugin": "^1.10.6",
+    "@fontsource/playwrite-de-grund-guides": "^5.2.6",
+    "@fontsource/playwrite-us-modern-guides": "^5.2.6",
+    "@tailwindcss/vite": "^4.1.18",
+    "astro": "^5.16.15",
+    "svelte": "^5.48.2",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3"
+  }
+}
