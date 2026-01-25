@@ -162,7 +162,7 @@ bun install
 
 ### 3. Set Up Environment Variables
 
-Create a `.env` file in the required projects as needed. Follow the env.example of each project.
+Create a `.env` file in the required projects as needed. Follow the `env.example` of each project.
 
 ```env
 # Database
