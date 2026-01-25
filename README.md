@@ -14,7 +14,7 @@ Before you begin, ensure you have the following installed:
 
 ### Install Node.js (>= 22.12.0)
 
-#### Option 1: Using NodeSource Repository (Recommended)
+#### Option 1: Using NodeSource Repository
 
 ```bash
 # Update package index
