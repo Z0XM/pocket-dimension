@@ -67,6 +67,7 @@
   // Initialize selected order
   let selectedOrder = $state(0);
   let titleContainer: HTMLDivElement | null = $state(null);
+  let contentArea: HTMLDivElement | null = $state(null);
 
   // Initialize from URL on client side, or use default
   $effect(() => {
@@ -185,6 +186,128 @@
     if (!selectedRhyme) return "";
     return marked.parse(selectedRhyme.content) as string;
   });
+
+  // Get next rhyme order
+  function getNextRhymeOrder(): number | null {
+    if (rhymes.length === 0) return null;
+    const currentIndex = rhymes.findIndex(
+      (r) => (r.frontmatter.order ?? 0) === selectedOrder,
+    );
+    if (currentIndex === -1) return null;
+    // Since rhymes are sorted descending, next is previous index
+    if (currentIndex > 0) {
+      const nextRhyme = rhymes[currentIndex - 1];
+      return nextRhyme.frontmatter.order ?? null;
+    }
+    return null;
+  }
+
+  // Get previous rhyme order
+  function getPreviousRhymeOrder(): number | null {
+    if (rhymes.length === 0) return null;
+    const currentIndex = rhymes.findIndex(
+      (r) => (r.frontmatter.order ?? 0) === selectedOrder,
+    );
+    if (currentIndex === -1) return null;
+    // Since rhymes are sorted descending, previous is next index
+    if (currentIndex < rhymes.length - 1) {
+      const prevRhyme = rhymes[currentIndex + 1];
+      return prevRhyme.frontmatter.order ?? null;
+    }
+    return null;
+  }
+
+  // Swipe detection state
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let isDragging = false;
+  const SWIPE_THRESHOLD = 50; // Minimum distance for a swipe
+
+  // Handle touch/mouse start
+  function handleStart(e: TouchEvent | MouseEvent) {
+    if (e instanceof TouchEvent) {
+      if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        isDragging = true;
+      }
+    } else {
+      // Mouse event
+      touchStartX = e.clientX;
+      touchStartY = e.clientY;
+      isDragging = true;
+    }
+  }
+
+  // Handle touch/mouse end
+  function handleEnd(e: TouchEvent | MouseEvent) {
+    if (!isDragging) return;
+    isDragging = false;
+
+    let touchEndX: number;
+    let touchEndY: number;
+
+    if (e instanceof TouchEvent) {
+      if (e.changedTouches.length !== 1) return;
+      touchEndX = e.changedTouches[0].clientX;
+      touchEndY = e.changedTouches[0].clientY;
+    } else {
+      // Mouse event
+      touchEndX = e.clientX;
+      touchEndY = e.clientY;
+    }
+
+    const deltaX = touchEndX - touchStartX;
+    const deltaY = touchEndY - touchStartY;
+    const distance = Math.abs(deltaX);
+    const verticalDistance = Math.abs(deltaY);
+
+    // Only process swipe if horizontal movement is greater than vertical (horizontal swipe)
+    if (distance > verticalDistance && distance > SWIPE_THRESHOLD) {
+      if (deltaX < 0) {
+        // Swipe right - go to previous rhyme
+        const prevOrder = getPreviousRhymeOrder();
+        if (prevOrder !== null) {
+          selectRhyme(prevOrder);
+        }
+      } else {
+        // Swipe left - go to next rhyme
+        const nextOrder = getNextRhymeOrder();
+        if (nextOrder !== null) {
+          selectRhyme(nextOrder);
+        }
+      }
+    }
+  }
+
+  // Handle mouse leave (cancel drag if mouse leaves area)
+  function handleMouseLeave() {
+    isDragging = false;
+  }
+
+  // Set up swipe handlers
+  $effect(() => {
+    if (!contentArea) return;
+
+    // Touch events
+    contentArea.addEventListener("touchstart", handleStart, { passive: true });
+    contentArea.addEventListener("touchend", handleEnd, { passive: true });
+
+    // Mouse events (for desktop)
+    contentArea.addEventListener("mousedown", handleStart);
+    contentArea.addEventListener("mouseup", handleEnd);
+    contentArea.addEventListener("mouseleave", handleMouseLeave);
+
+    return () => {
+      if (contentArea) {
+        contentArea.removeEventListener("touchstart", handleStart);
+        contentArea.removeEventListener("touchend", handleEnd);
+        contentArea.removeEventListener("mousedown", handleStart);
+        contentArea.removeEventListener("mouseup", handleEnd);
+        contentArea.removeEventListener("mouseleave", handleMouseLeave);
+      }
+    };
+  });
 </script>
 
 <div class="flex flex-col items-center w-full h-full mt-2 min-h-0">
@@ -226,6 +349,7 @@
       </div>
     </div>
     <div
+      bind:this={contentArea}
       class="w-full bg-theme-light-pink-1 px-4 pt-4 pb-32 flex-1 min-h-0 overflow-y-auto border-2 border-theme-pin-5"
     >
       <div
