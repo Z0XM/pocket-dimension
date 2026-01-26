@@ -226,7 +226,7 @@
       </div>
     </div>
     <div
-      class="w-full bg-theme-light-pink-1 px-4 pt-4 pb-16 flex-1 min-h-0 overflow-y-auto border-2 border-theme-pin-5"
+      class="w-full bg-theme-light-pink-1 px-4 pt-4 pb-32 flex-1 min-h-0 overflow-y-auto border-2 border-theme-pin-5"
     >
       <div
         class="text-xs font-heading flex flex-row gap-2 justify-end items-center"
