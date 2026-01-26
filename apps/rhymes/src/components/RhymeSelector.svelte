@@ -104,19 +104,42 @@
       if (targetElement && titleContainer) {
         const containerRect = titleContainer.getBoundingClientRect();
         const elementRect = targetElement.getBoundingClientRect();
-        const scrollLeft = titleContainer.scrollLeft;
-        const elementLeft = elementRect.left - containerRect.left + scrollLeft;
-        const elementWidth = elementRect.width;
-        const containerWidth = containerRect.width;
 
-        // Center the element in the container
-        const targetScroll =
-          elementLeft - containerWidth / 2 + elementWidth / 2;
+        // Check if we're on large screen (vertical scroll) or small screen (horizontal scroll)
+        const isLargeScreen = window.innerWidth >= 1024; // lg breakpoint
 
-        titleContainer.scrollTo({
-          left: targetScroll,
-          behavior: "smooth",
-        });
+        if (isLargeScreen) {
+          // Vertical scrolling for large screens
+          const scrollTop = titleContainer.scrollTop;
+          const elementTop = elementRect.top - containerRect.top + scrollTop;
+          const elementHeight = elementRect.height;
+          const containerHeight = containerRect.height;
+
+          // Center the element in the container vertically
+          const targetScroll =
+            elementTop - containerHeight / 2 + elementHeight / 2;
+
+          titleContainer.scrollTo({
+            top: targetScroll,
+            behavior: "smooth",
+          });
+        } else {
+          // Horizontal scrolling for small screens
+          const scrollLeft = titleContainer.scrollLeft;
+          const elementLeft =
+            elementRect.left - containerRect.left + scrollLeft;
+          const elementWidth = elementRect.width;
+          const containerWidth = containerRect.width;
+
+          // Center the element in the container
+          const targetScroll =
+            elementLeft - containerWidth / 2 + elementWidth / 2;
+
+          titleContainer.scrollTo({
+            left: targetScroll,
+            behavior: "smooth",
+          });
+        }
       }
     }, 0);
   }
@@ -159,9 +182,19 @@
 
     function handleWheel(e: WheelEvent) {
       if (titleContainer && e.deltaY !== 0) {
+        // Check if we're on large screen (vertical scroll) or small screen (horizontal scroll)
+        const isLargeScreen = window.innerWidth >= 1024; // lg breakpoint
+
         // Increase scroll sensitivity by multiplying delta
         const sensitivity = 2; // Adjust this value to make it more/less sensitive
-        titleContainer.scrollLeft += e.deltaY * sensitivity;
+
+        if (isLargeScreen) {
+          // Vertical scrolling for large screens
+          titleContainer.scrollTop += e.deltaY * sensitivity;
+        } else {
+          // Horizontal scrolling for small screens
+          titleContainer.scrollLeft += e.deltaY * sensitivity;
+        }
         e.preventDefault();
       }
     }
@@ -310,64 +343,91 @@
   });
 </script>
 
-<div class="flex flex-col items-center w-full h-full mt-2 min-h-0">
+<div
+  class="flex flex-col lg:flex-row items-center w-full h-full mt-2 min-h-0 gap-4 lg:px-4"
+>
+  <!-- Titles container: horizontal on small screens, vertical on large screens -->
   <div
-    bind:this={titleContainer}
-    class="flex flex-row overflow-x-scroll overflow-y-hidden flex-nowrap gap-2 w-screen px-[50vw] title-scroll-container shrink-0"
+    class="relative w-screen lg:w-64 lg:h-full shrink-0 lg:shrink-0 lg:order-2 title-container-wrapper"
   >
-    {#each rhymes as rhyme, index}
-      {@const order = rhyme.frontmatter.order ?? index + 1000}
-      <button
-        data-rhyme-order={order}
-        type="button"
-        onclick={() => selectRhyme(order)}
-        class="text-sm font-heading px-4 py-2 bg-theme-pink-1 border-x-2 border-t-2 border-theme-pink-5 whitespace-nowrap shrink-0 transition-all cursor-pointer hover:bg-theme-pink-2 {selectedOrder ===
-        order
-          ? 'scale-110'
-          : 'opacity-70'}"
-      >
-        {rhyme.frontmatter.title || "Untitled" + order}
-      </button>
-    {/each}
+    <div
+      bind:this={titleContainer}
+      class="flex flex-row lg:flex-col overflow-x-scroll lg:overflow-x-hidden lg:overflow-y-scroll overflow-y-hidden flex-nowrap gap-2 w-full lg:h-full px-[50vw] lg:px-0 lg:py-[50vh] title-scroll-container"
+    >
+      {#each rhymes as rhyme, index}
+        {@const order = rhyme.frontmatter.order ?? index + 1000}
+        <button
+          data-rhyme-order={order}
+          type="button"
+          onclick={() => selectRhyme(order)}
+          class="text-sm lg:text-lg font-heading px-4 py-2 bg-theme-pink-1 border-x-2 lg:border-x-0 lg:border-y-2 border-t-2 border-theme-pink-5 whitespace-nowrap shrink-0 lg:w-full transition-all cursor-pointer hover:bg-theme-pink-2 {selectedOrder ===
+          order
+            ? 'scale-110'
+            : 'opacity-70'}"
+        >
+          {rhyme.frontmatter.title || "Untitled" + order}
+        </button>
+      {/each}
+    </div>
+    <!-- Fade overlay for horizontal scroll end (small screens) -->
+    <div
+      class="absolute top-0 right-0 w-16 h-full pointer-events-none bg-gradient-to-l from-theme-pink-4 to-transparent lg:hidden"
+    ></div>
+    <div
+      class="absolute top-0 left-0 w-16 h-full pointer-events-none bg-gradient-to-r from-theme-pink-4 to-transparent lg:hidden"
+    ></div>
+    <!-- Fade overlay for vertical scroll end (large screens) -->
+    <div
+      class="hidden lg:block absolute bottom-0 left-0 w-full h-32 pointer-events-none bg-gradient-to-t from-theme-pink-5 to-transparent"
+    ></div>
+    <div
+      class="hidden lg:block absolute top-0 right-0 w-full h-32 pointer-events-none bg-gradient-to-b from-theme-pink-4 to-transparent"
+    ></div>
   </div>
-  {#if selectedRhyme}
-    <div
-      class="flex flex-row justify-between items-center w-full mt-4 shrink-0"
-    >
-      <div class="flex flex-row gap-2 px-2 justify-end items-center">
-        {#each selectedRhyme.frontmatter.tags as tag}
-          <span
-            class="text-[0.625rem] font-heading bg-theme-red-2 border-2 border-theme-red-1 text-theme-peach-1 px-2 py-1"
-            >{tag}</span
-          >
-        {/each}
-      </div>
-      <div>
-        <span class="text-[0.625rem] text-theme-peach-1 px-2 py-1 font-heading"
-          >{selectedRhyme.frontmatter.status}</span
-        >
-      </div>
-    </div>
-    <div
-      bind:this={contentArea}
-      class="w-full bg-theme-light-pink-1 px-4 pt-4 pb-32 flex-1 min-h-0 overflow-y-auto border-2 border-theme-pin-5"
-    >
+  <!-- Content area: full width on small screens, flex-1 on large screens -->
+  <div class="flex flex-col w-full lg:flex-1 min-h-0 h-full lg:order-1">
+    {#if selectedRhyme}
       <div
-        class="text-xs font-heading flex flex-row gap-2 justify-end items-center"
+        class="flex flex-row justify-between items-center w-full mt-4 lg:mt-0 shrink-0"
       >
-        <span class=""
-          >{selectedRhyme.frontmatter.rating}
-          <span class="text-[0.625rem]">/ 10</span>
-          ,
-        </span>
-        <span class=""
-          >{selectedRhyme.frontmatter.thought_on?.replaceAll("/", "-") ||
-            ""}</span
-        >
+        <div class="flex flex-row gap-2 px-2 justify-end items-center">
+          {#each selectedRhyme.frontmatter.tags as tag}
+            <span
+              class="text-[0.625rem] lg:text-sm font-heading bg-theme-red-2 border-2 border-theme-red-1 text-theme-peach-1 px-2 py-1"
+              >{tag}</span
+            >
+          {/each}
+        </div>
+        <div>
+          <span
+            class="text-[0.625rem] lg:text-sm text-theme-peach-1 px-2 py-1 font-heading"
+            >{selectedRhyme.frontmatter.status}</span
+          >
+        </div>
       </div>
-      <div class="content-text mt-4">{@html processedContent || ""}</div>
-    </div>
-  {/if}
+      <div
+        bind:this={contentArea}
+        class="w-full bg-theme-light-pink-1 px-4 lg:px-8 pt-4 pb-32 lg:pb-8 flex-1 min-h-0 h-full overflow-y-auto border-2 border-theme-pin-5"
+      >
+        <div
+          class="text-xs lg:text-lg font-heading flex flex-row gap-2 justify-end items-center"
+        >
+          <span class=""
+            >{selectedRhyme.frontmatter.rating}
+            <span class="text-[0.625rem] lg:text-xs">/ 10</span>
+            ,
+          </span>
+          <span class=""
+            >{selectedRhyme.frontmatter.thought_on?.replaceAll("/", "-") ||
+              ""}</span
+          >
+        </div>
+        <div class="content-text mt-4">
+          {@html processedContent || ""}
+        </div>
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -375,6 +435,13 @@
     font-family: var(--font-content);
     font-size: var(--text-sm);
     line-height: var(--tw-leading, var(--text-sm--line-height));
+  }
+
+  @media (width >= 1024px) {
+    .content-text {
+      font-size: var(--text-lg);
+      line-height: var(--tw-leading, var(--text-lg--line-height));
+    }
   }
 
   .content-text :global(blockquote) {
@@ -425,6 +492,13 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  @media (width >= 1024px) {
+    .title-scroll-container {
+      scroll-snap-type: y proximity;
+      scroll-padding: 0;
+    }
+  }
+
   .title-scroll-container button {
     scroll-snap-align: center;
   }
@@ -432,5 +506,11 @@
   /* Increase scroll sensitivity */
   .title-scroll-container {
     scroll-padding: 0 50vw;
+  }
+
+  @media (width >= 1024px) {
+    .title-scroll-container {
+      scroll-padding: 0;
+    }
   }
 </style>
