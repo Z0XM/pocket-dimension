@@ -44,10 +44,12 @@
         "@astrojs/node": "^9.5.2",
         "@astrojs/svelte": "^7.2.5",
         "@astrojs/ts-plugin": "^1.10.6",
+        "@fontsource-variable/playwrite-us-modern": "^5.2.7",
         "@fontsource/playwrite-de-grund-guides": "^5.2.6",
         "@fontsource/playwrite-us-modern-guides": "^5.2.6",
         "@tailwindcss/vite": "^4.1.18",
         "astro": "^5.16.15",
+        "marked": "^17.0.1",
         "svelte": "^5.48.2",
         "tailwindcss": "^4.1.18",
         "typescript": "^5.9.3",
@@ -386,6 +388,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.10", "", {}, "sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ=="],
 
     "@fontsource-variable/nunito-sans": ["@fontsource-variable/nunito-sans@5.2.7", "", {}, "sha512-rflH5HeAoNjIkwftStzQvxqCJhIS+usMr/lfslWg/RCa499B5qxyjo+74R/QMM0geQt4AY1URlG7wAR1iq6KPQ=="],
+
+    "@fontsource-variable/playwrite-us-modern": ["@fontsource-variable/playwrite-us-modern@5.2.7", "", {}, "sha512-773zKXTw0eA8nfBy1rjyNUC1VWlO51Ju6EfQS4l2zFxn9qADnXt8KtCcpEaFHbc1vhGq4GiiJapgxSHkdqSymA=="],
 
     "@fontsource-variable/victor-mono": ["@fontsource-variable/victor-mono@5.2.8", "", {}, "sha512-1j2AWMs4QhTbAdMcd5tyiVa/DZfT2Xk4DG4P2MmRDudYlo9o3hlWECrgk5sB9dAzXHYjimqb3E/VQFy7NR4p3w=="],
 
@@ -1172,6 +1176,8 @@
     "make-dir": ["make-dir@4.0.0", "", { "dependencies": { "semver": "^7.5.3" } }, "sha512-hXdUTZYIVOt1Ex//jAQi+wTZZpUpwBj/0QsOzqegb3rGMMeJiSEu5xLHnYfBrRV4RH2+OCSOO95Is/7x1WJ4bw=="],
 
     "markdown-table": ["markdown-table@3.0.4", "", {}, "sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw=="],
+
+    "marked": ["marked@17.0.1", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-boeBdiS0ghpWcSwoNm/jJBwdpFaMnZWRzjA6SkUMYb40SVaN1x7mmfGKp0jvexGcx+7y2La5zRZsYFZI6Qpypg=="],
 
     "mdast-util-definitions": ["mdast-util-definitions@6.0.0", "", { "dependencies": { "@types/mdast": "^4.0.0", "@types/unist": "^3.0.0", "unist-util-visit": "^5.0.0" } }, "sha512-scTllyX6pnYNZH/AIp/0ePz6s4cZtARxImwoPJ7kS42n+MnVsI4XbnG6d4ibehRIldYMWM2LD7ImQblVhUejVQ=="],
 

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import '@fontsource/playwrite-us-modern-guides';
 @import '@fontsource/playwrite-de-grund-guides';
+@import '@fontsource-variable/playwrite-us-modern';
 
 @theme {
     --color-theme-light-pink-1:#FFE4FA;
@@ -17,6 +18,7 @@
 
     --font-content: 'Playwrite US Modern Guides', cursive;
     --font-heading: 'Playwrite DE Grund Guides', cursive;
+    --font-no-guides: 'Playwrite US Modern', cursive;
 }
 
 html,
@@ -37,5 +39,5 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    @apply bg-theme-pink-1;
+    @apply bg-theme-red-1;
 }

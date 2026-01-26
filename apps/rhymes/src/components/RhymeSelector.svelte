@@ -1,19 +1,31 @@
 <script lang="ts">
-  interface Rhyme {
-    frontmatter: {
-      title?: string;
-      thought_on?: string;
-      order?: number;
-      [key: string]: any;
-    };
-    content: string;
-  }
+  import { marked } from "marked";
+  import { filteredRhymes, type Rhyme } from "../stores/filterStore";
 
   interface Props {
     rhymes: Rhyme[];
+    useFiltered?: boolean;
   }
 
-  const { rhymes }: Props = $props();
+  const { rhymes: initialRhymes, useFiltered = false }: Props = $props();
+
+  // Use filtered rhymes from store if useFiltered is true, otherwise use initial rhymes
+  let rhymes = $state(initialRhymes);
+
+  if (useFiltered) {
+    $effect(() => {
+      const unsubscribe = filteredRhymes.subscribe((value) => {
+        // Always use the filtered value, even if empty (empty means no matches)
+        rhymes = value;
+      });
+      return unsubscribe;
+    });
+  } else {
+    rhymes = initialRhymes;
+  }
+
+  // Configure marked to allow HTML (for <br> tags) and GitHub Flavored Markdown
+  marked.setOptions({ breaks: true, gfm: true });
 
   // Get default order (first rhyme's order)
   const getDefaultOrder = (): number => {
@@ -167,12 +179,18 @@
     // If no rhyme found, fallback to first rhyme
     return rhyme ?? (rhymes.length > 0 ? rhymes[0] : undefined);
   });
+
+  // Process markdown content to HTML
+  const processedContent = $derived.by(() => {
+    if (!selectedRhyme) return "";
+    return marked.parse(selectedRhyme.content) as string;
+  });
 </script>
 
-<div class="flex flex-col items-center w-full h-full">
+<div class="flex flex-col items-center w-full h-full mt-2 min-h-0">
   <div
     bind:this={titleContainer}
-    class="flex flex-row overflow-x-scroll flex-nowrap w-screen gap-2 px-[50vw] title-scroll-container"
+    class="flex flex-row overflow-x-scroll overflow-y-hidden flex-nowrap gap-2 w-screen px-[50vw] title-scroll-container shrink-0"
   >
     {#each rhymes as rhyme, index}
       {@const order = rhyme.frontmatter.order ?? index + 1000}
@@ -180,39 +198,102 @@
         data-rhyme-order={order}
         type="button"
         onclick={() => selectRhyme(order)}
-        class="text-lg md:text-2xl font-heading px-4 md:px-8 py-2 bg-theme-pink-1 border-x-2 border-t-2 border-theme-pink-5 whitespace-nowrap shrink-0 transition-all cursor-pointer hover:bg-theme-pink-2"
+        class="text-sm font-heading px-4 py-2 bg-theme-pink-1 border-x-2 border-t-2 border-theme-pink-5 whitespace-nowrap shrink-0 transition-all cursor-pointer hover:bg-theme-pink-2 {selectedOrder ===
+        order
+          ? 'scale-110'
+          : 'opacity-70'}"
       >
-        {rhyme.frontmatter.title || "Untitled"}
+        {rhyme.frontmatter.title || "Untitled" + order}
       </button>
     {/each}
   </div>
-  <div
-    class="relative bg-theme-light-pink-1 p-4 md:p-6 flex-1 shrink-0 lg:w-4xl h-full overflow-y-auto px-4 md:px-8 py-4 md:py-8 border-2 border-theme-pin-5"
-  >
-    {#if selectedRhyme}
-      <div class="right-0 absolute top-0 px-4 py-2">
-        {selectedRhyme.frontmatter.thought_on || ""}
+  {#if selectedRhyme}
+    <div
+      class="flex flex-row justify-between items-center w-full mt-4 shrink-0"
+    >
+      <div class="flex flex-row gap-2 px-2 justify-end items-center">
+        {#each selectedRhyme.frontmatter.tags as tag}
+          <span
+            class="text-[0.625rem] font-heading bg-theme-red-2 border-2 border-theme-red-1 text-theme-peach-1 px-2 py-1"
+            >{tag}</span
+          >
+        {/each}
       </div>
-      <pre class="content-text mt-8 pb-32">{selectedRhyme.content}</pre>
-    {/if}
-  </div>
+      <div>
+        <span class="text-[0.625rem] text-theme-peach-1 px-2 py-1 font-heading"
+          >{selectedRhyme.frontmatter.status}</span
+        >
+      </div>
+    </div>
+    <div
+      class="w-full bg-theme-light-pink-1 px-4 pt-4 pb-16 flex-1 min-h-0 overflow-y-auto border-2 border-theme-pin-5"
+    >
+      <div
+        class="text-xs font-heading flex flex-row gap-2 justify-end items-center"
+      >
+        <span class=""
+          >{selectedRhyme.frontmatter.rating}
+          <span class="text-[0.625rem]">/ 10</span>
+          ,
+        </span>
+        <span class=""
+          >{selectedRhyme.frontmatter.thought_on?.replaceAll("/", "-") ||
+            ""}</span
+        >
+      </div>
+      <div class="content-text mt-4">{@html processedContent || ""}</div>
+    </div>
+  {/if}
 </div>
-s
 
 <style>
   .content-text {
-    white-space: pre-wrap;
     font-family: var(--font-content);
-    font-size: var(--text-base);
-    line-height: var(--tw-leading, var(--text-base--line-height));
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
   }
 
-  @media (width >= 48rem) {
+  .content-text :global(blockquote) {
+    font-size: 0.875em; /* Smaller than normal text */
+    margin: 0.5em 0;
+    padding-left: 1em;
+    border-left: 2px solid currentColor;
+    font-family: var(--font-no-guides);
+  }
+
+  .content-text :global(h2) {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+  }
+
+  .content-text :global(p) {
+    margin: 0.5em 0;
+  }
+
+  .content-text :global(ul),
+  .content-text :global(ol) {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+  }
+
+  .content-text :global(li) {
+    margin: 0.25em 0;
+  }
+
+  .content-text :global(hr) {
+    margin: 1em 0;
+    border: none;
+    border-top: 1px solid currentColor;
+  }
+
+  /* @media (width >= 48rem) {
     .content-text {
       font-size: var(--text-xl);
       line-height: var(--tw-leading, var(--text-xl--line-height));
-    }
-  }
+    } */
+  /* } */
 
   .title-scroll-container {
     scroll-behavior: smooth;
