@@ -382,7 +382,7 @@
     margin: 0.5em 0;
     padding-left: 1em;
     border-left: 2px solid currentColor;
-    font-family: var(--font-no-guides);
+    font-family: var(--font-heading);
   }
 
   .content-text :global(h2) {
