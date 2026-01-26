@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "astro dev --port 3003",
     "build": "astro build",
-    "start": "astro preview --port 3003",
+    "start": "node ./dist/server/entry.mjs",
     "preview": "astro preview --port 3003",
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/node": "^9.5.2",
     "@astrojs/svelte": "^7.2.5",
     "@astrojs/ts-plugin": "^1.10.6",
     "@fontsource/playwrite-de-grund-guides": "^5.2.6",
