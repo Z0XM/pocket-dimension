@@ -18,7 +18,7 @@
   function getFiltersFromUrl(): FilterState {
     if (typeof window === "undefined") {
       return {
-        sort: "most-recent",
+        sort: "best",
         statuses: [],
         tags: [],
       };
@@ -34,7 +34,7 @@
         sort:
           sort === "best" || sort === "most-recent"
             ? (sort as SortOption)
-            : "most-recent",
+            : "best",
         statuses: statusesParam
           ? statusesParam
               .split(",")
@@ -52,7 +52,7 @@
       return result;
     } catch (e) {
       return {
-        sort: "most-recent",
+        sort: "best",
         statuses: [],
         tags: [],
       };
@@ -66,7 +66,7 @@
     const url = new URL(window.location.href);
 
     // Update or remove sort parameter
-    if (filters.sort === "most-recent") {
+    if (filters.sort === "best") {
       url.searchParams.delete("sort");
     } else {
       url.searchParams.set("sort", filters.sort);
@@ -228,7 +228,7 @@
   function clearFilters() {
     filterState.statuses = [];
     filterState.tags = [];
-    filterState.sort = "most-recent";
+    filterState.sort = "best";
     // URL will be updated by the effect
   }
 
@@ -259,7 +259,7 @@
   const hasActiveFilters = $derived(
     filterState.statuses.length > 0 ||
       filterState.tags.length > 0 ||
-      filterState.sort !== "most-recent",
+      filterState.sort !== "best",
   );
 </script>
 
