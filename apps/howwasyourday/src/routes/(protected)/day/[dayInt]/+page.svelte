@@ -81,8 +81,8 @@
   const isEditing = meta !== null;
 </script>
 
-<Card.Root class="mb-2">
-  <Card.Content class="px-6 py-3">
+<Card.Root class="">
+  <Card.Content class="px-6">
     <div class="text-lg text-muted-foreground">
       {isEditing ? "Editing" : "Fill in"}{" "}
       <span class="font-semibold text-white">{dateLabel}</span>
@@ -111,12 +111,12 @@
 
   <div class="grid w-full grid-cols-8 flex-col gap-x-4 gap-y-4">
     <Card.Root class="col-span-6">
-      <Card.Header class="pb-0 pt-6">
+      <Card.Header class="pb-0">
         <Card.Title>
           <div class="text-md">Rate your day out of 10.</div>
         </Card.Title>
       </Card.Header>
-      <Card.Content class="pb-6 pt-0">
+      <Card.Content class="">
         <div class="flex w-full flex-col gap-2">
           <div class="flex w-full gap-2">
             <Slider

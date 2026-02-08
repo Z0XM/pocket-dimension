@@ -45,7 +45,7 @@
     </Card.Description>
   </Card.Header>
   <Progress value={(todayCountOfDay / noOfDaysInYear) * 100} class="w-full" />
-  <Card.Content class="px-6 py-4">
+  <Card.Content class="px-6">
     <div class="text-2xl">
       <a href="/" class=" text-white cursor-pointer hover:underline">
         How Was Your Day</a

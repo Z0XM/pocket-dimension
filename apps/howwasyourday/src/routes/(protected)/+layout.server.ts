@@ -27,14 +27,50 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
   const filledDays = rows.map((r) => r.dayInt);
   const todayFilled = filledDays.includes(todayDayInt);
 
-  const publicNotes = rows
+  // Build maps of dayInt → emoji, dayInt → color, dayInt → rating for calendar/graph display
+  const dayEmojiMap: Record<number, string | null> = {};
+  const dayColorMap: Record<number, string | null> = {};
+  const dayRatingMap: Record<number, number | null> = {};
+  for (const r of rows) {
+    const meta = r.metadata as Record<string, unknown>;
+    const emoji = typeof meta?.dayEmoji === "string" && meta.dayEmoji.trim() !== "" ? meta.dayEmoji : null;
+    const color = typeof meta?.dayColor === "string" && meta.dayColor.trim() !== "" ? meta.dayColor : null;
+    const rating = typeof meta?.dayRating === "number" ? meta.dayRating : null;
+    dayEmojiMap[r.dayInt] = emoji;
+    dayColorMap[r.dayInt] = color;
+    dayRatingMap[r.dayInt] = rating;
+  }
+
+  // Fetch today's public notes from ALL users
+  const todayPublicRows = await db
+    .select({
+      metadata: schema.dayData.metadata,
+      userName: schema.user.name,
+      displayUsername: schema.user.displayUsername,
+      username: schema.user.username,
+    })
+    .from(schema.dayData)
+    .innerJoin(schema.user, eq(schema.dayData.user_id, schema.user.id))
+    .where(eq(schema.dayData.day_int, todayDayInt));
+
+  const publicNotes = todayPublicRows
     .filter((r) => {
       const meta = r.metadata as Record<string, unknown>;
       return meta?.dayPublicNote && typeof meta.dayPublicNote === "string" && meta.dayPublicNote.trim() !== "";
     })
     .map((r) => ({
-      dayInt: r.dayInt,
       note: (r.metadata as Record<string, unknown>).dayPublicNote as string,
+      author: r.displayUsername || r.username || r.userName,
+    }));
+
+  // Collect today's drawings from ALL users
+  const todayDrawings = todayPublicRows
+    .filter((r) => {
+      const meta = r.metadata as Record<string, unknown>;
+      return meta?.dayDrawing && typeof meta.dayDrawing === "string" && meta.dayDrawing.trim() !== "";
+    })
+    .map((r) => ({
+      drawing: (r.metadata as Record<string, unknown>).dayDrawing as string,
     }));
 
   // Redirect to today's day form if today is not filled and user is on the home page
@@ -47,5 +83,9 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
     todayFilled,
     publicNotes,
     todayDayInt,
+    dayEmojiMap,
+    dayColorMap,
+    dayRatingMap,
+    todayDrawings,
   };
 };

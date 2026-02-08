@@ -33,20 +33,24 @@
   let hasDrawn = $state(!!initialDrawing);
   let undoStack: ImageData[] = $state([]);
 
-  // Expose the drawing data only when the user has actually drawn
-  $effect(() => {
+  // Update the bound drawing output from current canvas state
+  function updateDrawingOutput() {
     currentDrawing = hasDrawn ? canvasEl?.toDataURL() || undefined : undefined;
-  });
+  }
 
   onMount(() => {
     ctx = canvasEl.getContext("2d", { willReadFrequently: true });
-    resize();
+
+    // Set canvas dimensions
+    canvasEl.width = containerEl.clientWidth;
+    canvasEl.height = canvasEl.width * 0.6;
 
     if (initialDrawing) {
       const img = new Image();
       img.onload = () => {
         if (ctx && canvasEl) {
-          ctx.drawImage(img, 0, 0);
+          ctx.drawImage(img, 0, 0, canvasEl.width, canvasEl.height);
+          updateDrawingOutput();
         }
       };
       img.src = initialDrawing;
@@ -59,16 +63,21 @@
 
   function resize() {
     if (!canvasEl || !containerEl) return;
-    const existingData = canvasEl.toDataURL();
+    const prevWidth = canvasEl.width;
+    const prevHeight = canvasEl.height;
+    const existingData = ctx?.getImageData(0, 0, prevWidth, prevHeight);
 
     canvasEl.width = containerEl.clientWidth;
     canvasEl.height = canvasEl.width * 0.6;
 
-    const img = new Image();
-    img.onload = () => {
-      ctx?.drawImage(img, 0, 0);
-    };
-    img.src = existingData;
+    if (existingData && ctx) {
+      // Create a temp canvas to scale the old content to the new size
+      const tmp = document.createElement("canvas");
+      tmp.width = prevWidth;
+      tmp.height = prevHeight;
+      tmp.getContext("2d")?.putImageData(existingData, 0, 0);
+      ctx.drawImage(tmp, 0, 0, canvasEl.width, canvasEl.height);
+    }
   }
 
   function saveUndo() {
@@ -83,6 +92,7 @@
       const prev = undoStack[undoStack.length - 1];
       undoStack = undoStack.slice(0, -1);
       ctx.putImageData(prev, 0, 0);
+      updateDrawingOutput();
     }
   }
 
@@ -152,7 +162,10 @@
   }
 
   function onUp() {
-    isDrawing = false;
+    if (isDrawing) {
+      isDrawing = false;
+      updateDrawingOutput();
+    }
   }
 
   function clearCanvas() {
@@ -161,6 +174,7 @@
       ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
       ctx.beginPath();
       hasDrawn = false;
+      updateDrawingOutput();
     }
   }
 
@@ -220,7 +234,7 @@
 
     <!-- Right-side color palette -->
     <div
-      class="z-[1] flex w-full flex-col items-center border-t border-white/20 justify-center lg:flex-row gap-1.5 py-2"
+      class="z-[1] flex w-full flex-col items-center border-t border-white/10 justify-center lg:flex-row gap-1.5 py-2"
     >
       <div class="flex flex-row gap-1.5">
         {#each COLORS as { hex, label }}

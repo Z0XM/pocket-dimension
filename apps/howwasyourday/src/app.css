@@ -76,7 +76,7 @@ body {
     }
 
     ::-webkit-scrollbar {
-        @apply w-[5px] bg-accent;
+        @apply w-px h-px bg-accent;
     }
 
     ::-webkit-scrollbar-thumb {
