@@ -1,10 +1,16 @@
 import { db, schema } from "@pocket-dimension/db";
 import { fail, redirect } from "@sveltejs/kit";
 import { and, eq } from "drizzle-orm";
-import { toDayInt } from "$lib/utils";
+import { getEffectiveDayInt, getEffectiveDayIntForTz } from "$lib/utils";
 import type { Actions, PageServerLoad } from "./$types";
 
-export const load: PageServerLoad = async ({ locals, params }) => {
+function getTodayDayInt(cookies: { get: (name: string) => string | undefined }): number {
+  const now = new Date();
+  const tzOffsetStr = cookies.get("tz_offset");
+  return tzOffsetStr != null && !Number.isNaN(parseInt(tzOffsetStr)) ? getEffectiveDayIntForTz(now, parseInt(tzOffsetStr)) : getEffectiveDayInt(now);
+}
+
+export const load: PageServerLoad = async ({ locals, params, cookies }) => {
   const user = locals.user;
   if (!user) {
     return redirect(307, "/login");
@@ -16,15 +22,14 @@ export const load: PageServerLoad = async ({ locals, params }) => {
   }
 
   // Validate: must be current year
-  const now = new Date();
-  const year = now.getFullYear();
+  const todayDayInt = getTodayDayInt(cookies);
+  const year = Math.floor(todayDayInt / 10000);
   const paramYear = Math.floor(dayInt / 10000);
   if (paramYear !== year) {
     return redirect(307, "/");
   }
 
   // Validate: must not be in the future
-  const todayDayInt = toDayInt(now);
   if (dayInt > todayDayInt) {
     return redirect(307, "/");
   }
@@ -47,7 +52,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 };
 
 export const actions: Actions = {
-  default: async ({ request, locals, params }) => {
+  default: async ({ request, locals, params, cookies }) => {
     const user = locals.user;
     if (!user) {
       return redirect(307, "/login");
@@ -59,14 +64,13 @@ export const actions: Actions = {
     }
 
     // Validate: must be current year and not future
-    const now = new Date();
-    const year = now.getFullYear();
+    const todayDayInt = getTodayDayInt(cookies);
+    const year = Math.floor(todayDayInt / 10000);
     const paramYear = Math.floor(dayInt / 10000);
     if (paramYear !== year) {
       return fail(400, { error: "Invalid year" });
     }
 
-    const todayDayInt = toDayInt(now);
     if (dayInt > todayDayInt) {
       return fail(400, { error: "Cannot fill future days" });
     }

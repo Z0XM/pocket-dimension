@@ -2,20 +2,23 @@
   import {
     CalendarDate,
     type DateValue,
-    getLocalTimeZone,
-    today as getToday,
   } from "@internationalized/date";
   import { goto } from "$app/navigation";
   import { buttonVariants } from "$lib/components/ui/button";
   import { Calendar } from "$lib/components/ui/calendar";
   import * as Card from "$lib/components/ui/card";
-  import { cn } from "$lib/utils";
+  import { cn, getEffectiveDate } from "$lib/utils";
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
 
-  const tz = getLocalTimeZone();
-  const todayCal = getToday(tz);
+  // Use browser time with -12hr offset: "today" = yesterday until noon
+  const effectiveNow = getEffectiveDate();
+  const todayCal = new CalendarDate(
+    effectiveNow.getFullYear(),
+    effectiveNow.getMonth() + 1,
+    effectiveNow.getDate(),
+  );
   const year = todayCal.year;
   const minValue = new CalendarDate(year, 1, 1);
   const maxValue = new CalendarDate(year, 12, 31);

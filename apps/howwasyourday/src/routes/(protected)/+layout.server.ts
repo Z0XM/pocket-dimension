@@ -1,18 +1,21 @@
 import { db, schema } from "@pocket-dimension/db";
 import { redirect } from "@sveltejs/kit";
 import { and, eq, gte, lte } from "drizzle-orm";
-import { toDayInt } from "$lib/utils";
+import { getEffectiveDayInt, getEffectiveDayIntForTz } from "$lib/utils";
 import type { LayoutServerLoad } from "./$types";
 
-export const load: LayoutServerLoad = async ({ locals, url }) => {
+export const load: LayoutServerLoad = async ({ locals, url, cookies }) => {
   const user = locals.user;
   if (!user) {
     return redirect(307, "/login");
   }
 
   const now = new Date();
-  const year = now.getFullYear();
-  const todayDayInt = toDayInt(now);
+  // Use client timezone if available (from tz_offset cookie), otherwise server time
+  const tzOffsetStr = cookies.get("tz_offset");
+  const todayDayInt =
+    tzOffsetStr != null && !Number.isNaN(parseInt(tzOffsetStr)) ? getEffectiveDayIntForTz(now, parseInt(tzOffsetStr)) : getEffectiveDayInt(now);
+  const year = Math.floor(todayDayInt / 10000);
   const yearStart = year * 10000 + 101; // Jan 1
   const yearEnd = year * 10000 + 1231; // Dec 31
 

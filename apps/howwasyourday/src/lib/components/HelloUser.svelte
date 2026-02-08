@@ -4,9 +4,11 @@
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
   import * as Popover from "$lib/components/ui/popover";
+  import { getEffectiveDate } from "$lib/utils";
   import { Progress } from "./ui/progress";
 
-  const today = new Date();
+  // Use effective date: "today" = yesterday until noon
+  const today = getEffectiveDate();
   const noOfDaysInYear = today.getFullYear() % 4 === 0 ? 366 : 365;
   const todayCountOfDay = Math.ceil(
     (today.getTime() - new Date(today.getFullYear(), 0, 1).getTime()) /
