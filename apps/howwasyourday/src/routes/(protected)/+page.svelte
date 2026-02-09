@@ -1,8 +1,5 @@
 <script lang="ts">
-  import {
-    CalendarDate,
-    type DateValue,
-  } from "@internationalized/date";
+  import { CalendarDate, type DateValue } from "@internationalized/date";
   import { goto } from "$app/navigation";
   import { buttonVariants } from "$lib/components/ui/button";
   import { Calendar } from "$lib/components/ui/calendar";
@@ -325,7 +322,9 @@
         {@const monthBounds = getMonthBoundaries()}
         {@const yearChartW = 600}
         {@const yearPlotW = yearChartW - padL - padR}
-        <div class="flex w-full flex-col items-center gap-1 overflow-x-auto">
+        <div
+          class="flex flex-col items-center gap-1 max-w-[calc(100vw-4rem)] md:max-w-full overflow-x-auto"
+        >
           <span class="text-sm font-medium">{year}</span>
           <svg
             viewBox="0 0 {yearChartW} {chartH}"
@@ -422,7 +421,9 @@
       {:else}
         <!-- Year Mosaic (Emojis or Colors) -->
         {@const mosaicData = getYearMosaicData()}
-        <div class="flex w-full flex-col gap-1 overflow-x-auto">
+        <div
+          class="flex flex-col gap-1 max-w-[calc(100vw-4rem)] md:max-w-full overflow-x-auto"
+        >
           {#each mosaicData as { label, days }}
             <div class="flex items-center gap-1">
               <span

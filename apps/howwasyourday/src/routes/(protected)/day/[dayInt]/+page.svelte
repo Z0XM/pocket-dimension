@@ -143,7 +143,9 @@
               {dayEmoji || "❓"}
             </div>
           </Dialog.Trigger>
-          <Dialog.Content class="flex flex-col items-center justify-center">
+          <Dialog.Content
+            class="flex max-h-[80vh] flex-col items-center justify-center"
+          >
             <Dialog.Header>
               <Dialog.Title class="pb-2 text-2xl"
                 >Emote your day! {dayEmoji || "❓"}</Dialog.Title
@@ -151,7 +153,7 @@
               <Dialog.Description>
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 <div
-                  class="flex flex-wrap gap-1"
+                  class="flex max-h-[60vh] flex-wrap gap-1 overflow-y-auto"
                   role="toolbar"
                   tabindex="-1"
                   aria-label="Emoji picker"
