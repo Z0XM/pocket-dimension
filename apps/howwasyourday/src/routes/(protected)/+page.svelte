@@ -1,5 +1,6 @@
 <script lang="ts">
   import { CalendarDate, type DateValue } from "@internationalized/date";
+  import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { buttonVariants } from "$lib/components/ui/button";
   import { Calendar } from "$lib/components/ui/calendar";
@@ -8,6 +9,27 @@
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
+
+  // Fullscreen support for year views
+  let yearViewEl: HTMLDivElement | undefined = $state();
+  let isFullscreen = $state(false);
+
+  function toggleFullscreen() {
+    if (!yearViewEl) return;
+    if (!document.fullscreenElement) {
+      yearViewEl.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+
+  onMount(() => {
+    const onFsChange = () => {
+      isFullscreen = !!document.fullscreenElement;
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  });
 
   // Use browser time with -12hr offset: "today" = yesterday until noon
   const effectiveNow = getEffectiveDate();
@@ -311,173 +333,250 @@
 
     <!-- ==================== YEAR VIEW ==================== -->
     {#if timeRange === "year"}
-      {#if calendarMode === "graph"}
-        <!-- Year Graph -->
-        {@const yearTotalDays = Array.from({ length: 12 }, (_, i) =>
-          daysInMonth(i + 1, year),
-        ).reduce((a, b) => a + b, 0)}
-        {@const yearPoints = getYearRatings()}
-        {@const yearSegments = buildYearSegments(yearPoints, yearTotalDays)}
-        {@const yTicks = [0, 2, 4, 6, 8, 10]}
-        {@const monthBounds = getMonthBoundaries()}
-        {@const yearChartW = 600}
-        {@const yearPlotW = yearChartW - padL - padR}
-        <div
-          class="flex flex-col items-center gap-1 max-w-[calc(100vw-4rem)] md:max-w-full overflow-x-auto"
+      <div
+        bind:this={yearViewEl}
+        class={cn(
+          "flex w-full flex-col items-center gap-2",
+          isFullscreen &&
+            "bg-background p-6 overflow-auto justify-center h-full",
+        )}
+      >
+        <!-- Fullscreen toggle -->
+        <button
+          type="button"
+          class="self-end rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          onclick={toggleFullscreen}
         >
-          <span class="text-sm font-medium">{year}</span>
-          <svg
-            viewBox="0 0 {yearChartW} {chartH}"
-            class="w-full min-w-[500px]"
-            preserveAspectRatio="xMidYMid meet"
+          {#if isFullscreen}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              ><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path
+                d="M21 8h-3a2 2 0 0 1-2-2V3"
+              /><path d="M3 16h3a2 2 0 0 1 2 2v3" /><path
+                d="M16 21v-3a2 2 0 0 1 2-2h3"
+              /></svg
+            >
+          {:else}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              ><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path
+                d="M21 8V5a2 2 0 0 0-2-2h-3"
+              /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path
+                d="M16 21h3a2 2 0 0 0 2-2v-3"
+              /></svg
+            >
+          {/if}
+        </button>
+
+        {#if calendarMode === "graph"}
+          <!-- Year Graph -->
+          {@const yearTotalDays = Array.from({ length: 12 }, (_, i) =>
+            daysInMonth(i + 1, year),
+          ).reduce((a, b) => a + b, 0)}
+          {@const yearPoints = getYearRatings()}
+          {@const yearSegments = buildYearSegments(yearPoints, yearTotalDays)}
+          {@const yTicks = [0, 2, 4, 6, 8, 10]}
+          {@const monthBounds = getMonthBoundaries()}
+          {@const yearChartW = 600}
+          {@const yearPlotW = yearChartW - padL - padR}
+          <div
+            class={cn(
+              "flex flex-col items-center gap-1 max-w-[calc(100vw-4rem)] md:max-w-full overflow-x-auto",
+              isFullscreen && "w-full max-w-full",
+            )}
           >
-            {#each yTicks as tick}
+            <span class="text-sm font-medium">{year}</span>
+            <svg
+              viewBox="0 0 {yearChartW} {chartH}"
+              class={cn("w-full min-w-[500px]", isFullscreen && "min-w-0")}
+              preserveAspectRatio="xMidYMid meet"
+            >
+              {#each yTicks as tick}
+                <line
+                  x1={padL}
+                  y1={yPos(tick)}
+                  x2={yearChartW - padR}
+                  y2={yPos(tick)}
+                  stroke="currentColor"
+                  stroke-opacity="0.1"
+                  stroke-width="0.5"
+                />
+                <text
+                  x={padL - 6}
+                  y={yPos(tick) + 3.5}
+                  text-anchor="end"
+                  fill="currentColor"
+                  fill-opacity="0.4"
+                  font-size="9">{tick}</text
+                >
+              {/each}
+
+              <!-- Month labels on x-axis -->
+              {#each monthBounds as mb}
+                {@const mx =
+                  padL + ((mb.dayOfYear - 1) / (yearTotalDays - 1)) * yearPlotW}
+                <text
+                  x={mx}
+                  y={chartH - 6}
+                  text-anchor="start"
+                  fill="currentColor"
+                  fill-opacity="0.4"
+                  font-size="8">{mb.label}</text
+                >
+                <line
+                  x1={mx}
+                  y1={padT}
+                  x2={mx}
+                  y2={chartH - padB}
+                  stroke="currentColor"
+                  stroke-opacity="0.06"
+                  stroke-width="0.5"
+                />
+              {/each}
+
+              {#each yearSegments as seg}
+                <path
+                  d={seg}
+                  fill="none"
+                  stroke="#22c55e"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              {/each}
+
+              {#each yearPoints as pt}
+                <circle
+                  cx={padL +
+                    ((pt.dayOfYear - 1) / (yearTotalDays - 1)) * yearPlotW}
+                  cy={yPos(pt.rating)}
+                  r="2"
+                  fill="#22c55e"
+                />
+              {/each}
+
               <line
                 x1={padL}
-                y1={yPos(tick)}
+                y1={yPos(0)}
                 x2={yearChartW - padR}
-                y2={yPos(tick)}
+                y2={yPos(0)}
                 stroke="currentColor"
-                stroke-opacity="0.1"
+                stroke-opacity="0.2"
                 stroke-width="0.5"
+                stroke-dasharray="4 2"
               />
-              <text
-                x={padL - 6}
-                y={yPos(tick) + 3.5}
-                text-anchor="end"
-                fill="currentColor"
-                fill-opacity="0.4"
-                font-size="9">{tick}</text
+
+              {#if yearPoints.length === 0}
+                <text
+                  x={yearChartW / 2}
+                  y={chartH / 2}
+                  text-anchor="middle"
+                  fill="currentColor"
+                  fill-opacity="0.3"
+                  font-size="12">No ratings this year</text
+                >
+              {/if}
+            </svg>
+          </div>
+        {:else}
+          <!-- Year Mosaic (Emojis or Colors) -->
+          {@const mosaicData = getYearMosaicData()}
+          <div
+            class={cn(
+              "flex flex-col gap-1 max-w-[calc(100vw-4rem)] md:max-w-full overflow-x-auto",
+              isFullscreen && "w-full max-w-full items-center gap-2",
+            )}
+          >
+            {#each mosaicData as { label, days }}
+              <div
+                class={cn(
+                  "flex items-center gap-1",
+                  isFullscreen && "w-full gap-2",
+                )}
               >
-            {/each}
-
-            <!-- Month labels on x-axis -->
-            {#each monthBounds as mb}
-              {@const mx =
-                padL + ((mb.dayOfYear - 1) / (yearTotalDays - 1)) * yearPlotW}
-              <text
-                x={mx}
-                y={chartH - 6}
-                text-anchor="start"
-                fill="currentColor"
-                fill-opacity="0.4"
-                font-size="8">{mb.label}</text
-              >
-              <line
-                x1={mx}
-                y1={padT}
-                x2={mx}
-                y2={chartH - padB}
-                stroke="currentColor"
-                stroke-opacity="0.06"
-                stroke-width="0.5"
-              />
-            {/each}
-
-            {#each yearSegments as seg}
-              <path
-                d={seg}
-                fill="none"
-                stroke="#22c55e"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            {/each}
-
-            {#each yearPoints as pt}
-              <circle
-                cx={padL +
-                  ((pt.dayOfYear - 1) / (yearTotalDays - 1)) * yearPlotW}
-                cy={yPos(pt.rating)}
-                r="2"
-                fill="#22c55e"
-              />
-            {/each}
-
-            <line
-              x1={padL}
-              y1={yPos(0)}
-              x2={yearChartW - padR}
-              y2={yPos(0)}
-              stroke="currentColor"
-              stroke-opacity="0.2"
-              stroke-width="0.5"
-              stroke-dasharray="4 2"
-            />
-
-            {#if yearPoints.length === 0}
-              <text
-                x={yearChartW / 2}
-                y={chartH / 2}
-                text-anchor="middle"
-                fill="currentColor"
-                fill-opacity="0.3"
-                font-size="12">No ratings this year</text
-              >
-            {/if}
-          </svg>
-        </div>
-      {:else}
-        <!-- Year Mosaic (Emojis or Colors) -->
-        {@const mosaicData = getYearMosaicData()}
-        <div
-          class="flex flex-col gap-1 max-w-[calc(100vw-4rem)] md:max-w-full overflow-x-auto"
-        >
-          {#each mosaicData as { label, days }}
-            <div class="flex items-center gap-1">
-              <span
-                class="w-8 shrink-0 text-right text-[11px] text-muted-foreground"
-                >{label}</span
-              >
-              <div class="flex gap-0.5">
-                {#each days as { dayInt, isFuture }}
-                  {@const filled = filledDayInts.has(dayInt)}
-                  {@const color = dayColorMap[dayInt] ?? null}
-                  {@const emoji = dayEmojiMap[dayInt] ?? null}
-                  {#if calendarMode === "colors"}
-                    <button
-                      type="button"
-                      class={cn(
-                        "size-6 rounded-[3px] transition-colors",
-                        isFuture && "opacity-20",
-                        filled && color && !isFuture
-                          ? ""
-                          : "bg-muted-foreground/10",
-                      )}
-                      style={filled && color && !isFuture
-                        ? `background-color: ${color};`
-                        : ""}
-                      disabled={isFuture}
-                      onclick={() => {
-                        if (!isFuture) goto(`/day/${dayInt}`);
-                      }}
-                    ></button>
-                  {:else}
-                    <!-- Emojis mode -->
-                    <button
-                      type="button"
-                      class={cn(
-                        "flex size-6 items-center justify-center rounded-[3px] transition-colors",
-                        isFuture && "opacity-20",
-                        filled && emoji ? "" : "bg-muted-foreground/10",
-                      )}
-                      disabled={isFuture}
-                      onclick={() => {
-                        if (!isFuture) goto(`/day/${dayInt}`);
-                      }}
-                    >
-                      {#if emoji && !isFuture}
-                        <span class="text-lg leading-none">{emoji}</span>
-                      {/if}
-                    </button>
-                  {/if}
-                {/each}
+                <span
+                  class={cn(
+                    "w-8 shrink-0 text-right text-[11px] text-muted-foreground",
+                    isFullscreen && "w-10 text-sm",
+                  )}>{label}</span
+                >
+                <div class={cn("flex gap-0.5", isFullscreen && "flex-1 gap-1")}>
+                  {#each days as { dayInt, isFuture }}
+                    {@const filled = filledDayInts.has(dayInt)}
+                    {@const color = dayColorMap[dayInt] ?? null}
+                    {@const emoji = dayEmojiMap[dayInt] ?? null}
+                    {#if calendarMode === "colors"}
+                      <button
+                        type="button"
+                        class={cn(
+                          "rounded-[3px] transition-colors",
+                          isFullscreen
+                            ? "min-w-0 flex-1 aspect-square rounded-md"
+                            : "size-6",
+                          isFuture && "opacity-20",
+                          filled && color && !isFuture
+                            ? ""
+                            : "bg-muted-foreground/10",
+                        )}
+                        style={filled && color && !isFuture
+                          ? `background-color: ${color};`
+                          : ""}
+                        disabled={isFuture}
+                        onclick={() => {
+                          if (!isFuture) goto(`/day/${dayInt}`);
+                        }}
+                      ></button>
+                    {:else}
+                      <!-- Emojis mode -->
+                      <button
+                        type="button"
+                        class={cn(
+                          "flex items-center justify-center rounded-[3px] transition-colors",
+                          isFullscreen
+                            ? "min-w-0 flex-1 aspect-square rounded-md"
+                            : "size-6",
+                          isFuture && "opacity-20",
+                          filled && emoji ? "" : "bg-muted-foreground/10",
+                        )}
+                        disabled={isFuture}
+                        onclick={() => {
+                          if (!isFuture) goto(`/day/${dayInt}`);
+                        }}
+                      >
+                        {#if emoji && !isFuture}
+                          <span
+                            class={cn(
+                              "text-lg leading-none",
+                              isFullscreen && "text-2xl",
+                            )}>{emoji}</span
+                          >
+                        {/if}
+                      </button>
+                    {/if}
+                  {/each}
+                </div>
               </div>
-            </div>
-          {/each}
-        </div>
-      {/if}
+            {/each}
+          </div>
+        {/if}
+      </div>
 
       <!-- ==================== MONTH VIEW ==================== -->
     {:else if calendarMode === "graph"}
