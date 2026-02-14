@@ -1,143 +1,152 @@
 <script lang="ts">
-let {
-  color = $bindable(undefined),
-}: {
-  color?: string;
-} = $props();
+  let {
+    color = $bindable(undefined),
+    hueOnly = false,
+  }: {
+    color?: string;
+    hueOnly?: boolean;
+  } = $props();
 
-// --- Color conversion helpers ---
+  // --- Color conversion helpers ---
 
-function hexToHsv(hex?: string): { h: number; s: number; v: number } {
-  if (!hex) return { h: 0, s: 0, v: 100 };
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return { h: 0, s: 0, v: 100 };
-  const r = parseInt(result[1], 16) / 255;
-  const g = parseInt(result[2], 16) / 255;
-  const b = parseInt(result[3], 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const d = max - min;
-  let h = 0;
-  if (d !== 0) {
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-    else if (max === g) h = ((b - r) / d + 2) / 6;
-    else h = ((r - g) / d + 4) / 6;
+  function hexToHsv(hex?: string): { h: number; s: number; v: number } {
+    if (!hex) return { h: 0, s: 0, v: 100 };
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!result) return { h: 0, s: 0, v: 100 };
+    const r = parseInt(result[1], 16) / 255;
+    const g = parseInt(result[2], 16) / 255;
+    const b = parseInt(result[3], 16) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    if (d !== 0) {
+      if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+      else if (max === g) h = ((b - r) / d + 2) / 6;
+      else h = ((r - g) / d + 4) / 6;
+    }
+    const s = max === 0 ? 0 : d / max;
+    return { h: h * 360, s: s * 100, v: max * 100 };
   }
-  const s = max === 0 ? 0 : d / max;
-  return { h: h * 360, s: s * 100, v: max * 100 };
-}
 
-function hsvToHex(h: number, s: number, v: number): string {
-  s /= 100;
-  v /= 100;
-  const c = v * s;
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-  const m = v - c;
-  let r = 0,
-    g = 0,
-    b = 0;
-  if (h < 60) {
-    r = c;
-    g = x;
-  } else if (h < 120) {
-    r = x;
-    g = c;
-  } else if (h < 180) {
-    g = c;
-    b = x;
-  } else if (h < 240) {
-    g = x;
-    b = c;
-  } else if (h < 300) {
-    r = x;
-    b = c;
-  } else {
-    r = c;
-    b = x;
+  function hsvToHex(h: number, s: number, v: number): string {
+    s /= 100;
+    v /= 100;
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = v - c;
+    let r = 0,
+      g = 0,
+      b = 0;
+    if (h < 60) {
+      r = c;
+      g = x;
+    } else if (h < 120) {
+      r = x;
+      g = c;
+    } else if (h < 180) {
+      g = c;
+      b = x;
+    } else if (h < 240) {
+      g = x;
+      b = c;
+    } else if (h < 300) {
+      r = x;
+      b = c;
+    } else {
+      r = c;
+      b = x;
+    }
+    const toHex = (n: number) =>
+      Math.round((n + m) * 255)
+        .toString(16)
+        .padStart(2, "0");
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
-  const toHex = (n: number) =>
-    Math.round((n + m) * 255)
-      .toString(16)
-      .padStart(2, "0");
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
 
-function hsvToHsl(h: number, s: number, v: number): string {
-  s /= 100;
-  v /= 100;
-  const l = v * (1 - s / 2);
-  const sl = l === 0 || l === 1 ? 0 : (v - l) / Math.min(l, 1 - l);
-  return `hsl(${Math.round(h)}, ${Math.round(sl * 100)}%, ${Math.round(l * 100)}%)`;
-}
-
-// --- State ---
-
-let hsv = $state(hexToHsv(color));
-let draggingSV = $state(false);
-let draggingHue = $state(false);
-let svArea: HTMLDivElement;
-let hueBar: HTMLDivElement;
-
-function updateColor() {
-  color = hsvToHex(hsv.h, hsv.s, hsv.v);
-}
-
-// --- Saturation/Value area ---
-
-function handleSV(e: MouseEvent | TouchEvent) {
-  if (!svArea) return;
-  const rect = svArea.getBoundingClientRect();
-  const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-  const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
-  const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-  const y = Math.max(0, Math.min(clientY - rect.top, rect.height));
-  hsv.s = (x / rect.width) * 100;
-  hsv.v = 100 - (y / rect.height) * 100;
-  updateColor();
-}
-
-function startSV(e: MouseEvent | TouchEvent) {
-  draggingSV = true;
-  handleSV(e);
-}
-
-// --- Hue bar ---
-
-function handleHue(e: MouseEvent | TouchEvent) {
-  if (!hueBar) return;
-  const rect = hueBar.getBoundingClientRect();
-  const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-  const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-  hsv.h = (x / rect.width) * 360;
-  updateColor();
-}
-
-function startHue(e: MouseEvent | TouchEvent) {
-  draggingHue = true;
-  handleHue(e);
-}
-
-// --- Global pointer move/up ---
-
-function handlePointerMove(e: MouseEvent | TouchEvent) {
-  if (draggingSV) handleSV(e);
-  if (draggingHue) handleHue(e);
-}
-
-function handlePointerUp() {
-  draggingSV = false;
-  draggingHue = false;
-}
-
-// Keep hsv in sync if color prop changes externally
-$effect(() => {
-  if (!color) return;
-  const newHsv = hexToHsv(color);
-  // Only update if hex actually differs (avoid loops)
-  if (hsvToHex(hsv.h, hsv.s, hsv.v) !== color) {
-    hsv = newHsv;
+  function hsvToHsl(h: number, s: number, v: number): string {
+    s /= 100;
+    v /= 100;
+    const l = v * (1 - s / 2);
+    const sl = l === 0 || l === 1 ? 0 : (v - l) / Math.min(l, 1 - l);
+    return `hsl(${Math.round(h)}, ${Math.round(sl * 100)}%, ${Math.round(l * 100)}%)`;
   }
-});
+
+  // --- State ---
+
+  let hsv = $state(hexToHsv(color));
+  let draggingSV = $state(false);
+  let draggingHue = $state(false);
+  let svArea: HTMLDivElement;
+  let hueBar: HTMLDivElement;
+
+  function updateColor() {
+    const s = hueOnly ? 100 : hsv.s;
+    const v = hueOnly ? 50 : hsv.v;
+    const newHex = hsvToHex(hsv.h, s, v);
+    lastSetColor = newHex;
+    color = newHex;
+  }
+
+  // --- Saturation/Value area ---
+
+  function handleSV(e: MouseEvent | TouchEvent) {
+    if (!svArea) return;
+    const rect = svArea.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    const y = Math.max(0, Math.min(clientY - rect.top, rect.height));
+    hsv.s = (x / rect.width) * 100;
+    hsv.v = 100 - (y / rect.height) * 100;
+    updateColor();
+  }
+
+  function startSV(e: MouseEvent | TouchEvent) {
+    draggingSV = true;
+    handleSV(e);
+  }
+
+  // --- Hue bar ---
+
+  function handleHue(e: MouseEvent | TouchEvent) {
+    if (!hueBar) return;
+    const rect = hueBar.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    hsv.h = (x / rect.width) * 360;
+    updateColor();
+  }
+
+  function startHue(e: MouseEvent | TouchEvent) {
+    draggingHue = true;
+    handleHue(e);
+  }
+
+  // --- Global pointer move/up ---
+
+  function handlePointerMove(e: MouseEvent | TouchEvent) {
+    if (draggingSV) handleSV(e);
+    if (draggingHue) handleHue(e);
+  }
+
+  function handlePointerUp() {
+    draggingSV = false;
+    draggingHue = false;
+  }
+
+  // Keep hsv in sync if color prop changes externally
+  // Track the last color we set ourselves to avoid re-entrancy
+  let lastSetColor = $state(color);
+
+  $effect(() => {
+    if (!color) return;
+    // Only update hsv if the color was changed externally (not by us)
+    if (color !== lastSetColor) {
+      hsv = hexToHsv(color);
+      lastSetColor = color;
+    }
+  });
 </script>
 
 <svelte:window
@@ -147,42 +156,48 @@ $effect(() => {
   ontouchend={handlePointerUp}
 />
 
-<div class="colorful">
-  <!-- Saturation/Value area -->
-  <div
-    class="colorful__saturation"
-    style="background-color: hsl({Math.round(hsv.h)}, 100%, 50%);"
-  >
+<div class="colorful" class:colorful--hue-only={hueOnly}>
+  {#if !hueOnly}
+    <!-- Saturation/Value area -->
     <div
-      bind:this={svArea}
-      class="colorful__interactive"
-      role="slider"
-      tabindex="0"
-      aria-label="Color"
-      aria-valuenow={Math.round(hsv.s)}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuetext="Saturation {Math.round(hsv.s)}%, Brightness {Math.round(
-        hsv.v,
-      )}%"
-      onmousedown={startSV}
-      ontouchstart={startSV}
+      class="colorful__saturation"
+      style="background-color: hsl({Math.round(hsv.h)}, 100%, 50%);"
     >
-      <!-- Saturation pointer -->
       <div
-        class="colorful__pointer colorful__saturation-pointer"
-        style="top: {100 - hsv.v}%; left: {hsv.s}%;"
+        bind:this={svArea}
+        class="colorful__interactive"
+        role="slider"
+        tabindex="0"
+        aria-label="Color"
+        aria-valuenow={Math.round(hsv.s)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuetext="Saturation {Math.round(hsv.s)}%, Brightness {Math.round(
+          hsv.v,
+        )}%"
+        onmousedown={startSV}
+        ontouchstart={startSV}
       >
+        <!-- Saturation pointer -->
         <div
-          class="colorful__pointer-fill"
-          style="background-color: {color ?? '#ffffff'};"
-        ></div>
+          class="colorful__pointer colorful__saturation-pointer"
+          style="top: {100 - hsv.v}%; left: {hsv.s}%;"
+        >
+          <div
+            class="colorful__pointer-fill"
+            style="background-color: {color ?? '#ffffff'};"
+          ></div>
+        </div>
       </div>
     </div>
-  </div>
+  {/if}
 
   <!-- Hue bar -->
-  <div class="colorful__hue colorful__last-control">
+  <div
+    class="colorful__hue"
+    class:colorful__last-control={!hueOnly}
+    class:colorful__hue--standalone={hueOnly}
+  >
     <div
       bind:this={hueBar}
       class="colorful__interactive"
@@ -219,6 +234,15 @@ $effect(() => {
     max-width: 280px;
     user-select: none;
     cursor: default;
+  }
+
+  .colorful--hue-only {
+    aspect-ratio: unset;
+  }
+
+  .colorful__hue--standalone {
+    border-radius: 12px;
+    height: 32px;
   }
 
   .colorful__saturation {
