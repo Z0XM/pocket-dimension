@@ -1,23 +1,23 @@
 <script lang="ts">
-  import XIcon from "@lucide/svelte/icons/x";
-  import { Dialog as DialogPrimitive } from "bits-ui";
-  import type { ComponentProps, Snippet } from "svelte";
-  import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
-  import DialogPortal from "./dialog-portal.svelte";
-  import * as Dialog from "./index.js";
+import XIcon from "@lucide/svelte/icons/x";
+import { Dialog as DialogPrimitive } from "bits-ui";
+import type { ComponentProps, Snippet } from "svelte";
+import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
+import DialogPortal from "./dialog-portal.svelte";
+import * as Dialog from "./index.js";
 
-  let {
-    ref = $bindable(null),
-    class: className,
-    portalProps,
-    children,
-    showCloseButton = true,
-    ...restProps
-  }: WithoutChildrenOrChild<DialogPrimitive.ContentProps> & {
-    portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DialogPortal>>;
-    children: Snippet;
-    showCloseButton?: boolean;
-  } = $props();
+let {
+  ref = $bindable(null),
+  class: className,
+  portalProps,
+  children,
+  showCloseButton = true,
+  ...restProps
+}: WithoutChildrenOrChild<DialogPrimitive.ContentProps> & {
+  portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DialogPortal>>;
+  children: Snippet;
+  showCloseButton?: boolean;
+} = $props();
 </script>
 
 <DialogPortal {...portalProps}>
@@ -26,7 +26,7 @@
     bind:ref
     data-slot="dialog-content"
     class={cn(
-      "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
+      "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-primary/15 p-6 shadow-lg shadow-primary/5 sm:max-w-lg",
       className,
     )}
     {...restProps}

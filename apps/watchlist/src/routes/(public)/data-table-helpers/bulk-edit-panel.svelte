@@ -1,98 +1,96 @@
 <script lang="ts">
-  import { CheckIcon, PlusIcon, Trash2Icon, XIcon } from "@lucide/svelte";
-  import { getContext } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import * as Card from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import * as Select from "$lib/components/ui/select";
-  import type { Watchlist } from "../columns";
-  import { getEditModeContext, type UserRole } from "./edit-mode.svelte.js";
+import { CheckIcon, PlusIcon, Trash2Icon, XIcon } from "@lucide/svelte";
+import { getContext } from "svelte";
+import { Button } from "$lib/components/ui/button";
+import * as Card from "$lib/components/ui/card";
+import { Input } from "$lib/components/ui/input";
+import * as Select from "$lib/components/ui/select";
+import type { Watchlist } from "../columns";
+import { getEditModeContext, type UserRole } from "./edit-mode.svelte.js";
 
-  interface Props {
-    data: Watchlist[];
-  }
+interface Props {
+  data: Watchlist[];
+}
 
-  let { data }: Props = $props();
+let { data }: Props = $props();
 
-  const editMode = getEditModeContext();
-  const editOptions = getContext<{
-    userRole: () => UserRole;
-    languages: () => Array<{ id: string; language: string }>;
-    types: () => string[];
-    progressStatuses: string[];
-  }>("editOptions");
+const editMode = getEditModeContext();
+const editOptions = getContext<{
+  userRole: () => UserRole;
+  languages: () => Array<{ id: string; language: string }>;
+  types: () => string[];
+  progressStatuses: string[];
+}>("editOptions");
 
-  const userRole = $derived(editOptions.userRole());
-  const canDelete = $derived(editMode.canDeleteRows(userRole));
-  // Only contributor and admin can edit contributor fields; "user" and "mobile" cannot
-  const canEditContributorFields = $derived(
-    userRole === "contributor" || userRole === "admin",
-  );
+const userRole = $derived(editOptions.userRole());
+const canDelete = $derived(editMode.canDeleteRows(userRole));
+// Only contributor and admin can edit contributor fields; "user" and "mobile" cannot
+const canEditContributorFields = $derived(userRole === "contributor" || userRole === "admin");
 
-  const selectedCount = $derived(editMode.selectedCount);
-  const isVisible = $derived(editMode.isEditMode && selectedCount > 0);
+const selectedCount = $derived(editMode.selectedCount);
+const isVisible = $derived(editMode.isEditMode && selectedCount > 0);
 
-  // Bulk edit values
-  let bulkLanguageId = $state<string>("");
-  let bulkType = $state<string>("");
-  let bulkProgress = $state<string>("");
-  let bulkTag = $state("");
+// Bulk edit values
+let bulkLanguageId = $state<string>("");
+let bulkType = $state<string>("");
+let bulkProgress = $state<string>("");
+let bulkTag = $state("");
 
-  // Language options
-  const languageOptions = $derived(
-    editOptions.languages().map((l) => ({
-      value: l.id,
-      label: l.language,
-    })),
-  );
+// Language options
+const languageOptions = $derived(
+  editOptions.languages().map((l) => ({
+    value: l.id,
+    label: l.language,
+  }))
+);
 
-  // Type options
-  const typeOptions = $derived(
-    editOptions.types().map((t) => ({
-      value: t,
-      label: t.charAt(0).toUpperCase() + t.slice(1),
-    })),
-  );
+// Type options
+const typeOptions = $derived(
+  editOptions.types().map((t) => ({
+    value: t,
+    label: t.charAt(0).toUpperCase() + t.slice(1),
+  }))
+);
 
-  // Progress options
-  const progressOptions = $derived(
-    editOptions.progressStatuses.map((p) => ({
-      value: p,
-      label: p.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-    })),
-  );
+// Progress options
+const progressOptions = $derived(
+  editOptions.progressStatuses.map((p) => ({
+    value: p,
+    label: p.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+  }))
+);
 
-  function applyBulkLanguage() {
-    if (!bulkLanguageId) return;
-    editMode.bulkEditField("languageId", bulkLanguageId, data);
-    bulkLanguageId = "";
-  }
+function applyBulkLanguage() {
+  if (!bulkLanguageId) return;
+  editMode.bulkEditField("languageId", bulkLanguageId, data);
+  bulkLanguageId = "";
+}
 
-  function applyBulkType() {
-    if (!bulkType) return;
-    editMode.bulkEditField("type", bulkType, data);
-    bulkType = "";
-  }
+function applyBulkType() {
+  if (!bulkType) return;
+  editMode.bulkEditField("type", bulkType, data);
+  bulkType = "";
+}
 
-  function applyBulkProgress() {
-    if (!bulkProgress) return;
-    editMode.bulkEditField("my_progress_status", bulkProgress as any, data);
-    bulkProgress = "";
-  }
+function applyBulkProgress() {
+  if (!bulkProgress) return;
+  editMode.bulkEditField("my_progress_status", bulkProgress as any, data);
+  bulkProgress = "";
+}
 
-  function applyBulkTag() {
-    if (!bulkTag.trim()) return;
-    editMode.bulkAddTag(bulkTag.trim());
-    bulkTag = "";
-  }
+function applyBulkTag() {
+  if (!bulkTag.trim()) return;
+  editMode.bulkAddTag(bulkTag.trim());
+  bulkTag = "";
+}
 
-  function handleBulkDelete() {
-    editMode.bulkDeleteSelected();
-  }
+function handleBulkDelete() {
+  editMode.bulkDeleteSelected();
+}
 
-  function handleClearSelection() {
-    editMode.clearSelection();
-  }
+function handleClearSelection() {
+  editMode.clearSelection();
+}
 </script>
 
 {#if isVisible}

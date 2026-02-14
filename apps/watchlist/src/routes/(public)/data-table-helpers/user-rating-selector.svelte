@@ -1,100 +1,91 @@
 <script lang="ts">
-  import { UsersIcon } from "@lucide/svelte";
-  import { toast } from "svelte-sonner";
-  import { goto } from "$app/navigation";
-  import { page } from "$app/state";
-  import { Button } from "$lib/components/ui/button";
-  import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-  import { Input } from "$lib/components/ui/input";
+import { UsersIcon } from "@lucide/svelte";
+import { toast } from "svelte-sonner";
+import { goto } from "$app/navigation";
+import { page } from "$app/state";
+import { Button } from "$lib/components/ui/button";
+import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+import { Input } from "$lib/components/ui/input";
 
-  type User = {
-    id: string;
-    username: string;
-  };
+type User = {
+  id: string;
+  username: string;
+};
 
-  let allUsers = $state<User[]>([]);
-  let selectedUserIds = $state<string[]>([]);
-  let searchQuery = $state("");
-  let isLoading = $state(true);
-  let isSaving = $state(false);
+let allUsers = $state<User[]>([]);
+let selectedUserIds = $state<string[]>([]);
+let searchQuery = $state("");
+let isLoading = $state(true);
+let isSaving = $state(false);
 
-  // Fetch all users and current preferences on mount
-  $effect(() => {
-    fetchData();
-  });
+// Fetch all users and current preferences on mount
+$effect(() => {
+  fetchData();
+});
 
-  async function fetchData() {
-    try {
-      // Fetch users and preferences in parallel
-      const [usersResponse, preferencesResponse] = await Promise.all([
-        fetch("/api/users"),
-        fetch("/api/user-rating-preferences"),
-      ]);
+async function fetchData() {
+  try {
+    // Fetch users and preferences in parallel
+    const [usersResponse, preferencesResponse] = await Promise.all([fetch("/api/users"), fetch("/api/user-rating-preferences")]);
 
-      if (!usersResponse.ok || !preferencesResponse.ok) {
-        throw new Error("Failed to fetch data");
-      }
-
-      const usersData = await usersResponse.json();
-      const preferencesData = await preferencesResponse.json();
-
-      allUsers = usersData.users;
-      selectedUserIds = preferencesData.preferredUserIds;
-      isLoading = false;
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error("Failed to load users");
-      isLoading = false;
+    if (!usersResponse.ok || !preferencesResponse.ok) {
+      throw new Error("Failed to fetch data");
     }
+
+    const usersData = await usersResponse.json();
+    const preferencesData = await preferencesResponse.json();
+
+    allUsers = usersData.users;
+    selectedUserIds = preferencesData.preferredUserIds;
+    isLoading = false;
+  } catch (error) {
+    console.error("Error fetching data:", error);
+    toast.error("Failed to load users");
+    isLoading = false;
   }
+}
 
-  // Filter users based on search query
-  const filteredUsers = $derived(
-    allUsers.filter((user) =>
-      user.username.toLowerCase().includes(searchQuery.toLowerCase()),
-    ),
-  );
+// Filter users based on search query
+const filteredUsers = $derived(allUsers.filter((user) => user.username.toLowerCase().includes(searchQuery.toLowerCase())));
 
-  async function toggleUser(userId: string) {
-    // Optimistically update UI
-    const newSelection = selectedUserIds.includes(userId)
-      ? selectedUserIds.filter((id) => id !== userId)
-      : [...selectedUserIds, userId];
+async function toggleUser(userId: string) {
+  // Optimistically update UI
+  const newSelection = selectedUserIds.includes(userId) ? selectedUserIds.filter((id) => id !== userId) : [...selectedUserIds, userId];
 
-    selectedUserIds = newSelection;
+  selectedUserIds = newSelection;
 
-    // Save to backend
-    await savePreferences(newSelection);
-  }
+  // Save to backend
+  await savePreferences(newSelection);
+}
 
-  async function savePreferences(userIds: string[]) {
-    isSaving = true;
-    try {
-      const response = await fetch("/api/user-rating-preferences", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preferredUserIds: userIds }),
-      });
+async function savePreferences(userIds: string[]) {
+  isSaving = true;
+  try {
+    const response = await fetch("/api/user-rating-preferences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preferredUserIds: userIds }),
+    });
 
-      if (!response.ok) {
-        throw new Error("Failed to save preferences");
-      }
-
-      // Use SvelteKit navigation to reload data without full page refresh
-      await goto(page.url.toString(), { invalidateAll: true });
-
-      isSaving = false;
-    } catch (error) {
-      console.error("Error saving preferences:", error);
-      toast.error("Failed to save user selection");
-      isSaving = false;
-
-      // Revert optimistic update on error
-      await fetchData();
+    if (!response.ok) {
+      throw new Error("Failed to save preferences");
     }
-  }
 
-  const selectedCount = $derived(selectedUserIds.length);
+    // Use SvelteKit navigation to reload data without full page refresh
+    await goto(page.url.toString(), { invalidateAll: true });
+
+    isSaving = false;
+  } catch (error) {
+    console.error("Error saving preferences:", error);
+    toast.error("Failed to save user selection");
+    isSaving = false;
+
+    // Revert optimistic update on error
+    await fetchData();
+  }
+}
+
+const selectedCount = $derived(selectedUserIds.length);
 </script>
 
 <DropdownMenu.Root>

@@ -1,10 +1,4 @@
-import {
-  createTable,
-  type RowData,
-  type TableOptions,
-  type TableOptionsResolved,
-  type TableState,
-} from "@tanstack/table-core";
+import { createTable, type RowData, type TableOptions, type TableOptionsResolved, type TableState } from "@tanstack/table-core";
 
 /**
  * Creates a reactive TanStack table object for Svelte.
@@ -38,10 +32,7 @@ export function createSvelteTable<TData extends RowData>(options: TableOptions<T
       state: {},
       onStateChange() {},
       renderFallbackValue: null,
-      mergeOptions: (
-        defaultOptions: TableOptions<TData>,
-        options: Partial<TableOptions<TData>>
-      ) => {
+      mergeOptions: (defaultOptions: TableOptions<TData>, options: Partial<TableOptions<TData>>) => {
         return mergeObjects(defaultOptions, options);
       },
     },
@@ -77,9 +68,7 @@ export function createSvelteTable<TData extends RowData>(options: TableOptions<T
 }
 
 type MaybeThunk<T extends object> = T | (() => T | null | undefined);
-type Intersection<T extends readonly unknown[]> = (T extends [infer H, ...infer R]
-  ? H & Intersection<R>
-  : unknown) & {};
+type Intersection<T extends readonly unknown[]> = (T extends [infer H, ...infer R] ? H & Intersection<R> : unknown) & {};
 
 /**
  * Lazily merges several objects (or thunks) while preserving
@@ -88,11 +77,8 @@ type Intersection<T extends readonly unknown[]> = (T extends [infer H, ...infer 
  * Proxy-based to avoid known WebKit recursion issue.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mergeObjects<Sources extends readonly MaybeThunk<any>[]>(
-  ...sources: Sources
-): Intersection<{ [K in keyof Sources]: Sources[K] }> {
-  const resolve = <T extends object>(src: MaybeThunk<T>): T | undefined =>
-    typeof src === "function" ? (src() ?? undefined) : src;
+export function mergeObjects<Sources extends readonly MaybeThunk<any>[]>(...sources: Sources): Intersection<{ [K in keyof Sources]: Sources[K] }> {
+  const resolve = <T extends object>(src: MaybeThunk<T>): T | undefined => (typeof src === "function" ? (src() ?? undefined) : src);
 
   const findSourceWithKey = (key: PropertyKey) => {
     for (let i = sources.length - 1; i >= 0; i--) {

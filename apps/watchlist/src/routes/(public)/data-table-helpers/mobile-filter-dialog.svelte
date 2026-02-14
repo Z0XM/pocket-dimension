@@ -1,136 +1,118 @@
 <script lang="ts">
-  import {
-    CheckIcon,
-    ChevronDownIcon,
-    ChevronUpIcon,
-    XIcon,
-  } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Input } from "$lib/components/ui/input";
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon, XIcon } from "@lucide/svelte";
+import { Button } from "$lib/components/ui/button";
+import * as Dialog from "$lib/components/ui/dialog";
+import { Input } from "$lib/components/ui/input";
 
-  interface Props {
-    open?: boolean;
-    languageOptions: string[];
-    tagOptions: string[];
-    typeOptions: string[];
-    selectedLanguages: string[];
-    selectedTags: string[];
-    selectedTypes: string[];
-    onApply: (filters: {
-      language: string[];
-      tags: string[];
-      type: string[];
-    }) => void;
+interface Props {
+  open?: boolean;
+  languageOptions: string[];
+  tagOptions: string[];
+  typeOptions: string[];
+  selectedLanguages: string[];
+  selectedTags: string[];
+  selectedTypes: string[];
+  onApply: (filters: { language: string[]; tags: string[]; type: string[] }) => void;
+}
+
+let { open = $bindable(false), languageOptions, tagOptions, typeOptions, selectedLanguages, selectedTags, selectedTypes, onApply }: Props = $props();
+
+// Temporary filter state
+let tempLanguages = $state<string[]>([]);
+let tempTags = $state<string[]>([]);
+let tempTypes = $state<string[]>([]);
+
+// Search states
+let languageSearch = $state("");
+let tagSearch = $state("");
+let typeSearch = $state("");
+
+// Collapsible states
+let languageExpanded = $state(false);
+let tagsExpanded = $state(false);
+let typeExpanded = $state(false);
+
+// Reset temp filters when dialog opens
+$effect(() => {
+  if (open) {
+    tempLanguages = [...selectedLanguages];
+    tempTags = [...selectedTags];
+    tempTypes = [...selectedTypes];
+    languageSearch = "";
+    tagSearch = "";
+    typeSearch = "";
+    // Auto-expand sections that have selected values
+    languageExpanded = selectedLanguages.length > 0;
+    tagsExpanded = selectedTags.length > 0;
+    typeExpanded = selectedTypes.length > 0;
   }
+});
 
-  let {
-    open = $bindable(false),
-    languageOptions,
-    tagOptions,
-    typeOptions,
-    selectedLanguages,
-    selectedTags,
-    selectedTypes,
-    onApply,
-  }: Props = $props();
+// Filtered options based on search
+const filteredLanguages = $derived.by(() => {
+  if (!languageSearch.trim()) return languageOptions;
+  const search = languageSearch.toLowerCase();
+  return languageOptions.filter((opt) => opt.toLowerCase().includes(search));
+});
 
-  // Temporary filter state
-  let tempLanguages = $state<string[]>([]);
-  let tempTags = $state<string[]>([]);
-  let tempTypes = $state<string[]>([]);
+const filteredTags = $derived.by(() => {
+  if (!tagSearch.trim()) return tagOptions;
+  const search = tagSearch.toLowerCase();
+  return tagOptions.filter((opt) => opt.toLowerCase().includes(search));
+});
 
-  // Search states
-  let languageSearch = $state("");
-  let tagSearch = $state("");
-  let typeSearch = $state("");
+const filteredTypes = $derived.by(() => {
+  if (!typeSearch.trim()) return typeOptions;
+  const search = typeSearch.toLowerCase();
+  return typeOptions.filter((opt) => opt.toLowerCase().includes(search));
+});
 
-  // Collapsible states
-  let languageExpanded = $state(false);
-  let tagsExpanded = $state(false);
-  let typeExpanded = $state(false);
+function toggleLanguage(value: string) {
+  if (tempLanguages.includes(value)) {
+    tempLanguages = tempLanguages.filter((v) => v !== value);
+  } else {
+    tempLanguages = [...tempLanguages, value];
+  }
+}
 
-  // Reset temp filters when dialog opens
-  $effect(() => {
-    if (open) {
-      tempLanguages = [...selectedLanguages];
-      tempTags = [...selectedTags];
-      tempTypes = [...selectedTypes];
-      languageSearch = "";
-      tagSearch = "";
-      typeSearch = "";
-      // Auto-expand sections that have selected values
-      languageExpanded = selectedLanguages.length > 0;
-      tagsExpanded = selectedTags.length > 0;
-      typeExpanded = selectedTypes.length > 0;
-    }
+function toggleTag(value: string) {
+  if (tempTags.includes(value)) {
+    tempTags = tempTags.filter((v) => v !== value);
+  } else {
+    tempTags = [...tempTags, value];
+  }
+}
+
+function toggleType(value: string) {
+  if (tempTypes.includes(value)) {
+    tempTypes = tempTypes.filter((v) => v !== value);
+  } else {
+    tempTypes = [...tempTypes, value];
+  }
+}
+
+function handleApply() {
+  onApply({
+    language: tempLanguages,
+    tags: tempTags,
+    type: tempTypes,
   });
+  open = false;
+}
 
-  // Filtered options based on search
-  const filteredLanguages = $derived.by(() => {
-    if (!languageSearch.trim()) return languageOptions;
-    const search = languageSearch.toLowerCase();
-    return languageOptions.filter((opt) => opt.toLowerCase().includes(search));
-  });
+function handleClear() {
+  tempLanguages = [];
+  tempTags = [];
+  tempTypes = [];
+}
 
-  const filteredTags = $derived.by(() => {
-    if (!tagSearch.trim()) return tagOptions;
-    const search = tagSearch.toLowerCase();
-    return tagOptions.filter((opt) => opt.toLowerCase().includes(search));
-  });
-
-  const filteredTypes = $derived.by(() => {
-    if (!typeSearch.trim()) return typeOptions;
-    const search = typeSearch.toLowerCase();
-    return typeOptions.filter((opt) => opt.toLowerCase().includes(search));
-  });
-
-  function toggleLanguage(value: string) {
-    if (tempLanguages.includes(value)) {
-      tempLanguages = tempLanguages.filter((v) => v !== value);
-    } else {
-      tempLanguages = [...tempLanguages, value];
-    }
+function formatOption(option: string): string {
+  if (!option) return option;
+  if (option.includes("_")) {
+    return option.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
-
-  function toggleTag(value: string) {
-    if (tempTags.includes(value)) {
-      tempTags = tempTags.filter((v) => v !== value);
-    } else {
-      tempTags = [...tempTags, value];
-    }
-  }
-
-  function toggleType(value: string) {
-    if (tempTypes.includes(value)) {
-      tempTypes = tempTypes.filter((v) => v !== value);
-    } else {
-      tempTypes = [...tempTypes, value];
-    }
-  }
-
-  function handleApply() {
-    onApply({
-      language: tempLanguages,
-      tags: tempTags,
-      type: tempTypes,
-    });
-    open = false;
-  }
-
-  function handleClear() {
-    tempLanguages = [];
-    tempTags = [];
-    tempTypes = [];
-  }
-
-  function formatOption(option: string): string {
-    if (!option) return option;
-    if (option.includes("_")) {
-      return option.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    }
-    return option.charAt(0).toUpperCase() + option.slice(1);
-  }
+  return option.charAt(0).toUpperCase() + option.slice(1);
+}
 </script>
 
 <Dialog.Root bind:open>

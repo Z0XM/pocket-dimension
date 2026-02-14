@@ -20,7 +20,7 @@
     "db:migrate": "./scripts/turbo-no-prefix.sh run db:migrate --filter=@pocket-dimension/db",
     "db:studio": "./scripts/turbo-no-prefix.sh run db:studio --filter=@pocket-dimension/db",
     "lint": "./scripts/turbo-no-prefix.sh run lint",
-    "format": "biome format --write .",
+    "format": "",
     "format:check": "biome format .",
     "check": "biome check .",
     "typecheck": "turbo run typecheck",

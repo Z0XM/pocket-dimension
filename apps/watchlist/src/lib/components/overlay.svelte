@@ -1,467 +1,446 @@
 <script lang="ts">
-  import {
-    CheckIcon,
-    ChevronDownIcon,
-    CircleQuestionMarkIcon,
-    CopyIcon,
-    LoaderCircleIcon,
-    LogInIcon,
-    MenuIcon,
-    PenLineIcon,
-    PlusIcon,
-    StarIcon,
-    TrashIcon,
-    UserRoundIcon,
-    XIcon,
-  } from "@lucide/svelte";
-  import { toast } from "svelte-sonner";
-  import { goto } from "$app/navigation";
-  import { page } from "$app/state";
-  import LogoutButton from "$components/logout-button.svelte";
-  import * as AlertDialog from "$components/ui/alert-dialog";
-  import { Badge } from "$components/ui/badge";
-  import { Button } from "$components/ui/button";
-  import * as DropdownMenu from "$components/ui/dropdown-menu";
-  import { Input } from "$components/ui/input";
-  import icon from "$lib/assets/icon.svg";
-  import { authClient } from "$lib/auth-client";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  CircleQuestionMarkIcon,
+  CopyIcon,
+  LoaderCircleIcon,
+  LogInIcon,
+  MenuIcon,
+  PenLineIcon,
+  PlusIcon,
+  StarIcon,
+  TrashIcon,
+  UserRoundIcon,
+  XIcon,
+} from "@lucide/svelte";
+import { toast } from "svelte-sonner";
+import { goto } from "$app/navigation";
+import { page } from "$app/state";
+import LogoutButton from "$components/logout-button.svelte";
+import * as AlertDialog from "$components/ui/alert-dialog";
+import { Badge } from "$components/ui/badge";
+import { Button } from "$components/ui/button";
+import * as DropdownMenu from "$components/ui/dropdown-menu";
+import { Input } from "$components/ui/input";
+import icon from "$lib/assets/icon.svg";
+import { authClient } from "$lib/auth-client";
 
-  const session = authClient.useSession();
+const session = authClient.useSession();
 
-  let isPending = $derived($session.isPending);
-  let user = $derived($session.data?.user);
-  let role = $derived((user as any)?.role as "admin" | "contributor" | "user");
-  let isEmailVerified = $derived(!!(user as any)?.emailVerified);
+let isPending = $derived($session.isPending);
+let user = $derived($session.data?.user);
+let role = $derived((user as any)?.role as "admin" | "contributor" | "user");
+let isEmailVerified = $derived(!!(user as any)?.emailVerified);
 
-  // Mobile detection - check if window width is less than 768px (md breakpoint)
-  let isMobile = $state(false);
+// Mobile detection - check if window width is less than 768px (md breakpoint)
+let isMobile = $state(false);
 
-  // Update mobile state on mount and resize
-  $effect(() => {
-    const checkMobile = () => {
-      isMobile = window.innerWidth < 768;
-    };
-
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-
-    return () => {
-      window.removeEventListener("resize", checkMobile);
-    };
-  });
-
-  // Effective role: force "mobile" role on mobile devices
-  const effectiveRole = $derived(isMobile ? "mobile" : role);
-
-  let mobileMenuOpen = $state(false);
-
-  type View = {
-    id: string;
-    name: string;
-    href: string;
-    isFavorite: boolean;
-    favoriteDate: Date | string | null;
-    createdAt: Date | string;
-    updatedAt: Date | string;
-    isDefault?: boolean; // Mark default views
+// Update mobile state on mount and resize
+$effect(() => {
+  const checkMobile = () => {
+    isMobile = window.innerWidth < 768;
   };
 
-  // Default views available to all users
-  const defaultViews: View[] = [
-    {
-      id: "default-watchlist",
-      name: "Watchlist",
-      href: "/",
-      isFavorite: false,
-      favoriteDate: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isDefault: true,
-    },
-    {
-      id: "default-watch-later",
-      name: "Watch Later",
-      href: "/?filterProgress=watch_later",
-      isFavorite: false,
-      favoriteDate: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isDefault: true,
-    },
-    {
-      id: "default-watching",
-      name: "Watching",
-      href: "/?filterProgress=watching",
-      isFavorite: false,
-      favoriteDate: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isDefault: true,
-    },
-  ];
+  checkMobile();
+  window.addEventListener("resize", checkMobile);
 
-  let views = $state<View[]>([]);
-  let isLoadingViews = $state(false);
-  let selectedViewName = $state<string | null>(defaultViews[0].name);
-  let isManualSelection = $state(false); // Track manual selections to prevent override
-  let isEditingName = $state(false);
-  let editedName = $state("");
-  let nameInputRef: HTMLInputElement | null = $state(null);
-  let deleteDialogOpen = $state(false);
-  let viewToDelete = $state<string | null>(null);
-  let selectedView = $derived.by(() => {
-    const allViews = [...defaultViews, ...views];
-    return allViews.find((v) => v.name === selectedViewName) || defaultViews[0];
+  return () => {
+    window.removeEventListener("resize", checkMobile);
+  };
+});
+
+// Effective role: force "mobile" role on mobile devices
+const effectiveRole = $derived(isMobile ? "mobile" : role);
+
+let mobileMenuOpen = $state(false);
+
+type View = {
+  id: string;
+  name: string;
+  href: string;
+  isFavorite: boolean;
+  favoriteDate: Date | string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  isDefault?: boolean; // Mark default views
+};
+
+// Default views available to all users
+const defaultViews: View[] = [
+  {
+    id: "default-watchlist",
+    name: "Watchlist",
+    href: "/",
+    isFavorite: false,
+    favoriteDate: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isDefault: true,
+  },
+  {
+    id: "default-watch-later",
+    name: "Watch Later",
+    href: "/?filterProgress=watch_later",
+    isFavorite: false,
+    favoriteDate: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isDefault: true,
+  },
+  {
+    id: "default-watching",
+    name: "Watching",
+    href: "/?filterProgress=watching",
+    isFavorite: false,
+    favoriteDate: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isDefault: true,
+  },
+];
+
+let views = $state<View[]>([]);
+let isLoadingViews = $state(false);
+let selectedViewName = $state<string | null>(defaultViews[0].name);
+let isManualSelection = $state(false); // Track manual selections to prevent override
+let isEditingName = $state(false);
+let editedName = $state("");
+let nameInputRef: HTMLInputElement | null = $state(null);
+let deleteDialogOpen = $state(false);
+let viewToDelete = $state<string | null>(null);
+let selectedView = $derived.by(() => {
+  const allViews = [...defaultViews, ...views];
+  return allViews.find((v) => v.name === selectedViewName) || defaultViews[0];
+});
+
+// Computed: all views excluding selected view
+let allViewsExcludingSelected = $derived.by(() => {
+  return [...defaultViews, ...views].filter((v) => v.name !== selectedViewName);
+});
+
+// Computed: default views and favorite views to display (excluding selected)
+let defaultAndFavoriteViews = $derived.by(() => {
+  const allViews = [...defaultViews, ...views];
+  return allViews.filter((v) => {
+    // Exclude selected view
+    if (v.name === selectedViewName) return false;
+    // Include default views
+    if (v.isDefault) return true;
+    // Include favorite views
+    if (v.isFavorite) return true;
+    return false;
   });
+});
 
-  // Computed: all views excluding selected view
-  let allViewsExcludingSelected = $derived.by(() => {
-    return [...defaultViews, ...views].filter(
-      (v) => v.name !== selectedViewName,
-    );
+// Computed: remaining views (non-default, non-favorite, excluding selected)
+let remainingViews = $derived.by(() => {
+  const allViews = [...defaultViews, ...views];
+  return allViews.filter((v) => {
+    // Exclude selected view
+    if (v.name === selectedViewName) return false;
+    // Exclude default views
+    if (v.isDefault) return false;
+    // Exclude favorite views
+    if (v.isFavorite) return false;
+    return true;
   });
+});
 
-  // Computed: default views and favorite views to display (excluding selected)
-  let defaultAndFavoriteViews = $derived.by(() => {
-    const allViews = [...defaultViews, ...views];
-    return allViews.filter((v) => {
-      // Exclude selected view
-      if (v.name === selectedViewName) return false;
-      // Include default views
-      if (v.isDefault) return true;
-      // Include favorite views
-      if (v.isFavorite) return true;
-      return false;
-    });
-  });
-
-  // Computed: remaining views (non-default, non-favorite, excluding selected)
-  let remainingViews = $derived.by(() => {
-    const allViews = [...defaultViews, ...views];
-    return allViews.filter((v) => {
-      // Exclude selected view
-      if (v.name === selectedViewName) return false;
-      // Exclude default views
-      if (v.isDefault) return false;
-      // Exclude favorite views
-      if (v.isFavorite) return false;
-      return true;
-    });
-  });
-
-  // Fetch views on mount and when user changes
-  $effect(() => {
-    if (user && !isPending) {
-      fetchViews();
-    } else if (!user) {
-      views = [];
-    }
-  });
-
-  async function fetchViews() {
-    if (!user || !isEmailVerified) return;
-
-    isLoadingViews = true;
-    try {
-      const response = await fetch("/api/views");
-      if (response.ok) {
-        const data = await response.json();
-        views = data.views || [];
-
-        // Determine selected view based on current URL (only if not manually selected)
-        if (!isManualSelection) {
-          const allViews = [...defaultViews, ...views];
-          const currentUrl = page.url.search;
-          const currentPath = page.url.pathname;
-
-          // Check if current URL matches a default view or user view
-          const matchingView = allViews.find((v) => {
-            if (v.href === "/" && currentPath === "/" && !currentUrl)
-              return true;
-            return v.href === `/${currentUrl}`;
-          });
-
-          selectedViewName = matchingView?.name || defaultViews[0].name;
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching views:", error);
-    } finally {
-      isLoadingViews = false;
-    }
+// Fetch views on mount and when user changes
+$effect(() => {
+  if (user && !isPending) {
+    fetchViews();
+  } else if (!user) {
+    views = [];
   }
+});
 
-  function isDefaultView(viewName: string | null): boolean {
-    if (!viewName) return false;
-    return defaultViews.some((v) => v.name === viewName);
-  }
+async function fetchViews() {
+  if (!user || !isEmailVerified) return;
 
-  async function handleSave() {
-    if (!user || !selectedViewName || isDefaultView(selectedViewName)) return;
+  isLoadingViews = true;
+  try {
+    const response = await fetch("/api/views");
+    if (response.ok) {
+      const data = await response.json();
+      views = data.views || [];
 
-    // Extract current filters from URL
-    const currentUrl = page.url;
-    const filterLanguage = currentUrl.searchParams.get("filterLanguage") || "";
-    const filterTags = currentUrl.searchParams.get("filterTags") || "";
-    const filterProgress = currentUrl.searchParams.get("filterProgress") || "";
-    const filterType = currentUrl.searchParams.get("filterType") || "";
-    const sortBy = currentUrl.searchParams.get("sortBy") || "";
-    const sortOrder = currentUrl.searchParams.get("sortOrder") || "";
-    const q = currentUrl.searchParams.get("q") || "";
+      // Determine selected view based on current URL (only if not manually selected)
+      if (!isManualSelection) {
+        const allViews = [...defaultViews, ...views];
+        const currentUrl = page.url.search;
+        const currentPath = page.url.pathname;
 
-    // Build filters object
-    const filters: Record<string, string> = {};
-    if (filterLanguage) filters.filterLanguage = filterLanguage;
-    if (filterTags) filters.filterTags = filterTags;
-    if (filterProgress) filters.filterProgress = filterProgress;
-    if (filterType) filters.filterType = filterType;
-    if (sortBy) filters.sortBy = sortBy;
-    if (sortOrder) filters.sortOrder = sortOrder;
-    if (q) filters.q = q;
+        // Check if current URL matches a default view or user view
+        const matchingView = allViews.find((v) => {
+          if (v.href === "/" && currentPath === "/" && !currentUrl) return true;
+          return v.href === `/${currentUrl}`;
+        });
 
-    try {
-      const response = await fetch(
-        `/api/views/${encodeURIComponent(selectedViewName)}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filters }),
-        },
-      );
-
-      if (response.ok) {
-        await fetchViews();
-        toast.success("View saved successfully");
-      } else {
-        const error = await response.json();
-        console.error("Error saving view:", error);
-        toast.error(error.error || "Failed to save view");
+        selectedViewName = matchingView?.name || defaultViews[0].name;
       }
-    } catch (error) {
+    }
+  } catch (error) {
+    console.error("Error fetching views:", error);
+  } finally {
+    isLoadingViews = false;
+  }
+}
+
+function isDefaultView(viewName: string | null): boolean {
+  if (!viewName) return false;
+  return defaultViews.some((v) => v.name === viewName);
+}
+
+async function handleSave() {
+  if (!user || !selectedViewName || isDefaultView(selectedViewName)) return;
+
+  // Extract current filters from URL
+  const currentUrl = page.url;
+  const filterLanguage = currentUrl.searchParams.get("filterLanguage") || "";
+  const filterTags = currentUrl.searchParams.get("filterTags") || "";
+  const filterProgress = currentUrl.searchParams.get("filterProgress") || "";
+  const filterType = currentUrl.searchParams.get("filterType") || "";
+  const sortBy = currentUrl.searchParams.get("sortBy") || "";
+  const sortOrder = currentUrl.searchParams.get("sortOrder") || "";
+  const q = currentUrl.searchParams.get("q") || "";
+
+  // Build filters object
+  const filters: Record<string, string> = {};
+  if (filterLanguage) filters.filterLanguage = filterLanguage;
+  if (filterTags) filters.filterTags = filterTags;
+  if (filterProgress) filters.filterProgress = filterProgress;
+  if (filterType) filters.filterType = filterType;
+  if (sortBy) filters.sortBy = sortBy;
+  if (sortOrder) filters.sortOrder = sortOrder;
+  if (q) filters.q = q;
+
+  try {
+    const response = await fetch(`/api/views/${encodeURIComponent(selectedViewName)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filters }),
+    });
+
+    if (response.ok) {
+      await fetchViews();
+      toast.success("View saved successfully");
+    } else {
+      const error = await response.json();
       console.error("Error saving view:", error);
-      toast.error("Failed to save view");
+      toast.error(error.error || "Failed to save view");
     }
+  } catch (error) {
+    console.error("Error saving view:", error);
+    toast.error("Failed to save view");
   }
+}
 
-  async function handleCreate() {
-    if (!user) return;
+async function handleCreate() {
+  if (!user) return;
 
-    // Build URL with current filters
-    const currentUrl = page.url.toString();
-    const urlObj = new URL(currentUrl);
+  // Build URL with current filters
+  const currentUrl = page.url.toString();
+  const urlObj = new URL(currentUrl);
 
-    try {
-      const response = await fetch(`/api/views${urlObj.search}`, {
-        method: "POST",
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        await fetchViews();
-        toast.success(
-          `View "${data.view?.name || "View"}" created successfully`,
-        );
-      } else {
-        const error = await response.json();
-        console.error("Error creating view:", error);
-        toast.error(error.error || "Failed to create view");
-      }
-    } catch (error) {
-      console.error("Error creating view:", error);
-      toast.error("Failed to create view");
-    }
-  }
-
-  function openDeleteDialog() {
-    if (!user || !selectedViewName || isDefaultView(selectedViewName)) return;
-    viewToDelete = selectedViewName;
-    deleteDialogOpen = true;
-  }
-
-  async function handleDelete() {
-    if (!user || !viewToDelete || isDefaultView(viewToDelete)) return;
-
-    const viewNameToDelete = viewToDelete;
-
-    try {
-      const response = await fetch(
-        `/api/views/${encodeURIComponent(viewNameToDelete)}`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      if (response.ok) {
-        selectedViewName = defaultViews[0].name;
-        await fetchViews();
-        deleteDialogOpen = false;
-        viewToDelete = null;
-        toast.success(`View "${viewNameToDelete}" deleted successfully`);
-      } else {
-        const error = await response.json();
-        console.error("Error deleting view:", error);
-        toast.error(error.error || "Failed to delete view");
-      }
-    } catch (error) {
-      console.error("Error deleting view:", error);
-      toast.error("Failed to delete view");
-    }
-  }
-
-  function startEditingName() {
-    if (!selectedViewName || isDefaultView(selectedViewName)) return;
-    isEditingName = true;
-    editedName = selectedViewName;
-    // Focus input after it's rendered
-    setTimeout(() => {
-      nameInputRef?.focus();
-      nameInputRef?.select();
-    }, 0);
-  }
-
-  function cancelEditingName() {
-    isEditingName = false;
-    editedName = "";
-  }
-
-  async function saveName() {
-    if (
-      !user ||
-      !selectedViewName ||
-      isDefaultView(selectedViewName) ||
-      !editedName.trim()
-    ) {
-      cancelEditingName();
-      return;
-    }
-
-    const trimmedName = editedName.trim();
-
-    // Don't update if name hasn't changed
-    if (trimmedName === selectedViewName) {
-      cancelEditingName();
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `/api/views/${encodeURIComponent(selectedViewName)}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: trimmedName }),
-        },
-      );
-
-      if (response.ok) {
-        selectedViewName = trimmedName;
-        await fetchViews();
-        isEditingName = false;
-        editedName = "";
-        toast.success("View name updated successfully");
-      } else {
-        const error = await response.json();
-        console.error("Error updating view name:", error);
-        toast.error(error.error || "Failed to update view name");
-      }
-    } catch (error) {
-      console.error("Error updating view name:", error);
-      toast.error("Failed to update view name");
-    }
-  }
-
-  function handleNameInputKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      saveName();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      cancelEditingName();
-    }
-  }
-
-  function handleClear() {
-    if (!selectedView) return;
-    // Navigate to the view's original href to restore filters
-    isManualSelection = true;
-    goto(selectedView.href);
-  }
-
-  async function handleCopyUrl() {
-    try {
-      const currentUrl = window.location.href;
-      await navigator.clipboard.writeText(currentUrl);
-      toast.success("Copied!");
-    } catch (error) {
-      console.error("Error copying URL to clipboard:", error);
-      // Fallback for browsers that don't support clipboard API
-      const textArea = document.createElement("textarea");
-      textArea.value = window.location.href;
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
-      document.body.appendChild(textArea);
-      textArea.select();
-      try {
-        document.execCommand("copy");
-        toast.success("Copied!");
-      } catch (err) {
-        console.error("Fallback copy failed:", err);
-        toast.error("Failed to copy URL");
-      }
-      document.body.removeChild(textArea);
-    }
-  }
-
-  // Update selected view when URL changes (but respect manual selections)
-  $effect(() => {
-    const allViews = [...defaultViews, ...views];
-    const currentUrl = page.url.search;
-    const currentPath = page.url.pathname;
-
-    // Check if current URL matches a default view or user view
-    const matchingView = allViews.find((v) => {
-      // Normalize hrefs for comparison
-      const viewHref = v.href === "/" ? "/" : v.href;
-      const currentHref = currentUrl ? `/${currentUrl}` : "/";
-
-      // Match root path (no query params)
-      if (viewHref === "/" && currentPath === "/" && !currentUrl) return true;
-
-      // Match with query params
-      if (viewHref.startsWith("/?")) {
-        return viewHref === currentHref;
-      }
-
-      // Match exact path
-      return viewHref === currentPath || viewHref === currentHref;
+  try {
+    const response = await fetch(`/api/views${urlObj.search}`, {
+      method: "POST",
     });
 
-    // Only update if:
-    // 1. We found a matching view AND
-    // 2. Either it's not a manual selection OR the matching view is different from current selection
-    if (matchingView) {
-      // If manual selection is active, check if the URL actually matches the selected view
-      if (isManualSelection) {
-        const selectedViewObj = allViews.find(
-          (v) => v.name === selectedViewName,
-        );
-        // If the URL matches the manually selected view, clear the flag
-        if (selectedViewObj && matchingView.name === selectedViewObj.name) {
-          isManualSelection = false;
-        }
-        // Otherwise, respect the manual selection for a bit longer
-        return;
-      }
-
-      // Update selection if it's different
-      if (matchingView.name !== selectedViewName) {
-        selectedViewName = matchingView.name;
-      }
-    } else if (!isManualSelection) {
-      // If no match and not manual selection, default to Watchlist
-      selectedViewName = defaultViews[0].name;
+    if (response.ok) {
+      const data = await response.json();
+      await fetchViews();
+      toast.success(`View "${data.view?.name || "View"}" created successfully`);
+    } else {
+      const error = await response.json();
+      console.error("Error creating view:", error);
+      toast.error(error.error || "Failed to create view");
     }
+  } catch (error) {
+    console.error("Error creating view:", error);
+    toast.error("Failed to create view");
+  }
+}
+
+function openDeleteDialog() {
+  if (!user || !selectedViewName || isDefaultView(selectedViewName)) return;
+  viewToDelete = selectedViewName;
+  deleteDialogOpen = true;
+}
+
+async function handleDelete() {
+  if (!user || !viewToDelete || isDefaultView(viewToDelete)) return;
+
+  const viewNameToDelete = viewToDelete;
+
+  try {
+    const response = await fetch(`/api/views/${encodeURIComponent(viewNameToDelete)}`, {
+      method: "DELETE",
+    });
+
+    if (response.ok) {
+      selectedViewName = defaultViews[0].name;
+      await fetchViews();
+      deleteDialogOpen = false;
+      viewToDelete = null;
+      toast.success(`View "${viewNameToDelete}" deleted successfully`);
+    } else {
+      const error = await response.json();
+      console.error("Error deleting view:", error);
+      toast.error(error.error || "Failed to delete view");
+    }
+  } catch (error) {
+    console.error("Error deleting view:", error);
+    toast.error("Failed to delete view");
+  }
+}
+
+function startEditingName() {
+  if (!selectedViewName || isDefaultView(selectedViewName)) return;
+  isEditingName = true;
+  editedName = selectedViewName;
+  // Focus input after it's rendered
+  setTimeout(() => {
+    nameInputRef?.focus();
+    nameInputRef?.select();
+  }, 0);
+}
+
+function cancelEditingName() {
+  isEditingName = false;
+  editedName = "";
+}
+
+async function saveName() {
+  if (!user || !selectedViewName || isDefaultView(selectedViewName) || !editedName.trim()) {
+    cancelEditingName();
+    return;
+  }
+
+  const trimmedName = editedName.trim();
+
+  // Don't update if name hasn't changed
+  if (trimmedName === selectedViewName) {
+    cancelEditingName();
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/views/${encodeURIComponent(selectedViewName)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: trimmedName }),
+    });
+
+    if (response.ok) {
+      selectedViewName = trimmedName;
+      await fetchViews();
+      isEditingName = false;
+      editedName = "";
+      toast.success("View name updated successfully");
+    } else {
+      const error = await response.json();
+      console.error("Error updating view name:", error);
+      toast.error(error.error || "Failed to update view name");
+    }
+  } catch (error) {
+    console.error("Error updating view name:", error);
+    toast.error("Failed to update view name");
+  }
+}
+
+function handleNameInputKeydown(e: KeyboardEvent) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    saveName();
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    cancelEditingName();
+  }
+}
+
+function handleClear() {
+  if (!selectedView) return;
+  // Navigate to the view's original href to restore filters
+  isManualSelection = true;
+  goto(selectedView.href);
+}
+
+async function handleCopyUrl() {
+  try {
+    const currentUrl = window.location.href;
+    await navigator.clipboard.writeText(currentUrl);
+    toast.success("Copied!");
+  } catch (error) {
+    console.error("Error copying URL to clipboard:", error);
+    // Fallback for browsers that don't support clipboard API
+    const textArea = document.createElement("textarea");
+    textArea.value = window.location.href;
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand("copy");
+      toast.success("Copied!");
+    } catch (err) {
+      console.error("Fallback copy failed:", err);
+      toast.error("Failed to copy URL");
+    }
+    document.body.removeChild(textArea);
+  }
+}
+
+// Update selected view when URL changes (but respect manual selections)
+$effect(() => {
+  const allViews = [...defaultViews, ...views];
+  const currentUrl = page.url.search;
+  const currentPath = page.url.pathname;
+
+  // Check if current URL matches a default view or user view
+  const matchingView = allViews.find((v) => {
+    // Normalize hrefs for comparison
+    const viewHref = v.href === "/" ? "/" : v.href;
+    const currentHref = currentUrl ? `/${currentUrl}` : "/";
+
+    // Match root path (no query params)
+    if (viewHref === "/" && currentPath === "/" && !currentUrl) return true;
+
+    // Match with query params
+    if (viewHref.startsWith("/?")) {
+      return viewHref === currentHref;
+    }
+
+    // Match exact path
+    return viewHref === currentPath || viewHref === currentHref;
   });
+
+  // Only update if:
+  // 1. We found a matching view AND
+  // 2. Either it's not a manual selection OR the matching view is different from current selection
+  if (matchingView) {
+    // If manual selection is active, check if the URL actually matches the selected view
+    if (isManualSelection) {
+      const selectedViewObj = allViews.find((v) => v.name === selectedViewName);
+      // If the URL matches the manually selected view, clear the flag
+      if (selectedViewObj && matchingView.name === selectedViewObj.name) {
+        isManualSelection = false;
+      }
+      // Otherwise, respect the manual selection for a bit longer
+      return;
+    }
+
+    // Update selection if it's different
+    if (matchingView.name !== selectedViewName) {
+      selectedViewName = matchingView.name;
+    }
+  } else if (!isManualSelection) {
+    // If no match and not manual selection, default to Watchlist
+    selectedViewName = defaultViews[0].name;
+  }
+});
 </script>
 
 <div

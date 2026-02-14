@@ -1,1031 +1,942 @@
 <script lang="ts" generics="TData, TValue">
-  import {
-    ArrowDownIcon,
-    ArrowUpIcon,
-    CheckIcon,
-    Columns2Icon,
-    FilterIcon,
-    GripVerticalIcon,
-    ListFilterIcon,
-    PencilIcon,
-    PlusIcon,
-    RotateCcwIcon,
-    Trash2Icon,
-    XIcon,
-  } from "@lucide/svelte";
-  import {
-    type ColumnDef,
-    getCoreRowModel,
-    type SortingState,
-    type VisibilityState,
-  } from "@tanstack/table-core";
-  import { setContext, tick } from "svelte";
-  import { dndzone } from "svelte-dnd-action";
-  import { toast } from "svelte-sonner";
-  import { goto } from "$app/navigation";
-  import { page } from "$app/state";
-  import { Button } from "$lib/components/ui/button";
-  import {
-    createSvelteTable,
-    FlexRender,
-  } from "$lib/components/ui/data-table/index.js";
-  import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-  import { Input } from "$lib/components/ui/input";
-  import * as Table from "$lib/components/ui/table/index.js";
-  import type { Watchlist } from "./columns";
-  import AddItemDialog from "./data-table-helpers/add-item-dialog.svelte";
-  import BulkEditPanel from "./data-table-helpers/bulk-edit-panel.svelte";
-  import {
-    type ColumnSettings,
-    useColumnSettings,
-  } from "./data-table-helpers/column-settings.svelte.js";
-  import ConfirmDialog from "./data-table-helpers/confirm-dialog.svelte";
-  import DeleteConfirmationDialog from "./data-table-helpers/delete-confirmation-dialog.svelte";
-  import {
-    createEditModeState,
-    setEditModeContext,
-    type UserRole,
-  } from "./data-table-helpers/edit-mode.svelte.js";
-  import FilterDropdown from "./data-table-helpers/filter-dropdown.svelte";
-  import MobileFilterDialog from "./data-table-helpers/mobile-filter-dialog.svelte";
-  import RowDetailsDialog from "./data-table-helpers/row-details-dialog.svelte";
-  import UnsavedChangesDialog from "./data-table-helpers/unsaved-changes-dialog.svelte";
-  import UserRatingSelector from "./data-table-helpers/user-rating-selector.svelte";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CheckIcon,
+  Columns2Icon,
+  FilterIcon,
+  GripVerticalIcon,
+  ListFilterIcon,
+  PencilIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  Trash2Icon,
+  XIcon,
+} from "@lucide/svelte";
+import { type ColumnDef, getCoreRowModel, type SortingState, type VisibilityState } from "@tanstack/table-core";
+import { setContext, tick } from "svelte";
+import { dndzone } from "svelte-dnd-action";
+import { toast } from "svelte-sonner";
+import { goto } from "$app/navigation";
+import { page } from "$app/state";
+import { Button } from "$lib/components/ui/button";
+import { createSvelteTable, FlexRender } from "$lib/components/ui/data-table/index.js";
+import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+import { Input } from "$lib/components/ui/input";
+import * as Table from "$lib/components/ui/table/index.js";
+import type { Watchlist } from "./columns";
+import AddItemDialog from "./data-table-helpers/add-item-dialog.svelte";
+import BulkEditPanel from "./data-table-helpers/bulk-edit-panel.svelte";
+import { type ColumnSettings, useColumnSettings } from "./data-table-helpers/column-settings.svelte.js";
+import ConfirmDialog from "./data-table-helpers/confirm-dialog.svelte";
+import DeleteConfirmationDialog from "./data-table-helpers/delete-confirmation-dialog.svelte";
+import { createEditModeState, setEditModeContext, type UserRole } from "./data-table-helpers/edit-mode.svelte.js";
+import FilterDropdown from "./data-table-helpers/filter-dropdown.svelte";
+import MobileFilterDialog from "./data-table-helpers/mobile-filter-dialog.svelte";
+import RowDetailsDialog from "./data-table-helpers/row-details-dialog.svelte";
+import UnsavedChangesDialog from "./data-table-helpers/unsaved-changes-dialog.svelte";
+import UserRatingSelector from "./data-table-helpers/user-rating-selector.svelte";
 
-  type DataTableProps<TData, TValue> = {
-    columns: ColumnDef<TData, TValue>[];
-    data: TData[];
-    onSentinelMount: (element: HTMLElement) => void;
-    isLoading?: boolean;
-    userRole?: UserRole;
-    isEmailVerified?: boolean;
-    filterOptions?: {
-      languages: Array<{ language: string }>;
-      tags: Array<{ tag: string }>;
-      progressStatuses: Array<{ my_progress_status: string }>;
-      types: Array<{ type: string }>;
-      allLanguages: Array<{ id: string; language: string }>;
-      allTags: Array<{ tag: string }>;
-      allTypes: Array<{ type: string }>;
-    };
+type DataTableProps<TData, TValue> = {
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+  onSentinelMount: (element: HTMLElement) => void;
+  isLoading?: boolean;
+  userRole?: UserRole;
+  isEmailVerified?: boolean;
+  filterOptions?: {
+    languages: Array<{ language: string }>;
+    tags: Array<{ tag: string }>;
+    progressStatuses: Array<{ my_progress_status: string }>;
+    types: Array<{ type: string }>;
+    allLanguages: Array<{ id: string; language: string }>;
+    allTags: Array<{ tag: string }>;
+    allTypes: Array<{ type: string }>;
+  };
+};
+
+let { data, columns, onSentinelMount, isLoading = false, userRole, isEmailVerified = false, filterOptions }: DataTableProps<TData, TValue> = $props();
+
+// Mobile detection - check if window width is less than 768px (md breakpoint)
+let isMobile = $state(false);
+
+// Update mobile state on mount and resize
+$effect(() => {
+  const checkMobile = () => {
+    isMobile = window.innerWidth < 768;
   };
 
-  let {
-    data,
-    columns,
-    onSentinelMount,
-    isLoading = false,
-    userRole,
-    isEmailVerified = false,
-    filterOptions,
-  }: DataTableProps<TData, TValue> = $props();
+  checkMobile();
+  window.addEventListener("resize", checkMobile);
 
-  // Mobile detection - check if window width is less than 768px (md breakpoint)
-  let isMobile = $state(false);
+  return () => {
+    window.removeEventListener("resize", checkMobile);
+  };
+});
 
-  // Update mobile state on mount and resize
-  $effect(() => {
-    const checkMobile = () => {
-      isMobile = window.innerWidth < 768;
-    };
+// Scroll to top functionality
+let showScrollToTop = $state(false);
+const scrollThreshold = 300; // Show button after scrolling 300px
+let scrollContainer: HTMLElement | null = $state(null);
 
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
+// Track scroll position on the table container
+$effect(() => {
+  if (!renderTable) return;
 
-    return () => {
-      window.removeEventListener("resize", checkMobile);
-    };
-  });
+  // Find the scroll container (the div with data-slot="table-container")
+  const findScrollContainer = async () => {
+    await tick(); // Wait for DOM to be ready
+    return document.querySelector('[data-slot="table-container"]') as HTMLElement;
+  };
 
-  // Scroll to top functionality
-  let showScrollToTop = $state(false);
-  const scrollThreshold = 300; // Show button after scrolling 300px
-  let scrollContainer: HTMLElement | null = $state(null);
+  let container: HTMLElement | null = null;
+  let scrollHandler: (() => void) | null = null;
 
-  // Track scroll position on the table container
-  $effect(() => {
-    if (!renderTable) return;
+  // Initialize scroll tracking
+  findScrollContainer().then((foundContainer) => {
+    if (!foundContainer) return;
 
-    // Find the scroll container (the div with data-slot="table-container")
-    const findScrollContainer = async () => {
-      await tick(); // Wait for DOM to be ready
-      return document.querySelector(
-        '[data-slot="table-container"]',
-      ) as HTMLElement;
-    };
+    container = foundContainer;
+    scrollContainer = container;
 
-    let container: HTMLElement | null = null;
-    let scrollHandler: (() => void) | null = null;
-
-    // Initialize scroll tracking
-    findScrollContainer().then((foundContainer) => {
-      if (!foundContainer) return;
-
-      container = foundContainer;
-      scrollContainer = container;
-
-      scrollHandler = () => {
-        if (container) {
-          showScrollToTop = container.scrollTop > scrollThreshold;
-        }
-      };
-
-      container.addEventListener("scroll", scrollHandler, { passive: true });
-      scrollHandler(); // Check initial scroll position
-    });
-
-    return () => {
-      if (container && scrollHandler) {
-        container.removeEventListener("scroll", scrollHandler);
+    scrollHandler = () => {
+      if (container) {
+        showScrollToTop = container.scrollTop > scrollThreshold;
       }
     };
+
+    container.addEventListener("scroll", scrollHandler, { passive: true });
+    scrollHandler(); // Check initial scroll position
   });
 
-  // Scroll to top function
-  function scrollToTop() {
-    const container =
-      scrollContainer ||
-      (document.querySelector('[data-slot="table-container"]') as HTMLElement);
-    if (container) {
-      container.scrollTo({ top: 0, behavior: "smooth" });
+  return () => {
+    if (container && scrollHandler) {
+      container.removeEventListener("scroll", scrollHandler);
     }
+  };
+});
+
+// Scroll to top function
+function scrollToTop() {
+  const container = scrollContainer || (document.querySelector('[data-slot="table-container"]') as HTMLElement);
+  if (container) {
+    container.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
+// Effective role: force "mobile" role on mobile devices
+const effectiveUserRole = $derived(isMobile ? "mobile" : userRole);
+
+// Create and provide edit mode context
+const editMode = createEditModeState();
+setEditModeContext(editMode);
+
+// Provide edit options context for editable cells
+
+setContext("editOptions", {
+  languages: () => filterOptions?.allLanguages ?? [],
+  types: () => filterOptions?.allTypes.map((t) => t.type) ?? [],
+  tags: () => filterOptions?.allTags.map((t) => t.tag) ?? [],
+  userRole: () => effectiveUserRole,
+});
+
+// Get default column order (excluding index which will always be first)
+let defaultColumnOrder = $derived(
+  columns
+    .map((col) => {
+      if ("id" in col && col.id) return col.id;
+      if ("accessorKey" in col && col.accessorKey) return col.accessorKey as string;
+      return null;
+    })
+    .filter((id): id is string => id !== null)
+);
+
+// Initialize state in component
+let columnSettings = $state<ColumnSettings>({});
+let isSettingsLoaded = $state(false);
+
+// Use hook to manage effects
+const { handleColumnVisibilityChange, handleColumnOrderChange } = useColumnSettings(
+  () => columnSettings,
+  (value) => {
+    columnSettings = value;
+  },
+  () => isSettingsLoaded,
+  (value) => {
+    isSettingsLoaded = value;
+  },
+  () => defaultColumnOrder // Pass as getter for reactivity
+);
+
+// Derive column order from settings (excluding index, which is always first)
+let columnOrder = $derived.by(() => {
+  const settings = columnSettings;
+  if (Object.keys(settings).length === 0) {
+    return defaultColumnOrder;
   }
 
-  // Effective role: force "mobile" role on mobile devices
-  const effectiveUserRole = $derived(isMobile ? "mobile" : userRole);
+  const ordered = Object.keys(settings)
+    .filter((id) => id !== "order")
+    .sort((a, b) => (settings[a]?.order ?? 999) - (settings[b]?.order ?? 999));
 
-  // Create and provide edit mode context
-  const editMode = createEditModeState();
-  setEditModeContext(editMode);
+  return ["order", ...ordered];
+});
 
-  // Provide edit options context for editable cells
-
-  setContext("editOptions", {
-    languages: () => filterOptions?.allLanguages ?? [],
-    types: () => filterOptions?.allTypes.map((t) => t.type) ?? [],
-    tags: () => filterOptions?.allTags.map((t) => t.tag) ?? [],
-    userRole: () => effectiveUserRole,
+// Derive visibility state from settings
+let columnVisibility = $derived.by(() => {
+  const settings = columnSettings;
+  const visibility: VisibilityState = {};
+  Object.keys(settings).forEach((columnId) => {
+    visibility[columnId] = settings[columnId]?.visible !== false;
   });
-
-  // Get default column order (excluding index which will always be first)
-  let defaultColumnOrder = $derived(
-    columns
-      .map((col) => {
-        if ("id" in col && col.id) return col.id;
-        if ("accessorKey" in col && col.accessorKey)
-          return col.accessorKey as string;
-        return null;
-      })
-      .filter((id): id is string => id !== null),
-  );
-
-  // Initialize state in component
-  let columnSettings = $state<ColumnSettings>({});
-  let isSettingsLoaded = $state(false);
-
-  // Use hook to manage effects
-  const { handleColumnVisibilityChange, handleColumnOrderChange } =
-    useColumnSettings(
-      () => columnSettings,
-      (value) => {
-        columnSettings = value;
-      },
-      () => isSettingsLoaded,
-      (value) => {
-        isSettingsLoaded = value;
-      },
-      () => defaultColumnOrder, // Pass as getter for reactivity
-    );
-
-  // Derive column order from settings (excluding index, which is always first)
-  let columnOrder = $derived.by(() => {
-    const settings = columnSettings;
-    if (Object.keys(settings).length === 0) {
-      return defaultColumnOrder;
-    }
-
-    const ordered = Object.keys(settings)
-      .filter((id) => id !== "order")
-      .sort(
-        (a, b) => (settings[a]?.order ?? 999) - (settings[b]?.order ?? 999),
-      );
-
-    return ["order", ...ordered];
-  });
-
-  // Derive visibility state from settings
-  let columnVisibility = $derived.by(() => {
-    const settings = columnSettings;
-    const visibility: VisibilityState = {};
-    Object.keys(settings).forEach((columnId) => {
-      visibility[columnId] = settings[columnId]?.visible !== false;
-    });
-    // Hide avg_rating column when in edit mode
-    if (editMode.isEditMode) {
-      visibility.avg_rating = false;
-    }
-    // On mobile, only show: order, title, my_progress_status, my_rating, avg_rating
-    if (isMobile) {
-      Object.keys(visibility).forEach((columnId) => {
-        if (
-          ![
-            "order",
-            "title",
-            "my_progress_status",
-            "my_rating",
-            "avg_rating",
-          ].includes(columnId)
-        ) {
-          visibility[columnId] = false;
-        }
-      });
-      // Hide select column on mobile (multi-select disabled)
-      visibility.select = false;
-      // Hide actions column on mobile
-      visibility.actions = false;
-    }
-    return visibility;
-  });
-
-  let sentinelRef: HTMLElement | null = $state(null);
-
-  $effect(() => {
-    if (sentinelRef) {
-      onSentinelMount(sentinelRef);
-    }
-  });
-
-  // Parse sorting from URL
-  function parseSortingFromUrl(): SortingState {
-    const sortBy = page.url.searchParams.get("sortBy");
-    const sortOrder = page.url.searchParams.get("sortOrder");
-
-    if (!sortBy) return [];
-
-    const columns = sortBy.split(",");
-    const orders = sortOrder?.split(",") ?? [];
-
-    return columns
-      .map((col, idx) => ({
-        id: col.trim(),
-        desc: orders[idx]?.trim().toLowerCase() === "desc",
-      }))
-      .filter((s) => s.id);
+  // Hide avg_rating column when in edit mode
+  if (editMode.isEditMode) {
+    visibility.avg_rating = false;
   }
-
-  // Convert sorting state to URL params
-  function sortingToUrlParams(sortState: SortingState): {
-    sortBy?: string;
-    sortOrder?: string;
-  } {
-    if (sortState.length === 0) {
-      return {};
-    }
-
-    return {
-      sortBy: sortState.map((s) => s.id).join(","),
-      sortOrder: sortState.map((s) => (s.desc ? "desc" : "asc")).join(","),
-    };
-  }
-
-  // Sorting state management
-  let sorting = $state<SortingState>(parseSortingFromUrl());
-  let isSortingChanging = $state(false);
-  let pendingSorting = $state<string | null>(null);
-
-  // Initialize sorting from URL
-  $effect(() => {
-    const urlSortBy = page.url.searchParams.get("sortBy");
-    const urlSortOrder = page.url.searchParams.get("sortOrder");
-
-    // If we have a pending sorting change, check if URL matches it
-    if (pendingSorting !== null) {
-      const expectedUrl = `${urlSortBy || ""},${urlSortOrder || ""}`;
-      if (expectedUrl === pendingSorting) {
-        pendingSorting = null;
-        isSortingChanging = false;
-        // Sync sorting state to match URL now that it's updated
-        const urlSorting = parseSortingFromUrl();
-        if (JSON.stringify(urlSorting) !== JSON.stringify(sorting)) {
-          sorting = urlSorting;
-        }
-        return;
-      } else {
-        // URL hasn't updated yet, don't sync
-        return;
+  // On mobile, only show: order, title, my_progress_status, my_rating, avg_rating
+  if (isMobile) {
+    Object.keys(visibility).forEach((columnId) => {
+      if (!["order", "title", "my_progress_status", "my_rating", "avg_rating"].includes(columnId)) {
+        visibility[columnId] = false;
       }
-    }
+    });
+    // Hide select column on mobile (multi-select disabled)
+    visibility.select = false;
+    // Hide actions column on mobile
+    visibility.actions = false;
+  }
+  return visibility;
+});
 
-    // Normal sync when not changing sorting and no pending change
-    if (isSortingChanging) {
+let sentinelRef: HTMLElement | null = $state(null);
+
+$effect(() => {
+  if (sentinelRef) {
+    onSentinelMount(sentinelRef);
+  }
+});
+
+// Parse sorting from URL
+function parseSortingFromUrl(): SortingState {
+  const sortBy = page.url.searchParams.get("sortBy");
+  const sortOrder = page.url.searchParams.get("sortOrder");
+
+  if (!sortBy) return [];
+
+  const columns = sortBy.split(",");
+  const orders = sortOrder?.split(",") ?? [];
+
+  return columns
+    .map((col, idx) => ({
+      id: col.trim(),
+      desc: orders[idx]?.trim().toLowerCase() === "desc",
+    }))
+    .filter((s) => s.id);
+}
+
+// Convert sorting state to URL params
+function sortingToUrlParams(sortState: SortingState): {
+  sortBy?: string;
+  sortOrder?: string;
+} {
+  if (sortState.length === 0) {
+    return {};
+  }
+
+  return {
+    sortBy: sortState.map((s) => s.id).join(","),
+    sortOrder: sortState.map((s) => (s.desc ? "desc" : "asc")).join(","),
+  };
+}
+
+// Sorting state management
+let sorting = $state<SortingState>(parseSortingFromUrl());
+let isSortingChanging = $state(false);
+let pendingSorting = $state<string | null>(null);
+
+// Initialize sorting from URL
+$effect(() => {
+  const urlSortBy = page.url.searchParams.get("sortBy");
+  const urlSortOrder = page.url.searchParams.get("sortOrder");
+
+  // If we have a pending sorting change, check if URL matches it
+  if (pendingSorting !== null) {
+    const expectedUrl = `${urlSortBy || ""},${urlSortOrder || ""}`;
+    if (expectedUrl === pendingSorting) {
+      pendingSorting = null;
+      isSortingChanging = false;
+      // Sync sorting state to match URL now that it's updated
+      const urlSorting = parseSortingFromUrl();
+      if (JSON.stringify(urlSorting) !== JSON.stringify(sorting)) {
+        sorting = urlSorting;
+      }
+      return;
+    } else {
+      // URL hasn't updated yet, don't sync
       return;
     }
-
-    const urlSorting = parseSortingFromUrl();
-    if (JSON.stringify(urlSorting) !== JSON.stringify(sorting)) {
-      sorting = urlSorting;
-    }
-  });
-
-  // Handle sorting changes
-  function handleSortingChange(
-    updater: SortingState | ((prev: SortingState) => SortingState),
-  ) {
-    isSortingChanging = true;
-    const newSorting =
-      typeof updater === "function" ? updater(sorting) : updater;
-    sorting = newSorting;
-
-    // Update URL
-    const url = new URL(page.url);
-    const params = sortingToUrlParams(newSorting);
-
-    if (params.sortBy) {
-      url.searchParams.set("sortBy", params.sortBy);
-      url.searchParams.set("sortOrder", params.sortOrder ?? "");
-    } else {
-      url.searchParams.delete("sortBy");
-      url.searchParams.delete("sortOrder");
-    }
-
-    const expectedUrl = `${params.sortBy || ""},${params.sortOrder || ""}`;
-    pendingSorting = expectedUrl;
-    goto(url.toString(), { keepFocus: true, invalidateAll: true });
   }
 
-  // Parse filters from URL
-  function parseFiltersFromUrl(): {
-    language: string[];
-    tags: string[];
-    progress: string[];
-    type: string[];
-  } {
-    const filterLanguage = page.url.searchParams.get("filterLanguage");
-    const filterTags = page.url.searchParams.get("filterTags");
-    const filterProgress = page.url.searchParams.get("filterProgress");
-    const filterType = page.url.searchParams.get("filterType");
-
-    return {
-      language: filterLanguage
-        ? filterLanguage
-            .split(",")
-            .map((v) => v.trim())
-            .filter(Boolean)
-        : [],
-      tags: filterTags
-        ? filterTags
-            .split(",")
-            .map((v) => v.trim())
-            .filter(Boolean)
-        : [],
-      progress: filterProgress
-        ? filterProgress
-            .split(",")
-            .map((v) => v.trim())
-            .filter(Boolean)
-        : [],
-      type: filterType
-        ? filterType
-            .split(",")
-            .map((v) => v.trim())
-            .filter(Boolean)
-        : [],
-    };
+  // Normal sync when not changing sorting and no pending change
+  if (isSortingChanging) {
+    return;
   }
 
-  // Filter state management
-  let filters = $state<{
-    language: string[];
-    tags: string[];
-    progress: string[];
-    type: string[];
-  }>(parseFiltersFromUrl());
-  let isFilterChanging = $state(false);
-  let pendingFilters = $state<string | null>(null);
+  const urlSorting = parseSortingFromUrl();
+  if (JSON.stringify(urlSorting) !== JSON.stringify(sorting)) {
+    sorting = urlSorting;
+  }
+});
 
-  // Initialize filters from URL
-  $effect(() => {
-    const urlFilters = parseFiltersFromUrl();
-    const urlFiltersStr = JSON.stringify(urlFilters);
+// Handle sorting changes
+function handleSortingChange(updater: SortingState | ((prev: SortingState) => SortingState)) {
+  isSortingChanging = true;
+  const newSorting = typeof updater === "function" ? updater(sorting) : updater;
+  sorting = newSorting;
 
-    // If we have a pending filter change, check if URL matches it
-    if (pendingFilters !== null) {
-      if (urlFiltersStr === pendingFilters) {
-        pendingFilters = null;
-        isFilterChanging = false;
-        // Sync filter state to match URL now that it's updated
-        if (JSON.stringify(urlFilters) !== JSON.stringify(filters)) {
-          filters = urlFilters;
-        }
-        return;
-      } else {
-        // URL hasn't updated yet, don't sync
-        return;
+  // Update URL
+  const url = new URL(page.url);
+  const params = sortingToUrlParams(newSorting);
+
+  if (params.sortBy) {
+    url.searchParams.set("sortBy", params.sortBy);
+    url.searchParams.set("sortOrder", params.sortOrder ?? "");
+  } else {
+    url.searchParams.delete("sortBy");
+    url.searchParams.delete("sortOrder");
+  }
+
+  const expectedUrl = `${params.sortBy || ""},${params.sortOrder || ""}`;
+  pendingSorting = expectedUrl;
+  goto(url.toString(), { keepFocus: true, invalidateAll: true });
+}
+
+// Parse filters from URL
+function parseFiltersFromUrl(): {
+  language: string[];
+  tags: string[];
+  progress: string[];
+  type: string[];
+} {
+  const filterLanguage = page.url.searchParams.get("filterLanguage");
+  const filterTags = page.url.searchParams.get("filterTags");
+  const filterProgress = page.url.searchParams.get("filterProgress");
+  const filterType = page.url.searchParams.get("filterType");
+
+  return {
+    language: filterLanguage
+      ? filterLanguage
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean)
+      : [],
+    tags: filterTags
+      ? filterTags
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean)
+      : [],
+    progress: filterProgress
+      ? filterProgress
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean)
+      : [],
+    type: filterType
+      ? filterType
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean)
+      : [],
+  };
+}
+
+// Filter state management
+let filters = $state<{
+  language: string[];
+  tags: string[];
+  progress: string[];
+  type: string[];
+}>(parseFiltersFromUrl());
+let isFilterChanging = $state(false);
+let pendingFilters = $state<string | null>(null);
+
+// Initialize filters from URL
+$effect(() => {
+  const urlFilters = parseFiltersFromUrl();
+  const urlFiltersStr = JSON.stringify(urlFilters);
+
+  // If we have a pending filter change, check if URL matches it
+  if (pendingFilters !== null) {
+    if (urlFiltersStr === pendingFilters) {
+      pendingFilters = null;
+      isFilterChanging = false;
+      // Sync filter state to match URL now that it's updated
+      if (JSON.stringify(urlFilters) !== JSON.stringify(filters)) {
+        filters = urlFilters;
       }
-    }
-
-    // Normal sync when not changing filters and no pending change
-    if (isFilterChanging) {
+      return;
+    } else {
+      // URL hasn't updated yet, don't sync
       return;
     }
-
-    if (JSON.stringify(urlFilters) !== JSON.stringify(filters)) {
-      filters = urlFilters;
-    }
-  });
-
-  // Handle filter changes
-  function handleFilterChange(
-    filterType: "language" | "tags" | "progress" | "type",
-    values: string[],
-  ) {
-    isFilterChanging = true;
-    filters = { ...filters, [filterType]: values };
-
-    // Update URL
-    const url = new URL(page.url);
-
-    if (values.length > 0) {
-      url.searchParams.set(
-        `filter${filterType.charAt(0).toUpperCase() + filterType.slice(1)}`,
-        values.join(","),
-      );
-    } else {
-      url.searchParams.delete(
-        `filter${filterType.charAt(0).toUpperCase() + filterType.slice(1)}`,
-      );
-    }
-
-    const expectedFilters = JSON.stringify(filters);
-    pendingFilters = expectedFilters;
-    goto(url.toString(), { keepFocus: true, invalidateAll: true });
   }
 
-  // Add a filter value (used by clickable cells)
-  // Toggles the filter: removes if already present, adds if not present
-  function addFilterValue(
-    filterType: "language" | "tags" | "progress" | "type",
-    value: string,
-  ) {
-    const currentValues = filters[filterType];
-    // Toggle: remove if already in filter, add if not
-    if (currentValues.includes(value)) {
-      const newValues = currentValues.filter((v) => v !== value);
-      handleFilterChange(filterType, newValues);
-    } else {
-      handleFilterChange(filterType, [...currentValues, value]);
-    }
+  // Normal sync when not changing filters and no pending change
+  if (isFilterChanging) {
+    return;
   }
 
-  // Provide filter context for child components
-  setContext("filterContext", {
-    handleFilterChange,
-    addFilterValue,
-    filters: () => filters,
-  });
+  if (JSON.stringify(urlFilters) !== JSON.stringify(filters)) {
+    filters = urlFilters;
+  }
+});
 
-  // Provide search context for child components
-  setContext("searchContext", {
-    updateSearchQuery,
-    currentSearchQuery: () => searchValue,
-  });
+// Handle filter changes
+function handleFilterChange(filterType: "language" | "tags" | "progress" | "type", values: string[]) {
+  isFilterChanging = true;
+  filters = { ...filters, [filterType]: values };
 
-  // Remove a single filter value
-  function removeFilter(
-    filterType: "language" | "tags" | "progress" | "type",
-    value: string,
-  ) {
-    const currentValues = filters[filterType];
+  // Update URL
+  const url = new URL(page.url);
+
+  if (values.length > 0) {
+    url.searchParams.set(`filter${filterType.charAt(0).toUpperCase() + filterType.slice(1)}`, values.join(","));
+  } else {
+    url.searchParams.delete(`filter${filterType.charAt(0).toUpperCase() + filterType.slice(1)}`);
+  }
+
+  const expectedFilters = JSON.stringify(filters);
+  pendingFilters = expectedFilters;
+  goto(url.toString(), { keepFocus: true, invalidateAll: true });
+}
+
+// Add a filter value (used by clickable cells)
+// Toggles the filter: removes if already present, adds if not present
+function addFilterValue(filterType: "language" | "tags" | "progress" | "type", value: string) {
+  const currentValues = filters[filterType];
+  // Toggle: remove if already in filter, add if not
+  if (currentValues.includes(value)) {
     const newValues = currentValues.filter((v) => v !== value);
     handleFilterChange(filterType, newValues);
+  } else {
+    handleFilterChange(filterType, [...currentValues, value]);
   }
+}
 
-  // Get filter options arrays
-  let languageOptions = $derived.by(() => {
-    return (
-      filterOptions?.languages?.map((l) => l.language).filter(Boolean) ?? []
-    );
-  });
+// Provide filter context for child components
+setContext("filterContext", {
+  handleFilterChange,
+  addFilterValue,
+  filters: () => filters,
+});
 
-  let tagOptions = $derived.by(() => {
-    return filterOptions?.tags?.map((t) => t.tag).filter(Boolean) ?? [];
-  });
+// Provide search context for child components
+setContext("searchContext", {
+  updateSearchQuery,
+  currentSearchQuery: () => searchValue,
+});
 
-  // Helper function to format progress status for display
-  function formatProgressStatus(status: string | null): string {
-    if (!status) return "Unmarked";
-    return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  }
+// Remove a single filter value
+function removeFilter(filterType: "language" | "tags" | "progress" | "type", value: string) {
+  const currentValues = filters[filterType];
+  const newValues = currentValues.filter((v) => v !== value);
+  handleFilterChange(filterType, newValues);
+}
 
-  // Helper function to capitalize type values
-  function capitalizeType(type: string): string {
-    if (!type) return type;
-    return type.charAt(0).toUpperCase() + type.slice(1);
-  }
+// Get filter options arrays
+let languageOptions = $derived.by(() => {
+  return filterOptions?.languages?.map((l) => l.language).filter(Boolean) ?? [];
+});
 
-  let progressOptions = $derived.by(() => {
-    return (
-      filterOptions?.progressStatuses?.map(
-        (p) => p.my_progress_status ?? "Unmarked",
-      ) ?? []
-    );
-  });
+let tagOptions = $derived.by(() => {
+  return filterOptions?.tags?.map((t) => t.tag).filter(Boolean) ?? [];
+});
 
-  let typeOptions = $derived.by(() => {
-    return filterOptions?.types?.map((t) => t.type).filter(Boolean) ?? [];
-  });
+// Helper function to format progress status for display
+function formatProgressStatus(status: string | null): string {
+  if (!status) return "Unmarked";
+  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
-  // Combine original data with new rows from edit mode
-  const tableData = $derived.by(() => {
-    // Convert new rows to Watchlist format
-    const newRowsAsWatchlist = editMode.newRows.map((row) => ({
-      id: row.tempId,
-      order: 0,
-      title: row.title,
-      releaseStatus: "",
-      seasons: null,
-      type: row.type,
-      language_id: row.languageId,
-      language: row.language,
-      tags: row.tags.join(", "),
-      avg_rating: "",
-      infinity_counts: "0",
-      shitty_counts: "0",
-      my_rating: null,
-      my_infinity: null,
-      my_shitty: null,
-      my_progress_status: null,
-    })) as Watchlist[];
+// Helper function to capitalize type values
+function capitalizeType(type: string): string {
+  if (!type) return type;
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
 
-    // Put new rows at the top
-    return [...newRowsAsWatchlist, ...(data as Watchlist[])];
-  });
+let progressOptions = $derived.by(() => {
+  return filterOptions?.progressStatuses?.map((p) => p.my_progress_status ?? "Unmarked") ?? [];
+});
 
-  const table = createSvelteTable({
-    get data() {
-      return tableData as Watchlist[];
+let typeOptions = $derived.by(() => {
+  return filterOptions?.types?.map((t) => t.type).filter(Boolean) ?? [];
+});
+
+// Combine original data with new rows from edit mode
+const tableData = $derived.by(() => {
+  // Convert new rows to Watchlist format
+  const newRowsAsWatchlist = editMode.newRows.map((row) => ({
+    id: row.tempId,
+    order: 0,
+    title: row.title,
+    releaseStatus: "",
+    seasons: null,
+    type: row.type,
+    language_id: row.languageId,
+    language: row.language,
+    tags: row.tags.join(", "),
+    avg_rating: "",
+    infinity_counts: "0",
+    shitty_counts: "0",
+    my_rating: null,
+    my_infinity: null,
+    my_shitty: null,
+    my_progress_status: null,
+  })) as Watchlist[];
+
+  // Put new rows at the top
+  return [...newRowsAsWatchlist, ...(data as Watchlist[])];
+});
+
+const table = createSvelteTable({
+  get data() {
+    return tableData as Watchlist[];
+  },
+  get columns() {
+    return columns as ColumnDef<Watchlist, unknown>[];
+  },
+  getCoreRowModel: getCoreRowModel(),
+  manualSorting: true,
+  enableMultiSort: true,
+  onColumnVisibilityChange: handleColumnVisibilityChange,
+  onColumnOrderChange: handleColumnOrderChange,
+  onSortingChange: handleSortingChange,
+  state: {
+    get columnVisibility() {
+      return columnVisibility;
     },
-    get columns() {
-      return columns as ColumnDef<Watchlist, unknown>[];
+    get columnOrder() {
+      return columnOrder;
     },
-    getCoreRowModel: getCoreRowModel(),
-    manualSorting: true,
-    enableMultiSort: true,
-    onColumnVisibilityChange: handleColumnVisibilityChange,
-    onColumnOrderChange: handleColumnOrderChange,
-    onSortingChange: handleSortingChange,
-    state: {
-      get columnVisibility() {
-        return columnVisibility;
-      },
-      get columnOrder() {
-        return columnOrder;
-      },
-      get sorting() {
-        return sorting;
-      },
+    get sorting() {
+      return sorting;
     },
-  });
+  },
+});
 
-  // Get draggable columns (exclude index)
-  let draggableColumns = $derived.by(() => {
-    return table
-      .getAllColumns()
-      .filter((col) => col.getCanHide() && col.id !== "order")
-      .sort((a, b) => {
-        const orderA = columnSettings[a.id]?.order ?? 999;
-        const orderB = columnSettings[b.id]?.order ?? 999;
-        return orderA - orderB;
-      });
-  });
+// Get draggable columns (exclude index)
+let draggableColumns = $derived.by(() => {
+  return table
+    .getAllColumns()
+    .filter((col) => col.getCanHide() && col.id !== "order")
+    .sort((a, b) => {
+      const orderA = columnSettings[a.id]?.order ?? 999;
+      const orderB = columnSettings[b.id]?.order ?? 999;
+      return orderA - orderB;
+    });
+});
 
-  // Items array for dndzone
-  let dndItems = $state<Array<{ id: string }>>([]);
+// Items array for dndzone
+let dndItems = $state<Array<{ id: string }>>([]);
 
-  // Sync dndItems with draggableColumns, but only when not dragging
-  let isDragging = $state(false);
+// Sync dndItems with draggableColumns, but only when not dragging
+let isDragging = $state(false);
 
-  $effect(() => {
-    if (renderTable && !isDragging) {
-      const newIds = draggableColumns.map((col) => col.id);
-      const currentIds = dndItems.map((item) => item.id);
-      // Only update if the IDs actually changed to prevent infinite loops
-      if (
-        newIds.length !== currentIds.length ||
-        !newIds.every((id, i) => id === currentIds[i])
-      ) {
-        dndItems = draggableColumns.map((col) => ({ id: col.id }));
-      }
+$effect(() => {
+  if (renderTable && !isDragging) {
+    const newIds = draggableColumns.map((col) => col.id);
+    const currentIds = dndItems.map((item) => item.id);
+    // Only update if the IDs actually changed to prevent infinite loops
+    if (newIds.length !== currentIds.length || !newIds.every((id, i) => id === currentIds[i])) {
+      dndItems = draggableColumns.map((col) => ({ id: col.id }));
     }
-  });
+  }
+});
 
-  function handleDndEvent(
-    event: CustomEvent<{ items: Array<{ id: string }> }>,
-  ) {
-    if (event.type === "consider") {
-      isDragging = true;
-      // Update dndItems to match what dndzone expects during drag, but filter out placeholders
-      dndItems = event.detail.items.filter(
-        (item) => !item.id.startsWith("id:dnd-shadow-placeholder"),
-      );
+function handleDndEvent(event: CustomEvent<{ items: Array<{ id: string }> }>) {
+  if (event.type === "consider") {
+    isDragging = true;
+    // Update dndItems to match what dndzone expects during drag, but filter out placeholders
+    dndItems = event.detail.items.filter((item) => !item.id.startsWith("id:dnd-shadow-placeholder"));
+    return;
+  }
+
+  if (event.type === "finalize") {
+    isDragging = false;
+    const { items } = event.detail;
+    // Filter out any placeholder IDs before updating dndItems
+    const validItems = items.filter((item) => !item.id.startsWith("id:dnd-shadow-placeholder"));
+    // Update dndItems to match the final order from dndzone
+    dndItems = validItems;
+    // Extract order for processing
+    const newOrder = validItems.map((item) => item.id);
+    handleColumnOrderChange(["order", ...newOrder]);
+  }
+}
+
+let renderTable = $derived(isSettingsLoaded && !isLoading);
+
+// Search functionality with debouncing
+let searchValue = $state("");
+let debounceTimer: ReturnType<typeof setTimeout> | null = $state(null);
+let isUserTyping = $state(false);
+let pendingQuery = $state<string | null>(null);
+let searchInputRef: HTMLInputElement | null = $state(null);
+
+// Initialize and sync search value from URL (only when user is not typing or pending query matches)
+$effect(() => {
+  const urlQuery = page.url.searchParams.get("q") ?? "";
+
+  // If we have a pending query, check if URL matches it - if so, clear the flag
+  if (pendingQuery !== null) {
+    if (urlQuery === pendingQuery) {
+      pendingQuery = null;
+      isUserTyping = false;
+      // Sync searchValue to match URL now that it's updated
+      if (urlQuery !== searchValue) {
+        searchValue = urlQuery;
+      }
+      return;
+    } else {
+      // URL hasn't updated yet, don't sync
       return;
     }
-
-    if (event.type === "finalize") {
-      isDragging = false;
-      const { items } = event.detail;
-      // Filter out any placeholder IDs before updating dndItems
-      const validItems = items.filter(
-        (item) => !item.id.startsWith("id:dnd-shadow-placeholder"),
-      );
-      // Update dndItems to match the final order from dndzone
-      dndItems = validItems;
-      // Extract order for processing
-      const newOrder = validItems.map((item) => item.id);
-      handleColumnOrderChange(["order", ...newOrder]);
-    }
   }
 
-  let renderTable = $derived(isSettingsLoaded && !isLoading);
+  // Normal sync when not typing and no pending query
+  if (isUserTyping) {
+    return;
+  }
 
-  // Search functionality with debouncing
-  let searchValue = $state("");
-  let debounceTimer: ReturnType<typeof setTimeout> | null = $state(null);
-  let isUserTyping = $state(false);
-  let pendingQuery = $state<string | null>(null);
-  let searchInputRef: HTMLInputElement | null = $state(null);
+  if (urlQuery !== searchValue) {
+    searchValue = urlQuery;
+  }
+});
 
-  // Initialize and sync search value from URL (only when user is not typing or pending query matches)
-  $effect(() => {
-    const urlQuery = page.url.searchParams.get("q") ?? "";
+// Debounced function to update URL query param
+function updateSearchQuery(query: string) {
+  // Clear existing timer
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+  }
 
-    // If we have a pending query, check if URL matches it - if so, clear the flag
-    if (pendingQuery !== null) {
-      if (urlQuery === pendingQuery) {
-        pendingQuery = null;
-        isUserTyping = false;
-        // Sync searchValue to match URL now that it's updated
-        if (urlQuery !== searchValue) {
-          searchValue = urlQuery;
-        }
-        return;
-      } else {
-        // URL hasn't updated yet, don't sync
-        return;
-      }
+  // Set new timer
+  debounceTimer = setTimeout(() => {
+    const url = new URL(page.url);
+    // Only trim when checking if query is empty, but preserve spaces in the actual query
+    const trimmedQuery = query.trim();
+    if (trimmedQuery) {
+      // Store the full query with spaces preserved
+      url.searchParams.set("q", query);
+    } else {
+      url.searchParams.delete("q");
     }
+    const newQuery = trimmedQuery ? query : null;
 
-    // Normal sync when not typing and no pending query
-    if (isUserTyping) {
-      return;
-    }
+    // Set pending query BEFORE calling goto - this prevents sync effect from running with old URL
+    pendingQuery = newQuery;
+    goto(url.toString(), { keepFocus: true, invalidateAll: false });
+  }, 300);
+}
 
-    if (urlQuery !== searchValue) {
-      searchValue = urlQuery;
-    }
-  });
-
-  // Debounced function to update URL query param
-  function updateSearchQuery(query: string) {
-    // Clear existing timer
+// Cleanup timer on component destroy
+$effect(() => {
+  return () => {
     if (debounceTimer) {
       clearTimeout(debounceTimer);
     }
+  };
+});
 
-    // Set new timer
-    debounceTimer = setTimeout(() => {
-      const url = new URL(page.url);
-      // Only trim when checking if query is empty, but preserve spaces in the actual query
-      const trimmedQuery = query.trim();
-      if (trimmedQuery) {
-        // Store the full query with spaces preserved
-        url.searchParams.set("q", query);
-      } else {
-        url.searchParams.delete("q");
-      }
-      const newQuery = trimmedQuery ? query : null;
+function handleSearchInput(e: Event) {
+  const target = e.currentTarget as HTMLInputElement;
+  isUserTyping = true;
+  searchValue = target.value;
+  updateSearchQuery(target.value);
+}
 
-      // Set pending query BEFORE calling goto - this prevents sync effect from running with old URL
-      pendingQuery = newQuery;
-      goto(url.toString(), { keepFocus: true, invalidateAll: false });
-    }, 300);
-  }
+// Keyboard shortcut: Ctrl+Q to focus search input, Ctrl+S to save in edit mode, Escape to cancel
+$effect(() => {
+  // Only set up listener when table is rendered
+  if (!renderTable) return;
 
-  // Cleanup timer on component destroy
-  $effect(() => {
-    return () => {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-    };
-  });
+  function handleKeyDown(e: KeyboardEvent) {
+    // Check for Ctrl+Q or Cmd+Q (Mac) - check both key and code for reliability
+    const isQ = e.key?.toLowerCase() === "q" || e.code === "KeyQ";
+    const isS = e.key?.toLowerCase() === "s" || e.code === "KeyS";
+    const isEscape = e.key === "Escape" || e.code === "Escape";
+    const isModifier = e.ctrlKey || e.metaKey;
 
-  function handleSearchInput(e: Event) {
-    const target = e.currentTarget as HTMLInputElement;
-    isUserTyping = true;
-    searchValue = target.value;
-    updateSearchQuery(target.value);
-  }
-
-  // Keyboard shortcut: Ctrl+Q to focus search input, Ctrl+S to save in edit mode, Escape to cancel
-  $effect(() => {
-    // Only set up listener when table is rendered
-    if (!renderTable) return;
-
-    function handleKeyDown(e: KeyboardEvent) {
-      // Check for Ctrl+Q or Cmd+Q (Mac) - check both key and code for reliability
-      const isQ = e.key?.toLowerCase() === "q" || e.code === "KeyQ";
-      const isS = e.key?.toLowerCase() === "s" || e.code === "KeyS";
-      const isEscape = e.key === "Escape" || e.code === "Escape";
-      const isModifier = e.ctrlKey || e.metaKey;
-
-      // Ctrl+S to save in edit mode
-      if (isModifier && isS && editMode.isEditMode) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleSave();
-        return;
-      }
-
-      // Escape to cancel edit mode (only if no dialogs are open)
-      // Check DOM for any open dialog/alertdialog
-      const anyDialogOpen = document.querySelector(
-        '[role="dialog"], [role="alertdialog"]',
-      );
-
-      if (isEscape && editMode.isEditMode && !anyDialogOpen) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleCancelEdit();
-        return;
-      }
-
-      if (isModifier && isQ) {
-        // Don't prevent if user is typing in an input/textarea
-        const target = e.target as HTMLElement;
-        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
-          return;
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        // Try ref first, then fallback to ID selector
-        const input =
-          searchInputRef ||
-          (document.getElementById("search-input") as HTMLInputElement);
-        if (input) {
-          input.focus();
-          input.select(); // Also select the text for better UX
-        }
-      }
+    // Ctrl+S to save in edit mode
+    if (isModifier && isS && editMode.isEditMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      handleSave();
+      return;
     }
 
-    document.addEventListener("keydown", handleKeyDown, true); // Use capture phase
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown, true);
-    };
-  });
+    // Escape to cancel edit mode (only if no dialogs are open)
+    // Check DOM for any open dialog/alertdialog
+    const anyDialogOpen = document.querySelector('[role="dialog"], [role="alertdialog"]');
 
-  // Edit mode handlers
-  async function handleEnterEditMode() {
-    // Show loading state immediately for instant visual feedback
-    isEnteringEditMode = true;
+    if (isEscape && editMode.isEditMode && !anyDialogOpen) {
+      e.preventDefault();
+      e.stopPropagation();
+      handleCancelEdit();
+      return;
+    }
 
-    // Wait for Svelte to apply the DOM update (spinner added to DOM)
-    await tick();
+    if (isModifier && isQ) {
+      // Don't prevent if user is typing in an input/textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      // Try ref first, then fallback to ID selector
+      const input = searchInputRef || (document.getElementById("search-input") as HTMLInputElement);
+      if (input) {
+        input.focus();
+        input.select(); // Also select the text for better UX
+      }
+    }
+  }
 
-    // Wait for browser to actually PAINT the spinner
-    // Double rAF: first rAF schedules before next paint, second rAF ensures that paint completed
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => resolve());
-      });
-    });
+  document.addEventListener("keydown", handleKeyDown, true); // Use capture phase
+  return () => {
+    document.removeEventListener("keydown", handleKeyDown, true);
+  };
+});
 
-    // Now enter edit mode - this triggers the reactive cascade (user sees spinner during this)
-    editMode.enterEditMode();
+// Edit mode handlers
+async function handleEnterEditMode() {
+  // Show loading state immediately for instant visual feedback
+  isEnteringEditMode = true;
 
-    // Clear loading state after browser has painted the edit mode UI
+  // Wait for Svelte to apply the DOM update (spinner added to DOM)
+  await tick();
+
+  // Wait for browser to actually PAINT the spinner
+  // Double rAF: first rAF schedules before next paint, second rAF ensures that paint completed
+  await new Promise<void>((resolve) => {
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        isEnteringEditMode = false;
-      });
+      requestAnimationFrame(() => resolve());
     });
-  }
-
-  function handleCancelEdit() {
-    if (editMode.hasChanges) {
-      showCancelEditDialog = true;
-      return;
-    }
-    editMode.exitEditMode();
-  }
-
-  function confirmCancelEdit() {
-    showCancelEditDialog = false;
-    editMode.exitEditMode();
-  }
-
-  function handleUndoAllChanges() {
-    if (!editMode.hasChanges) {
-      toast.info("No changes to undo.");
-      return;
-    }
-    showUndoAllDialog = true;
-  }
-
-  function confirmUndoAll() {
-    showUndoAllDialog = false;
-    editMode.resetEditState();
-    toast.success("All changes have been undone.");
-  }
-
-  function handleAddNewRow() {
-    if (!effectiveUserRole || !editMode.canAddRows(effectiveUserRole)) return;
-    const tempId = editMode.addNewRow();
-    toast.success("New row added. Fill in the required fields.");
-  }
-
-  async function handleSave() {
-    if (!editMode.hasChanges) {
-      toast.info("No changes to save.");
-      editMode.exitEditMode();
-      return;
-    }
-
-    if (editMode.hasValidationErrors) {
-      toast.error("Please fix validation errors before saving.");
-      return;
-    }
-
-    const changeset = editMode.getChangeset();
-
-    // Validate new rows have required fields
-    for (const newItem of changeset.newItems) {
-      if (
-        !newItem.title?.trim() ||
-        !newItem.languageId?.trim() ||
-        !newItem.type?.trim()
-      ) {
-        toast.error("New rows must have Title, Language, and Type filled in.");
-        return;
-      }
-    }
-
-    // Show delete confirmation if there are deletions
-    if (changeset.deleteIds.length > 0) {
-      showDeleteConfirmation = true;
-      return;
-    }
-
-    await executeSave();
-  }
-
-  let isSaving = $state(false);
-  let isEnteringEditMode = $state(false);
-
-  // Dialog states
-  let showDeleteConfirmation = $state(false);
-  let showUnsavedChangesDialog = $state(false);
-  let showCancelEditDialog = $state(false);
-  let showUndoAllDialog = $state(false);
-  let showAddItemDialog = $state(false);
-  let showMobileFilterDialog = $state(false);
-  let showRowDetailsDialog = $state(false);
-  let selectedRowForDetails = $state<Watchlist | null>(null);
-  let pendingServerAction = $state<(() => void) | null>(null);
-
-  // Get titles for delete confirmation
-  const deleteTitles = $derived.by(() => {
-    const titles: string[] = [];
-    for (const id of editMode.deletedRowIds) {
-      const row = (data as Watchlist[]).find((r) => r.id === id);
-      if (row) {
-        titles.push(row.title);
-      }
-    }
-    return titles;
   });
 
-  // Check if user can edit (must be signed in with verified email)
-  const canEdit = $derived(
-    isEmailVerified &&
-      (effectiveUserRole === "user" ||
-        effectiveUserRole === "mobile" ||
-        effectiveUserRole === "contributor" ||
-        effectiveUserRole === "admin"),
-  );
-  // Check actual user role (not effectiveRole) for adding rows
-  // This allows mobile users with admin/contributor roles to add items
-  const canAddRows = $derived(
-    isEmailVerified && (userRole === "contributor" || userRole === "admin"),
-  );
-  const canDeleteRows = $derived(
-    isEmailVerified && effectiveUserRole === "admin",
-  );
+  // Now enter edit mode - this triggers the reactive cascade (user sees spinner during this)
+  editMode.enterEditMode();
 
-  // Handle delete confirmation
-  function handleDeleteConfirm() {
-    showDeleteConfirmation = false;
-    // Continue with save
-    executeSave();
-  }
-
-  function handleDeleteCancel() {
-    showDeleteConfirmation = false;
-  }
-
-  // Handle unsaved changes dialog
-  function handleSaveAndContinue() {
-    showUnsavedChangesDialog = false;
-    handleSave().then(() => {
-      if (pendingServerAction) {
-        pendingServerAction();
-        pendingServerAction = null;
-      }
+  // Clear loading state after browser has painted the edit mode UI
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      isEnteringEditMode = false;
     });
+  });
+}
+
+function handleCancelEdit() {
+  if (editMode.hasChanges) {
+    showCancelEditDialog = true;
+    return;
+  }
+  editMode.exitEditMode();
+}
+
+function confirmCancelEdit() {
+  showCancelEditDialog = false;
+  editMode.exitEditMode();
+}
+
+function handleUndoAllChanges() {
+  if (!editMode.hasChanges) {
+    toast.info("No changes to undo.");
+    return;
+  }
+  showUndoAllDialog = true;
+}
+
+function confirmUndoAll() {
+  showUndoAllDialog = false;
+  editMode.resetEditState();
+  toast.success("All changes have been undone.");
+}
+
+function handleAddNewRow() {
+  if (!effectiveUserRole || !editMode.canAddRows(effectiveUserRole)) return;
+  const tempId = editMode.addNewRow();
+  toast.success("New row added. Fill in the required fields.");
+}
+
+async function handleSave() {
+  if (!editMode.hasChanges) {
+    toast.info("No changes to save.");
+    editMode.exitEditMode();
+    return;
   }
 
-  function handleDiscardAndContinue() {
-    showUnsavedChangesDialog = false;
-    editMode.exitEditMode();
+  if (editMode.hasValidationErrors) {
+    toast.error("Please fix validation errors before saving.");
+    return;
+  }
+
+  const changeset = editMode.getChangeset();
+
+  // Validate new rows have required fields
+  for (const newItem of changeset.newItems) {
+    if (!newItem.title?.trim() || !newItem.languageId?.trim() || !newItem.type?.trim()) {
+      toast.error("New rows must have Title, Language, and Type filled in.");
+      return;
+    }
+  }
+
+  // Show delete confirmation if there are deletions
+  if (changeset.deleteIds.length > 0) {
+    showDeleteConfirmation = true;
+    return;
+  }
+
+  await executeSave();
+}
+
+let isSaving = $state(false);
+let isEnteringEditMode = $state(false);
+
+// Dialog states
+let showDeleteConfirmation = $state(false);
+let showUnsavedChangesDialog = $state(false);
+let showCancelEditDialog = $state(false);
+let showUndoAllDialog = $state(false);
+let showAddItemDialog = $state(false);
+let showMobileFilterDialog = $state(false);
+let showRowDetailsDialog = $state(false);
+let selectedRowForDetails = $state<Watchlist | null>(null);
+let pendingServerAction = $state<(() => void) | null>(null);
+
+// Get titles for delete confirmation
+const deleteTitles = $derived.by(() => {
+  const titles: string[] = [];
+  for (const id of editMode.deletedRowIds) {
+    const row = (data as Watchlist[]).find((r) => r.id === id);
+    if (row) {
+      titles.push(row.title);
+    }
+  }
+  return titles;
+});
+
+// Check if user can edit (must be signed in with verified email)
+const canEdit = $derived(
+  isEmailVerified &&
+    (effectiveUserRole === "user" || effectiveUserRole === "mobile" || effectiveUserRole === "contributor" || effectiveUserRole === "admin")
+);
+// Check actual user role (not effectiveRole) for adding rows
+// This allows mobile users with admin/contributor roles to add items
+const canAddRows = $derived(isEmailVerified && (userRole === "contributor" || userRole === "admin"));
+const canDeleteRows = $derived(isEmailVerified && effectiveUserRole === "admin");
+
+// Handle delete confirmation
+function handleDeleteConfirm() {
+  showDeleteConfirmation = false;
+  // Continue with save
+  executeSave();
+}
+
+function handleDeleteCancel() {
+  showDeleteConfirmation = false;
+}
+
+// Handle unsaved changes dialog
+function handleSaveAndContinue() {
+  showUnsavedChangesDialog = false;
+  handleSave().then(() => {
     if (pendingServerAction) {
       pendingServerAction();
       pendingServerAction = null;
     }
-  }
+  });
+}
 
-  function handleStayHere() {
-    showUnsavedChangesDialog = false;
+function handleDiscardAndContinue() {
+  showUnsavedChangesDialog = false;
+  editMode.exitEditMode();
+  if (pendingServerAction) {
+    pendingServerAction();
     pendingServerAction = null;
   }
+}
 
-  // Check for unsaved changes before server action
-  function checkUnsavedChanges(action: () => void) {
-    if (editMode.isEditMode && editMode.hasChanges) {
-      pendingServerAction = action;
-      showUnsavedChangesDialog = true;
-      return true;
-    }
-    return false;
+function handleStayHere() {
+  showUnsavedChangesDialog = false;
+  pendingServerAction = null;
+}
+
+// Check for unsaved changes before server action
+function checkUnsavedChanges(action: () => void) {
+  if (editMode.isEditMode && editMode.hasChanges) {
+    pendingServerAction = action;
+    showUnsavedChangesDialog = true;
+    return true;
   }
+  return false;
+}
 
-  // Actual save execution
-  async function executeSave() {
-    const changeset = editMode.getChangeset();
+// Actual save execution
+async function executeSave() {
+  const changeset = editMode.getChangeset();
 
-    isSaving = true;
+  isSaving = true;
 
-    try {
-      const response = await fetch("/api/watchlist/bulk-update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(changeset),
-      });
+  try {
+    const response = await fetch("/api/watchlist/bulk-update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(changeset),
+    });
 
-      const result = await response.json();
+    const result = await response.json();
 
-      if (!response.ok) {
-        toast.error(result.error || "Failed to save changes.");
-        isSaving = false;
-        return;
-      }
-
-      // Handle partial success
-      if (result.errors && result.errors.length > 0) {
-        for (const error of result.errors) {
-          toast.error(`Error for ${error.id}: ${error.message}`);
-        }
-      }
-
-      const successCount =
-        (result.results?.updated?.length || 0) +
-        (result.results?.created?.length || 0) +
-        (result.results?.deleted?.length || 0);
-
-      if (successCount > 0) {
-        toast.success(`Successfully saved ${successCount} change(s).`);
-
-        // Refresh the page to get updated data
-        // Keep isSaving true during navigation to show loading overlay
-        await goto(page.url.toString(), { invalidateAll: true });
-
-        // Clear edit state after successful save to reset the undo tracker
-        // This ensures changes are cleared even if component doesn't fully remount
-        editMode.exitEditMode();
-      } else {
-        // No changes saved, exit edit mode if no more changes
-        if (!editMode.hasChanges) {
-          editMode.exitEditMode();
-        }
-      }
-    } catch (error) {
-      console.error("Save error:", error);
-      toast.error("An unexpected error occurred while saving.");
-    } finally {
-      // Clear saving state after navigation completes
+    if (!response.ok) {
+      toast.error(result.error || "Failed to save changes.");
       isSaving = false;
+      return;
     }
+
+    // Handle partial success
+    if (result.errors && result.errors.length > 0) {
+      for (const error of result.errors) {
+        toast.error(`Error for ${error.id}: ${error.message}`);
+      }
+    }
+
+    const successCount = (result.results?.updated?.length || 0) + (result.results?.created?.length || 0) + (result.results?.deleted?.length || 0);
+
+    if (successCount > 0) {
+      toast.success(`Successfully saved ${successCount} change(s).`);
+
+      // Refresh the page to get updated data
+      // Keep isSaving true during navigation to show loading overlay
+      await goto(page.url.toString(), { invalidateAll: true });
+
+      // Clear edit state after successful save to reset the undo tracker
+      // This ensures changes are cleared even if component doesn't fully remount
+      editMode.exitEditMode();
+    } else {
+      // No changes saved, exit edit mode if no more changes
+      if (!editMode.hasChanges) {
+        editMode.exitEditMode();
+      }
+    }
+  } catch (error) {
+    console.error("Save error:", error);
+    toast.error("An unexpected error occurred while saving.");
+  } finally {
+    // Clear saving state after navigation completes
+    isSaving = false;
   }
+}
 </script>
 
 {#if renderTable}

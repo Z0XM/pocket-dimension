@@ -41,17 +41,8 @@ function parseCSVLine(line: string, delimiter: string, quote: string): string[] 
   return result;
 }
 
-export const readAsCsv = async (
-  path: string,
-  options: CsvReadOptions = {}
-): Promise<CsvReadResult> => {
-  const {
-    delimiter = ",",
-    quote = '"',
-    skipEmptyRows = true,
-    trimFields = true,
-    skipHeader = false,
-  } = options;
+export const readAsCsv = async (path: string, options: CsvReadOptions = {}): Promise<CsvReadResult> => {
+  const { delimiter = ",", quote = '"', skipEmptyRows = true, trimFields = true, skipHeader = false } = options;
 
   const file = Bun.file(path);
   const content = await file.text();

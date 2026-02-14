@@ -1,8 +1,8 @@
 <script>
-  import * as Card from "$components/ui/card/index.js";
-  import icon from "$lib/assets/icon.svg";
+import * as Card from "$components/ui/card/index.js";
+import icon from "$lib/assets/icon.svg";
 
-  const { children } = $props();
+const { children } = $props();
 </script>
 
 <div class="flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
@@ -11,7 +11,7 @@
       <Card.Root class="overflow-hidden p-0">
         <Card.Content class="grid p-0 md:grid-cols-2">
           {@render children()}
-          <div class="bg-black relative hidden md:block">
+          <div class="bg-primary/5 relative hidden md:block">
             <img
               src={icon}
               alt="placeholder"

@@ -1,113 +1,93 @@
 <script lang="ts">
-  import {
-    CircleCheckIcon,
-    CircleXIcon,
-    LoaderCircleIcon,
-    LockIcon,
-  } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
-  import { page } from "$app/state";
-  import { Button } from "$components/ui/button/index.js";
-  import {
-    Field,
-    FieldDescription,
-    FieldGroup,
-    FieldLabel,
-  } from "$components/ui/field/index.js";
-  import { Input } from "$components/ui/input/index.js";
-  import { PUBLIC_BASE_AUTH_URL } from "$env/static/public";
+import { CircleCheckIcon, CircleXIcon, LoaderCircleIcon, LockIcon } from "@lucide/svelte";
+import { goto } from "$app/navigation";
+import { page } from "$app/state";
+import { Button } from "$components/ui/button/index.js";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "$components/ui/field/index.js";
+import { Input } from "$components/ui/input/index.js";
+import { PUBLIC_BASE_AUTH_URL } from "$env/static/public";
 
-  const id = $props.id();
+const id = $props.id();
 
-  const token = $derived(page.url.searchParams.get("token") ?? "");
-  const errorParam = $derived(page.url.searchParams.get("error"));
+const token = $derived(page.url.searchParams.get("token") ?? "");
+const errorParam = $derived(page.url.searchParams.get("error"));
 
-  // Map error codes to user-friendly messages
-  function getErrorMessage(errorCode: string | null): string {
-    if (!errorCode) return "";
+// Map error codes to user-friendly messages
+function getErrorMessage(errorCode: string | null): string {
+  if (!errorCode) return "";
 
-    const errorMessages: Record<string, string> = {
-      missing_callback:
-        "Invalid reset link. Please use the link from your email.",
-      token_expired:
-        "This password reset link has expired. Please request a new password reset email.",
-      token_invalid:
-        "This password reset link is invalid. Please request a new password reset link.",
-      token_already_used:
-        "This password reset link has already been used. Please request a new one.",
-      unknown: "An error occurred. Please try again.",
-    };
+  const errorMessages: Record<string, string> = {
+    missing_callback: "Invalid reset link. Please use the link from your email.",
+    token_expired: "This password reset link has expired. Please request a new password reset email.",
+    token_invalid: "This password reset link is invalid. Please request a new password reset link.",
+    token_already_used: "This password reset link has already been used. Please request a new one.",
+    unknown: "An error occurred. Please try again.",
+  };
 
-    return errorMessages[errorCode] ?? errorMessages.unknown;
+  return errorMessages[errorCode] ?? errorMessages.unknown;
+}
+
+const errorMessage = $derived(getErrorMessage(errorParam));
+const hasErrorFromParam = $derived(!!errorParam);
+
+let password = $state("");
+let confirmPassword = $state("");
+let error = $state<string | null>(null);
+let loading = $state(false);
+let success = $state(false);
+
+// Strong password regex: at least 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+async function handleSubmit(e: SubmitEvent) {
+  e.preventDefault();
+  error = null;
+
+  if (!token) {
+    error = "Invalid or missing reset token. Please request a new password reset link.";
+    return;
   }
 
-  const errorMessage = $derived(getErrorMessage(errorParam));
-  const hasErrorFromParam = $derived(!!errorParam);
+  if (password !== confirmPassword) {
+    error = "Passwords do not match";
+    return;
+  }
 
-  let password = $state("");
-  let confirmPassword = $state("");
-  let error = $state<string | null>(null);
-  let loading = $state(false);
-  let success = $state(false);
+  if (!strongPasswordRegex.test(password)) {
+    error = "Password must be at least 8 characters and contain uppercase, lowercase, number, and special character";
+    return;
+  }
 
-  // Strong password regex: at least 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
-  const strongPasswordRegex =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  loading = true;
 
-  async function handleSubmit(e: SubmitEvent) {
-    e.preventDefault();
-    error = null;
+  try {
+    const response = await fetch(`${PUBLIC_BASE_AUTH_URL}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        newPassword: password,
+        token,
+      }),
+    });
 
-    if (!token) {
-      error =
-        "Invalid or missing reset token. Please request a new password reset link.";
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      error = "Passwords do not match";
-      return;
-    }
-
-    if (!strongPasswordRegex.test(password)) {
-      error =
-        "Password must be at least 8 characters and contain uppercase, lowercase, number, and special character";
-      return;
-    }
-
-    loading = true;
-
-    try {
-      const response = await fetch(`${PUBLIC_BASE_AUTH_URL}/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          newPassword: password,
-          token,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        error =
-          data.message ??
-          data.error ??
-          "Failed to reset password. The link may have expired.";
-        loading = false;
-        return;
-      }
-
-      success = true;
-      // Auto redirect to login after 3 seconds
-      setTimeout(() => {
-        goto("/login");
-      }, 3000);
-    } catch (err) {
-      console.error(err);
-      error = "Something went wrong!";
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      error = data.message ?? data.error ?? "Failed to reset password. The link may have expired.";
       loading = false;
+      return;
     }
+
+    success = true;
+    // Auto redirect to login after 3 seconds
+    setTimeout(() => {
+      goto("/login");
+    }, 3000);
+  } catch (err) {
+    console.error(err);
+    error = "Something went wrong!";
+    loading = false;
   }
+}
 </script>
 
 {#if !token || hasErrorFromParam}
@@ -143,9 +123,9 @@
   <div class="p-6 md:p-8">
     <div class="flex flex-col items-center gap-6 text-center">
       <div
-        class="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10"
+        class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10"
       >
-        <CircleCheckIcon class="h-8 w-8 text-green-500" />
+        <CircleCheckIcon class="h-8 w-8 text-primary" />
       </div>
       <div class="flex flex-col gap-2">
         <h1 class="text-2xl font-bold">Password Reset!</h1>

@@ -1,91 +1,89 @@
 <script lang="ts">
-  import { enhance } from "$app/forms";
-  import ColorPicker from "$lib/components/ColorPicker.svelte";
-  import DrawingCanvas from "$lib/components/DrawingCanvas.svelte";
-  import { Button } from "$lib/components/ui/button";
-  import * as Card from "$lib/components/ui/card";
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { Input } from "$lib/components/ui/input";
-  import { Slider } from "$lib/components/ui/slider";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import { listOfEmojis } from "$lib/emojis";
-  import { fromDayInt } from "$lib/utils";
-  import type { PageData } from "./$types";
+import { enhance } from "$app/forms";
+import ColorPicker from "$lib/components/ColorPicker.svelte";
+import DrawingCanvas from "$lib/components/DrawingCanvas.svelte";
+import { Button } from "$lib/components/ui/button";
+import * as Card from "$lib/components/ui/card";
+import * as Dialog from "$lib/components/ui/dialog";
+import { Input } from "$lib/components/ui/input";
+import { Slider } from "$lib/components/ui/slider";
+import { Textarea } from "$lib/components/ui/textarea";
+import { listOfEmojis } from "$lib/emojis";
+import { fromDayInt } from "$lib/utils";
+import type { PageData } from "./$types";
 
-  const { data }: { data: PageData } = $props();
+const { data }: { data: PageData } = $props();
 
-  const meta = data.metadata as Record<string, unknown> | null;
+const meta = data.metadata as Record<string, unknown> | null;
 
-  // Initial values from loaded data (or defaults)
-  const initialValues = {
-    dayRating: (meta?.dayRating as number) ?? undefined,
-    dayEmoji: (meta?.dayEmoji as string) || undefined,
-    dayWord: (meta?.dayWord as string) || undefined,
-    dayColor: (meta?.dayColor as string) || undefined,
-    dayPerson: (meta?.dayPerson as string) || undefined,
-    dayNote: (meta?.dayNote as string) || undefined,
-    dayPublicNote: (meta?.dayPublicNote as string) || undefined,
-    dayDrawing: (meta?.dayDrawing as string) || undefined,
-  };
+// Initial values from loaded data (or defaults)
+const initialValues = {
+  dayRating: (meta?.dayRating as number) ?? undefined,
+  dayEmoji: (meta?.dayEmoji as string) || undefined,
+  dayWord: (meta?.dayWord as string) || undefined,
+  dayColor: (meta?.dayColor as string) || undefined,
+  dayPerson: (meta?.dayPerson as string) || undefined,
+  dayNote: (meta?.dayNote as string) || undefined,
+  dayPublicNote: (meta?.dayPublicNote as string) || undefined,
+  dayDrawing: (meta?.dayDrawing as string) || undefined,
+};
 
-  let emojiPickerOpen = $state(false);
+let emojiPickerOpen = $state(false);
 
-  let dayRatingSet = $state(initialValues.dayRating != null);
-  let dayRating = $state(initialValues.dayRating ?? 5);
-  let dayEmoji = $state(initialValues.dayEmoji);
-  let dayWord = $state(initialValues.dayWord);
-  let dayColor = $state(initialValues.dayColor);
-  let dayPerson = $state(initialValues.dayPerson);
-  let dayNote = $state(initialValues.dayNote);
-  let dayPublicNote = $state(initialValues.dayPublicNote);
-  let dayDrawing = $state(initialValues.dayDrawing);
+let dayRatingSet = $state(initialValues.dayRating != null);
+let dayRating = $state(initialValues.dayRating ?? 5);
+let dayEmoji = $state(initialValues.dayEmoji);
+let dayWord = $state(initialValues.dayWord);
+let dayColor = $state(initialValues.dayColor);
+let dayPerson = $state(initialValues.dayPerson);
+let dayNote = $state(initialValues.dayNote);
+let dayPublicNote = $state(initialValues.dayPublicNote);
+let dayDrawing = $state(initialValues.dayDrawing);
 
-  function resetForm() {
-    dayRatingSet = initialValues.dayRating != null;
-    dayRating = initialValues.dayRating ?? 5;
-    dayEmoji = initialValues.dayEmoji;
-    dayWord = initialValues.dayWord;
-    dayColor = initialValues.dayColor;
-    dayPerson = initialValues.dayPerson;
-    dayNote = initialValues.dayNote;
-    dayPublicNote = initialValues.dayPublicNote;
-    dayDrawing = initialValues.dayDrawing;
+function resetForm() {
+  dayRatingSet = initialValues.dayRating != null;
+  dayRating = initialValues.dayRating ?? 5;
+  dayEmoji = initialValues.dayEmoji;
+  dayWord = initialValues.dayWord;
+  dayColor = initialValues.dayColor;
+  dayPerson = initialValues.dayPerson;
+  dayNote = initialValues.dayNote;
+  dayPublicNote = initialValues.dayPublicNote;
+  dayDrawing = initialValues.dayDrawing;
+}
+
+// Pre-build the static HTML string once since the list never changes
+const emojiGridHTML = listOfEmojis
+  .map(
+    (e) =>
+      `<span role="button" tabindex="0" data-emoji="${e}" class="cursor-pointer rounded-md p-1 text-3xl hover:bg-accent active:scale-95 inline-block">${e}</span>`
+  )
+  .join("");
+
+function handleEmojiClick(event: MouseEvent) {
+  const target = (event.target as HTMLElement).closest<HTMLElement>("[data-emoji]");
+  if (target?.dataset.emoji) {
+    dayEmoji = target.dataset.emoji;
+    emojiPickerOpen = false;
   }
+}
 
-  // Pre-build the static HTML string once since the list never changes
-  const emojiGridHTML = listOfEmojis
-    .map(
-      (e) =>
-        `<span role="button" tabindex="0" data-emoji="${e}" class="cursor-pointer rounded-md p-1 text-3xl hover:bg-accent active:scale-95 inline-block">${e}</span>`,
-    )
-    .join("");
+const editDate = fromDayInt(data.dayInt);
+const dateLabel = editDate.toLocaleDateString("en-IN", {
+  weekday: "long",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
 
-  function handleEmojiClick(event: MouseEvent) {
-    const target = (event.target as HTMLElement).closest<HTMLElement>(
-      "[data-emoji]",
-    );
-    if (target?.dataset.emoji) {
-      dayEmoji = target.dataset.emoji;
-      emojiPickerOpen = false;
-    }
-  }
-
-  const editDate = fromDayInt(data.dayInt);
-  const dateLabel = editDate.toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
-  const isEditing = meta !== null;
+const isEditing = meta !== null;
 </script>
 
 <Card.Root class="">
   <Card.Content class="px-6">
     <div class="text-lg text-muted-foreground">
       {isEditing ? "Editing" : "Fill in"}{" "}
-      <span class="font-semibold text-white">{dateLabel}</span>
+      <span class="font-semibold text-primary">{dateLabel}</span>
     </div>
   </Card.Content>
 </Card.Root>

@@ -1,153 +1,148 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+import { onMount } from "svelte";
 
-  interface Props {
-    enableFilter?: boolean;
-    enableAnimation?: boolean;
+interface Props {
+  enableFilter?: boolean;
+  enableAnimation?: boolean;
+}
+
+const { enableFilter = true, enableAnimation = true }: Props = $props();
+
+const animations = {
+  radialWave: () => {
+    const tiles = document.querySelectorAll(".tile");
+    const svgCenterX = 1762 / 2;
+    const svgCenterY = 1042 / 2;
+    const maxDistance = Math.sqrt(svgCenterX ** 2 + svgCenterY ** 2);
+
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0") + 43; // tile center x (half of 86)
+      const y = parseFloat(rect.getAttribute("y") || "0") + 39; // tile center y (half of 78)
+
+      // Calculate distance from center
+      const distance = Math.sqrt((x - svgCenterX) ** 2 + (y - svgCenterY) ** 2);
+
+      // Normalize distance (0 to 1) and convert to delay (0 to 2 seconds)
+      const normalizedDistance = distance / maxDistance;
+      const delay = normalizedDistance * 2;
+
+      // Set animation delay
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  leftToRight: () => {
+    const tiles = document.querySelectorAll(".tile");
+    const svgWidth = 1762;
+
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0") + 43;
+
+      // Normalize x position (0 to 1) and convert to delay
+      const normalizedX = x / svgWidth;
+      const delay = normalizedX * 4; // 4 second sweep
+
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  topToBottom: () => {
+    const tiles = document.querySelectorAll(".tile");
+    const svgHeight = 1042;
+
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const y = parseFloat(rect.getAttribute("y") || "0") + 39;
+
+      const normalizedY = y / svgHeight;
+      const delay = normalizedY * 4;
+
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  diagonalWave: () => {
+    const tiles = document.querySelectorAll(".tile");
+    const svgWidth = 1762;
+    const svgHeight = 1042;
+
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0") + 43;
+      const y = parseFloat(rect.getAttribute("y") || "0") + 39;
+
+      // Diagonal distance from top-left
+      const diagonal = (x + y) / (svgWidth + svgHeight);
+      const delay = diagonal * 4;
+
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  checkerboard: () => {
+    const tiles = document.querySelectorAll(".tile");
+
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0");
+      const y = parseFloat(rect.getAttribute("y") || "0");
+
+      // Calculate grid position
+      const col = Math.floor(x / 86);
+      const row = Math.floor(y / 78);
+      const isEven = (col + row) % 2 === 0;
+
+      // Alternate delay for checkerboard effect
+      const delay = isEven ? 0 : 2;
+
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  spiral: () => {
+    const tiles = document.querySelectorAll(".tile");
+    const svgCenterX = 1762 / 2;
+    const svgCenterY = 1042 / 2;
+
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0") + 43;
+      const y = parseFloat(rect.getAttribute("y") || "0") + 39;
+
+      // Calculate angle and distance
+      const dx = x - svgCenterX;
+      const dy = y - svgCenterY;
+      const angle = Math.atan2(dy, dx);
+      const distance = Math.sqrt(dx ** 2 + dy ** 2);
+
+      // Combine angle and distance for spiral effect
+      const delay = (((angle + Math.PI) / (2 * Math.PI) + distance / 2000) % 1) * 4;
+
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+  randomStagger: () => {
+    const tiles = document.querySelectorAll(".tile");
+
+    tiles.forEach((tile) => {
+      const rect = tile as SVGRectElement;
+      const x = parseFloat(rect.getAttribute("x") || "0");
+      const y = parseFloat(rect.getAttribute("y") || "0");
+
+      // Use position as seed for pseudo-random
+      const seed = (x * 7919 + y * 9973) % 1000;
+      const delay = (seed / 1000) * 4;
+
+      rect.style.animationDelay = `${delay}s`;
+    });
+  },
+};
+
+onMount(() => {
+  if (enableAnimation) {
+    const animationKeys = Object.keys(animations);
+    const randomAnimation = animationKeys[Math.floor(Math.random() * animationKeys.length)];
+    const selectedAnimation = animations[randomAnimation as keyof typeof animations];
+    selectedAnimation();
   }
-
-  const { enableFilter = true, enableAnimation = true }: Props = $props();
-
-  const animations = {
-    radialWave: () => {
-      const tiles = document.querySelectorAll(".tile");
-      const svgCenterX = 1762 / 2;
-      const svgCenterY = 1042 / 2;
-      const maxDistance = Math.sqrt(svgCenterX ** 2 + svgCenterY ** 2);
-
-      tiles.forEach((tile) => {
-        const rect = tile as SVGRectElement;
-        const x = parseFloat(rect.getAttribute("x") || "0") + 43; // tile center x (half of 86)
-        const y = parseFloat(rect.getAttribute("y") || "0") + 39; // tile center y (half of 78)
-
-        // Calculate distance from center
-        const distance = Math.sqrt(
-          (x - svgCenterX) ** 2 + (y - svgCenterY) ** 2,
-        );
-
-        // Normalize distance (0 to 1) and convert to delay (0 to 2 seconds)
-        const normalizedDistance = distance / maxDistance;
-        const delay = normalizedDistance * 2;
-
-        // Set animation delay
-        rect.style.animationDelay = `${delay}s`;
-      });
-    },
-    leftToRight: () => {
-      const tiles = document.querySelectorAll(".tile");
-      const svgWidth = 1762;
-
-      tiles.forEach((tile) => {
-        const rect = tile as SVGRectElement;
-        const x = parseFloat(rect.getAttribute("x") || "0") + 43;
-
-        // Normalize x position (0 to 1) and convert to delay
-        const normalizedX = x / svgWidth;
-        const delay = normalizedX * 4; // 4 second sweep
-
-        rect.style.animationDelay = `${delay}s`;
-      });
-    },
-    topToBottom: () => {
-      const tiles = document.querySelectorAll(".tile");
-      const svgHeight = 1042;
-
-      tiles.forEach((tile) => {
-        const rect = tile as SVGRectElement;
-        const y = parseFloat(rect.getAttribute("y") || "0") + 39;
-
-        const normalizedY = y / svgHeight;
-        const delay = normalizedY * 4;
-
-        rect.style.animationDelay = `${delay}s`;
-      });
-    },
-    diagonalWave: () => {
-      const tiles = document.querySelectorAll(".tile");
-      const svgWidth = 1762;
-      const svgHeight = 1042;
-
-      tiles.forEach((tile) => {
-        const rect = tile as SVGRectElement;
-        const x = parseFloat(rect.getAttribute("x") || "0") + 43;
-        const y = parseFloat(rect.getAttribute("y") || "0") + 39;
-
-        // Diagonal distance from top-left
-        const diagonal = (x + y) / (svgWidth + svgHeight);
-        const delay = diagonal * 4;
-
-        rect.style.animationDelay = `${delay}s`;
-      });
-    },
-    checkerboard: () => {
-      const tiles = document.querySelectorAll(".tile");
-
-      tiles.forEach((tile) => {
-        const rect = tile as SVGRectElement;
-        const x = parseFloat(rect.getAttribute("x") || "0");
-        const y = parseFloat(rect.getAttribute("y") || "0");
-
-        // Calculate grid position
-        const col = Math.floor(x / 86);
-        const row = Math.floor(y / 78);
-        const isEven = (col + row) % 2 === 0;
-
-        // Alternate delay for checkerboard effect
-        const delay = isEven ? 0 : 2;
-
-        rect.style.animationDelay = `${delay}s`;
-      });
-    },
-    spiral: () => {
-      const tiles = document.querySelectorAll(".tile");
-      const svgCenterX = 1762 / 2;
-      const svgCenterY = 1042 / 2;
-
-      tiles.forEach((tile) => {
-        const rect = tile as SVGRectElement;
-        const x = parseFloat(rect.getAttribute("x") || "0") + 43;
-        const y = parseFloat(rect.getAttribute("y") || "0") + 39;
-
-        // Calculate angle and distance
-        const dx = x - svgCenterX;
-        const dy = y - svgCenterY;
-        const angle = Math.atan2(dy, dx);
-        const distance = Math.sqrt(dx ** 2 + dy ** 2);
-
-        // Combine angle and distance for spiral effect
-        const delay =
-          (((angle + Math.PI) / (2 * Math.PI) + distance / 2000) % 1) * 4;
-
-        rect.style.animationDelay = `${delay}s`;
-      });
-    },
-    randomStagger: () => {
-      const tiles = document.querySelectorAll(".tile");
-
-      tiles.forEach((tile) => {
-        const rect = tile as SVGRectElement;
-        const x = parseFloat(rect.getAttribute("x") || "0");
-        const y = parseFloat(rect.getAttribute("y") || "0");
-
-        // Use position as seed for pseudo-random
-        const seed = (x * 7919 + y * 9973) % 1000;
-        const delay = (seed / 1000) * 4;
-
-        rect.style.animationDelay = `${delay}s`;
-      });
-    },
-  };
-
-  onMount(() => {
-    if (enableAnimation) {
-      const animationKeys = Object.keys(animations);
-      const randomAnimation =
-        animationKeys[Math.floor(Math.random() * animationKeys.length)];
-      const selectedAnimation =
-        animations[randomAnimation as keyof typeof animations];
-      selectedAnimation();
-    }
-  });
+});
 </script>
 
 <div class="background-container">

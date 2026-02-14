@@ -1,55 +1,47 @@
 <script lang="ts">
-  import { KeyIcon, LoaderCircleIcon } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
-  import { Button } from "$components/ui/button/index.js";
-  import {
-    Field,
-    FieldDescription,
-    FieldGroup,
-    FieldLabel,
-  } from "$components/ui/field/index.js";
-  import { Input } from "$components/ui/input/index.js";
-  import { PUBLIC_BASE_AUTH_URL } from "$env/static/public";
+import { KeyIcon, LoaderCircleIcon } from "@lucide/svelte";
+import { goto } from "$app/navigation";
+import { Button } from "$components/ui/button/index.js";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "$components/ui/field/index.js";
+import { Input } from "$components/ui/input/index.js";
+import { PUBLIC_BASE_AUTH_URL } from "$env/static/public";
 
-  const id = $props.id();
+const id = $props.id();
 
-  let email = $state("");
-  let error = $state<string | null>(null);
-  let loading = $state(false);
+let email = $state("");
+let error = $state<string | null>(null);
+let loading = $state(false);
 
-  async function handleSubmit(e: SubmitEvent) {
-    e.preventDefault();
-    error = null;
-    loading = true;
+async function handleSubmit(e: SubmitEvent) {
+  e.preventDefault();
+  error = null;
+  loading = true;
 
-    try {
-      const response = await fetch(`${PUBLIC_BASE_AUTH_URL}/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          redirectTo: `${window.location.origin}/reset-password`,
-        }),
-      });
+  try {
+    const response = await fetch(`${PUBLIC_BASE_AUTH_URL}/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        redirectTo: `${window.location.origin}/reset-password`,
+      }),
+    });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        error =
-          data.message ??
-          data.error ??
-          "Failed to send reset email. Please try again.";
-        loading = false;
-        return;
-      }
-
-      // Redirect to check-email page
-      await goto(`/check-email?type=forgot&email=${encodeURIComponent(email)}`);
-    } catch (err) {
-      console.error(err);
-      error = "Something went wrong!";
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      error = data.message ?? data.error ?? "Failed to send reset email. Please try again.";
       loading = false;
+      return;
     }
+
+    // Redirect to check-email page
+    await goto(`/check-email?type=forgot&email=${encodeURIComponent(email)}`);
+  } catch (err) {
+    console.error(err);
+    error = "Something went wrong!";
+    loading = false;
   }
+}
 </script>
 
 <form class="p-6 md:p-8" onsubmit={handleSubmit}>

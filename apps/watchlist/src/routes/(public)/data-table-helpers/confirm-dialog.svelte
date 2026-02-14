@@ -1,28 +1,28 @@
 <script lang="ts">
-  import { TriangleAlert } from "@lucide/svelte";
-  import * as AlertDialog from "$lib/components/ui/alert-dialog";
+import { TriangleAlert } from "@lucide/svelte";
+import * as AlertDialog from "$lib/components/ui/alert-dialog";
 
-  interface Props {
-    open: boolean;
-    title: string;
-    description: string;
-    confirmLabel?: string;
-    cancelLabel?: string;
-    variant?: "default" | "destructive";
-    onConfirm: () => void;
-    onCancel: () => void;
-  }
+interface Props {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  variant?: "default" | "destructive";
+  onConfirm: () => void;
+  onCancel: () => void;
+}
 
-  let {
-    open = $bindable(),
-    title,
-    description,
-    confirmLabel = "Confirm",
-    cancelLabel = "Cancel",
-    variant = "destructive",
-    onConfirm,
-    onCancel,
-  }: Props = $props();
+let {
+  open = $bindable(),
+  title,
+  description,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  variant = "destructive",
+  onConfirm,
+  onCancel,
+}: Props = $props();
 </script>
 
 <AlertDialog.Root bind:open>

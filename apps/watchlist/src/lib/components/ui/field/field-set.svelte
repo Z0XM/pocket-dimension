@@ -2,12 +2,7 @@
 import type { HTMLFieldsetAttributes } from "svelte/elements";
 import { cn, type WithElementRef } from "$lib/utils.js";
 
-let {
-  ref = $bindable(null),
-  class: className,
-  children,
-  ...restProps
-}: WithElementRef<HTMLFieldsetAttributes> = $props();
+let { ref = $bindable(null), class: className, children, ...restProps }: WithElementRef<HTMLFieldsetAttributes> = $props();
 </script>
 
 <fieldset

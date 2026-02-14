@@ -1,174 +1,154 @@
 <script lang="ts">
-  import { getContext } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { getEditModeContext, type UserRole } from "./edit-mode.svelte.js";
-  import EditableCellWrapper from "./editable-cell-wrapper.svelte";
+import { getContext } from "svelte";
+import { Button } from "$lib/components/ui/button";
+import { Input } from "$lib/components/ui/input";
+import { getEditModeContext, type UserRole } from "./edit-mode.svelte.js";
+import EditableCellWrapper from "./editable-cell-wrapper.svelte";
 
-  interface Props {
-    rowId: string;
-    rating: string | null;
-    infinity: boolean | null;
-    shitty: boolean | null;
-    progressStatus: string | null;
-    class?: string;
+interface Props {
+  rowId: string;
+  rating: string | null;
+  infinity: boolean | null;
+  shitty: boolean | null;
+  progressStatus: string | null;
+  class?: string;
+}
+
+let { rowId, rating, infinity, shitty, progressStatus, class: className = "" }: Props = $props();
+
+const editMode = getEditModeContext();
+const editOptions = getContext<{ userRole: () => UserRole }>("editOptions");
+
+// Get current progress status (edited or original)
+// Read directly from editedRows for proper reactivity
+const currentProgressStatus = $derived.by(() => {
+  const rowEdits = editMode.editedRows.get(rowId);
+  const editedValue = rowEdits?.my_progress_status;
+  return editedValue !== undefined ? editedValue : progressStatus;
+});
+
+// Check if progress is "watched" or "dropped" - ratings are only editable for these statuses
+const canRate = $derived(currentProgressStatus === "watched" || currentProgressStatus === "dropped");
+
+// All users can edit their own rating, but only if progress is "watched" or "dropped"
+const canEdit = $derived(editMode.canEditField(editOptions.userRole(), "my_rating") && canRate);
+
+// Get current values (edited or original)
+// Read directly from editedRows for proper reactivity
+const currentRating = $derived.by(() => {
+  const rowEdits = editMode.editedRows.get(rowId);
+  const editedValue = rowEdits?.my_rating;
+  return editedValue !== undefined ? editedValue : rating;
+});
+const currentInfinity = $derived.by(() => {
+  const rowEdits = editMode.editedRows.get(rowId);
+  const editedValue = rowEdits?.my_infinity;
+  return editedValue !== undefined ? editedValue : infinity;
+});
+const currentShitty = $derived.by(() => {
+  const rowEdits = editMode.editedRows.get(rowId);
+  const editedValue = rowEdits?.my_shitty;
+  return editedValue !== undefined ? editedValue : shitty;
+});
+
+// Determine current mode: 'rating', 'infinity', or 'shitty'
+const currentMode = $derived.by(() => {
+  return currentInfinity ? "infinity" : currentShitty ? "shitty" : "rating";
+});
+
+function handleRatingInput(e: Event) {
+  const target = e.currentTarget as HTMLInputElement;
+  let newValue = target.value;
+
+  // Validate rating is between 0 and 10
+  const numValue = parseFloat(newValue);
+  if (!Number.isNaN(numValue)) {
+    if (numValue < 0) newValue = "0";
+    if (numValue > 10) newValue = "10";
   }
 
-  let {
-    rowId,
-    rating,
-    infinity,
-    shitty,
-    progressStatus,
-    class: className = "",
-  }: Props = $props();
+  // Mark all rating-related fields
+  editMode.markFieldEdited(rowId, "my_rating", newValue || null, rating);
+  editMode.markFieldEdited(rowId, "my_infinity", false, infinity);
+  editMode.markFieldEdited(rowId, "my_shitty", false, shitty);
 
-  const editMode = getEditModeContext();
-  const editOptions = getContext<{ userRole: () => UserRole }>("editOptions");
-
-  // Get current progress status (edited or original)
-  // Read directly from editedRows for proper reactivity
-  const currentProgressStatus = $derived.by(() => {
-    const rowEdits = editMode.editedRows.get(rowId);
-    const editedValue = rowEdits?.my_progress_status;
-    return editedValue !== undefined ? editedValue : progressStatus;
-  });
-
-  // Check if progress is "watched" or "dropped" - ratings are only editable for these statuses
-  const canRate = $derived(
-    currentProgressStatus === "watched" || currentProgressStatus === "dropped",
-  );
-
-  // All users can edit their own rating, but only if progress is "watched" or "dropped"
-  const canEdit = $derived(
-    editMode.canEditField(editOptions.userRole(), "my_rating") && canRate,
-  );
-
-  // Get current values (edited or original)
-  // Read directly from editedRows for proper reactivity
-  const currentRating = $derived.by(() => {
-    const rowEdits = editMode.editedRows.get(rowId);
-    const editedValue = rowEdits?.my_rating;
-    return editedValue !== undefined ? editedValue : rating;
-  });
-  const currentInfinity = $derived.by(() => {
-    const rowEdits = editMode.editedRows.get(rowId);
-    const editedValue = rowEdits?.my_infinity;
-    return editedValue !== undefined ? editedValue : infinity;
-  });
-  const currentShitty = $derived.by(() => {
-    const rowEdits = editMode.editedRows.get(rowId);
-    const editedValue = rowEdits?.my_shitty;
-    return editedValue !== undefined ? editedValue : shitty;
-  });
-
-  // Determine current mode: 'rating', 'infinity', or 'shitty'
-  const currentMode = $derived.by(() => {
-    return currentInfinity ? "infinity" : currentShitty ? "shitty" : "rating";
-  });
-
-  function handleRatingInput(e: Event) {
-    const target = e.currentTarget as HTMLInputElement;
-    let newValue = target.value;
-
-    // Validate rating is between 0 and 10
-    const numValue = parseFloat(newValue);
-    if (!Number.isNaN(numValue)) {
-      if (numValue < 0) newValue = "0";
-      if (numValue > 10) newValue = "10";
-    }
-
-    // Mark all rating-related fields
-    editMode.markFieldEdited(rowId, "my_rating", newValue || null, rating);
-    editMode.markFieldEdited(rowId, "my_infinity", false, infinity);
-    editMode.markFieldEdited(rowId, "my_shitty", false, shitty);
-
-    // Validate
-    if (
-      newValue &&
-      (Number.isNaN(parseFloat(newValue)) ||
-        parseFloat(newValue) < 0 ||
-        parseFloat(newValue) > 10)
-    ) {
-      editMode.setValidationError(
-        rowId,
-        "my_rating",
-        "Rating must be between 0 and 10",
-      );
-    } else {
-      editMode.clearValidationError(rowId, "my_rating");
-    }
-  }
-
-  function setInfinity() {
-    editMode.markFieldEdited(rowId, "my_infinity", true, infinity);
-    editMode.markFieldEdited(rowId, "my_shitty", false, shitty);
-    editMode.markFieldEdited(rowId, "my_rating", null, rating);
+  // Validate
+  if (newValue && (Number.isNaN(parseFloat(newValue)) || parseFloat(newValue) < 0 || parseFloat(newValue) > 10)) {
+    editMode.setValidationError(rowId, "my_rating", "Rating must be between 0 and 10");
+  } else {
     editMode.clearValidationError(rowId, "my_rating");
   }
+}
 
-  function setShitty() {
-    editMode.markFieldEdited(rowId, "my_shitty", true, shitty);
-    editMode.markFieldEdited(rowId, "my_infinity", false, infinity);
-    editMode.markFieldEdited(rowId, "my_rating", null, rating);
-    editMode.clearValidationError(rowId, "my_rating");
+function setInfinity() {
+  editMode.markFieldEdited(rowId, "my_infinity", true, infinity);
+  editMode.markFieldEdited(rowId, "my_shitty", false, shitty);
+  editMode.markFieldEdited(rowId, "my_rating", null, rating);
+  editMode.clearValidationError(rowId, "my_rating");
+}
+
+function setShitty() {
+  editMode.markFieldEdited(rowId, "my_shitty", true, shitty);
+  editMode.markFieldEdited(rowId, "my_infinity", false, infinity);
+  editMode.markFieldEdited(rowId, "my_rating", null, rating);
+  editMode.clearValidationError(rowId, "my_rating");
+}
+
+function clearSpecial() {
+  editMode.markFieldEdited(rowId, "my_infinity", false, infinity);
+  editMode.markFieldEdited(rowId, "my_shitty", false, shitty);
+}
+
+// Toggle functions - check mode at call time and dispatch to correct handler
+function toggleInfinity() {
+  if (currentMode === "infinity") {
+    clearSpecial();
+  } else {
+    setInfinity();
   }
+}
 
-  function clearSpecial() {
-    editMode.markFieldEdited(rowId, "my_infinity", false, infinity);
-    editMode.markFieldEdited(rowId, "my_shitty", false, shitty);
+function toggleShitty() {
+  if (currentMode === "shitty") {
+    clearSpecial();
+  } else {
+    setShitty();
   }
+}
 
-  // Toggle functions - check mode at call time and dispatch to correct handler
-  function toggleInfinity() {
-    if (currentMode === "infinity") {
-      clearSpecial();
-    } else {
-      setInfinity();
-    }
-  }
+// Custom undo handler that undoes all rating-related fields
+function handleRatingUndo() {
+  editMode.undoFieldEdit(rowId, "my_rating");
+  editMode.undoFieldEdit(rowId, "my_infinity");
+  editMode.undoFieldEdit(rowId, "my_shitty");
+}
 
-  function toggleShitty() {
-    if (currentMode === "shitty") {
-      clearSpecial();
-    } else {
-      setShitty();
-    }
-  }
+// Format rating for display
+function formatRating(r: string | null): string {
+  if (!r) return "";
+  const num = parseFloat(r);
+  return Number.isNaN(num) ? "" : num.toFixed(1);
+}
 
-  // Custom undo handler that undoes all rating-related fields
-  function handleRatingUndo() {
-    editMode.undoFieldEdit(rowId, "my_rating");
-    editMode.undoFieldEdit(rowId, "my_infinity");
-    editMode.undoFieldEdit(rowId, "my_shitty");
-  }
+// Get color style based on rating value
+function getRatingColor(rating: string | null): string {
+  if (!rating) return "";
+  const num = parseFloat(rating);
+  if (Number.isNaN(num)) return "";
 
-  // Format rating for display
-  function formatRating(r: string | null): string {
-    if (!r) return "";
-    const num = parseFloat(r);
-    return Number.isNaN(num) ? "" : num.toFixed(1);
-  }
-
-  // Get color style based on rating value
-  function getRatingColor(rating: string | null): string {
-    if (!rating) return "";
-    const num = parseFloat(rating);
-    if (Number.isNaN(num)) return "";
-
-    // Map rating ranges to hex colors
-    if (num >= 10) return "color: #61ED51;";
-    if (num >= 9) return "color: #80EC51;";
-    if (num >= 8) return "color: #9EEA4E;";
-    if (num >= 7) return "color: #BAE84C;";
-    if (num >= 6) return "color: #DAE54A;";
-    if (num >= 5) return "color: #E2CC45;";
-    if (num >= 4) return "color: #DCA93D;";
-    if (num >= 3) return "color: #D58235;";
-    if (num >= 2) return "color: #CE5A2C;";
-    if (num >= 1) return "color: #C73024;";
-    return "color: #880A00;";
-  }
+  // Map rating ranges to hex colors
+  if (num >= 10) return "color: #61ED51;";
+  if (num >= 9) return "color: #80EC51;";
+  if (num >= 8) return "color: #9EEA4E;";
+  if (num >= 7) return "color: #BAE84C;";
+  if (num >= 6) return "color: #DAE54A;";
+  if (num >= 5) return "color: #E2CC45;";
+  if (num >= 4) return "color: #DCA93D;";
+  if (num >= 3) return "color: #D58235;";
+  if (num >= 2) return "color: #CE5A2C;";
+  if (num >= 1) return "color: #C73024;";
+  return "color: #880A00;";
+}
 </script>
 
 <EditableCellWrapper

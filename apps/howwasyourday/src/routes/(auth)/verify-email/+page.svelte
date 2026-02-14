@@ -1,33 +1,30 @@
 <script lang="ts">
-  import { CircleCheckIcon, CircleXIcon } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
-  import { page } from "$app/state";
-  import { Button } from "$components/ui/button/index.js";
+import { CircleCheckIcon, CircleXIcon } from "@lucide/svelte";
+import { goto } from "$app/navigation";
+import { page } from "$app/state";
+import { Button } from "$components/ui/button/index.js";
 
-  // Get error query parameter
-  const error = $derived(page.url.searchParams.get("error"));
+// Get error query parameter
+const error = $derived(page.url.searchParams.get("error"));
 
-  // Map error codes to user-friendly messages
-  function getErrorMessage(errorCode: string | null): string {
-    if (!errorCode) return "";
+// Map error codes to user-friendly messages
+function getErrorMessage(errorCode: string | null): string {
+  if (!errorCode) return "";
 
-    const errorMessages: Record<string, string> = {
-      token_expired:
-        "This verification link has expired. Please request a new verification email.",
-      token_invalid:
-        "This verification link is invalid. Please request a new verification email.",
-      token_already_used:
-        "This verification link has already been used. Your email may already be verified.",
-      user_not_found: "User account not found. Please sign up again.",
-      email_already_verified: "This email address has already been verified.",
-      unknown: "An error occurred during verification. Please try again.",
-    };
+  const errorMessages: Record<string, string> = {
+    token_expired: "This verification link has expired. Please request a new verification email.",
+    token_invalid: "This verification link is invalid. Please request a new verification email.",
+    token_already_used: "This verification link has already been used. Your email may already be verified.",
+    user_not_found: "User account not found. Please sign up again.",
+    email_already_verified: "This email address has already been verified.",
+    unknown: "An error occurred during verification. Please try again.",
+  };
 
-    return errorMessages[errorCode] ?? errorMessages.unknown;
-  }
+  return errorMessages[errorCode] ?? errorMessages.unknown;
+}
 
-  const errorMessage = $derived(getErrorMessage(error));
-  const hasError = $derived(!!error);
+const errorMessage = $derived(getErrorMessage(error));
+const hasError = $derived(!!error);
 </script>
 
 <div class="p-6 md:p-8">
@@ -58,9 +55,9 @@
     {:else}
       <!-- Success State -->
       <div
-        class="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10"
+        class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10"
       >
-        <CircleCheckIcon class="h-8 w-8 text-green-500" />
+        <CircleCheckIcon class="h-8 w-8 text-primary" />
       </div>
       <div class="flex flex-col gap-2">
         <h1 class="text-2xl font-bold">Email Verified!</h1>

@@ -24,13 +24,7 @@ export function useInfiniteScroll(options: {
   threshold?: number;
   enabled?: () => boolean;
 }) {
-  const {
-    loadMore,
-    debounceMs = 500,
-    rootMargin = "100px",
-    threshold = 0.01,
-    enabled = () => true,
-  } = options;
+  const { loadMore, debounceMs = 500, rootMargin = "100px", threshold = 0.01, enabled = () => true } = options;
 
   let sentinelElement = $state<HTMLElement | null>(null);
   let isLoading = $state(false);

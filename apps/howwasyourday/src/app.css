@@ -7,33 +7,33 @@ body {
 
 @layer base {
     :root {
-        --background: 20 14.3% 4.1%;
-        --foreground: 0 0% 95%;
-        --card: 24 9.8% 10%;
-        --card-foreground: 0 0% 95%;
-        --popover: 0 0% 9%;
-        --popover-foreground: 0 0% 95%;
+        --background: 150 15% 4.5%;
+        --foreground: 142 15% 93%;
+        --card: 148 12% 9%;
+        --card-foreground: 142 15% 93%;
+        --popover: 150 12% 8%;
+        --popover-foreground: 142 15% 93%;
         --primary: 142.1 70.6% 45.3%;
         --primary-foreground: 144.9 80.4% 10%;
-        --secondary: 240 3.7% 15.9%;
-        --secondary-foreground: 0 0% 98%;
-        --muted: 0 0% 15%;
-        --muted-foreground: 240 5% 64.9%;
-        --accent: 12 6.5% 15.1%;
-        --accent-foreground: 0 0% 98%;
+        --secondary: 148 18% 14%;
+        --secondary-foreground: 142 10% 96%;
+        --muted: 148 12% 13%;
+        --muted-foreground: 142 10% 55%;
+        --accent: 142 25% 15%;
+        --accent-foreground: 142 10% 96%;
         --destructive: 0 62.8% 30.6%;
         --destructive-foreground: 0 85.7% 97.3%;
-        --border: 240 3.7% 15.9%;
-        --input: 240 3.7% 15.9%;
+        --border: 145 18% 16%;
+        --input: 148 15% 14%;
         --ring: 142.4 71.8% 29.2%;
-        --sidebar-background: 240 5.9% 10%;
-        --sidebar-foreground: 240 4.8% 95.9%;
-        --sidebar-primary: 224.3 76.3% 48%;
+        --sidebar-background: 150 12% 8%;
+        --sidebar-foreground: 142 10% 95%;
+        --sidebar-primary: 142.1 70.6% 45.3%;
         --sidebar-primary-foreground: 0 0% 100%;
-        --sidebar-accent: 240 3.7% 15.9%;
-        --sidebar-accent-foreground: 240 4.8% 95.9%;
-        --sidebar-border: 240 3.7% 15.9%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
+        --sidebar-accent: 142 20% 14%;
+        --sidebar-accent-foreground: 142 10% 95%;
+        --sidebar-border: 145 18% 16%;
+        --sidebar-ring: 142.4 71.8% 29.2%;
     }
 }
 
@@ -73,6 +73,10 @@ body {
     }
     body {
         @apply bg-background text-foreground;
+    }
+
+    a {
+        @apply text-primary hover:text-primary/80 transition-colors;
     }
 
     ::-webkit-scrollbar {

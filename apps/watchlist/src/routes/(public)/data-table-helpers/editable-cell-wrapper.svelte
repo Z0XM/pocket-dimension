@@ -1,71 +1,61 @@
 <script lang="ts">
-  import { RotateCcwIcon } from "@lucide/svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { getEditModeContext } from "./edit-mode.svelte.js";
+import { RotateCcwIcon } from "@lucide/svelte";
+import { Button } from "$lib/components/ui/button";
+import { getEditModeContext } from "./edit-mode.svelte.js";
 
-  interface Props {
-    rowId: string;
-    field: string;
-    canEdit: boolean;
-    children: import("svelte").Snippet;
-    class?: string;
-    /** Additional fields to check for "edited" state (for compound cells like rating) */
-    additionalFields?: string[];
-    /** Custom undo handler (for compound cells that need to undo multiple fields) */
-    onUndo?: () => void;
-    /** Override the internal isEdited check (for special cases like tags) */
-    isEditedOverride?: boolean;
+interface Props {
+  rowId: string;
+  field: string;
+  canEdit: boolean;
+  children: import("svelte").Snippet;
+  class?: string;
+  /** Additional fields to check for "edited" state (for compound cells like rating) */
+  additionalFields?: string[];
+  /** Custom undo handler (for compound cells that need to undo multiple fields) */
+  onUndo?: () => void;
+  /** Override the internal isEdited check (for special cases like tags) */
+  isEditedOverride?: boolean;
+}
+
+let { rowId, field, canEdit, children, class: className = "", additionalFields = [], onUndo, isEditedOverride }: Props = $props();
+
+const editMode = getEditModeContext();
+
+// Derived state - check primary field AND any additional fields (unless overridden)
+const isEdited = $derived(
+  isEditedOverride !== undefined
+    ? isEditedOverride
+    : editMode.isFieldChanged(rowId, field) || additionalFields.some((f) => editMode.isFieldChanged(rowId, f))
+);
+const hasError = $derived(editMode.hasFieldError(rowId, field));
+const errorMessage = $derived(editMode.getValidationError(rowId, field));
+
+function handleUndo() {
+  if (onUndo) {
+    onUndo();
+  } else {
+    editMode.undoFieldEdit(rowId, field as any);
+  }
+}
+
+// Compute CSS classes based on state
+const wrapperClasses = $derived.by(() => {
+  const classes = ["relative"];
+
+  if (editMode.isEditMode && canEdit) {
+    classes.push("editable-cell");
   }
 
-  let {
-    rowId,
-    field,
-    canEdit,
-    children,
-    class: className = "",
-    additionalFields = [],
-    onUndo,
-    isEditedOverride,
-  }: Props = $props();
+  // if (hasError) {
+  //   classes.push("cell-error");
+  // }
 
-  const editMode = getEditModeContext();
-
-  // Derived state - check primary field AND any additional fields (unless overridden)
-  const isEdited = $derived(
-    isEditedOverride !== undefined
-      ? isEditedOverride
-      : editMode.isFieldChanged(rowId, field) ||
-          additionalFields.some((f) => editMode.isFieldChanged(rowId, f)),
-  );
-  const hasError = $derived(editMode.hasFieldError(rowId, field));
-  const errorMessage = $derived(editMode.getValidationError(rowId, field));
-
-  function handleUndo() {
-    if (onUndo) {
-      onUndo();
-    } else {
-      editMode.undoFieldEdit(rowId, field as any);
-    }
+  if (className) {
+    classes.push(className);
   }
 
-  // Compute CSS classes based on state
-  const wrapperClasses = $derived.by(() => {
-    const classes = ["relative"];
-
-    if (editMode.isEditMode && canEdit) {
-      classes.push("editable-cell");
-    }
-
-    // if (hasError) {
-    //   classes.push("cell-error");
-    // }
-
-    if (className) {
-      classes.push(className);
-    }
-
-    return classes.join(" ");
-  });
+  return classes.join(" ");
+});
 </script>
 
 <div class={wrapperClasses} title={hasError ? errorMessage : undefined}>

@@ -1,75 +1,72 @@
 <script lang="ts">
-  import { getContext } from "svelte";
-  import { Button } from "$lib/components/ui/button";
-  import * as Dialog from "$lib/components/ui/dialog";
-  import type { Watchlist } from "../columns";
+import { getContext } from "svelte";
+import { Button } from "$lib/components/ui/button";
+import * as Dialog from "$lib/components/ui/dialog";
+import type { Watchlist } from "../columns";
 
-  interface Props {
-    open?: boolean;
-    row: Watchlist | null;
-  }
+interface Props {
+  open?: boolean;
+  row: Watchlist | null;
+}
 
-  let { open = $bindable(false), row }: Props = $props();
+let { open = $bindable(false), row }: Props = $props();
 
-  const filterContext = getContext<{
-    addFilterValue: (
-      filterType: "language" | "tags" | "progress" | "type",
-      value: string,
-    ) => void;
-    filters: () => {
-      language: string[];
-      tags: string[];
-      progress: string[];
-      type: string[];
-    };
-  }>("filterContext");
+const filterContext = getContext<{
+  addFilterValue: (filterType: "language" | "tags" | "progress" | "type", value: string) => void;
+  filters: () => {
+    language: string[];
+    tags: string[];
+    progress: string[];
+    type: string[];
+  };
+}>("filterContext");
 
-  // Parse tags
-  const tagList = $derived.by(() => {
-    if (!row?.tags) return [];
-    return row.tags
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean);
-  });
+// Parse tags
+const tagList = $derived.by(() => {
+  if (!row?.tags) return [];
+  return row.tags
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+});
 
-  // Check if values are in filters
-  const isLanguageFiltered = $derived.by(() => {
-    if (!row?.language || !filterContext) return false;
-    return filterContext.filters().language.includes(row.language);
-  });
+// Check if values are in filters
+const isLanguageFiltered = $derived.by(() => {
+  if (!row?.language || !filterContext) return false;
+  return filterContext.filters().language.includes(row.language);
+});
 
-  const isTypeFiltered = $derived.by(() => {
-    if (!row?.type || !filterContext) return false;
-    return filterContext.filters().type.includes(row.type);
-  });
+const isTypeFiltered = $derived.by(() => {
+  if (!row?.type || !filterContext) return false;
+  return filterContext.filters().type.includes(row.type);
+});
 
-  const isTagFiltered = $derived.by(() => {
-    return (tag: string) => {
-      if (!filterContext) return false;
-      return filterContext.filters().tags.includes(tag);
-    };
-  });
+const isTagFiltered = $derived.by(() => {
+  return (tag: string) => {
+    if (!filterContext) return false;
+    return filterContext.filters().tags.includes(tag);
+  };
+});
 
-  function handleLanguageClick() {
-    if (!row?.language || !filterContext) return;
-    filterContext.addFilterValue("language", row.language);
-  }
+function handleLanguageClick() {
+  if (!row?.language || !filterContext) return;
+  filterContext.addFilterValue("language", row.language);
+}
 
-  function handleTypeClick() {
-    if (!row?.type || !filterContext) return;
-    filterContext.addFilterValue("type", row.type);
-  }
+function handleTypeClick() {
+  if (!row?.type || !filterContext) return;
+  filterContext.addFilterValue("type", row.type);
+}
 
-  function handleTagClick(tag: string) {
-    if (!filterContext) return;
-    filterContext.addFilterValue("tags", tag);
-  }
+function handleTagClick(tag: string) {
+  if (!filterContext) return;
+  filterContext.addFilterValue("tags", tag);
+}
 
-  function capitalizeType(type: string): string {
-    if (!type) return type;
-    return type.charAt(0).toUpperCase() + type.slice(1);
-  }
+function capitalizeType(type: string): string {
+  if (!type) return type;
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
 </script>
 
 <Dialog.Root bind:open>

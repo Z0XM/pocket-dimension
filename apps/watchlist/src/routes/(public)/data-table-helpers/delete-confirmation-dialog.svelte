@@ -16,9 +16,7 @@ let { open = $bindable(), titles, onConfirm, onCancel }: Props = $props();
 const requireConfirmText = $derived(titles.length > 1);
 let confirmText = $state("");
 
-const canConfirm = $derived(
-  !requireConfirmText || confirmText.toUpperCase() === "DELETE"
-);
+const canConfirm = $derived(!requireConfirmText || confirmText.toUpperCase() === "DELETE");
 
 function handleConfirm() {
   if (!canConfirm) return;

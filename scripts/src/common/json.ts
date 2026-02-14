@@ -10,10 +10,7 @@ interface ToJsonOptions {
   fieldTransformer?: (fieldName: string, value: string) => unknown;
 }
 
-export const csvOutputToJson = <T = Record<string, unknown>>(
-  csv: CsvReadResult,
-  options: ToJsonOptions = {}
-): T[] => {
+export const csvOutputToJson = <T = Record<string, unknown>>(csv: CsvReadResult, options: ToJsonOptions = {}): T[] => {
   const {
     arrayFields = [],
     numericFields = [],

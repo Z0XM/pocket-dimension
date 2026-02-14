@@ -1,187 +1,184 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+import { onMount } from "svelte";
 
-  let {
-    currentDrawing = $bindable(undefined),
-    initialDrawing = undefined,
-  }: {
-    currentDrawing?: string;
-    initialDrawing?: string;
-  } = $props();
+let {
+  currentDrawing = $bindable(undefined),
+  initialDrawing = undefined,
+}: {
+  currentDrawing?: string;
+  initialDrawing?: string;
+} = $props();
 
-  const COLORS = [
-    { hex: "#ffffff", label: "White" },
-    { hex: "#eab308", label: "Yellow" },
-    { hex: "#ff7e01", label: "Orange" },
-    { hex: "#ef4444", label: "Red" },
-    { hex: "#22c55e", label: "Green" },
-    { hex: "#3b82f6", label: "Blue" },
-    { hex: "#fc77fe", label: "Pink" },
-    { hex: "#a855f7", label: "Purple" },
-  ];
+const COLORS = [
+  { hex: "#ffffff", label: "White" },
+  { hex: "#eab308", label: "Yellow" },
+  { hex: "#ff7e01", label: "Orange" },
+  { hex: "#ef4444", label: "Red" },
+  { hex: "#22c55e", label: "Green" },
+  { hex: "#3b82f6", label: "Blue" },
+  { hex: "#fc77fe", label: "Pink" },
+  { hex: "#a855f7", label: "Purple" },
+];
 
-  const BRUSH_SIZES = [2, 4, 8];
+const BRUSH_SIZES = [2, 4, 8];
 
-  let canvasEl: HTMLCanvasElement;
-  let containerEl: HTMLDivElement;
-  let ctx: CanvasRenderingContext2D | null = null;
-  let isDrawing = $state(false);
-  let isEraser = $state(false);
-  let drawColor = $state("#ffffff");
-  let brushSize = $state(4);
-  let collapsed = $state(!initialDrawing);
-  let hasDrawn = $state(!!initialDrawing);
-  let undoStack: ImageData[] = $state([]);
+let canvasEl: HTMLCanvasElement;
+let containerEl: HTMLDivElement;
+let ctx: CanvasRenderingContext2D | null = null;
+let isDrawing = $state(false);
+let isEraser = $state(false);
+let drawColor = $state("#ffffff");
+let brushSize = $state(4);
+let collapsed = $state(!initialDrawing);
+let hasDrawn = $state(!!initialDrawing);
+let undoStack: ImageData[] = $state([]);
 
-  // Update the bound drawing output from current canvas state
-  function updateDrawingOutput() {
-    currentDrawing = hasDrawn ? canvasEl?.toDataURL() || undefined : undefined;
+// Update the bound drawing output from current canvas state
+function updateDrawingOutput() {
+  currentDrawing = hasDrawn ? canvasEl?.toDataURL() || undefined : undefined;
+}
+
+onMount(() => {
+  ctx = canvasEl.getContext("2d", { willReadFrequently: true });
+
+  // Set canvas dimensions
+  canvasEl.width = containerEl.clientWidth;
+  canvasEl.height = canvasEl.width * 0.6;
+
+  if (initialDrawing) {
+    const img = new Image();
+    img.onload = () => {
+      if (ctx && canvasEl) {
+        ctx.drawImage(img, 0, 0, canvasEl.width, canvasEl.height);
+        updateDrawingOutput();
+      }
+    };
+    img.src = initialDrawing;
   }
 
-  onMount(() => {
-    ctx = canvasEl.getContext("2d", { willReadFrequently: true });
+  const handleResize = () => resize();
+  window.addEventListener("resize", handleResize);
+  return () => window.removeEventListener("resize", handleResize);
+});
 
-    // Set canvas dimensions
-    canvasEl.width = containerEl.clientWidth;
-    canvasEl.height = canvasEl.width * 0.6;
+function resize() {
+  if (!canvasEl || !containerEl) return;
+  const prevWidth = canvasEl.width;
+  const prevHeight = canvasEl.height;
+  const existingData = ctx?.getImageData(0, 0, prevWidth, prevHeight);
 
-    if (initialDrawing) {
-      const img = new Image();
-      img.onload = () => {
-        if (ctx && canvasEl) {
-          ctx.drawImage(img, 0, 0, canvasEl.width, canvasEl.height);
-          updateDrawingOutput();
-        }
-      };
-      img.src = initialDrawing;
-    }
+  canvasEl.width = containerEl.clientWidth;
+  canvasEl.height = canvasEl.width * 0.6;
 
-    const handleResize = () => resize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  });
+  if (existingData && ctx) {
+    // Create a temp canvas to scale the old content to the new size
+    const tmp = document.createElement("canvas");
+    tmp.width = prevWidth;
+    tmp.height = prevHeight;
+    tmp.getContext("2d")?.putImageData(existingData, 0, 0);
+    ctx.drawImage(tmp, 0, 0, canvasEl.width, canvasEl.height);
+  }
+}
 
-  function resize() {
-    if (!canvasEl || !containerEl) return;
-    const prevWidth = canvasEl.width;
-    const prevHeight = canvasEl.height;
-    const existingData = ctx?.getImageData(0, 0, prevWidth, prevHeight);
+function saveUndo() {
+  if (ctx && canvasEl) {
+    const data = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+    undoStack = [...undoStack.slice(-19), data]; // keep last 20
+  }
+}
 
-    canvasEl.width = containerEl.clientWidth;
-    canvasEl.height = canvasEl.width * 0.6;
+function undo() {
+  if (ctx && canvasEl && undoStack.length > 0) {
+    const prev = undoStack[undoStack.length - 1];
+    undoStack = undoStack.slice(0, -1);
+    ctx.putImageData(prev, 0, 0);
+    updateDrawingOutput();
+  }
+}
 
-    if (existingData && ctx) {
-      // Create a temp canvas to scale the old content to the new size
-      const tmp = document.createElement("canvas");
-      tmp.width = prevWidth;
-      tmp.height = prevHeight;
-      tmp.getContext("2d")?.putImageData(existingData, 0, 0);
-      ctx.drawImage(tmp, 0, 0, canvasEl.width, canvasEl.height);
-    }
+function getOffset(e: MouseEvent | TouchEvent, el: HTMLCanvasElement): { x: number; y: number } {
+  const rect = el.getBoundingClientRect();
+  if ("touches" in e && e.touches.length > 0) {
+    return {
+      x: e.touches[0].clientX - rect.left,
+      y: e.touches[0].clientY - rect.top,
+    };
+  }
+  const me = e as MouseEvent;
+  return { x: me.clientX - rect.left, y: me.clientY - rect.top };
+}
+
+function onDown(e: MouseEvent | TouchEvent) {
+  if (!ctx) return;
+
+  saveUndo();
+  hasDrawn = true;
+  isDrawing = true;
+
+  const { x, y } = getOffset(e, canvasEl);
+
+  ctx.beginPath();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (isEraser) {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+    ctx.lineWidth = brushSize * 3;
+  } else {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = drawColor;
+    ctx.lineWidth = brushSize;
   }
 
-  function saveUndo() {
-    if (ctx && canvasEl) {
-      const data = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
-      undoStack = [...undoStack.slice(-19), data]; // keep last 20
-    }
+  ctx.moveTo(x, y);
+}
+
+function onMove(e: MouseEvent | TouchEvent) {
+  if (!isDrawing || !ctx) return;
+
+  const { x, y } = getOffset(e, canvasEl);
+
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (isEraser) {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+    ctx.lineWidth = brushSize * 3;
+  } else {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = drawColor;
+    ctx.lineWidth = brushSize;
   }
 
-  function undo() {
-    if (ctx && canvasEl && undoStack.length > 0) {
-      const prev = undoStack[undoStack.length - 1];
-      undoStack = undoStack.slice(0, -1);
-      ctx.putImageData(prev, 0, 0);
-      updateDrawingOutput();
-    }
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+}
+
+function onUp() {
+  if (isDrawing) {
+    isDrawing = false;
+    updateDrawingOutput();
   }
+}
 
-  function getOffset(
-    e: MouseEvent | TouchEvent,
-    el: HTMLCanvasElement,
-  ): { x: number; y: number } {
-    const rect = el.getBoundingClientRect();
-    if ("touches" in e && e.touches.length > 0) {
-      return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top,
-      };
-    }
-    const me = e as MouseEvent;
-    return { x: me.clientX - rect.left, y: me.clientY - rect.top };
-  }
-
-  function onDown(e: MouseEvent | TouchEvent) {
-    if (!ctx) return;
-
+function clearCanvas() {
+  if (ctx && canvasEl) {
     saveUndo();
-    hasDrawn = true;
-    isDrawing = true;
-
-    const { x, y } = getOffset(e, canvasEl);
-
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
     ctx.beginPath();
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    if (isEraser) {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.strokeStyle = "rgba(0,0,0,1)";
-      ctx.lineWidth = brushSize * 3;
-    } else {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = drawColor;
-      ctx.lineWidth = brushSize;
-    }
-
-    ctx.moveTo(x, y);
+    hasDrawn = false;
+    updateDrawingOutput();
   }
+}
 
-  function onMove(e: MouseEvent | TouchEvent) {
-    if (!isDrawing || !ctx) return;
-
-    const { x, y } = getOffset(e, canvasEl);
-
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    if (isEraser) {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.strokeStyle = "rgba(0,0,0,1)";
-      ctx.lineWidth = brushSize * 3;
-    } else {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = drawColor;
-      ctx.lineWidth = brushSize;
-    }
-
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  }
-
-  function onUp() {
-    if (isDrawing) {
-      isDrawing = false;
-      updateDrawingOutput();
-    }
-  }
-
-  function clearCanvas() {
-    if (ctx && canvasEl) {
-      saveUndo();
-      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-      ctx.beginPath();
-      hasDrawn = false;
-      updateDrawingOutput();
-    }
-  }
-
-  function selectColor(hex: string) {
-    isEraser = false;
-    drawColor = hex;
-  }
+function selectColor(hex: string) {
+  isEraser = false;
+  drawColor = hex;
+}
 </script>
 
 <svelte:window onmouseup={onUp} ontouchend={onUp} />
@@ -193,7 +190,7 @@
   <!-- Toggle button -->
   <button
     type="button"
-    class="flex w-full cursor-pointer items-center justify-between rounded-lg bg-card px-4 py-2 text-sm hover:bg-accent/50 transition-colors"
+    class="flex w-full cursor-pointer items-center justify-between rounded-lg bg-card border border-primary/10 px-4 py-2 text-sm hover:bg-primary/10 transition-colors"
     onclick={() => (collapsed = !collapsed)}
   >
     <span>Draw your day?</span>
@@ -213,7 +210,7 @@
   </button>
 
   <div
-    class="relative w-full rounded-lg ring-2 ring-card"
+    class="relative w-full rounded-lg ring-2 ring-primary/15"
     style="display: {collapsed ? 'none' : 'block'};"
   >
     <!-- Canvas -->
@@ -234,7 +231,7 @@
 
     <!-- Right-side color palette -->
     <div
-      class="z-[1] flex w-full flex-col items-center border-t border-white/10 justify-center lg:flex-row gap-1.5 py-2"
+      class="z-[1] flex w-full flex-col items-center border-t border-primary/15 justify-center lg:flex-row gap-1.5 py-2"
     >
       <div class="flex flex-row gap-1.5">
         {#each COLORS as { hex, label }}
@@ -260,7 +257,7 @@
             type="button"
             class="flex h-7 w-7 cursor-pointer items-center justify-center transition-transform duration-200 hover:scale-110 lg:h-8 lg:w-8"
             class:text-primary={brushSize === size && !isEraser}
-            class:text-white={brushSize !== size || isEraser}
+            class:text-muted-foreground={brushSize !== size || isEraser}
             aria-label="Brush size {size}"
             onclick={() => {
               brushSize = size;
@@ -283,7 +280,7 @@
           type="button"
           class="flex h-7 w-7 cursor-pointer items-center justify-center transition-all duration-200 hover:scale-110 hover:text-primary lg:h-8 lg:w-8"
           class:text-primary={isEraser}
-          class:text-white={!isEraser}
+          class:text-muted-foreground={!isEraser}
           aria-label="Eraser"
           onclick={() => (isEraser = !isEraser)}
         >
@@ -306,7 +303,7 @@
         <!-- <div class="row-span-2 flex items-center justify-center xl:row-span-1"> -->
         <button
           type="button"
-          class="flex h-7 w-7 cursor-pointer items-center justify-center text-white transition-all duration-200 hover:scale-110 hover:text-primary lg:h-8 lg:w-8 disabled:opacity-30 disabled:hover:scale-100 disabled:hover:text-white"
+          class="flex h-7 w-7 cursor-pointer items-center justify-center text-muted-foreground transition-all duration-200 hover:scale-110 hover:text-primary lg:h-8 lg:w-8 disabled:opacity-30 disabled:hover:scale-100 disabled:hover:text-muted-foreground"
           aria-label="Undo"
           disabled={undoStack.length === 0}
           onclick={undo}
@@ -330,7 +327,7 @@
         <!-- <div class="row-span-2 flex items-center justify-center xl:row-span-1"> -->
         <button
           type="button"
-          class="flex h-7 w-7 cursor-pointer items-center justify-center text-white transition-all duration-200 hover:scale-110 hover:text-red-400 lg:h-8 lg:w-8"
+          class="flex h-7 w-7 cursor-pointer items-center justify-center text-muted-foreground transition-all duration-200 hover:scale-110 hover:text-destructive lg:h-8 lg:w-8"
           aria-label="Clear canvas"
           onclick={clearCanvas}
         >
