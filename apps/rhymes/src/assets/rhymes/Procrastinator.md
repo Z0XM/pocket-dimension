@@ -1,12 +1,13 @@
 ---
-title: 'Procrastinator'
-thought_on: '2022/01/19'
+title: "Procrastinator"
+thought_on: "2022/01/19"
 rating: 6
-phase: 'Poet'
-status: 'Instagram'
+phase: "Poet"
+status: "Instagram"
 order: 5
-tags: ['Self']
+tags: ["Self"]
 ---
+
 "The more the merrier."
 Is the same with sorrow?
 

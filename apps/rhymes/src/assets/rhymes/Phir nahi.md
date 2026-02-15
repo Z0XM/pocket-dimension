@@ -1,12 +1,13 @@
 ---
-title: 'Phir nahi'
-thought_on: '2024/05/16'
+title: "Phir nahi"
+thought_on: "2024/05/16"
 rating: 3
-phase: 'Natural Talent'
-status: 'Scrapped'
+phase: "Natural Talent"
+status: "Scrapped"
 order: 87
-tags: ['Random']
+tags: ["Random"]
 ---
+
 wahi jo pehle kabhi hua tha,
 wahi jo ab to nahi,
 tumse milke kuch aisa laga tha,

@@ -1,11 +1,12 @@
 ---
-thought_on: '2023/10/06'
+thought_on: "2023/10/06"
 rating: 5
-phase: 'Literature'
-status: 'Done'
+phase: "Literature"
+status: "Done"
 order: 50
-tags: ['Random']
+tags: ["Random"]
 ---
+
 Love all you can right now,
 Live all you can right now,
 For this time is now,

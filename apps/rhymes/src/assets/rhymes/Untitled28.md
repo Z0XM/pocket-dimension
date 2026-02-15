@@ -1,11 +1,12 @@
 ---
-thought_on: '2023/02/09'
+thought_on: "2023/02/09"
 rating: 3
-phase: 'Blooming'
-status: 'Done'
+phase: "Blooming"
+status: "Done"
 order: 28
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 mai hu
 one with the confused mind,
 abhi bhi,
@@ -17,7 +18,6 @@ kahin bhi,
 mai hun
 one with the strong side,
 pehle nahi thi,
-
 
 mai hun
 one with the long life,

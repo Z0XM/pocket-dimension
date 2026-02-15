@@ -1,12 +1,13 @@
 ---
-title: 'Reflections Of Us'
-thought_on: '2024/11/23'
+title: "Reflections Of Us"
+thought_on: "2024/11/23"
 rating: 10
-phase: '10/10 Poet'
-status: 'Instagram'
+phase: "10/10 Poet"
+status: "Instagram"
 order: 147
-tags: ['Feel Good', 'Article']
+tags: ["Feel Good", "Article"]
 ---
+
 ## Phase 1
 
 > With the reminder of the right time, I seek to wish.
@@ -18,7 +19,7 @@ tags: ['Feel Good', 'Article']
 
 Hey Vsauce! Michael here.
 
-As wonderful as the special events are in the our lives, are, if not more, the people who remember the events for and with us. The joy of small and unexpected wishes we get on our special occasions is really different. *“Ah! I thought you forgot our anniversary”, “Aww! You remember my birthday?”* You must have phrases like these in your lives - where remembering a small detail about someone’s life makes them feel special about themselves.
+As wonderful as the special events are in the our lives, are, if not more, the people who remember the events for and with us. The joy of small and unexpected wishes we get on our special occasions is really different. _“Ah! I thought you forgot our anniversary”, “Aww! You remember my birthday?”_ You must have phrases like these in your lives - where remembering a small detail about someone’s life makes them feel special about themselves.
 
 But what exactly is it that makes these moments so special for us?
 
@@ -35,6 +36,7 @@ Before getting closer to answering the question, let’s try and evaluate what i
 So here, think it through - imagine someone close to you - wishing you in these 4 ways, in which ones do you think you would feel happier?
 
 ---
+
 ## Phase 2
 
 > In all of the memories of you, I wonder what's true!
@@ -45,13 +47,14 @@ So here, think it through - imagine someone close to you - wishing you in these 
 
 When you click a photo and you don’t like it, how often do you change the tone, the brightness, the contrast or maybe even the hue? Have you ever wondered that you might be altering the way you remember those events ? What if the sky is dark blue in photo you don’t like and you make it lighter, and hence, when you tell the story of your first Goa Trip to your grandkids, the sky will look a little lighter forever! And if the color of the sky doesn’t matter to you, what if you change the background? the people? add people? remove people? generate a completely new background? maybe even not click a picture and just let AI generate one completely for you and now what you have is an completely imaginary story to tell to your grandkids.
 
-If still you find yourself in the domain of *“huh! so what?”* then lets go a bit into the past and try to understand essence of photos.
+If still you find yourself in the domain of _“huh! so what?”_ then lets go a bit into the past and try to understand essence of photos.
 
 Photos in social lives of people were meant to capture something precious that is cherish-able for the upcoming days for them. A way to store memories - a way to remember them - a way to fit in missing details of the puzzle of a past memory. Now what if your memories were also manipulating, fabricated, generated through AI or other means. Would you be happy to live with such memories. And with the scary fact that you can’t even distinguish which memories are fabricated and which are not!
 
 So again, a question to you, next time you click a photo, what would you wanna capture? A moment in life that can be a memory forever? Or a custom memory that in one of the parallel universes would be a moment?
 
 ---
+
 ## Phase 3
 
 > The sides of division that lie across,
@@ -59,7 +62,7 @@ So again, a question to you, next time you click a photo, what would you wanna c
 > The line that divides gets blurred and thinned,
 > As the eyes are none but my biases within.
 
-Now the two examples through which I ask you several questions can be normalised to one simple question, *“Does involvement of technology deteriorate personal feelings and human connections and to what extent?”*
+Now the two examples through which I ask you several questions can be normalised to one simple question, _“Does involvement of technology deteriorate personal feelings and human connections and to what extent?”_
 
 The answer to the above question has to be a personal one. Yes! It depends on you, since they are your memories, your life, your loved ones and your feelings.
 
@@ -67,13 +70,14 @@ Though the rapid growth of technology is changing the ways we talk, express, con
 
 Well, all this emotional talk sounds cute, but lets talk facts. In any of the options of remembering dates you are gonna use a tool build for your help, be it automation, digital calendar or physical calendars. To make the point, even dates are a tool to make things simpler for humans. Can you wish them a happy birthday by not using dates but rather after evaluating positions of the sun and the stars? We can say that editing images clicked is altering memories but then you have used technology to capture the photo in the first place. Try clicking the same moment from 10 different devices. All of them would capture a different version of the memory. So out of the 10 which one is the actual one? And then in that case why can’t the edited photo be also considered one?
 
-That being said, the line that separates what is *“okay”* and what is not depends on where you decide to draw it. With increasing technology and ease of use, the line is gonna translate to a higher displacement towards more involvement of technology.
+That being said, the line that separates what is _“okay”_ and what is not depends on where you decide to draw it. With increasing technology and ease of use, the line is gonna translate to a higher displacement towards more involvement of technology.
 
 But the value of efforts, love, connections and memories would remain the same. A good example of this would be handwritten letters, books or handmade gifts, a song or a poem written for them which would always bloom happiness on someone.
 
-Here, a statement that comes to the mind, upto you to decide if its valid, is *“Technology does bring change in yourself, helps in communicating with others and eases crafting beautiful memories together, But it also chages the perception of you in the memories that are made now, and changes the perception of memories that would be thought of in the future”*.
+Here, a statement that comes to the mind, upto you to decide if its valid, is _“Technology does bring change in yourself, helps in communicating with others and eases crafting beautiful memories together, But it also chages the perception of you in the memories that are made now, and changes the perception of memories that would be thought of in the future”_.
 
 ---
+
 ## End
 
 > In the end, on your remembrance,

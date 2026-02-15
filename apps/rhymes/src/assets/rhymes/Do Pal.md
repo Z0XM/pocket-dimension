@@ -1,12 +1,13 @@
 ---
-title: 'Do Pal'
-thought_on: '2023/06/01'
+title: "Do Pal"
+thought_on: "2023/06/01"
 rating: 5
-phase: 'Faltu'
-status: 'Done'
+phase: "Faltu"
+status: "Done"
 order: 38
-tags: ['Random']
+tags: ["Random"]
 ---
+
 Do pal ki khushi hai ye ya do pal ka gham,
 Pyar to tha na hamare beech?
 Phir bas sath kyun do pal the hum?

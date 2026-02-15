@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/01/27'
+thought_on: "2024/01/27"
 rating: 7
-phase: 'Faltu'
-status: 'Done'
+phase: "Faltu"
+status: "Done"
 order: 65
-tags: ['Fun', 'Random']
+tags: ["Fun", "Random"]
 ---
+
 Ek botal rum, 4 botal whiskey,
 aaju baaju dekhun, ladki ye kiski,
 Thoda thoda mai, puri ye typsi,

@@ -1,218 +1,218 @@
 <script lang="ts">
-import { CalendarDate, type DateValue } from "@internationalized/date";
-import { onMount } from "svelte";
-import { goto } from "$app/navigation";
-import { buttonVariants } from "$lib/components/ui/button";
-import { Calendar } from "$lib/components/ui/calendar";
-import * as Card from "$lib/components/ui/card";
-import { cn, getEffectiveDate } from "$lib/utils";
-import type { PageData } from "./$types";
+  import { CalendarDate, type DateValue } from "@internationalized/date";
+  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
+  import { buttonVariants } from "$lib/components/ui/button";
+  import { Calendar } from "$lib/components/ui/calendar";
+  import * as Card from "$lib/components/ui/card";
+  import { cn, getEffectiveDate } from "$lib/utils";
+  import type { PageData } from "./$types";
 
-const { data }: { data: PageData } = $props();
+  const { data }: { data: PageData } = $props();
 
-// Fullscreen support for year views
-let yearViewEl: HTMLDivElement | undefined = $state();
-let isFullscreen = $state(false);
+  // Fullscreen support for year views
+  let yearViewEl: HTMLDivElement | undefined = $state();
+  let isFullscreen = $state(false);
 
-function toggleFullscreen() {
-  if (!yearViewEl) return;
-  if (!document.fullscreenElement) {
-    yearViewEl.requestFullscreen().catch(() => {});
-  } else {
-    document.exitFullscreen().catch(() => {});
-  }
-}
-
-onMount(() => {
-  const onFsChange = () => {
-    isFullscreen = !!document.fullscreenElement;
-  };
-  document.addEventListener("fullscreenchange", onFsChange);
-  return () => document.removeEventListener("fullscreenchange", onFsChange);
-});
-
-// Use browser time with -12hr offset: "today" = yesterday until noon
-const effectiveNow = getEffectiveDate();
-const todayCal = new CalendarDate(effectiveNow.getFullYear(), effectiveNow.getMonth() + 1, effectiveNow.getDate());
-const year = todayCal.year;
-const minValue = new CalendarDate(year, 1, 1);
-const maxValue = new CalendarDate(year, 12, 31);
-
-const filledDayInts = new Set(data.filledDays);
-const dayEmojiMap: Record<number, string | null> = data.dayEmojiMap ?? {};
-const dayColorMap: Record<number, string | null> = data.dayColorMap ?? {};
-const dayRatingMap: Record<number, number | null> = data.dayRatingMap ?? {};
-
-type CalendarMode = "emojis" | "colors" | "graph";
-let calendarMode: CalendarMode = $state("emojis");
-
-type TimeRange = "month" | "year";
-let timeRange: TimeRange = $state("month");
-
-// Graph state
-let graphMonth = $state(todayCal.month); // 1-12
-const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-function daysInMonth(month: number, yr: number): number {
-  return new Date(yr, month, 0).getDate();
-}
-
-function getMonthRatings(month: number): { day: number; rating: number }[] {
-  const totalDays = daysInMonth(month, year);
-  const points: { day: number; rating: number }[] = [];
-  for (let d = 1; d <= totalDays; d++) {
-    const dayInt = year * 10000 + month * 100 + d;
-    const r = dayRatingMap[dayInt];
-    if (r != null) {
-      points.push({ day: d, rating: r });
+  function toggleFullscreen() {
+    if (!yearViewEl) return;
+    if (!document.fullscreenElement) {
+      yearViewEl.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
     }
   }
-  return points;
-}
 
-// SVG chart dimensions
-const chartW = 340;
-const chartH = 200;
-const padL = 32;
-const padR = 12;
-const padT = 16;
-const padB = 28;
-const plotW = chartW - padL - padR;
-const plotH = chartH - padT - padB;
-const ratingMin = -1;
-const ratingMax = 11;
-
-function xPos(day: number, totalDays: number): number {
-  return padL + ((day - 1) / (totalDays - 1)) * plotW;
-}
-
-function yPos(rating: number): number {
-  return padT + plotH - ((rating - ratingMin) / (ratingMax - ratingMin)) * plotH;
-}
-
-// Build line segments (non-continuous: only connect consecutive days)
-function buildSegments(points: { day: number; rating: number }[], totalDays: number): string[] {
-  const segments: string[] = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    if (points[i + 1].day === points[i].day + 1) {
-      // Consecutive days — connect them
-      const x1 = xPos(points[i].day, totalDays);
-      const y1 = yPos(points[i].rating);
-      const x2 = xPos(points[i + 1].day, totalDays);
-      const y2 = yPos(points[i + 1].rating);
-      // If the previous point wasn't connected, start a new segment
-      if (segments.length === 0 || i === 0 || points[i].day !== points[i - 1].day + 1) {
-        segments.push(`M${x1},${y1} L${x2},${y2}`);
-      } else {
-        // Extend the last segment
-        segments[segments.length - 1] += ` L${x2},${y2}`;
-      }
-    }
-  }
-  return segments;
-}
-
-// Short month labels for year mosaic
-const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-// Build year mosaic data: array of { month, days: { day, dayInt, isFuture }[] }
-function getYearMosaicData(): {
-  month: number;
-  label: string;
-  days: { day: number; dayInt: number; isFuture: boolean }[];
-}[] {
-  const todayInt = year * 10000 + todayCal.month * 100 + todayCal.day;
-  return Array.from({ length: 12 }, (_, i) => {
-    const m = i + 1;
-    const total = daysInMonth(m, year);
-    return {
-      month: m,
-      label: MONTH_SHORT[i],
-      days: Array.from({ length: total }, (_, d) => {
-        const dayInt = year * 10000 + m * 100 + (d + 1);
-        return { day: d + 1, dayInt, isFuture: dayInt > todayInt };
-      }),
+  onMount(() => {
+    const onFsChange = () => {
+      isFullscreen = !!document.fullscreenElement;
     };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
   });
-}
 
-// Year graph: get all ratings across the entire year as sequential points
-function getYearRatings(): {
-  dayOfYear: number;
-  rating: number;
-  dayInt: number;
-}[] {
-  const points: { dayOfYear: number; rating: number; dayInt: number }[] = [];
-  let seq = 0;
-  for (let m = 1; m <= 12; m++) {
-    const total = daysInMonth(m, year);
-    for (let d = 1; d <= total; d++) {
-      seq++;
-      const dayInt = year * 10000 + m * 100 + d;
+  // Use browser time with -12hr offset: "today" = yesterday until noon
+  const effectiveNow = getEffectiveDate();
+  const todayCal = new CalendarDate(effectiveNow.getFullYear(), effectiveNow.getMonth() + 1, effectiveNow.getDate());
+  const year = todayCal.year;
+  const minValue = new CalendarDate(year, 1, 1);
+  const maxValue = new CalendarDate(year, 12, 31);
+
+  const filledDayInts = new Set(data.filledDays);
+  const dayEmojiMap: Record<number, string | null> = data.dayEmojiMap ?? {};
+  const dayColorMap: Record<number, string | null> = data.dayColorMap ?? {};
+  const dayRatingMap: Record<number, number | null> = data.dayRatingMap ?? {};
+
+  type CalendarMode = "emojis" | "colors" | "graph";
+  let calendarMode: CalendarMode = $state("emojis");
+
+  type TimeRange = "month" | "year";
+  let timeRange: TimeRange = $state("month");
+
+  // Graph state
+  let graphMonth = $state(todayCal.month); // 1-12
+  const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  function daysInMonth(month: number, yr: number): number {
+    return new Date(yr, month, 0).getDate();
+  }
+
+  function getMonthRatings(month: number): { day: number; rating: number }[] {
+    const totalDays = daysInMonth(month, year);
+    const points: { day: number; rating: number }[] = [];
+    for (let d = 1; d <= totalDays; d++) {
+      const dayInt = year * 10000 + month * 100 + d;
       const r = dayRatingMap[dayInt];
       if (r != null) {
-        points.push({ dayOfYear: seq, rating: r, dayInt });
+        points.push({ day: d, rating: r });
       }
     }
+    return points;
   }
-  return points;
-}
 
-// Build year graph segments (non-continuous for gaps)
-function buildYearSegments(points: { dayOfYear: number; rating: number }[], totalDays: number): string[] {
-  const segments: string[] = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    if (points[i + 1].dayOfYear === points[i].dayOfYear + 1) {
-      const x1 = xPos(points[i].dayOfYear, totalDays);
-      const y1 = yPos(points[i].rating);
-      const x2 = xPos(points[i + 1].dayOfYear, totalDays);
-      const y2 = yPos(points[i + 1].rating);
-      if (segments.length === 0 || i === 0 || points[i].dayOfYear !== points[i - 1].dayOfYear + 1) {
-        segments.push(`M${x1},${y1} L${x2},${y2}`);
-      } else {
-        segments[segments.length - 1] += ` L${x2},${y2}`;
+  // SVG chart dimensions
+  const chartW = 340;
+  const chartH = 200;
+  const padL = 32;
+  const padR = 12;
+  const padT = 16;
+  const padB = 28;
+  const plotW = chartW - padL - padR;
+  const plotH = chartH - padT - padB;
+  const ratingMin = -1;
+  const ratingMax = 11;
+
+  function xPos(day: number, totalDays: number): number {
+    return padL + ((day - 1) / (totalDays - 1)) * plotW;
+  }
+
+  function yPos(rating: number): number {
+    return padT + plotH - ((rating - ratingMin) / (ratingMax - ratingMin)) * plotH;
+  }
+
+  // Build line segments (non-continuous: only connect consecutive days)
+  function buildSegments(points: { day: number; rating: number }[], totalDays: number): string[] {
+    const segments: string[] = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      if (points[i + 1].day === points[i].day + 1) {
+        // Consecutive days — connect them
+        const x1 = xPos(points[i].day, totalDays);
+        const y1 = yPos(points[i].rating);
+        const x2 = xPos(points[i + 1].day, totalDays);
+        const y2 = yPos(points[i + 1].rating);
+        // If the previous point wasn't connected, start a new segment
+        if (segments.length === 0 || i === 0 || points[i].day !== points[i - 1].day + 1) {
+          segments.push(`M${x1},${y1} L${x2},${y2}`);
+        } else {
+          // Extend the last segment
+          segments[segments.length - 1] += ` L${x2},${y2}`;
+        }
       }
     }
+    return segments;
   }
-  return segments;
-}
 
-// Month boundary positions for year graph x-axis labels
-function getMonthBoundaries(): { label: string; dayOfYear: number }[] {
-  const boundaries: { label: string; dayOfYear: number }[] = [];
-  let seq = 0;
-  for (let m = 1; m <= 12; m++) {
-    boundaries.push({ label: MONTH_SHORT[m - 1], dayOfYear: seq + 1 });
-    seq += daysInMonth(m, year);
+  // Short month labels for year mosaic
+  const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  // Build year mosaic data: array of { month, days: { day, dayInt, isFuture }[] }
+  function getYearMosaicData(): {
+    month: number;
+    label: string;
+    days: { day: number; dayInt: number; isFuture: boolean }[];
+  }[] {
+    const todayInt = year * 10000 + todayCal.month * 100 + todayCal.day;
+    return Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1;
+      const total = daysInMonth(m, year);
+      return {
+        month: m,
+        label: MONTH_SHORT[i],
+        days: Array.from({ length: total }, (_, d) => {
+          const dayInt = year * 10000 + m * 100 + (d + 1);
+          return { day: d + 1, dayInt, isFuture: dayInt > todayInt };
+        }),
+      };
+    });
   }
-  return boundaries;
-}
 
-function isDateDisabled(date: DateValue): boolean {
-  // Disable future dates
-  return date.compare(todayCal) > 0;
-}
+  // Year graph: get all ratings across the entire year as sequential points
+  function getYearRatings(): {
+    dayOfYear: number;
+    rating: number;
+    dayInt: number;
+  }[] {
+    const points: { dayOfYear: number; rating: number; dayInt: number }[] = [];
+    let seq = 0;
+    for (let m = 1; m <= 12; m++) {
+      const total = daysInMonth(m, year);
+      for (let d = 1; d <= total; d++) {
+        seq++;
+        const dayInt = year * 10000 + m * 100 + d;
+        const r = dayRatingMap[dayInt];
+        if (r != null) {
+          points.push({ dayOfYear: seq, rating: r, dayInt });
+        }
+      }
+    }
+    return points;
+  }
 
-function isDayFilled(date: DateValue): boolean {
-  const dayInt = date.year * 10000 + date.month * 100 + date.day;
-  return filledDayInts.has(dayInt);
-}
+  // Build year graph segments (non-continuous for gaps)
+  function buildYearSegments(points: { dayOfYear: number; rating: number }[], totalDays: number): string[] {
+    const segments: string[] = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      if (points[i + 1].dayOfYear === points[i].dayOfYear + 1) {
+        const x1 = xPos(points[i].dayOfYear, totalDays);
+        const y1 = yPos(points[i].rating);
+        const x2 = xPos(points[i + 1].dayOfYear, totalDays);
+        const y2 = yPos(points[i + 1].rating);
+        if (segments.length === 0 || i === 0 || points[i].dayOfYear !== points[i - 1].dayOfYear + 1) {
+          segments.push(`M${x1},${y1} L${x2},${y2}`);
+        } else {
+          segments[segments.length - 1] += ` L${x2},${y2}`;
+        }
+      }
+    }
+    return segments;
+  }
 
-function getDayEmoji(date: DateValue): string | null {
-  const dayInt = date.year * 10000 + date.month * 100 + date.day;
-  return dayEmojiMap[dayInt] ?? null;
-}
+  // Month boundary positions for year graph x-axis labels
+  function getMonthBoundaries(): { label: string; dayOfYear: number }[] {
+    const boundaries: { label: string; dayOfYear: number }[] = [];
+    let seq = 0;
+    for (let m = 1; m <= 12; m++) {
+      boundaries.push({ label: MONTH_SHORT[m - 1], dayOfYear: seq + 1 });
+      seq += daysInMonth(m, year);
+    }
+    return boundaries;
+  }
 
-function getDayColor(date: DateValue): string | null {
-  const dayInt = date.year * 10000 + date.month * 100 + date.day;
-  return dayColorMap[dayInt] ?? null;
-}
+  function isDateDisabled(date: DateValue): boolean {
+    // Disable future dates
+    return date.compare(todayCal) > 0;
+  }
 
-function handleDayClick(date: DateValue) {
-  if (date.compare(todayCal) > 0) return;
-  const dayInt = date.year * 10000 + date.month * 100 + date.day;
-  goto(`/day/${dayInt}`);
-}
+  function isDayFilled(date: DateValue): boolean {
+    const dayInt = date.year * 10000 + date.month * 100 + date.day;
+    return filledDayInts.has(dayInt);
+  }
+
+  function getDayEmoji(date: DateValue): string | null {
+    const dayInt = date.year * 10000 + date.month * 100 + date.day;
+    return dayEmojiMap[dayInt] ?? null;
+  }
+
+  function getDayColor(date: DateValue): string | null {
+    const dayInt = date.year * 10000 + date.month * 100 + date.day;
+    return dayColorMap[dayInt] ?? null;
+  }
+
+  function handleDayClick(date: DateValue) {
+    if (date.compare(todayCal) > 0) return;
+    const dayInt = date.year * 10000 + date.month * 100 + date.day;
+    goto(`/day/${dayInt}`);
+  }
 </script>
 
 <Card.Root>
@@ -223,9 +223,7 @@ function handleDayClick(date: DateValue) {
           type="button"
           class={cn(
             "rounded-md px-3 py-1 text-xs font-medium transition-all",
-            calendarMode === "emojis"
-              ? "bg-primary/15 text-primary shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
+            calendarMode === "emojis" ? "bg-primary/15 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
           onclick={() => (calendarMode = "emojis")}
         >
@@ -235,9 +233,7 @@ function handleDayClick(date: DateValue) {
           type="button"
           class={cn(
             "rounded-md px-3 py-1 text-xs font-medium transition-all",
-            calendarMode === "colors"
-              ? "bg-primary/15 text-primary shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
+            calendarMode === "colors" ? "bg-primary/15 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
           onclick={() => (calendarMode = "colors")}
         >
@@ -247,9 +243,7 @@ function handleDayClick(date: DateValue) {
           type="button"
           class={cn(
             "rounded-md px-3 py-1 text-xs font-medium transition-all",
-            calendarMode === "graph"
-              ? "bg-primary/15 text-primary shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
+            calendarMode === "graph" ? "bg-primary/15 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
           onclick={() => (calendarMode = "graph")}
         >
@@ -262,9 +256,7 @@ function handleDayClick(date: DateValue) {
           type="button"
           class={cn(
             "rounded-md px-3 py-1 text-xs font-medium transition-all",
-            timeRange === "month"
-              ? "bg-primary/15 text-primary shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
+            timeRange === "month" ? "bg-primary/15 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
           onclick={() => (timeRange = "month")}
         >
@@ -274,9 +266,7 @@ function handleDayClick(date: DateValue) {
           type="button"
           class={cn(
             "rounded-md px-3 py-1 text-xs font-medium transition-all",
-            timeRange === "year"
-              ? "bg-primary/15 text-primary shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
+            timeRange === "year" ? "bg-primary/15 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
           onclick={() => (timeRange = "year")}
         >
@@ -289,11 +279,7 @@ function handleDayClick(date: DateValue) {
     {#if timeRange === "year"}
       <div
         bind:this={yearViewEl}
-        class={cn(
-          "flex w-full flex-col items-center gap-2",
-          isFullscreen &&
-            "bg-background p-6 overflow-auto justify-center h-full",
-        )}
+        class={cn("flex w-full flex-col items-center gap-2", isFullscreen && "bg-background p-6 overflow-auto justify-center h-full")}
       >
         <!-- Fullscreen toggle -->
         <button
@@ -313,9 +299,7 @@ function handleDayClick(date: DateValue) {
               stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
-              ><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path
-                d="M21 8h-3a2 2 0 0 1-2-2V3"
-              /><path d="M3 16h3a2 2 0 0 1 2 2v3" /><path
+              ><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path d="M21 8h-3a2 2 0 0 1-2-2V3" /><path d="M3 16h3a2 2 0 0 1 2 2v3" /><path
                 d="M16 21v-3a2 2 0 0 1 2-2h3"
               /></svg
             >
@@ -330,9 +314,7 @@ function handleDayClick(date: DateValue) {
               stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
-              ><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path
-                d="M21 8V5a2 2 0 0 0-2-2h-3"
-              /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path
+              ><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path
                 d="M16 21h3a2 2 0 0 0 2-2v-3"
               /></svg
             >
@@ -341,9 +323,7 @@ function handleDayClick(date: DateValue) {
 
         {#if calendarMode === "graph"}
           <!-- Year Graph -->
-          {@const yearTotalDays = Array.from({ length: 12 }, (_, i) =>
-            daysInMonth(i + 1, year),
-          ).reduce((a, b) => a + b, 0)}
+          {@const yearTotalDays = Array.from({ length: 12 }, (_, i) => daysInMonth(i + 1, year)).reduce((a, b) => a + b, 0)}
           {@const yearPoints = getYearRatings()}
           {@const yearSegments = buildYearSegments(yearPoints, yearTotalDays)}
           {@const yTicks = [0, 2, 4, 6, 8, 10]}
@@ -351,10 +331,7 @@ function handleDayClick(date: DateValue) {
           {@const yearChartW = 600}
           {@const yearPlotW = yearChartW - padL - padR}
           <div
-            class={cn(
-              "flex flex-col items-center gap-1 max-w-[calc(100vw-4rem)] md:max-w-full overflow-x-auto",
-              isFullscreen && "w-full max-w-full",
-            )}
+            class={cn("flex flex-col items-center gap-1 max-w-[calc(100vw-4rem)] md:max-w-full overflow-x-auto", isFullscreen && "w-full max-w-full")}
           >
             <span class="text-sm font-medium">{year}</span>
             <svg
@@ -372,58 +349,22 @@ function handleDayClick(date: DateValue) {
                   stroke-opacity="0.1"
                   stroke-width="0.5"
                 />
-                <text
-                  x={padL - 6}
-                  y={yPos(tick) + 3.5}
-                  text-anchor="end"
-                  fill="currentColor"
-                  fill-opacity="0.4"
-                  font-size="9">{tick}</text
-                >
+                <text x={padL - 6} y={yPos(tick) + 3.5} text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="9">{tick}</text>
               {/each}
 
               <!-- Month labels on x-axis -->
               {#each monthBounds as mb}
-                {@const mx =
-                  padL + ((mb.dayOfYear - 1) / (yearTotalDays - 1)) * yearPlotW}
-                <text
-                  x={mx}
-                  y={chartH - 6}
-                  text-anchor="start"
-                  fill="currentColor"
-                  fill-opacity="0.4"
-                  font-size="8">{mb.label}</text
-                >
-                <line
-                  x1={mx}
-                  y1={padT}
-                  x2={mx}
-                  y2={chartH - padB}
-                  stroke="currentColor"
-                  stroke-opacity="0.06"
-                  stroke-width="0.5"
-                />
+                {@const mx = padL + ((mb.dayOfYear - 1) / (yearTotalDays - 1)) * yearPlotW}
+                <text x={mx} y={chartH - 6} text-anchor="start" fill="currentColor" fill-opacity="0.4" font-size="8">{mb.label}</text>
+                <line x1={mx} y1={padT} x2={mx} y2={chartH - padB} stroke="currentColor" stroke-opacity="0.06" stroke-width="0.5" />
               {/each}
 
               {#each yearSegments as seg}
-                <path
-                  d={seg}
-                  fill="none"
-                  stroke="hsl(var(--primary))"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
+                <path d={seg} fill="none" stroke="hsl(var(--primary))" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               {/each}
 
               {#each yearPoints as pt}
-                <circle
-                  cx={padL +
-                    ((pt.dayOfYear - 1) / (yearTotalDays - 1)) * yearPlotW}
-                  cy={yPos(pt.rating)}
-                  r="2"
-                  fill="hsl(var(--primary))"
-                />
+                <circle cx={padL + ((pt.dayOfYear - 1) / (yearTotalDays - 1)) * yearPlotW} cy={yPos(pt.rating)} r="2" fill="hsl(var(--primary))" />
               {/each}
 
               <line
@@ -438,13 +379,8 @@ function handleDayClick(date: DateValue) {
               />
 
               {#if yearPoints.length === 0}
-                <text
-                  x={yearChartW / 2}
-                  y={chartH / 2}
-                  text-anchor="middle"
-                  fill="currentColor"
-                  fill-opacity="0.3"
-                  font-size="12">No ratings this year</text
+                <text x={yearChartW / 2} y={chartH / 2} text-anchor="middle" fill="currentColor" fill-opacity="0.3" font-size="12"
+                  >No ratings this year</text
                 >
               {/if}
             </svg>
@@ -455,22 +391,12 @@ function handleDayClick(date: DateValue) {
           <div
             class={cn(
               "flex flex-col gap-1 max-w-[calc(100vw-4rem)] md:max-w-full overflow-x-auto",
-              isFullscreen && "w-full max-w-full items-center gap-2",
+              isFullscreen && "w-full max-w-full items-center gap-2"
             )}
           >
             {#each mosaicData as { label, days }}
-              <div
-                class={cn(
-                  "flex items-center gap-1",
-                  isFullscreen && "w-full gap-2",
-                )}
-              >
-                <span
-                  class={cn(
-                    "w-8 shrink-0 text-right text-[11px] text-muted-foreground",
-                    isFullscreen && "w-10 text-sm",
-                  )}>{label}</span
-                >
+              <div class={cn("flex items-center gap-1", isFullscreen && "w-full gap-2")}>
+                <span class={cn("w-8 shrink-0 text-right text-[11px] text-muted-foreground", isFullscreen && "w-10 text-sm")}>{label}</span>
                 <div class={cn("flex gap-0.5", isFullscreen && "flex-1 gap-1")}>
                   {#each days as { dayInt, isFuture }}
                     {@const filled = filledDayInts.has(dayInt)}
@@ -481,17 +407,11 @@ function handleDayClick(date: DateValue) {
                         type="button"
                         class={cn(
                           "rounded-[3px] transition-colors",
-                          isFullscreen
-                            ? "min-w-0 flex-1 aspect-square rounded-md"
-                            : "size-6",
+                          isFullscreen ? "min-w-0 flex-1 aspect-square rounded-md" : "size-6",
                           isFuture && "opacity-20",
-                          filled && color && !isFuture
-                            ? ""
-                            : "bg-muted-foreground/10",
+                          filled && color && !isFuture ? "" : "bg-muted-foreground/10"
                         )}
-                        style={filled && color && !isFuture
-                          ? `background-color: ${color};`
-                          : ""}
+                        style={filled && color && !isFuture ? `background-color: ${color};` : ""}
                         disabled={isFuture}
                         onclick={() => {
                           if (!isFuture) goto(`/day/${dayInt}`);
@@ -503,11 +423,9 @@ function handleDayClick(date: DateValue) {
                         type="button"
                         class={cn(
                           "flex items-center justify-center rounded-[3px] transition-colors",
-                          isFullscreen
-                            ? "min-w-0 flex-1 aspect-square rounded-md"
-                            : "size-6",
+                          isFullscreen ? "min-w-0 flex-1 aspect-square rounded-md" : "size-6",
                           isFuture && "opacity-20",
-                          filled && emoji ? "" : "bg-muted-foreground/10",
+                          filled && emoji ? "" : "bg-muted-foreground/10"
                         )}
                         disabled={isFuture}
                         onclick={() => {
@@ -515,12 +433,7 @@ function handleDayClick(date: DateValue) {
                         }}
                       >
                         {#if emoji && !isFuture}
-                          <span
-                            class={cn(
-                              "text-lg leading-none",
-                              isFullscreen && "text-2xl",
-                            )}>{emoji}</span
-                          >
+                          <span class={cn("text-lg leading-none", isFullscreen && "text-2xl")}>{emoji}</span>
                         {/if}
                       </button>
                     {/if}
@@ -584,62 +497,24 @@ function handleDayClick(date: DateValue) {
         </div>
 
         <!-- SVG Chart -->
-        <svg
-          viewBox="0 0 {chartW} {chartH}"
-          class="w-full max-w-[400px]"
-          preserveAspectRatio="xMidYMid meet"
-        >
+        <svg viewBox="0 0 {chartW} {chartH}" class="w-full max-w-[400px]" preserveAspectRatio="xMidYMid meet">
           {#each yTicks as tick}
-            <line
-              x1={padL}
-              y1={yPos(tick)}
-              x2={chartW - padR}
-              y2={yPos(tick)}
-              stroke="currentColor"
-              stroke-opacity="0.1"
-              stroke-width="0.5"
-            />
-            <text
-              x={padL - 6}
-              y={yPos(tick) + 3.5}
-              text-anchor="end"
-              fill="currentColor"
-              fill-opacity="0.4"
-              font-size="9">{tick}</text
-            >
+            <line x1={padL} y1={yPos(tick)} x2={chartW - padR} y2={yPos(tick)} stroke="currentColor" stroke-opacity="0.1" stroke-width="0.5" />
+            <text x={padL - 6} y={yPos(tick) + 3.5} text-anchor="end" fill="currentColor" fill-opacity="0.4" font-size="9">{tick}</text>
           {/each}
 
           {#each Array.from({ length: totalDays }, (_, i) => i + 1) as d}
             {#if d === 1 || d % 5 === 0 || d === totalDays}
-              <text
-                x={xPos(d, totalDays)}
-                y={chartH - 6}
-                text-anchor="middle"
-                fill="currentColor"
-                fill-opacity="0.4"
-                font-size="9">{d}</text
-              >
+              <text x={xPos(d, totalDays)} y={chartH - 6} text-anchor="middle" fill="currentColor" fill-opacity="0.4" font-size="9">{d}</text>
             {/if}
           {/each}
 
           {#each segments as seg}
-            <path
-              d={seg}
-              fill="none"
-              stroke="hsl(var(--primary))"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
+            <path d={seg} fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           {/each}
 
           {#each points as pt}
-            <circle
-              cx={xPos(pt.day, totalDays)}
-              cy={yPos(pt.rating)}
-              r="3"
-              fill="hsl(var(--primary))"
-            />
+            <circle cx={xPos(pt.day, totalDays)} cy={yPos(pt.rating)} r="3" fill="hsl(var(--primary))" />
             <title>{MONTH_NAMES[graphMonth - 1]} {pt.day}: {pt.rating}</title>
           {/each}
 
@@ -655,13 +530,7 @@ function handleDayClick(date: DateValue) {
           />
 
           {#if points.length === 0}
-            <text
-              x={chartW / 2}
-              y={chartH / 2}
-              text-anchor="middle"
-              fill="currentColor"
-              fill-opacity="0.3"
-              font-size="12">No ratings this month</text
+            <text x={chartW / 2} y={chartH / 2} text-anchor="middle" fill="currentColor" fill-opacity="0.3" font-size="12">No ratings this month</text
             >
           {/if}
         </svg>
@@ -690,17 +559,12 @@ function handleDayClick(date: DateValue) {
                 buttonVariants({ variant: "ghost" }),
                 "flex size-(--cell-size) flex-col items-center justify-center gap-0 p-0 leading-none font-normal whitespace-nowrap select-none relative rounded-md",
                 isToday && !filled && "bg-accent text-accent-foreground",
-                isToday &&
-                  filled &&
-                  "ring-2 ring-primary/60 ring-offset-1 ring-offset-background",
+                isToday && filled && "ring-2 ring-primary/60 ring-offset-1 ring-offset-background",
                 outsideMonth && "text-muted-foreground opacity-50",
-                isFuture &&
-                  "text-muted-foreground pointer-events-none opacity-50",
-                filled && !color && "bg-muted",
+                isFuture && "text-muted-foreground pointer-events-none opacity-50",
+                filled && !color && "bg-muted"
               )}
-              style={filled && color && !isFuture && !outsideMonth
-                ? `background-color: ${color};`
-                : ""}
+              style={filled && color && !isFuture && !outsideMonth ? `background-color: ${color};` : ""}
               disabled={isFuture || outsideMonth}
               onclick={() => handleDayClick(date)}
             >
@@ -715,13 +579,10 @@ function handleDayClick(date: DateValue) {
                 buttonVariants({ variant: "ghost" }),
                 "flex size-(--cell-size) flex-col items-center justify-center gap-0 p-0 leading-none font-normal whitespace-nowrap select-none relative",
                 isToday && !filled && "bg-accent text-accent-foreground",
-                isToday &&
-                  filled &&
-                  "ring-2 ring-primary ring-offset-1 ring-offset-background rounded-md",
+                isToday && filled && "ring-2 ring-primary ring-offset-1 ring-offset-background rounded-md",
                 filled && !emoji && "text-primary font-semibold",
                 outsideMonth && "text-muted-foreground opacity-50",
-                isFuture &&
-                  "text-muted-foreground pointer-events-none opacity-50",
+                isFuture && "text-muted-foreground pointer-events-none opacity-50"
               )}
               disabled={isFuture || outsideMonth}
               onclick={() => handleDayClick(date)}
@@ -751,13 +612,9 @@ function handleDayClick(date: DateValue) {
 {/if}
 
 {#if data.todayDrawings && data.todayDrawings.length > 0}
-  <div
-    class="flex w-full max-w-[90%] flex-wrap items-center justify-center gap-2"
-  >
+  <div class="flex w-full max-w-[90%] flex-wrap items-center justify-center gap-2">
     {#each data.todayDrawings as { drawing }}
-      <div
-        class="flex max-w-[150px] items-center justify-center sm:max-w-[300px]"
-      >
+      <div class="flex max-w-[150px] items-center justify-center sm:max-w-[300px]">
         <img src={drawing} alt="" width="300" height="180" class="rounded-md" />
       </div>
     {/each}

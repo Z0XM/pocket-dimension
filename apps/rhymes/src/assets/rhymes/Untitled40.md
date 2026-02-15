@@ -1,11 +1,12 @@
 ---
-thought_on: '2023/07/16'
+thought_on: "2023/07/16"
 rating: 7
-phase: 'Her'
-status: 'Done'
+phase: "Her"
+status: "Done"
 order: 40
-tags: ['For Them', 'Song']
+tags: ["For Them", "Song"]
 ---
+
 aane se, jaane se,
 kya hi hai hona.
 

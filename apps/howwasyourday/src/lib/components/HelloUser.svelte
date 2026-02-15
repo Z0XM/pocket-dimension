@@ -12,10 +12,7 @@
   // Use effective date: "today" = yesterday until noon
   const today = getEffectiveDate();
   const noOfDaysInYear = today.getFullYear() % 4 === 0 ? 366 : 365;
-  const todayCountOfDay = Math.ceil(
-    (today.getTime() - new Date(today.getFullYear(), 0, 1).getTime()) /
-      (1000 * 60 * 60 * 24),
-  );
+  const todayCountOfDay = Math.ceil((today.getTime() - new Date(today.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24));
 
   const session = authClient.useSession();
   const user = $derived($session.data?.user);
@@ -154,8 +151,7 @@
     </Card.Title>
     <Card.Description>
       <span class="text-xl text-primary">{todayCountOfDay}</span>
-      <span class="text-md text-muted-foreground">{` / ${noOfDaysInYear}`}</span
-      >
+      <span class="text-md text-muted-foreground">{` / ${noOfDaysInYear}`}</span>
     </Card.Description>
 
     <!-- Theme color picker icon -->
@@ -192,15 +188,7 @@
           <p class="text-sm font-medium text-foreground">Theme Color</p>
           <ColorPicker bind:color={themeColor} hueOnly />
           <div class="flex w-full gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              class="flex-1"
-              onclick={clearTheme}
-            >
-              Reset
-            </Button>
+            <Button type="button" variant="secondary" size="sm" class="flex-1" onclick={clearTheme}>Reset</Button>
             <Popover.Close>
               <Button type="button" size="sm" class="flex-1">Done</Button>
             </Popover.Close>
@@ -212,18 +200,10 @@
   <Progress value={(todayCountOfDay / noOfDaysInYear) * 100} class="w-full" />
   <Card.Content class="px-6">
     <div class="text-2xl">
-      <a
-        href="/"
-        class="text-foreground! cursor-pointer hover:underline hover:text-foreground/80!"
-      >
-        How Was Your Day</a
-      >
+      <a href="/" class="text-foreground! cursor-pointer hover:underline hover:text-foreground/80!"> How Was Your Day</a>
       <Popover.Root bind:open={logoutPopoverOpen}>
         <Popover.Trigger>
-          <span
-            class="text-3xl font-bold text-primary cursor-pointer hover:underline"
-            >{user?.username}</span
-          >
+          <span class="text-3xl font-bold text-primary cursor-pointer hover:underline">{user?.username}</span>
         </Popover.Trigger>
         <Popover.Content class="w-auto">
           <div class="flex flex-col gap-3">
@@ -232,9 +212,7 @@
               <Popover.Close>
                 <Button variant="secondary" size="sm">Cancel</Button>
               </Popover.Close>
-              <Button variant="destructive" size="sm" onclick={handleLogout}
-                >Logout</Button
-              >
+              <Button variant="destructive" size="sm" onclick={handleLogout}>Logout</Button>
             </div>
           </div>
         </Popover.Content>

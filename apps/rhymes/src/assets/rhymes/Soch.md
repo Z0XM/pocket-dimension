@@ -1,12 +1,13 @@
 ---
-title: 'Soch'
-thought_on: '2023/12/17'
+title: "Soch"
+thought_on: "2023/12/17"
 rating: 9
-phase: 'Singer!'
-status: 'Done'
+phase: "Singer!"
+status: "Done"
 order: 61
-tags: ['Song']
+tags: ["Song"]
 ---
+
 Tujhko jabse maine dekha hai,
 Ek dafa, socha hai sau dafa.
 Tu aayi to bin bulaye thi,
@@ -15,7 +16,7 @@ Yun jayegi kab de bata.
 Ye jo khwashiyen meri aayengi,
 Mujhko satayengi ye bada.
 
-Kya tu  bhi mere baare aise soche jaise mai sochu?
+Kya tu bhi mere baare aise soche jaise mai sochu?
 Tu bhi mujhe dekhe aur muskurae jaise mai karu?
 Tu bhi kho jaati hai is bheedh mein?
 Aur kya phir tu dhoondhen mujhe jaise mai tujhe dhoondoon.
@@ -32,7 +33,7 @@ In khushiyon mei kabhi hum "hum" lage?
 
 Mai jo paas tere to kuch kam yahan?
 Kya mujhe dekh ke tu bhi chipaye ankhiyan?
-Kya mere chune pe udti  titliyan?
+Kya mere chune pe udti titliyan?
 Kya mere aane pe chalti hai hawa?
 
 Mai soch ke hi jaanlu kya soch teri,

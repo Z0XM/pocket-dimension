@@ -18,4 +18,7 @@ export const actionsByUser = {
   updatedById: uuid("updated_by_id").references(() => auth.user.id, { onDelete: "cascade" }),
 };
 
-export const id = uuid("id").primaryKey().default(sql`uuidv7()`).notNull();
+export const id = uuid("id")
+  .primaryKey()
+  .default(sql`uuidv7()`)
+  .notNull();

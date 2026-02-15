@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/07/23'
+thought_on: "2024/07/23"
 rating: 7
-phase: 'Drama'
-status: 'Done'
+phase: "Drama"
+status: "Done"
 order: 119
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 mai joke suna dunga,
 mai poem suna dunga.
 

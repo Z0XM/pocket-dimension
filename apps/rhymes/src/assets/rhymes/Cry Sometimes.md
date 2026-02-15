@@ -1,12 +1,13 @@
 ---
-title: 'Cry Sometimes'
-thought_on: '2024/06/07'
+title: "Cry Sometimes"
+thought_on: "2024/06/07"
 rating: 10
-phase: 'Kathakali'
-status: 'Done'
+phase: "Kathakali"
+status: "Done"
 order: 101
-tags: ['Sad', 'Self']
+tags: ["Sad", "Self"]
 ---
+
 I look from afar,
 See them cry,
 To express a little
@@ -21,7 +22,7 @@ But then for myself why do I doubt?
 What harm would it do to say I love?
 What harm would it do to say I miss?
 What harm would it do to hug and burst out?
-What harm would it do to express  sometimes?
+What harm would it do to express sometimes?
 Right now, all I can express is through my rhymes.
 And hence, I ask myself several times,
 With no answers to be concluded as it all conflicts in my mind.

@@ -1,17 +1,18 @@
 ---
-title: 'Ro de Bhai'
-thought_on: '2025/05/03'
+title: "Ro de Bhai"
+thought_on: "2025/05/03"
 rating: 9
-phase: 'Kuch Alag'
-status: 'Done'
+phase: "Kuch Alag"
+status: "Done"
 order: 163
-tags: ['Self']
+tags: ["Self"]
 ---
+
 Mai keh rhi hu na,
 Tu zyada soch rha hai!
 Aur ye apna aap ko na itna rok mat, inta tok mat.
 Kuch baatein batane se kamzor nahi hojate,
-Thode aasun dhikane se mardaangi ke  chor nahi hojate.
+Thode aasun dhikane se mardaangi ke chor nahi hojate.
 
 Arey par maine kab kaha ki mai kuch chipa raha hun.
 Aisa hi seekha hai maine,

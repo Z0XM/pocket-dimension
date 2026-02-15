@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/07/28'
+thought_on: "2024/07/28"
 rating: 7
-phase: 'Drama'
-status: 'Done'
+phase: "Drama"
+status: "Done"
 order: 121
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 Don't turn your face away,
 Don't hide behind those smiles,
 I know you are the prettiest in the town,

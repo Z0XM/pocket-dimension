@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/07/27'
+thought_on: "2024/07/27"
 rating: 7
-phase: 'Drama'
-status: 'Done'
+phase: "Drama"
+status: "Done"
 order: 120
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 I hope you are fine,
 
 I hope you are fine in the world I can see,

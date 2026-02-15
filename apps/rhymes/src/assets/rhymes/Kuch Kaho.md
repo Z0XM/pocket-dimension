@@ -1,12 +1,13 @@
 ---
-title: 'Kuch Kaho'
-thought_on: '2024/05/16'
+title: "Kuch Kaho"
+thought_on: "2024/05/16"
 rating: 5
-phase: 'Natural Talent'
-status: 'In progress'
+phase: "Natural Talent"
+status: "In progress"
 order: 88
-tags: ['Random', 'Song']
+tags: ["Random", "Song"]
 ---
+
 kuch kaho, kuch bhi kaho,
 ab na tum saath mei chup yun raho,
 is pal mujhe kyun tarsa rahe,

@@ -1,12 +1,13 @@
 ---
-title: 'Dheemi Raftaarein'
-thought_on: '2024/09/07'
+title: "Dheemi Raftaarein"
+thought_on: "2024/09/07"
 rating: 8
-phase: 'Gayak'
-status: 'In progress'
+phase: "Gayak"
+status: "In progress"
 order: 129
-tags: ['Song']
+tags: ["Song"]
 ---
+
 Aisi kya baatein,
 Jo dheemi raftaarein,
 In raaho se pucho ye jaati kahan hai?

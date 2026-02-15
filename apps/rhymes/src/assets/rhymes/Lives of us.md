@@ -1,12 +1,13 @@
 ---
-title: 'Lives of us'
-thought_on: '2024/10/19'
+title: "Lives of us"
+thought_on: "2024/10/19"
 rating: 9
-phase: 'Matured'
-status: 'Instagram'
+phase: "Matured"
+status: "Instagram"
 order: 140
-tags: ['Feel Good', 'For Them', 'Self']
+tags: ["Feel Good", "For Them", "Self"]
 ---
+
 Dances of us can't last quite long,
 Unknown to me, they end before the good part of our song.
 
@@ -23,8 +24,8 @@ Memories of us bundle moments of love.
 Love that exists with no expectations of us.
 
 Love of us, non-existential as it may be,
-Sometimes, allows us to  just be and dance across life.
+Sometimes, allows us to just be and dance across life.
 
 And,
 Dances of us can't last quite long,
-Unknown to me, they end before the good part of our song. 
+Unknown to me, they end before the good part of our song.

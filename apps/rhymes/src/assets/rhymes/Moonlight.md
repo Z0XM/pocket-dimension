@@ -1,12 +1,13 @@
 ---
-title: 'Moonlight'
-thought_on: '2024/05/28'
+title: "Moonlight"
+thought_on: "2024/05/28"
 rating: 7
-phase: 'Natural Talent'
-status: 'In progress'
+phase: "Natural Talent"
+status: "In progress"
 order: 97
-tags: ['Random']
+tags: ["Random"]
 ---
+
 In your days I disappear,
 In your nights I shall shine bright!
 I have craters myself

@@ -1,11 +1,12 @@
 ---
-thought_on: '2022/11/01'
+thought_on: "2022/11/01"
 rating: 8
-phase: 'Singer ?'
-status: 'Idea'
+phase: "Singer ?"
+status: "Idea"
 order: 19
-tags: ['For Them', 'Self', 'Song']
+tags: ["For Them", "Self", "Song"]
 ---
+
 darr lage ab mujhe ki,
 tujhko jo bataya to,
 tuuuu rahegi yahin pe ya phir nahii

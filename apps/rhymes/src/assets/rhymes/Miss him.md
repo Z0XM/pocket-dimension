@@ -1,12 +1,13 @@
 ---
-title: 'Miss him'
-thought_on: '2021/12/28'
+title: "Miss him"
+thought_on: "2021/12/28"
 rating: 5
-phase: 'Ignition'
-status: 'In progress'
+phase: "Ignition"
+status: "In progress"
 order: 3
-tags: ['Sad', 'Self']
+tags: ["Sad", "Self"]
 ---
+
 Sometimes I smile without being happy,
 
 Sometimes I cry without any tears,

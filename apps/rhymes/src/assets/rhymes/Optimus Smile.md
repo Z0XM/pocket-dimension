@@ -1,12 +1,13 @@
 ---
-title: 'Optimus Smile'
-thought_on: '2024/05/02'
+title: "Optimus Smile"
+thought_on: "2024/05/02"
 rating: 7
-phase: 'Literature'
-status: 'Instagram'
+phase: "Literature"
+status: "Instagram"
 order: 82
-tags: ['Self']
+tags: ["Self"]
 ---
+
 This phase of life ending so soon.
 I am yet to traverse a long mile,
 At least I have upgraded,

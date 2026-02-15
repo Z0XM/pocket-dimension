@@ -1,12 +1,13 @@
 ---
-title: 'A Day To Remember'
-thought_on: '2025/01/15'
+title: "A Day To Remember"
+thought_on: "2025/01/15"
 rating: 10
-phase: '10/10 Poet'
-status: 'Done'
+phase: "10/10 Poet"
+status: "Done"
 order: 156
-tags: ['Feel Good', 'For Them']
+tags: ["Feel Good", "For Them"]
 ---
+
 If your grandkids ask you,
 "Who wrote this poem ?"
 You would tell them its me,
@@ -64,7 +65,7 @@ That day made me come a long way.
 Through all of those days,
 Your trust and care for me was constant, only more to grow,
 As I developed and understood the world around,
-As I learned to  express, feel emotions, and tried a little to show.
+As I learned to express, feel emotions, and tried a little to show.
 
 Some days to remember
 Would be me with my long hair,

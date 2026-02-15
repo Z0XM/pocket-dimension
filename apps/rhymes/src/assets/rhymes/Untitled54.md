@@ -1,11 +1,12 @@
 ---
-thought_on: '2023/11/22'
+thought_on: "2023/11/22"
 rating: 7
-phase: 'Okasan'
-status: 'Done'
+phase: "Okasan"
+status: "Done"
 order: 54
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 Give me your hand,
 We'll have fun together.
 To chase your dreams,

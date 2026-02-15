@@ -1,12 +1,13 @@
 ---
-title: 'Seem Fine'
-thought_on: '2024/05/20'
+title: "Seem Fine"
+thought_on: "2024/05/20"
 rating: 5
-phase: 'Tire Puncture'
-status: 'Done'
+phase: "Tire Puncture"
+status: "Done"
 order: 92
-tags: ['Feel Good', 'For Them']
+tags: ["Feel Good", "For Them"]
 ---
+
 Everything will seem fine,
 
 Once the days are gone and seen as not what we'll lose

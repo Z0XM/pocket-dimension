@@ -1,11 +1,12 @@
 ---
-thought_on: '2022/10/10'
+thought_on: "2022/10/10"
 rating: 0
-phase: 'Singer ?'
-status: 'Scrapped'
+phase: "Singer ?"
+status: "Scrapped"
 order: 15
-tags: ['Random', 'Song']
+tags: ["Random", "Song"]
 ---
+
 And there's one thing, I'll never have again,
 One thing, I'll never share again,
 One thing, I'll never dare again,

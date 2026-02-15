@@ -1,11 +1,12 @@
 ---
-thought_on: '2023/11/03'
+thought_on: "2023/11/03"
 rating: 8
-phase: 'Her'
-status: 'In progress'
+phase: "Her"
+status: "In progress"
 order: 53
-tags: ['Song']
+tags: ["Song"]
 ---
+
 Naya naya sa ek ye khwab hai,
 Mera, Tera hogya mai.
 Teri in baaton ke sangeet mei,
@@ -21,7 +22,6 @@ ye choti choti khushiyan,
 kyun ban rahi,
 mere liye,
 pyar ki ye titliyaan.
-
 
 darr lage ab mujhe ki,
 tujhko jo bataya to,

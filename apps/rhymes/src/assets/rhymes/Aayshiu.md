@@ -1,12 +1,13 @@
 ---
-title: 'Aayshiu'
-thought_on: '2023/07/20'
+title: "Aayshiu"
+thought_on: "2023/07/20"
 rating: 7
-phase: 'Her'
-status: 'Done'
+phase: "Her"
+status: "Done"
 order: 41
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 Kabhi narm, kabhi tez,
 kabhi garm, kabhi sard,
 tu leher leher v-aayu-si

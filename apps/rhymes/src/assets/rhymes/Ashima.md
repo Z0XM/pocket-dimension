@@ -1,11 +1,11 @@
 ---
-title: 'Ashima'
-thought_on: '2024/11/07'
+title: "Ashima"
+thought_on: "2024/11/07"
 rating: 7.5
-phase: 'Matured'
-status: 'Done'
+phase: "Matured"
+status: "Done"
 order: 142
-tags: ['Feel Good', 'For Them']
+tags: ["Feel Good", "For Them"]
 ---
 
 If this was a dream let's watch it together,
@@ -27,6 +27,6 @@ Let us paint how we see us.
 
 And for the gift,
 Let it be unknown, a curious mystery.
-As when we meet again, 
+As when we meet again,
 Let it be a reason for the fun
-And for another page in our history. 
+And for another page in our history.

@@ -1,12 +1,13 @@
 ---
-title: 'Green Flags'
-thought_on: '2024/02/01'
+title: "Green Flags"
+thought_on: "2024/02/01"
 rating: 7
-phase: 'Rice'
-status: 'Done'
+phase: "Rice"
+status: "Done"
 order: 66
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 Walk with me,
 And we'll go to places we've never been.
 Watch with me,

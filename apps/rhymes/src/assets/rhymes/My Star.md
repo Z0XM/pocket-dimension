@@ -1,12 +1,13 @@
 ---
-title: 'My Star'
-thought_on: '2022/03/06'
+title: "My Star"
+thought_on: "2022/03/06"
 rating: 10
-phase: 'Poet'
-status: 'Instagram'
+phase: "Poet"
+status: "Instagram"
 order: 8
-tags: ['Feel Good', 'Self']
+tags: ["Feel Good", "Self"]
 ---
+
 I was looking up at the night sky,
 I found something was missing....
 

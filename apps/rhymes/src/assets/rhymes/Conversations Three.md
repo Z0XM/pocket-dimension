@@ -1,12 +1,13 @@
 ---
-title: 'Conversations Three'
-thought_on: '2025/03/09'
+title: "Conversations Three"
+thought_on: "2025/03/09"
 rating: 8
-phase: '10/10 Poet'
-status: 'Instagram'
+phase: "10/10 Poet"
+status: "Instagram"
 order: 160
-tags: ['Feel Good']
+tags: ["Feel Good"]
 ---
+
 If I knew what's wrong
 Maybe, I would live a better life.
 In my head, If I knew,

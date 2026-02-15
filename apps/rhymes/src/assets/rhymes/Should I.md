@@ -1,12 +1,13 @@
 ---
-title: 'Should I ?'
-thought_on: '2023/04/13'
+title: "Should I ?"
+thought_on: "2023/04/13"
 rating: 10
-phase: 'Reference Game'
-status: 'Instagram'
+phase: "Reference Game"
+status: "Instagram"
 order: 33
-tags: ['Random']
+tags: ["Random"]
 ---
+
 I say "I love", but should I ?
 For if the world doesn't love me, why should I ?
 I say "I listen", but do I ?

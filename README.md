@@ -110,6 +110,7 @@ GRANT ALL PRIVILEGES ON DATABASE pocket_dimension TO your_username;
 ```
 
 **Note**: For local development, you can use the default `postgres` user. Update your `DATABASE_URL` in `.env` accordingly:
+
 - With custom user: `postgresql://your_username:your_password@localhost:5432/pocket_dimension`
 - With postgres user: `postgresql://postgres:postgres@localhost:5432/pocket_dimension`
 
@@ -187,6 +188,7 @@ NODE_ENV=development
 ```
 
 **Note**: Replace placeholder values with your actual configuration. For local development:
+
 - Set up a local PostgreSQL database and update `DATABASE_URL`
 - Generate a secure random string for `BETTER_AUTH_SECRET`
 - Get a Resend API key from [resend.com](https://resend.com) for email functionality
@@ -260,12 +262,14 @@ Then start individual services as needed.
 ## Available Scripts
 
 ### Development
+
 - `bun run dev` - Start all apps in development mode
 - `bun run dev:app:auth` - Start auth service only
 - `bun run dev:app:watchlist` - Start watchlist app only
 - `bun run dev:app:rhymes` - Start rhymes app only
 
 ### Building
+
 - `bun run build` - Build all packages and apps
 - `bun run build:shared:auth` - Build auth shared package
 - `bun run build:shared:db` - Build db shared package
@@ -275,11 +279,13 @@ Then start individual services as needed.
 - `bun run build:app:rhymes` - Build rhymes app
 
 ### Database
+
 - `bun run db:generate` - Generate database migrations
 - `bun run db:migrate` - Run database migrations
 - `bun run db:studio` - Open Drizzle Studio (database GUI)
 
 ### Code Quality
+
 - `bun run lint` - Lint all packages
 - `bun run format` - Format code with Biome
 - `bun run format:check` - Check code formatting
@@ -287,6 +293,7 @@ Then start individual services as needed.
 - `bun run typecheck` - Type check all packages
 
 ### Testing
+
 - `bun run test` - Run all tests
 - `bun run test:coverage` - Run tests with coverage
 

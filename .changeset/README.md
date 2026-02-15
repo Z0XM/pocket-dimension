@@ -11,6 +11,7 @@ bun run changeset
 ```
 
 This will prompt you to:
+
 1. Select which packages have changed
 2. Choose the type of change (major, minor, patch)
 3. Write a summary of the changes
@@ -26,6 +27,7 @@ bun run version
 ```
 
 This will:
+
 - Update package versions based on changesets
 - Update CHANGELOG.md files
 - Remove used changesets
@@ -52,5 +54,6 @@ bun run release
 ## CI Integration
 
 The CI workflow will check for changesets in pull requests and can be configured to:
+
 - Verify changesets exist for changed packages
 - Automatically version and publish on merge to main

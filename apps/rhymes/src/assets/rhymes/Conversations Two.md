@@ -1,12 +1,13 @@
 ---
-title: 'Conversations Two'
-thought_on: '2024/11/26'
+title: "Conversations Two"
+thought_on: "2024/11/26"
 rating: 7.5
-phase: '10/10 Poet'
-status: 'Instagram'
+phase: "10/10 Poet"
+status: "Instagram"
 order: 148
-tags: ['Self']
+tags: ["Self"]
 ---
+
 If I was a flower, Would I withstand winds flowing strong?
 Or break apart in the chaos of rain and thunderstorms?
 If I was a flower, Would I bring you joy?

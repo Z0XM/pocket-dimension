@@ -1,9 +1,10 @@
 ---
-thought_on: '2022/09/12'
+thought_on: "2022/09/12"
 rating: 0
-phase: 'Insignificant'
-status: 'Idea'
+phase: "Insignificant"
+status: "Idea"
 order: 11
-tags: ['Random']
+tags: ["Random"]
 ---
+
 if I had a moment to live

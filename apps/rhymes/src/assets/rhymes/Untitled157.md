@@ -1,11 +1,12 @@
 ---
-thought_on: '2025/01/16'
+thought_on: "2025/01/16"
 rating: 6
-phase: '10/10 Poet'
-status: 'Done'
+phase: "10/10 Poet"
+status: "Done"
 order: 157
-tags: ['Fun']
+tags: ["Fun"]
 ---
+
 Wo kya hai na,
 Din mere thode acche jaa na re the,
 Sapno mei aap thoda sata rahe the,

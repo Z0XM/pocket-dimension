@@ -13,7 +13,7 @@
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist --format esm --target bun --external better-auth --external drizzle-orm --external pg --external zod --external @pocket-dimension/utils",
     "clean": "rm -rf dist",
-    "lint": "biome check .",
+    "lint": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "db:generate": "bunx --bun drizzle-kit generate",
     "db:migrate": "bunx --bun drizzle-kit migrate",

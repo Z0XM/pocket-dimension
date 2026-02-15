@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/04/18'
+thought_on: "2024/04/18"
 rating: 10
-phase: 'Natural Talent'
-status: 'Done'
+phase: "Natural Talent"
+status: "Done"
 order: 80
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 With the dreams that don't let me sleep,
 And a family which doesn't let me dream,
 I feel stuck in this life,

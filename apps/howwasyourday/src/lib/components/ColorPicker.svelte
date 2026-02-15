@@ -149,20 +149,12 @@
   });
 </script>
 
-<svelte:window
-  onmousemove={handlePointerMove}
-  onmouseup={handlePointerUp}
-  ontouchmove={handlePointerMove}
-  ontouchend={handlePointerUp}
-/>
+<svelte:window onmousemove={handlePointerMove} onmouseup={handlePointerUp} ontouchmove={handlePointerMove} ontouchend={handlePointerUp} />
 
 <div class="colorful" class:colorful--hue-only={hueOnly}>
   {#if !hueOnly}
     <!-- Saturation/Value area -->
-    <div
-      class="colorful__saturation"
-      style="background-color: hsl({Math.round(hsv.h)}, 100%, 50%);"
-    >
+    <div class="colorful__saturation" style="background-color: hsl({Math.round(hsv.h)}, 100%, 50%);">
       <div
         bind:this={svArea}
         class="colorful__interactive"
@@ -172,32 +164,20 @@
         aria-valuenow={Math.round(hsv.s)}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuetext="Saturation {Math.round(hsv.s)}%, Brightness {Math.round(
-          hsv.v,
-        )}%"
+        aria-valuetext="Saturation {Math.round(hsv.s)}%, Brightness {Math.round(hsv.v)}%"
         onmousedown={startSV}
         ontouchstart={startSV}
       >
         <!-- Saturation pointer -->
-        <div
-          class="colorful__pointer colorful__saturation-pointer"
-          style="top: {100 - hsv.v}%; left: {hsv.s}%;"
-        >
-          <div
-            class="colorful__pointer-fill"
-            style="background-color: {color ?? '#ffffff'};"
-          ></div>
+        <div class="colorful__pointer colorful__saturation-pointer" style="top: {100 - hsv.v}%; left: {hsv.s}%;">
+          <div class="colorful__pointer-fill" style="background-color: {color ?? '#ffffff'};"></div>
         </div>
       </div>
     </div>
   {/if}
 
   <!-- Hue bar -->
-  <div
-    class="colorful__hue"
-    class:colorful__last-control={!hueOnly}
-    class:colorful__hue--standalone={hueOnly}
-  >
+  <div class="colorful__hue" class:colorful__last-control={!hueOnly} class:colorful__hue--standalone={hueOnly}>
     <div
       bind:this={hueBar}
       class="colorful__interactive"
@@ -211,14 +191,8 @@
       ontouchstart={startHue}
     >
       <!-- Hue pointer -->
-      <div
-        class="colorful__pointer colorful__hue-pointer"
-        style="top: 50%; left: {(hsv.h / 360) * 100}%;"
-      >
-        <div
-          class="colorful__pointer-fill"
-          style="background-color: hsl({Math.round(hsv.h)}, 100%, 50%);"
-        ></div>
+      <div class="colorful__pointer colorful__hue-pointer" style="top: 50%; left: {(hsv.h / 360) * 100}%;">
+        <div class="colorful__pointer-fill" style="background-color: hsl({Math.round(hsv.h)}, 100%, 50%);"></div>
       </div>
     </div>
   </div>
@@ -251,24 +225,14 @@
     border-color: transparent;
     border-bottom: 12px solid #000;
     border-radius: 12px 12px 0 0;
-    background-image: linear-gradient(to top, #000, rgba(0, 0, 0, 0)),
-      linear-gradient(to right, #fff, rgba(255, 255, 255, 0));
+    background-image: linear-gradient(to top, #000, rgba(0, 0, 0, 0)), linear-gradient(to right, #fff, rgba(255, 255, 255, 0));
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
   }
 
   .colorful__hue {
     position: relative;
     height: 28px;
-    background: linear-gradient(
-      to right,
-      #f00 0%,
-      #ff0 17%,
-      #0f0 33%,
-      #0ff 50%,
-      #00f 67%,
-      #f0f 83%,
-      #f00 100%
-    );
+    background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
   }
 
   .colorful__last-control {

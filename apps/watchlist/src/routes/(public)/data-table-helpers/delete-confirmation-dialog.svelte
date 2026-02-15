@@ -1,40 +1,40 @@
 <script lang="ts">
-import { TriangleAlert } from "@lucide/svelte";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { Input } from "$lib/components/ui/input";
+  import { TriangleAlert } from "@lucide/svelte";
+  import * as AlertDialog from "$lib/components/ui/alert-dialog";
+  import { Input } from "$lib/components/ui/input";
 
-interface Props {
-  open: boolean;
-  titles: string[];
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-let { open = $bindable(), titles, onConfirm, onCancel }: Props = $props();
-
-// For bulk deletes (>1), require typing DELETE
-const requireConfirmText = $derived(titles.length > 1);
-let confirmText = $state("");
-
-const canConfirm = $derived(!requireConfirmText || confirmText.toUpperCase() === "DELETE");
-
-function handleConfirm() {
-  if (!canConfirm) return;
-  confirmText = "";
-  onConfirm();
-}
-
-function handleCancel() {
-  confirmText = "";
-  onCancel();
-}
-
-// Reset confirm text when dialog opens/closes
-$effect(() => {
-  if (!open) {
-    confirmText = "";
+  interface Props {
+    open: boolean;
+    titles: string[];
+    onConfirm: () => void;
+    onCancel: () => void;
   }
-});
+
+  let { open = $bindable(), titles, onConfirm, onCancel }: Props = $props();
+
+  // For bulk deletes (>1), require typing DELETE
+  const requireConfirmText = $derived(titles.length > 1);
+  let confirmText = $state("");
+
+  const canConfirm = $derived(!requireConfirmText || confirmText.toUpperCase() === "DELETE");
+
+  function handleConfirm() {
+    if (!canConfirm) return;
+    confirmText = "";
+    onConfirm();
+  }
+
+  function handleCancel() {
+    confirmText = "";
+    onCancel();
+  }
+
+  // Reset confirm text when dialog opens/closes
+  $effect(() => {
+    if (!open) {
+      confirmText = "";
+    }
+  });
 </script>
 
 <AlertDialog.Root bind:open>
@@ -86,23 +86,14 @@ $effect(() => {
           </div>
         {/if}
 
-        <p class="text-sm text-red-600">
-          This action cannot be undone. The items will be permanently removed.
-        </p>
+        <p class="text-sm text-red-600">This action cannot be undone. The items will be permanently removed.</p>
       </div>
 
       <AlertDialog.Footer>
-        <AlertDialog.Cancel
-          class="dark:hover:bg-white/70 dark:bg-gray-200 text-black hover:text-black"
-          onclick={handleCancel}
-        >
+        <AlertDialog.Cancel class="dark:hover:bg-white/70 dark:bg-gray-200 text-black hover:text-black" onclick={handleCancel}>
           Cancel
         </AlertDialog.Cancel>
-        <AlertDialog.Action
-          onclick={handleConfirm}
-          disabled={!canConfirm}
-          class="dark:bg-rose-500 dark:hover:bg-rose-800"
-        >
+        <AlertDialog.Action onclick={handleConfirm} disabled={!canConfirm} class="dark:bg-rose-500 dark:hover:bg-rose-800">
           Delete {titles.length > 1 ? `${titles.length} Items` : "Item"}
         </AlertDialog.Action>
       </AlertDialog.Footer>

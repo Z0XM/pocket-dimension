@@ -1,12 +1,13 @@
 ---
-title: 'Thanks for the smile'
-thought_on: '2022/10/05'
+title: "Thanks for the smile"
+thought_on: "2022/10/05"
 rating: 7
-phase: 'Insignificant'
-status: 'Done'
+phase: "Insignificant"
+status: "Done"
 order: 13
-tags: ['Random', 'Song']
+tags: ["Random", "Song"]
 ---
+
 this is a letter to you,
 for the day,
 for the day jab mai,
@@ -27,8 +28,8 @@ if i say a final goodbye.
 kya -
 
 kya mai kabhi - usey doondh paunga,
-wo insaan,  jo kabhi khush tha,
-wo insaan,  jo ab koi pehchane na,
+wo insaan, jo kabhi khush tha,
+wo insaan, jo ab koi pehchane na,
 wo insaan jo dooba mere andar kahin,
 jiski talaash mei guzaari maine raatein kayi.
 kabhi kabhi kuch log bole yun
@@ -48,7 +49,7 @@ maine,
 maine na socha tumse hogi mulakaat
 kabhi,
 kabhi na itne time se maine smile kiya,
-bas apni diary  ke panno  pe,
+bas apni diary ke panno pe,
 shabdo ko rhyme kiya.
 haan -
 tune gham ko khushi mei gholna sikhaya,

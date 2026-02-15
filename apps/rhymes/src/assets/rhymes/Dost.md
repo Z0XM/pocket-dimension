@@ -1,12 +1,13 @@
 ---
-title: 'Dost'
-thought_on: '2024/09/24'
+title: "Dost"
+thought_on: "2024/09/24"
 rating: 8
-phase: 'Lekhak'
-status: 'In progress'
+phase: "Lekhak"
+status: "In progress"
 order: 134
-tags: ['For Them', 'Random']
+tags: ["For Them", "Random"]
 ---
+
 Wo kya hai na,
 Hum sirf dost hai.
 Mai tujhe zyada kuch bata nahi sakta,

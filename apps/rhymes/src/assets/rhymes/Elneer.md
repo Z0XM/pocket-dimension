@@ -1,12 +1,13 @@
 ---
-title: 'Elneer'
-thought_on: '2024/04/21'
+title: "Elneer"
+thought_on: "2024/04/21"
 rating: 10
-phase: 'Natural Talent'
-status: 'Done'
+phase: "Natural Talent"
+status: "Done"
 order: 81
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 I met a girl and she wanted to die,
 boli chahiye harpic aur bas karni suicide.
 I tell her ways to, the best of them all,
@@ -46,7 +47,7 @@ Or do you like rivers?
 Do you wanna fly high,
 with nothing to consider ?
 And you know she doesn't answer, I mean huh Geez,
-And she says, "I'm a horrible person.  Next question please!"
+And she says, "I'm a horrible person. Next question please!"
 
 I met a girl who has had a lot of fruits.
 Trust me!
@@ -55,7 +56,7 @@ There's no rhyme in this para,
 It's just her and her fruits!
 
 I met a girl who's very shy,
-she's smart and sweet and  funny sometimes!
+she's smart and sweet and funny sometimes!
 
 Me and her, she and I,
 We have met couple of times,

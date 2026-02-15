@@ -1,12 +1,13 @@
 ---
-title: 'Divine'
-thought_on: '2024/12/31'
+title: "Divine"
+thought_on: "2024/12/31"
 rating: 8.5
-phase: '10/10 Poet'
-status: 'In progress'
+phase: "10/10 Poet"
+status: "In progress"
 order: 155
-tags: ['Random']
+tags: ["Random"]
 ---
+
 You do great things, amazed by the actions, I join my hands, praise you for my life's span.
 I might walk right beside you, help in any way I can, learn in all ways I can.
 

@@ -1,24 +1,25 @@
 ---
-title: 'Afraid of Love'
-thought_on: '2024/02/04'
+title: "Afraid of Love"
+thought_on: "2024/02/04"
 rating: 10
-phase: 'Singer!'
-status: 'YouTube'
+phase: "Singer!"
+status: "YouTube"
 order: 68
-tags: ['Song']
+tags: ["Song"]
 ---
+
 Tere khayalo mei kho raha hu,
 Tujhse door reh ke yu ro raha hu,
 In vichaaron mein,
 In sawalon mein,
 Tujhe sapne mai dikha raha hu.
-Tujhko chahunga phir mai  agar.
+Tujhko chahunga phir mai agar.
 Tujhpe lutaunga sabkuch agar.
 Tujhse pyar to ho raha hai magar
 
 Mai is pyar se darr raha hu,
 
-tujhko kya mai  batadun,
+tujhko kya mai batadun,
 Ab jab,
 Khud se hi mai khafa hun.
 Tujhko kyu zara bhi saza dun,

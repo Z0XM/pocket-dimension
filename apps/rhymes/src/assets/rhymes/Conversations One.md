@@ -1,12 +1,13 @@
 ---
-title: 'Conversations One'
-thought_on: '2024/12/09'
+title: "Conversations One"
+thought_on: "2024/12/09"
 rating: 9
-phase: '10/10 Poet'
-status: 'Instagram'
+phase: "10/10 Poet"
+status: "Instagram"
 order: 154
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 Z:
 If what I say could speak 1000 ways,
 Which of them would you choose to walk?

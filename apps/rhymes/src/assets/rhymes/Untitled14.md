@@ -1,11 +1,12 @@
 ---
-thought_on: '2022/10/08'
+thought_on: "2022/10/08"
 rating: 0
-phase: 'Insignificant'
-status: 'Scrapped'
+phase: "Insignificant"
+status: "Scrapped"
 order: 14
-tags: ['Random']
+tags: ["Random"]
 ---
+
 I was going though some rough times,
 Flooded with thoughts of crime,
 In my mind.

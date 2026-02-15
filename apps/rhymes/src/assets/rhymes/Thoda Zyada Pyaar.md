@@ -1,12 +1,13 @@
 ---
-title: 'Thoda Zyada Pyaar'
-thought_on: '2024/03/27'
+title: "Thoda Zyada Pyaar"
+thought_on: "2024/03/27"
 rating: 10
-phase: 'Singer!'
-status: 'In progress'
+phase: "Singer!"
+status: "In progress"
 order: 75
-tags: ['Song']
+tags: ["Song"]
 ---
+
 zaroori lag rha hai,
 Tera ab sath.
 Najane kaise,

@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/05/15'
+thought_on: "2024/05/15"
 rating: 8
-phase: 'Natural Talent'
-status: 'Done'
+phase: "Natural Talent"
+status: "Done"
 order: 86
-tags: ['For Them', 'Sad', 'Song']
+tags: ["For Them", "Sad", "Song"]
 ---
+
 Mera mann, pareshaan, mai jaanu na mujhe kya hua.
 
 Mujhe sach na pata ya sach ko kahin daba raha.

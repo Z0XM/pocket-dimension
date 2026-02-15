@@ -6,7 +6,7 @@
     "build": "echo 'No build step needed - Bun runs TypeScript directly'",
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "lint": "biome check .",
+    "lint": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests"

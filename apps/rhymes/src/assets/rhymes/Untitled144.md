@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/11/16'
+thought_on: "2024/11/16"
 rating: 6
-phase: 'Pyaar Ki Baatein'
-status: 'In progress'
+phase: "Pyaar Ki Baatein"
+status: "In progress"
 order: 144
-tags: ['Song']
+tags: ["Song"]
 ---
+
 Jab milne ka samay subah chaar hota tha,
 Jab haath pakadna izhaar hota tha,
 Jisey pata saari batein sachcha yaar hota tha.

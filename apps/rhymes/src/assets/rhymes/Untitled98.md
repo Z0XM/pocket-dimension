@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/05/29'
+thought_on: "2024/05/29"
 rating: 7
-phase: 'Natural Talent'
-status: 'Done'
+phase: "Natural Talent"
+status: "Done"
 order: 98
-tags: ['Feel Good', 'For Them', 'Shayari']
+tags: ["Feel Good", "For Them", "Shayari"]
 ---
+
 Abhi kis baat pe shayari likhun?
 Abhi kisi baat ka gham nahi hai!
 

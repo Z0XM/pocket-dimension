@@ -1,11 +1,12 @@
 ---
-thought_on: '2022/10/20'
+thought_on: "2022/10/20"
 rating: 2
-phase: 'Singer ?'
-status: 'Idea'
+phase: "Singer ?"
+status: "Idea"
 order: 17
-tags: ['Random', 'Song']
+tags: ["Random", "Song"]
 ---
+
 Kyunki zindagi mein meri,
 Zindagi mei meri,
 zindagi mein meri,

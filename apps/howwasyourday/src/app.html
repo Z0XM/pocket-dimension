@@ -1,87 +1,90 @@
 <!doctype html>
 <html lang="en" class="dark">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
-		<!-- Primary Meta Tags -->
-		<title>How Was Your Day</title>
-		<meta name="title" content="How Was Your Day" />
-		<meta name="description" content="Track and reflect on your daily experiences" />
-		<meta name="author" content="Z0XM" />
-		<meta name="robots" content="index, follow" />
-		<meta name="language" content="English" />
+    <!-- Primary Meta Tags -->
+    <title>How Was Your Day</title>
+    <meta name="title" content="How Was Your Day" />
+    <meta name="description" content="Track and reflect on your daily experiences" />
+    <meta name="author" content="Z0XM" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="English" />
 
-		<!-- Open Graph / Facebook -->
-		<meta property="og:type" content="website" />
-		<meta property="og:title" content="How Was Your Day" />
-		<meta property="og:description" content="Track and reflect on your daily experiences" />
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How Was Your Day" />
+    <meta property="og:description" content="Track and reflect on your daily experiences" />
 
-		<!-- Twitter -->
-		<meta name="twitter:card" content="summary" />
-		<meta name="twitter:title" content="How Was Your Day" />
-		<meta name="twitter:description" content="Track and reflect on your daily experiences" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="How Was Your Day" />
+    <meta name="twitter:description" content="Track and reflect on your daily experiences" />
 
-		<!-- Icons -->
-		<link rel="icon" href="%sveltekit.assets%/icon.svg" type="image/svg+xml" />
-		<link rel="apple-touch-icon" href="%sveltekit.assets%/icon.svg" />
+    <!-- Icons -->
+    <link rel="icon" href="%sveltekit.assets%/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="%sveltekit.assets%/icon.svg" />
 
-		<!-- Web App -->
-		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-		<meta name="apple-mobile-web-app-title" content="How Was Your Day" />
-		<meta name="mobile-web-app-capable" content="yes" />
-		<meta name="application-name" content="How Was Your Day" />
+    <!-- Web App -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="How Was Your Day" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="How Was Your Day" />
 
-		%sveltekit.head%
-		<script>
-			// Apply saved theme color from localStorage before first paint to avoid flash
-			(function() {
-				try {
-					var hex = localStorage.getItem("hwyd-theme-color");
-					if (!hex) return;
-					var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-					if (!result) return;
-					var r = parseInt(result[1], 16) / 255;
-					var g = parseInt(result[2], 16) / 255;
-					var b = parseInt(result[3], 16) / 255;
-					var max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, h = 0;
-					if (d !== 0) {
-						if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
-						else if (max === g) h = ((b - r) / d + 2) * 60;
-						else h = ((r - g) / d + 4) * 60;
-					}
-					h = Math.round(h * 10) / 10;
-					var s = document.documentElement.style;
-					s.setProperty("--background", h+" 15% 4.5%");
-					s.setProperty("--foreground", h+" 15% 93%");
-					s.setProperty("--card", h+" 12% 9%");
-					s.setProperty("--card-foreground", h+" 15% 93%");
-					s.setProperty("--popover", h+" 12% 8%");
-					s.setProperty("--popover-foreground", h+" 15% 93%");
-					s.setProperty("--primary", h+" 70.6% 45.3%");
-					s.setProperty("--primary-foreground", h+" 80.4% 10%");
-					s.setProperty("--secondary", h+" 18% 14%");
-					s.setProperty("--secondary-foreground", h+" 10% 96%");
-					s.setProperty("--muted", h+" 12% 13%");
-					s.setProperty("--muted-foreground", h+" 10% 55%");
-					s.setProperty("--accent", h+" 25% 15%");
-					s.setProperty("--accent-foreground", h+" 10% 96%");
-					s.setProperty("--border", h+" 18% 16%");
-					s.setProperty("--input", h+" 15% 14%");
-					s.setProperty("--ring", h+" 71.8% 29.2%");
-					s.setProperty("--sidebar-background", h+" 12% 8%");
-					s.setProperty("--sidebar-foreground", h+" 10% 95%");
-					s.setProperty("--sidebar-primary", h+" 70.6% 45.3%");
-					s.setProperty("--sidebar-accent", h+" 20% 14%");
-					s.setProperty("--sidebar-accent-foreground", h+" 10% 95%");
-					s.setProperty("--sidebar-border", h+" 18% 16%");
-					s.setProperty("--sidebar-ring", h+" 71.8% 29.2%");
-				} catch(e) {}
-			})();
-		</script>
-	</head>
-	<body data-sveltekit-preload-data="hover">
-		<div style="display: contents">%sveltekit.body%</div>
-	</body>
+    %sveltekit.head%
+    <script>
+      // Apply saved theme color from localStorage before first paint to avoid flash
+      (function () {
+        try {
+          var hex = localStorage.getItem("hwyd-theme-color");
+          if (!hex) return;
+          var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          if (!result) return;
+          var r = parseInt(result[1], 16) / 255;
+          var g = parseInt(result[2], 16) / 255;
+          var b = parseInt(result[3], 16) / 255;
+          var max = Math.max(r, g, b),
+            min = Math.min(r, g, b),
+            d = max - min,
+            h = 0;
+          if (d !== 0) {
+            if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+            else if (max === g) h = ((b - r) / d + 2) * 60;
+            else h = ((r - g) / d + 4) * 60;
+          }
+          h = Math.round(h * 10) / 10;
+          var s = document.documentElement.style;
+          s.setProperty("--background", h + " 15% 4.5%");
+          s.setProperty("--foreground", h + " 15% 93%");
+          s.setProperty("--card", h + " 12% 9%");
+          s.setProperty("--card-foreground", h + " 15% 93%");
+          s.setProperty("--popover", h + " 12% 8%");
+          s.setProperty("--popover-foreground", h + " 15% 93%");
+          s.setProperty("--primary", h + " 70.6% 45.3%");
+          s.setProperty("--primary-foreground", h + " 80.4% 10%");
+          s.setProperty("--secondary", h + " 18% 14%");
+          s.setProperty("--secondary-foreground", h + " 10% 96%");
+          s.setProperty("--muted", h + " 12% 13%");
+          s.setProperty("--muted-foreground", h + " 10% 55%");
+          s.setProperty("--accent", h + " 25% 15%");
+          s.setProperty("--accent-foreground", h + " 10% 96%");
+          s.setProperty("--border", h + " 18% 16%");
+          s.setProperty("--input", h + " 15% 14%");
+          s.setProperty("--ring", h + " 71.8% 29.2%");
+          s.setProperty("--sidebar-background", h + " 12% 8%");
+          s.setProperty("--sidebar-foreground", h + " 10% 95%");
+          s.setProperty("--sidebar-primary", h + " 70.6% 45.3%");
+          s.setProperty("--sidebar-accent", h + " 20% 14%");
+          s.setProperty("--sidebar-accent-foreground", h + " 10% 95%");
+          s.setProperty("--sidebar-border", h + " 18% 16%");
+          s.setProperty("--sidebar-ring", h + " 71.8% 29.2%");
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
 </html>

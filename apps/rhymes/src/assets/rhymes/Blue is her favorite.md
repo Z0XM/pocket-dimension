@@ -1,12 +1,13 @@
 ---
-title: 'Blue is her favorite'
-thought_on: '2024/06/13'
+title: "Blue is her favorite"
+thought_on: "2024/06/13"
 rating: 9
-phase: 'Kathakali'
-status: 'Done'
+phase: "Kathakali"
+status: "Done"
 order: 103
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 Now when I look at the skies, it reminds me of the time we spent,
 Every pen, and a blot of ink reminds me of poems written,
 Even when my screen lights up, I hope it was for texts that you've sent.
@@ -21,7 +22,7 @@ Which colors may I see ?
 Among all the lights that shine,
 I wonder if the colors I see are true ?
 
-I also wonder what colors of mine  you see,
+I also wonder what colors of mine you see,
 Do you see the colors all the same as I do ?
 Are your clouds as white as for me ?
 Is my violet the same for you?

@@ -1,12 +1,13 @@
 ---
-title: 'Sleepless sleep'
-thought_on: '2023/08/27'
+title: "Sleepless sleep"
+thought_on: "2023/08/27"
 rating: 4
-phase: 'Literature'
-status: 'In progress'
+phase: "Literature"
+status: "In progress"
 order: 47
-tags: ['Self']
+tags: ["Self"]
 ---
+
 I lie on my bed, turn off the lights.
 Tuck in the bedsheet and
 Crawl on to the side

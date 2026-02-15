@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/06/28'
+thought_on: "2024/06/28"
 rating: 7
-phase: 'Faltu'
-status: 'Done'
+phase: "Faltu"
+status: "Done"
 order: 113
-tags: ['Fun', 'Random']
+tags: ["Fun", "Random"]
 ---
+
 Mai jo chal raha tha raaste mein,
 chalte chalte gir gaya mai,
 girte girte uth gaya mai,

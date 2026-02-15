@@ -1,36 +1,36 @@
 <script lang="ts">
-import { Trash2Icon, RotateCcwIcon, XIcon } from "@lucide/svelte";
-import { getContext } from "svelte";
-import { Button } from "$lib/components/ui/button";
-import { getEditModeContext, type UserRole } from "./edit-mode.svelte.js";
+  import { Trash2Icon, RotateCcwIcon, XIcon } from "@lucide/svelte";
+  import { getContext } from "svelte";
+  import { Button } from "$lib/components/ui/button";
+  import { getEditModeContext, type UserRole } from "./edit-mode.svelte.js";
 
-interface Props {
-  rowId: string;
-  isNewRow?: boolean;
-}
+  interface Props {
+    rowId: string;
+    isNewRow?: boolean;
+  }
 
-let { rowId, isNewRow = false }: Props = $props();
+  let { rowId, isNewRow = false }: Props = $props();
 
-const editMode = getEditModeContext();
-const editOptions = getContext<{ userRole: () => UserRole }>("editOptions");
+  const editMode = getEditModeContext();
+  const editOptions = getContext<{ userRole: () => UserRole }>("editOptions");
 
-const userRole = $derived(editOptions.userRole());
-const canDelete = $derived(editMode.canDeleteRows(userRole));
-const isDeleted = $derived(editMode.isRowDeleted(rowId));
+  const userRole = $derived(editOptions.userRole());
+  const canDelete = $derived(editMode.canDeleteRows(userRole));
+  const isDeleted = $derived(editMode.isRowDeleted(rowId));
 
-function handleDelete() {
-  if (isNewRow) {
-    // Remove the temporary new row
-    editMode.removeNewRow(rowId);
-  } else {
-    // Toggle delete state
-    if (isDeleted) {
-      editMode.unmarkRowDeleted(rowId);
+  function handleDelete() {
+    if (isNewRow) {
+      // Remove the temporary new row
+      editMode.removeNewRow(rowId);
     } else {
-      editMode.markRowDeleted(rowId);
+      // Toggle delete state
+      if (isDeleted) {
+        editMode.unmarkRowDeleted(rowId);
+      } else {
+        editMode.markRowDeleted(rowId);
+      }
     }
   }
-}
 </script>
 
 {#if editMode.isEditMode}
@@ -52,7 +52,9 @@ function handleDelete() {
         variant="ghost"
         size="sm"
         onclick={handleDelete}
-        class="h-7 w-7 p-0 {isDeleted ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950' : 'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950'}"
+        class="h-7 w-7 p-0 {isDeleted
+          ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950'
+          : 'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950'}"
         title={isDeleted ? "Undo delete" : "Mark for deletion"}
       >
         {#if isDeleted}

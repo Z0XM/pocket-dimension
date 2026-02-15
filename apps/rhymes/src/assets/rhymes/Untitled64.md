@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/01/23'
+thought_on: "2024/01/23"
 rating: 8
-phase: 'Rice'
-status: 'Done'
+phase: "Rice"
+status: "Done"
 order: 64
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 In andheri raaton mei na ye sitaare gina tu akshata,
 In behti nadiyon ke na ye kinaare dikha tu akshata.
 

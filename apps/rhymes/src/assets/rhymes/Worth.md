@@ -1,12 +1,13 @@
 ---
-title: 'Worth'
-thought_on: '2024/05/20'
+title: "Worth"
+thought_on: "2024/05/20"
 rating: 10
-phase: 'Natural Talent'
-status: 'Done'
+phase: "Natural Talent"
+status: "Done"
 order: 93
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 “Use words to prove your worth first”
 
 Oh dear stranger,

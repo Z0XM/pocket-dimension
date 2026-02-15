@@ -1,12 +1,13 @@
 ---
-title: 'Thoda Pyaar Nahi'
-thought_on: '2024/05/06'
+title: "Thoda Pyaar Nahi"
+thought_on: "2024/05/06"
 rating: 7
-phase: 'Singer!'
-status: 'In progress'
+phase: "Singer!"
+status: "In progress"
 order: 84
-tags: ['Song']
+tags: ["Song"]
 ---
+
 Tu thoda pyaar mat karna,
 Mai na karpaunga.
 Tu mera haath na pakadna,

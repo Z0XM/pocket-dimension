@@ -1,11 +1,12 @@
 ---
-thought_on: '2023/11/22'
+thought_on: "2023/11/22"
 rating: 7
-phase: 'Okasan'
-status: 'Done'
+phase: "Okasan"
+status: "Done"
 order: 55
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 Straight emotions in front of the world,
 Before you they bend.
 Multiple colors all around me,

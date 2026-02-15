@@ -1,12 +1,13 @@
 ---
-title: 'Sapne'
-thought_on: '2024/03/20'
+title: "Sapne"
+thought_on: "2024/03/20"
 rating: 8
-phase: 'Singer!'
-status: 'YouTube'
+phase: "Singer!"
+status: "YouTube"
 order: 74
-tags: ['Song']
+tags: ["Song"]
 ---
+
 un sitaaron wali raaton mein,
 bhooli hui yaadon mein,
 jab thoda mai dil mei tha tere,
@@ -31,11 +32,11 @@ jo sach hai wo bataja,
 mera dil tod de,
 mujhko sapno se uthaja.
 
-un bhooli  hui raaton mein,
+un bhooli hui raaton mein,
 sitaaron wali yaadon mein,
 jaisi bhi thi dil mei thi mere,
 
-meri halki  halki shaamon mein,
+meri halki halki shaamon mein,
 dhalti hui muskaano mein,
 teri khushi hai sapno mei mere.
 
@@ -56,7 +57,7 @@ mera dil tod de,
 mujhko sapno se uthaja.
 
 nadi kinaaron mein,
-mai teri baaho  mein,
+mai teri baaho mein,
 kahe tu kuch nahi, hai sab pata.
 
 tu mujhse kafa,

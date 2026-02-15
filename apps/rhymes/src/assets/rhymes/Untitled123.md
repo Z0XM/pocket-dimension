@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/08/02'
+thought_on: "2024/08/02"
 rating: 7
-phase: 'Drama'
-status: 'Done'
+phase: "Drama"
+status: "Done"
 order: 123
-tags: ['For Them']
+tags: ["For Them"]
 ---
+
 I wish I was next to you,
 Not to make you feel better or make you smile,
 But rather so that I can see how you are,

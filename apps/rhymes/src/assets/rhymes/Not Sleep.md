@@ -1,12 +1,13 @@
 ---
-title: 'Not Sleep'
-thought_on: '2025/04/28'
+title: "Not Sleep"
+thought_on: "2025/04/28"
 rating: 6
-phase: 'Kuch Alag'
-status: 'Instagram'
+phase: "Kuch Alag"
+status: "Instagram"
 order: 161
-tags: ['Random']
+tags: ["Random"]
 ---
+
 Some days some nights are not to sleep.
 Sometimes some places are not to be,
 Some dreams some visions are not to see,

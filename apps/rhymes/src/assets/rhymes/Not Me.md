@@ -1,12 +1,13 @@
 ---
-title: 'Not Me'
-thought_on: '2021/11/24'
+title: "Not Me"
+thought_on: "2021/11/24"
 rating: 10
-phase: 'Ignition'
-status: 'Instagram'
+phase: "Ignition"
+status: "Instagram"
 order: 1
-tags: ['Sad', 'Self']
+tags: ["Sad", "Self"]
 ---
+
 Feels like no one cares for me,
 Feels like no one's here for me.
 
@@ -59,4 +60,4 @@ I don't know what I lack,
 I don't know what I need,
 With time I will heal,
 Console myself, smile again,
-At least,  that's how it has been.
+At least, that's how it has been.

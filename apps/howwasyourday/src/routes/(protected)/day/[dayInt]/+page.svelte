@@ -1,82 +1,82 @@
 <script lang="ts">
-import { enhance } from "$app/forms";
-import ColorPicker from "$lib/components/ColorPicker.svelte";
-import DrawingCanvas from "$lib/components/DrawingCanvas.svelte";
-import { Button } from "$lib/components/ui/button";
-import * as Card from "$lib/components/ui/card";
-import * as Dialog from "$lib/components/ui/dialog";
-import { Input } from "$lib/components/ui/input";
-import { Slider } from "$lib/components/ui/slider";
-import { Textarea } from "$lib/components/ui/textarea";
-import { listOfEmojis } from "$lib/emojis";
-import { fromDayInt } from "$lib/utils";
-import type { PageData } from "./$types";
+  import { enhance } from "$app/forms";
+  import ColorPicker from "$lib/components/ColorPicker.svelte";
+  import DrawingCanvas from "$lib/components/DrawingCanvas.svelte";
+  import { Button } from "$lib/components/ui/button";
+  import * as Card from "$lib/components/ui/card";
+  import * as Dialog from "$lib/components/ui/dialog";
+  import { Input } from "$lib/components/ui/input";
+  import { Slider } from "$lib/components/ui/slider";
+  import { Textarea } from "$lib/components/ui/textarea";
+  import { listOfEmojis } from "$lib/emojis";
+  import { fromDayInt } from "$lib/utils";
+  import type { PageData } from "./$types";
 
-const { data }: { data: PageData } = $props();
+  const { data }: { data: PageData } = $props();
 
-const meta = data.metadata as Record<string, unknown> | null;
+  const meta = data.metadata as Record<string, unknown> | null;
 
-// Initial values from loaded data (or defaults)
-const initialValues = {
-  dayRating: (meta?.dayRating as number) ?? undefined,
-  dayEmoji: (meta?.dayEmoji as string) || undefined,
-  dayWord: (meta?.dayWord as string) || undefined,
-  dayColor: (meta?.dayColor as string) || undefined,
-  dayPerson: (meta?.dayPerson as string) || undefined,
-  dayNote: (meta?.dayNote as string) || undefined,
-  dayPublicNote: (meta?.dayPublicNote as string) || undefined,
-  dayDrawing: (meta?.dayDrawing as string) || undefined,
-};
+  // Initial values from loaded data (or defaults)
+  const initialValues = {
+    dayRating: (meta?.dayRating as number) ?? undefined,
+    dayEmoji: (meta?.dayEmoji as string) || undefined,
+    dayWord: (meta?.dayWord as string) || undefined,
+    dayColor: (meta?.dayColor as string) || undefined,
+    dayPerson: (meta?.dayPerson as string) || undefined,
+    dayNote: (meta?.dayNote as string) || undefined,
+    dayPublicNote: (meta?.dayPublicNote as string) || undefined,
+    dayDrawing: (meta?.dayDrawing as string) || undefined,
+  };
 
-let emojiPickerOpen = $state(false);
+  let emojiPickerOpen = $state(false);
 
-let dayRatingSet = $state(initialValues.dayRating != null);
-let dayRating = $state(initialValues.dayRating ?? 5);
-let dayEmoji = $state(initialValues.dayEmoji);
-let dayWord = $state(initialValues.dayWord);
-let dayColor = $state(initialValues.dayColor);
-let dayPerson = $state(initialValues.dayPerson);
-let dayNote = $state(initialValues.dayNote);
-let dayPublicNote = $state(initialValues.dayPublicNote);
-let dayDrawing = $state(initialValues.dayDrawing);
+  let dayRatingSet = $state(initialValues.dayRating != null);
+  let dayRating = $state(initialValues.dayRating ?? 5);
+  let dayEmoji = $state(initialValues.dayEmoji);
+  let dayWord = $state(initialValues.dayWord);
+  let dayColor = $state(initialValues.dayColor);
+  let dayPerson = $state(initialValues.dayPerson);
+  let dayNote = $state(initialValues.dayNote);
+  let dayPublicNote = $state(initialValues.dayPublicNote);
+  let dayDrawing = $state(initialValues.dayDrawing);
 
-function resetForm() {
-  dayRatingSet = initialValues.dayRating != null;
-  dayRating = initialValues.dayRating ?? 5;
-  dayEmoji = initialValues.dayEmoji;
-  dayWord = initialValues.dayWord;
-  dayColor = initialValues.dayColor;
-  dayPerson = initialValues.dayPerson;
-  dayNote = initialValues.dayNote;
-  dayPublicNote = initialValues.dayPublicNote;
-  dayDrawing = initialValues.dayDrawing;
-}
-
-// Pre-build the static HTML string once since the list never changes
-const emojiGridHTML = listOfEmojis
-  .map(
-    (e) =>
-      `<span role="button" tabindex="0" data-emoji="${e}" class="cursor-pointer rounded-md p-1 text-3xl hover:bg-accent active:scale-95 inline-block">${e}</span>`
-  )
-  .join("");
-
-function handleEmojiClick(event: MouseEvent) {
-  const target = (event.target as HTMLElement).closest<HTMLElement>("[data-emoji]");
-  if (target?.dataset.emoji) {
-    dayEmoji = target.dataset.emoji;
-    emojiPickerOpen = false;
+  function resetForm() {
+    dayRatingSet = initialValues.dayRating != null;
+    dayRating = initialValues.dayRating ?? 5;
+    dayEmoji = initialValues.dayEmoji;
+    dayWord = initialValues.dayWord;
+    dayColor = initialValues.dayColor;
+    dayPerson = initialValues.dayPerson;
+    dayNote = initialValues.dayNote;
+    dayPublicNote = initialValues.dayPublicNote;
+    dayDrawing = initialValues.dayDrawing;
   }
-}
 
-const editDate = fromDayInt(data.dayInt);
-const dateLabel = editDate.toLocaleDateString("en-IN", {
-  weekday: "long",
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
+  // Pre-build the static HTML string once since the list never changes
+  const emojiGridHTML = listOfEmojis
+    .map(
+      (e) =>
+        `<span role="button" tabindex="0" data-emoji="${e}" class="cursor-pointer rounded-md p-1 text-3xl hover:bg-accent active:scale-95 inline-block">${e}</span>`
+    )
+    .join("");
 
-const isEditing = meta !== null;
+  function handleEmojiClick(event: MouseEvent) {
+    const target = (event.target as HTMLElement).closest<HTMLElement>("[data-emoji]");
+    if (target?.dataset.emoji) {
+      dayEmoji = target.dataset.emoji;
+      emojiPickerOpen = false;
+    }
+  }
+
+  const editDate = fromDayInt(data.dayInt);
+  const dateLabel = editDate.toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  const isEditing = meta !== null;
 </script>
 
 <Card.Root class="">
@@ -135,19 +135,13 @@ const isEditing = meta !== null;
       <Card.Content class="p-0">
         <Dialog.Root bind:open={emojiPickerOpen}>
           <Dialog.Trigger type="button">
-            <div
-              class="flex animate-bounce cursor-pointer items-center justify-center text-3xl"
-            >
+            <div class="flex animate-bounce cursor-pointer items-center justify-center text-3xl">
               {dayEmoji || "❓"}
             </div>
           </Dialog.Trigger>
-          <Dialog.Content
-            class="flex max-h-[80vh] flex-col items-center justify-center"
-          >
+          <Dialog.Content class="flex max-h-[80vh] flex-col items-center justify-center">
             <Dialog.Header>
-              <Dialog.Title class="pb-2 text-2xl"
-                >Emote your day! {dayEmoji || "❓"}</Dialog.Title
-              >
+              <Dialog.Title class="pb-2 text-2xl">Emote your day! {dayEmoji || "❓"}</Dialog.Title>
               <Dialog.Description>
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 <div
@@ -157,8 +151,7 @@ const isEditing = meta !== null;
                   aria-label="Emoji picker"
                   onclick={handleEmojiClick}
                   onkeydown={(e) => {
-                    if (e.key === "Enter" || e.key === " ")
-                      handleEmojiClick(e as unknown as MouseEvent);
+                    if (e.key === "Enter" || e.key === " ") handleEmojiClick(e as unknown as MouseEvent);
                   }}
                 >
                   {@html emojiGridHTML}
@@ -177,27 +170,15 @@ const isEditing = meta !== null;
     <Card.Root class="col-span-8">
       <Card.Content class="">
         <div class="flex w-full flex-col gap-2">
-          <Input
-            class="text-md"
-            bind:value={dayWord}
-            type="text"
-            maxlength={64}
-            placeholder="Describe today in short."
-          />
+          <Input class="text-md" bind:value={dayWord} type="text" maxlength={64} placeholder="Describe today in short." />
         </div>
       </Card.Content>
     </Card.Root>
     <Card.Root class="col-span-2 flex items-center justify-center">
       <Card.Content class="p-0">
         <Dialog.Root>
-          <Dialog.Trigger
-            type="button"
-            class="flex items-center justify-center cursor-pointer"
-          >
-            <div
-              style={`background-color: ${dayColor ?? "#d3d3d3"}`}
-              class="h-[35px] w-[35px] rounded-full"
-            ></div>
+          <Dialog.Trigger type="button" class="flex items-center justify-center cursor-pointer">
+            <div style={`background-color: ${dayColor ?? "#d3d3d3"}`} class="h-[35px] w-[35px] rounded-full"></div>
           </Dialog.Trigger>
           <Dialog.Content class="flex flex-col items-center justify-center">
             <Dialog.Header>
@@ -216,45 +197,19 @@ const isEditing = meta !== null;
     <Card.Root class="col-span-6">
       <Card.Content class="">
         <div class="flex w-full flex-col gap-2">
-          <Input
-            class="text-md"
-            bind:value={dayPerson}
-            type="text"
-            maxlength={64}
-            placeholder="A person to remember."
-          />
+          <Input class="text-md" bind:value={dayPerson} type="text" maxlength={64} placeholder="A person to remember." />
         </div>
       </Card.Content>
     </Card.Root>
     <div class="col-span-8 flex w-full flex-col gap-2">
-      <Textarea
-        class="text-md px-2 py-1"
-        bind:value={dayNote}
-        placeholder="Write a note about today."
-      />
+      <Textarea class="text-md px-2 py-1" bind:value={dayNote} placeholder="Write a note about today." />
     </div>
     <div class="col-span-8 flex w-full flex-col gap-2">
-      <Input
-        class="text-md px-2 py-1"
-        bind:value={dayPublicNote}
-        placeholder="Write a public note."
-        type="text"
-        maxlength={120}
-      />
+      <Input class="text-md px-2 py-1" bind:value={dayPublicNote} placeholder="Write a public note." type="text" maxlength={120} />
     </div>
-    <DrawingCanvas
-      bind:currentDrawing={dayDrawing}
-      initialDrawing={initialValues.dayDrawing}
-    />
+    <DrawingCanvas bind:currentDrawing={dayDrawing} initialDrawing={initialValues.dayDrawing} />
     <div class="col-span-8 flex w-full gap-2">
-      <Button
-        type="button"
-        variant="secondary"
-        class="text-md flex-1  rounded p-2"
-        onclick={resetForm}
-      >
-        Cancel
-      </Button>
+      <Button type="button" variant="secondary" class="text-md flex-1  rounded p-2" onclick={resetForm}>Cancel</Button>
       <Button type="submit" class="text-md flex-1  rounded p-2">Submit</Button>
     </div>
   </div>

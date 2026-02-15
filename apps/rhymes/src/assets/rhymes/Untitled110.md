@@ -1,11 +1,12 @@
 ---
-thought_on: '2024/06/28'
+thought_on: "2024/06/28"
 rating: 6
-phase: 'Lekhak'
-status: 'Idea'
+phase: "Lekhak"
+status: "Idea"
 order: 110
-tags: ['Random']
+tags: ["Random"]
 ---
+
 Agar chaand ki thodi si roshani chura sakun,
 To mai wapas lauta dunga.
 

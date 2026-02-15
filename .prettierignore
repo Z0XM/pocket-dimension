@@ -1,0 +1,9 @@
+*.css
+*.gen.ts
+bun.lock
+node_modules
+dist
+build
+.next
+coverage
+.turbo
