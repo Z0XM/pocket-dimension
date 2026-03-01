@@ -36,16 +36,16 @@
     %sveltekit.head%
     <script>
       // Apply saved theme color from localStorage before first paint to avoid flash
-      (function () {
+      (() => {
         try {
-          var hex = localStorage.getItem("hwyd-theme-color");
+          const hex = localStorage.getItem("hwyd-theme-color");
           if (!hex) return;
-          var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
           if (!result) return;
-          var r = parseInt(result[1], 16) / 255;
-          var g = parseInt(result[2], 16) / 255;
-          var b = parseInt(result[3], 16) / 255;
-          var max = Math.max(r, g, b),
+          const r = parseInt(result[1], 16) / 255;
+          const g = parseInt(result[2], 16) / 255;
+          const b = parseInt(result[3], 16) / 255;
+          let max = Math.max(r, g, b),
             min = Math.min(r, g, b),
             d = max - min,
             h = 0;
@@ -55,7 +55,7 @@
             else h = ((r - g) / d + 4) * 60;
           }
           h = Math.round(h * 10) / 10;
-          var s = document.documentElement.style;
+          const s = document.documentElement.style;
           s.setProperty("--background", h + " 15% 4.5%");
           s.setProperty("--foreground", h + " 15% 93%");
           s.setProperty("--card", h + " 12% 9%");
