@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Time } from "@internationalized/date";
-  import { TimeField } from "bits-ui";
   import { onMount } from "svelte";
   import { browser } from "$app/environment";
   import { PUBLIC_VAPID_KEY } from "$env/static/public";
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
+  import * as Popover from "$lib/components/ui/popover";
+  import * as Select from "$lib/components/ui/select";
 
   type NotifState = "loading" | "unsupported" | "prompt" | "subscribing" | "subscribed" | "denied";
 
@@ -13,17 +13,38 @@
   let swRegistration: ServiceWorkerRegistration | null = $state(null);
   let reminderTime: string = $state("21:00");
   let saving: boolean = $state(false);
+  let selectedHour: string = $state("09");
+  let selectedMinute: string = $state("00");
+  let selectedPeriod: "AM" | "PM" = $state("PM");
 
-  function parseTime(str: string): Time {
-    const [h, m] = str.split(":").map(Number);
-    return new Time(h, m);
+  const hourOptions = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+  const minuteOptions = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+
+  function syncPickerFromTimeString(time: string) {
+    if (!/^\d{2}:\d{2}$/.test(time)) return;
+    const [hStr, mStr] = time.split(":");
+    const hour24 = Number(hStr);
+    const minute = Number(mStr);
+    selectedPeriod = hour24 >= 12 ? "PM" : "AM";
+    selectedHour = String(hour24 % 12 || 12).padStart(2, "0");
+    selectedMinute = String(minute).padStart(2, "0");
   }
 
-  function timeToString(t: Time): string {
-    return `${String(t.hour).padStart(2, "0")}:${String(t.minute).padStart(2, "0")}`;
+  function pickerToTimeString(hour: string, minute: string, period: "AM" | "PM"): string {
+    let hour24 = Number(hour) % 12;
+    if (period === "PM") hour24 += 12;
+    return `${String(hour24).padStart(2, "0")}:${minute}`;
   }
 
-  let timeValue: Time = $state(parseTime(reminderTime));
+  function formatTimeForDisplay(time: string): string {
+    if (!/^\d{2}:\d{2}$/.test(time)) return time;
+    const [hStr, mStr] = time.split(":");
+    const hour24 = Number(hStr);
+    const minute = Number(mStr);
+    const hour12 = hour24 % 12 || 12;
+    const period = hour24 < 12 ? "AM" : "PM";
+    return `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
+  }
 
   function urlBase64ToUint8Array(base64String: string): Uint8Array {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -46,7 +67,7 @@
         if (data.reminderTime) {
           reminderTime = data.reminderTime;
           prevTime = data.reminderTime;
-          timeValue = parseTime(data.reminderTime);
+          syncPickerFromTimeString(data.reminderTime);
         }
       } else {
         notifState = "prompt";
@@ -138,11 +159,9 @@
 
   let prevTime: string = $state("21:00");
 
-  function onTimeChange(val: Time | undefined) {
-    if (!val) return;
-    timeValue = val;
-    reminderTime = timeToString(val);
-  }
+  $effect(() => {
+    reminderTime = pickerToTimeString(selectedHour, selectedMinute, selectedPeriod);
+  });
 
   $effect(() => {
     if (reminderTime === prevTime) return;
@@ -181,32 +200,62 @@
       <div class="flex flex-col gap-0.5">
         <span class="text-sm font-medium text-foreground">Daily Reminders</span>
         <span class="text-xs text-muted-foreground">
-          {saving
-            ? "Saving..."
-            : `You will be notified at ${String(timeValue.hour % 12 || 12).padStart(2, "0")}:${String(timeValue.minute).padStart(2, "0")} ${timeValue.hour < 12 ? "AM" : "PM"}.`}
+          {saving ? "Saving..." : `You will be notified at ${formatTimeForDisplay(reminderTime)}.`}
         </span>
       </div>
       <div class="flex items-center gap-2">
-        <TimeField.Root value={timeValue} onValueChange={onTimeChange} hourCycle={12}>
-          <TimeField.Input class="flex h-8 items-center rounded-md border border-input bg-background px-2 text-xs text-foreground">
-            {#snippet children({ segments })}
-              {#each segments as { part, value }, i (part + i)}
-                {#if part === "literal"}
-                  <TimeField.Segment {part} class="px-0.5 text-muted-foreground">
-                    {value}
-                  </TimeField.Segment>
-                {:else}
-                  <TimeField.Segment
-                    {part}
-                    class="rounded px-0.5 py-0.5 tabular-nums hover:bg-muted focus:bg-primary/15 focus:text-foreground aria-[valuetext=Empty]:text-muted-foreground focus-visible:ring-0 focus-visible:outline-none"
-                  >
-                    {value}
-                  </TimeField.Segment>
-                {/if}
-              {/each}
-            {/snippet}
-          </TimeField.Input>
-        </TimeField.Root>
+        <Popover.Root>
+          <Popover.Trigger>
+            <button
+              type="button"
+              class="flex h-8 min-w-30 items-center justify-center rounded-md border border-input bg-background px-2 text-xs text-foreground hover:bg-muted/50"
+              aria-label="Change reminder time"
+            >
+              {formatTimeForDisplay(reminderTime)}
+            </button>
+          </Popover.Trigger>
+          <Popover.Content class="w-auto p-3" align="end">
+            <div class="flex items-end gap-2">
+              <div class="flex flex-col gap-1">
+                <span class="text-[10px] uppercase tracking-wide text-muted-foreground">Hour</span>
+                <Select.Root type="single" bind:value={selectedHour}>
+                  <Select.Trigger size="sm" class="w-18 justify-between">{selectedHour}</Select.Trigger>
+                  <Select.Content class="max-h-48">
+                    {#each hourOptions as hour}
+                      <Select.Item value={hour}>{hour}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </div>
+              <div class="flex flex-col gap-1">
+                <span class="text-[10px] uppercase tracking-wide text-muted-foreground">Minute</span>
+                <Select.Root type="single" bind:value={selectedMinute}>
+                  <Select.Trigger size="sm" class="w-18 justify-between">{selectedMinute}</Select.Trigger>
+                  <Select.Content class="max-h-48">
+                    {#each minuteOptions as minute}
+                      <Select.Item value={minute}>{minute}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </div>
+              <div class="flex flex-col gap-1">
+                <span class="text-[10px] uppercase tracking-wide text-muted-foreground">AM/PM</span>
+                <Select.Root type="single" bind:value={selectedPeriod}>
+                  <Select.Trigger size="sm" class="w-20 justify-between">{selectedPeriod}</Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="AM">AM</Select.Item>
+                    <Select.Item value="PM">PM</Select.Item>
+                  </Select.Content>
+                </Select.Root>
+              </div>
+            </div>
+            <div class="mt-3 flex justify-end">
+              <Popover.Close>
+                <Button size="sm">Done</Button>
+              </Popover.Close>
+            </div>
+          </Popover.Content>
+        </Popover.Root>
         <Button size="sm" variant="secondary" onclick={unsubscribe}>Disable</Button>
       </div>
     </Card.Content>
