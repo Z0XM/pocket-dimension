@@ -1,0 +1,1 @@
+ALTER TABLE "howwasyourday"."push_subscription" ADD COLUMN "reminder_time" text DEFAULT '21:00' NOT NULL;

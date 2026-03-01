@@ -3,6 +3,11 @@ import type { schema } from "@pocket-dimension/db";
 import { type Handle, redirect } from "@sveltejs/kit";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
+import { startNotificationScheduler } from "$lib/server/notification-scheduler";
+
+if (!building) {
+  startNotificationScheduler();
+}
 
 export const handle: Handle = async ({ event, resolve }) => {
   // Fetch current session from Better Auth
