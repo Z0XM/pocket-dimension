@@ -4,5 +4,5 @@
   "tabWidth": 2,
   "trailingComma": "es5",
   "printWidth": 150,
-  "plugins": ["prettier-plugin-svelte"]
+  "plugins": ["prettier-plugin-astro", "prettier-plugin-svelte"]
 }

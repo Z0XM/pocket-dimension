@@ -7,12 +7,23 @@ import "../styles/global.css";
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/rhyme_icon.svg" />
+    <link rel="apple-touch-icon" href="/rhyme_icon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#84093E" />
     <meta name="generator" content={Astro.generator} />
     <title>Rhymes by Z0XM</title>
   </head>
   <body>
     <slot />
+    <script is:inline>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js").catch(() => {
+            // Ignore registration failures to avoid breaking page load.
+          });
+        });
+      }
+    </script>
   </body>
 </html>

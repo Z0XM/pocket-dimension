@@ -1,0 +1,18 @@
+{
+  "name": "Rhymes by Z0XM",
+  "short_name": "Rhymes",
+  "description": "Rhymes by Z0XM",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#2D0111",
+  "theme_color": "#84093E",
+  "icons": [
+    {
+      "src": "/rhyme_icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
