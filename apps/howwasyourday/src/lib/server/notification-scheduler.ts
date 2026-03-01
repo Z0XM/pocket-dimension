@@ -2,8 +2,8 @@ import { db, schema } from "@pocket-dimension/db";
 import cron from "node-cron";
 import webpush from "web-push";
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
-import { VAPID_PRIVATE_KEY, VAPID_SUBJECT } from "$env/static/private";
-import { PUBLIC_VAPID_KEY } from "$env/static/public";
+import { env } from "$env/dynamic/private";
+import { env as publicEnv } from "$env/dynamic/public";
 
 let started = false;
 
@@ -94,12 +94,12 @@ async function tick() {
 
 export function startNotificationScheduler() {
   if (started) return;
-  if (!PUBLIC_VAPID_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) {
+  if (!publicEnv.PUBLIC_VAPID_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) {
     console.warn("[notifications] VAPID keys not configured, skipping scheduler");
     return;
   }
 
-  webpush.setVapidDetails(VAPID_SUBJECT, PUBLIC_VAPID_KEY, VAPID_PRIVATE_KEY);
+  webpush.setVapidDetails(env.VAPID_SUBJECT, publicEnv.PUBLIC_VAPID_KEY, env.VAPID_PRIVATE_KEY);
   cron.schedule("* * * * *", tick);
   started = true;
   console.log("[notifications] Scheduler started - checking every minute for due reminders");
