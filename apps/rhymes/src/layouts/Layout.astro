@@ -16,7 +16,69 @@ import "../styles/global.css";
   </head>
   <body>
     <slot />
+    <button id="pwa-install-button" type="button" aria-label="Install app"> Install </button>
+    <style>
+      #pwa-install-button {
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        z-index: 50;
+        display: none;
+        border: 1px solid #ffc8d3;
+        border-radius: 9999px;
+        background: rgba(42, 1, 15, 0.85);
+        color: #ffe4fa;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.75rem;
+        line-height: 1;
+        font-family: var(--font-content);
+        cursor: pointer;
+      }
+
+      #pwa-install-button:hover {
+        background: rgba(78, 3, 34, 0.9);
+      }
+    </style>
     <script is:inline>
+      (() => {
+        const installButton = document.getElementById("pwa-install-button");
+        if (!installButton) return;
+
+        let deferredPrompt = null;
+        const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+        const ua = window.navigator.userAgent.toLowerCase();
+        const isIos = /iphone|ipad|ipod/.test(ua) || (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+
+        if (!isStandalone && isIos) {
+          installButton.style.display = "inline-flex";
+        }
+
+        window.addEventListener("beforeinstallprompt", (event) => {
+          event.preventDefault();
+          deferredPrompt = event;
+          installButton.style.display = "inline-flex";
+        });
+
+        window.addEventListener("appinstalled", () => {
+          deferredPrompt = null;
+          installButton.style.display = "none";
+        });
+
+        installButton.addEventListener("click", async () => {
+          if (deferredPrompt) {
+            await deferredPrompt.prompt();
+            await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            installButton.style.display = "none";
+            return;
+          }
+
+          if (isIos) {
+            window.alert("To install this app on iOS, tap Share and then 'Add to Home Screen'.");
+          }
+        });
+      })();
+
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("/sw.js").catch(() => {
