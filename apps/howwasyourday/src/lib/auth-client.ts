@@ -6,4 +6,9 @@ export const authClient = createAuthClient({
   baseURL: PUBLIC_BASE_AUTH_URL,
   basePath: PUBLIC_BASE_AUTH_PATH,
   plugins: [usernameClient()],
+  sessionOptions: {
+    /** Seconds. Polls /get-session while logged in to extend sliding session cookie. */
+    refetchInterval: 60 * 5,
+    refetchOnWindowFocus: true,
+  },
 });

@@ -37,6 +37,16 @@ export const auth = betterAuth({
     },
     resetPasswordTokenExpiresIn: 60 * 60, // 1 hour
   },
+  /**
+   * Sliding session: each successful /get-session after `updateAge` extends `expiresIn`
+   * from "now" (see better-auth session route). This is cookie-based refresh — no
+   * separate refresh token. Pair with client `sessionOptions.refetchInterval` for
+   * background keep-alive while the tab is open.
+   */
+  session: {
+    expiresIn: 60 * 60 * 24 * 30, // 30 days — must hit get-session before absolute expiry
+    updateAge: 60 * 60 * 24, // extend session at most once per day of activity
+  },
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) => {
       // Log the URL to debug callbackURL issues
