@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+@plugin "@tailwindcss/typography";
+@import "tw-animate-css";
+@import "@fontsource-variable/nunito-sans";
+@import "@fontsource/fira-mono";
+
+:root {
+  /* Mayukai Dark inspired terminal palette */
+  --background: #060b0f;
+  --foreground: #dadbc0;
+  --card: #0d1016;
+  --card-foreground: #dadbc0;
+  --primary: #e6b450;
+  --primary-foreground: #0a0e14;
+  --secondary: #121922;
+  --secondary-foreground: #b3b1ad;
+  --muted: #191e25;
+  --muted-foreground: #8b93a1;
+  --accent: #d4bfff;
+  --accent-foreground: #0a0e14;
+  --border: #2e323c;
+  --ring: #ffa759;
+}
+
+@theme inline {
+  --font-sans: "Nunito Sans Variable", sans-serif;
+  --font-mono: "Fira Mono", monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body {
+    @apply min-h-screen bg-background text-foreground font-mono;
+  }
+
+  body {
+    background: var(--background);
+  }
+}
