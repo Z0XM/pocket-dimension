@@ -1,9 +1,9 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "types": ["bun"],
     "paths": {
+      "*": ["./*"],
       "@common/*": ["src/common/*"]
     }
   },

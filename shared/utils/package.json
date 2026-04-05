@@ -14,7 +14,7 @@
     "build": "bun build ./src/index.ts --outdir ./dist --format esm --target bun --external zod",
     "clean": "rm -rf dist",
     "lint": "prettier --check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "zod": "^4.2.1"

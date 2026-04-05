@@ -7,7 +7,7 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
     "lint": "prettier --check .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsgo --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests"
   },

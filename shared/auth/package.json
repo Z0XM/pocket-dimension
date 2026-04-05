@@ -14,7 +14,7 @@
     "build": "bun build ./src/index.ts --outdir ./dist --format esm --target bun --external better-auth --external @pocket-dimension/utils --external @pocket-dimension/db --external resend",
     "clean": "rm -rf dist",
     "lint": "prettier --check .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsgo --noEmit",
     "auth:generate": "bunx --bun better-auth generate --config ./src/index.ts",
     "auth:secret": "better-auth secret"
   },
