@@ -2,6 +2,7 @@
 @plugin "@tailwindcss/forms";
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
+@import "@fontsource-variable/syne";
 @import "@fontsource-variable/nunito-sans";
 @import "@fontsource/fira-mono";
 
@@ -41,6 +42,7 @@
 @theme inline {
   --font-sans: "Nunito Sans Variable", sans-serif;
   --font-mono: "Fira Mono", monospace;
+  --font-heading: "Syne Variable", var(--font-sans);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -69,6 +71,15 @@
 
   body {
     background: var(--background);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
   }
 }
 

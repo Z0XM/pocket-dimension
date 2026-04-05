@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@fontsource-variable/nunito-sans": "^5.2.7",
+    "@fontsource-variable/syne": "^5.2.7",
     "@fontsource/fira-mono": "^5.2.7",
     "@pocket-dimension/auth": "workspace:*",
     "@pocket-dimension/db": "workspace:*",
