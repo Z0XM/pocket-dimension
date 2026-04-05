@@ -6,21 +6,26 @@
 @import "@fontsource/fira-mono";
 
 :root {
-  /* Mayukai Dark inspired terminal palette */
+  /* Mayukacula: Mayukai Dark shell + Dracula accents */
   --background: #060b0f;
   --foreground: #dadbc0;
   --card: #0d1016;
   --card-foreground: #dadbc0;
-  --primary: #e6b450;
+  --primary: #ffb86c;
   --primary-foreground: #0a0e14;
   --secondary: #121922;
   --secondary-foreground: #b3b1ad;
   --muted: #191e25;
   --muted-foreground: #8b93a1;
-  --accent: #d4bfff;
+  --accent: #c5a3ff;
   --accent-foreground: #0a0e14;
   --border: #2e323c;
-  --ring: #ffa759;
+  --ring: #8be9fd;
+  --success: #50fa7b;
+  --danger: #ff5555;
+  --meter-needs: #ffb86c;
+  --meter-wants: #bd93f9;
+  --meter-savings: #50fa7b;
 }
 
 @theme inline {
