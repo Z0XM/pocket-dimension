@@ -8,7 +8,11 @@
   "steps": {
     "build": {
       "commands": ["./apps/markitdown/scripts/deploy-build.sh"],
-      "deployOutputs": ["apps/markitdown/build", "apps/markitdown/python", "apps/markitdown/python-packages"]
+      "deployOutputs": [
+        {
+          "include": ["apps/markitdown/build", "apps/markitdown/python", "apps/markitdown/python-packages"]
+        }
+      ]
     }
   },
   "deploy": {
