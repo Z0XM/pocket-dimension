@@ -1,5 +1,8 @@
 *.css
 *.gen.ts
+.venv
+.svelte-kit
+build
 bun.lock
 node_modules
 dist
