@@ -15,10 +15,22 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   if (event.route.id?.startsWith("/(auth)/")) {
-    const allowlisted = ["/(auth)/verify-email", "/(auth)/check-email"];
-    const isAllowlisted = allowlisted.some((route) => event.route.id?.startsWith(route));
-    if (session?.user.emailVerified && !isAllowlisted) {
-      return redirect(307, "/");
+    const allowedAuthRoutes = ["/(auth)/verify-email", "/(auth)/check-email"];
+    const isAllowedAuthRoute = allowedAuthRoutes.some((route) => event.route.id?.startsWith(route));
+
+    if (session && !isAllowedAuthRoute) {
+      if (session.user.emailVerified) {
+        return redirect(307, "/app");
+      }
+    }
+  }
+
+  if (event.route.id?.startsWith("/(protected)")) {
+    if (!session) {
+      return redirect(307, "/login");
+    }
+    if (!session.user.emailVerified) {
+      return redirect(307, "/check-email?reason=verify");
     }
   }
 
