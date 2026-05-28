@@ -16,7 +16,7 @@
     "variables": {
       "NODE_ENV": "production",
       "HOST": "0.0.0.0",
-      "PYTHON_PATH": "python3",
+      "PYTHON_PATH": ".venv/bin/python",
       "EXIFTOOL_PATH": "/usr/bin/exiftool",
       "FFMPEG_PATH": "/usr/bin/ffmpeg",
       "BODY_SIZE_LIMIT": "52428800"
