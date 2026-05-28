@@ -1,6 +1,6 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { env } from "$lib/server/env";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -48,6 +48,17 @@ function getAppRoot(): string {
   return process.cwd();
 }
 
+function getPythonPath(): string {
+  const configured = env.PYTHON_PATH;
+  return configured.startsWith("/") ? configured : resolve(getAppRoot(), configured);
+}
+
+function getPythonPackagesDir(): string | undefined {
+  const configured = env.PYTHON_PACKAGES_DIR;
+  if (!configured) return undefined;
+  return configured.startsWith("/") ? configured : resolve(getAppRoot(), configured);
+}
+
 function getConvertScriptPath(): string {
   return join(getAppRoot(), "python", "convert.py");
 }
@@ -81,12 +92,15 @@ export async function convertUploadedFile(file: File): Promise<string> {
     await writeFile(filePath, Buffer.from(await file.arrayBuffer()));
 
     const scriptPath = getConvertScriptPath();
-    const proc = Bun.spawn([env.PYTHON_PATH, scriptPath, filePath], {
+    const pythonPath = getPythonPath();
+    const pythonPackagesDir = getPythonPackagesDir();
+    const proc = Bun.spawn([pythonPath, scriptPath, filePath], {
       stdout: "pipe",
       stderr: "pipe",
       cwd: getAppRoot(),
       env: {
         ...process.env,
+        ...(pythonPackagesDir ? { PYTHONPATH: pythonPackagesDir } : {}),
         EXIFTOOL_PATH: process.env.EXIFTOOL_PATH ?? "/usr/bin/exiftool",
         FFMPEG_PATH: process.env.FFMPEG_PATH ?? "/usr/bin/ffmpeg",
       },

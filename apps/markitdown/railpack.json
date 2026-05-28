@@ -7,7 +7,8 @@
   "buildAptPackages": ["ffmpeg", "libimage-exiftool-perl"],
   "steps": {
     "build": {
-      "commands": ["./apps/markitdown/scripts/deploy-build.sh"]
+      "commands": ["./apps/markitdown/scripts/deploy-build.sh"],
+      "deployOutputs": ["apps/markitdown/build", "apps/markitdown/python", "apps/markitdown/python-packages"]
     }
   },
   "deploy": {
@@ -16,7 +17,8 @@
     "variables": {
       "NODE_ENV": "production",
       "HOST": "0.0.0.0",
-      "PYTHON_PATH": ".venv/bin/python",
+      "PYTHON_PATH": "python3",
+      "PYTHON_PACKAGES_DIR": "python-packages",
       "EXIFTOOL_PATH": "/usr/bin/exiftool",
       "FFMPEG_PATH": "/usr/bin/ffmpeg",
       "BODY_SIZE_LIMIT": "52428800"

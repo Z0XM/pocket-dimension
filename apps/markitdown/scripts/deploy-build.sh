@@ -11,8 +11,12 @@ echo "Installing Bun workspace dependencies..."
 bun install --frozen-lockfile
 
 echo "Installing MarkItDown Python dependencies..."
-python3 -m venv "$APP_DIR/.venv"
-"$APP_DIR/.venv/bin/pip" install --no-cache-dir -r "$APP_DIR/requirements.txt"
+PYTHON_PACKAGES_DIR="$APP_DIR/python-packages"
+mkdir -p "$PYTHON_PACKAGES_DIR"
+PIP_ROOT_USER_ACTION=ignore python3 -m pip install \
+  --no-cache-dir \
+  --target "$PYTHON_PACKAGES_DIR" \
+  -r "$APP_DIR/requirements.txt"
 
 echo "Building @pocket-dimension/markitdown..."
 bun build:app:markitdown
