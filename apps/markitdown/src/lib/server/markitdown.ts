@@ -50,7 +50,11 @@ function getAppRoot(): string {
 
 function getPythonPath(): string {
   const configured = env.PYTHON_PATH;
-  return configured.startsWith("/") ? configured : resolve(getAppRoot(), configured);
+  if (configured.startsWith("/")) return configured;
+  if (configured.startsWith(".") || configured.includes("/")) {
+    return resolve(getAppRoot(), configured);
+  }
+  return configured;
 }
 
 function getPythonPackagesDir(): string | undefined {
