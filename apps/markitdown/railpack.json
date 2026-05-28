@@ -7,7 +7,7 @@
   "buildAptPackages": ["ffmpeg", "libimage-exiftool-perl"],
   "steps": {
     "build": {
-      "commands": ["...", "./apps/markitdown/scripts/deploy-build.sh"]
+      "commands": ["./apps/markitdown/scripts/deploy-build.sh"]
     }
   },
   "deploy": {
