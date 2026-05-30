@@ -74,7 +74,7 @@
     </button>
 
     <p class="text-center text-sm text-muted-foreground">
-      <a href="/login" class="text-primary underline-offset-2 hover:underline">Back to sign in</a>
+      <a href="/login" class="text-primary-foreground underline-offset-2 hover:underline">Back to sign in</a>
     </p>
   </div>
 </form>

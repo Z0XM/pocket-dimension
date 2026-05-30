@@ -1,8 +1,11 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import { authClient } from "$lib/auth-client";
 
   const id = $props.id();
+
+  const redirectTo = $derived(page.url.searchParams.get("redirect") ?? "/app");
 
   let loginBy = $state<"email" | "username">("email");
   let email = $state("");
@@ -47,7 +50,7 @@
         return;
       }
 
-      await goto("/app");
+      await goto(redirectTo);
     } catch (err) {
       console.error(err);
       error = "Something went wrong!";
@@ -101,7 +104,7 @@
     <div
       class="mb-4 rounded-md border border-[color-mix(in_srgb,var(--primary)_35%,var(--border))] bg-[color-mix(in_srgb,var(--primary)_10%,transparent)] p-4 text-sm"
     >
-      <p class="mb-3 text-foreground">Your email address has not been verified yet.</p>
+      <p class="mb-3 text-text">Your email address has not been verified yet.</p>
       <button
         type="button"
         class="w-full rounded border border-border bg-secondary px-3 py-2 text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
@@ -127,7 +130,7 @@
       <div class="flex items-center gap-3 text-sm">
         <button
           type="button"
-          class="font-medium {loginBy === 'email' ? 'text-primary' : 'text-muted-foreground'}"
+          class="font-medium {loginBy === 'email' ? 'text-primary-foreground' : 'text-muted-foreground'}"
           onclick={() => (loginBy = "email")}
         >
           Email
@@ -135,7 +138,7 @@
         <span class="text-muted-foreground">·</span>
         <button
           type="button"
-          class="font-medium {loginBy === 'username' ? 'text-primary' : 'text-muted-foreground'}"
+          class="font-medium {loginBy === 'username' ? 'text-primary-foreground' : 'text-muted-foreground'}"
           onclick={() => (loginBy = "username")}
         >
           Username
@@ -167,7 +170,7 @@
     <div class="flex flex-col gap-2">
       <div class="flex items-center gap-2">
         <label for="password-{id}" class="text-sm font-medium">Password</label>
-        <a href="/forgot-password" class="ms-auto text-sm text-primary underline-offset-2 hover:underline">Forgot password?</a>
+        <a href="/forgot-password" class="ms-auto text-sm text-primary-foreground underline-offset-2 hover:underline">Forgot password?</a>
       </div>
       <input
         id="password-{id}"
@@ -182,7 +185,7 @@
     <button
       type="submit"
       disabled={loading}
-      class="rounded border border-border bg-secondary px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+      class="border-2 border-foreground bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-[3px_3px_0_var(--foreground)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_var(--foreground)] disabled:opacity-50"
     >
       {#if loading}
         Please wait…
@@ -193,7 +196,7 @@
 
     <p class="text-center text-sm text-muted-foreground">
       No account?
-      <a href="/sign-up" class="text-primary underline-offset-2 hover:underline">Sign up</a>
+      <a href="/sign-up" class="text-primary-foreground underline-offset-2 hover:underline">Sign up</a>
     </p>
   </div>
 </form>

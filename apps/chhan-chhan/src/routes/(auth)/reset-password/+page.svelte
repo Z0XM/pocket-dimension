@@ -100,7 +100,7 @@
         >
           Request new link
         </button>
-        <a href="/login" class="text-sm text-muted-foreground hover:text-primary">← Back to sign in</a>
+        <a href="/login" class="text-sm text-muted-foreground hover:text-primary-foreground-foreground">← Back to sign in</a>
       </div>
     </div>
   </div>
@@ -168,7 +168,7 @@
       </button>
 
       <p class="text-center text-sm text-muted-foreground">
-        <a href="/login" class="text-primary underline-offset-2 hover:underline">← Back to sign in</a>
+        <a href="/login" class="text-primary-foreground underline-offset-2 hover:underline">← Back to sign in</a>
       </p>
     </div>
   </form>

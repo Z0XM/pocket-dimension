@@ -146,7 +146,7 @@
 
     <p class="text-center text-sm text-muted-foreground">
       Already registered?
-      <a href="/login" class="text-primary underline-offset-2 hover:underline">Sign in</a>
+      <a href="/login" class="text-primary-foreground underline-offset-2 hover:underline">Sign in</a>
     </p>
   </div>
 </form>

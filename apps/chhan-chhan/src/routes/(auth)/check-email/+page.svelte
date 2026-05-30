@@ -100,7 +100,7 @@
         </button>
       {/if}
 
-      <a href="/login" class="text-sm text-muted-foreground hover:text-primary">← Back to sign in</a>
+      <a href="/login" class="text-sm text-muted-foreground hover:text-primary-foreground">← Back to sign in</a>
     </div>
 
     <div class="mt-2 text-xs text-muted-foreground">

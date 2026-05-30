@@ -5,6 +5,12 @@ import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
 
 export const handle: Handle = async ({ event, resolve }) => {
+  const { pathname } = event.url;
+
+  if (pathname === "/sample" || pathname.startsWith("/sample/")) {
+    throw redirect(307, "/app");
+  }
+
   const session = await auth.api.getSession({
     headers: event.request.headers,
   });
@@ -27,7 +33,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   if (event.route.id?.startsWith("/(protected)")) {
     if (!session) {
-      return redirect(307, "/login");
+      const returnTo = encodeURIComponent(event.url.pathname + event.url.search);
+      return redirect(307, `/login?redirect=${returnTo}`);
     }
     if (!session.user.emailVerified) {
       return redirect(307, "/check-email?reason=verify");

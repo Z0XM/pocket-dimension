@@ -2,49 +2,51 @@
 @plugin "@tailwindcss/forms";
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
-@import "@fontsource-variable/syne";
-@import "@fontsource-variable/nunito-sans";
+@import "@fontsource/archivo-black";
+@import "@fontsource-variable/archivo";
 @import "@fontsource/fira-mono";
+@import "./lib/styles/forge.css";
 
 :root {
-  /* Mayukacula: Mayukai Dark shell + Dracula accents */
-  --background: #060b0f;
-  --foreground: #dadbc0;
-  --card: #0d1016;
-  --card-foreground: #dadbc0;
-  --primary: #ffb86c;
-  --primary-foreground: #0a0e14;
-  --secondary: #121922;
-  --secondary-foreground: #b3b1ad;
-  --muted: #191e25;
-  --muted-foreground: #8b93a1;
-  --accent: #c5a3ff;
-  --accent-foreground: #0a0e14;
-  --border: #2e323c;
-  --ring: #8be9fd;
-  --success: #50fa7b;
-  --danger: #ff5555;
-  --meter-needs: #ffb86c;
-  --meter-wants: #bd93f9;
-  --meter-savings: #50fa7b;
-  /* Sample route only: soft viewport washes (not component gradients) */
-  --sample-glow-cyan: rgba(139, 233, 253, 0.06);
-  --sample-glow-violet: rgba(197, 163, 255, 0.05);
-  --sample-glow-amber: rgba(255, 184, 108, 0.05);
-}
+  /* Locked palette */
+  --brand-black: #060b0f;
+  --brand-white: #e8e4f0;
+  --brand-accent: #634bdd;
+  --brand-table: #060b0f;
+  --brand-cards: #21094e;
+  --brand-danger: #a50036;
+  --brand-success: #00a553;
 
-@property --terminal-border-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
+  /* Derived theme tokens */
+  --background: var(--brand-black);
+  --main-text: var(--brand-white);
+  --foreground: var(--brand-cards);
+  --card: var(--brand-black);
+  --card-foreground: var(--brand-white);
+  --primary: var(--brand-black);
+  --primary-foreground: var(--brand-accent);
+  --secondary: var(--brand-black);
+  --secondary-foreground: var(--brand-white);
+  --muted: var(--brand-black);
+  --muted-foreground: var(--brand-white);
+  --accent: var(--brand-accent);
+  --accent-foreground: var(--brand-black);
+  --border: var(--brand-table);
+  --ring: var(--brand-accent);
+  --success: var(--brand-success);
+  --danger: var(--brand-danger);
+  --scrollbar-thumb: var(--brand-accent);
+  --scrollbar-track: var(--brand-black);
+  --scrollbar-thumb-hover: var(--brand-accent);
 }
 
 @theme inline {
-  --font-sans: "Nunito Sans Variable", sans-serif;
+  --font-sans: "Archivo Variable", sans-serif;
   --font-mono: "Fira Mono", monospace;
-  --font-heading: "Syne Variable", var(--font-sans);
+  --font-heading: "Archivo Black", var(--font-sans);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-text: var(--main-text);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-primary: var(--primary);
@@ -62,11 +64,13 @@
 @layer base {
   * {
     @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   }
 
   html,
   body {
-    @apply min-h-screen bg-background text-foreground font-mono;
+    @apply min-h-screen bg-background text-text font-mono;
   }
 
   body {
@@ -81,109 +85,26 @@
   h6 {
     font-family: var(--font-heading);
   }
-}
 
-@layer components {
-  /* /sample: depth + grain; typography stays global font-mono + theme fonts */
-  .sample-console {
-    position: relative;
-    isolation: isolate;
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
   }
 
-  .sample-console::before {
-    content: "";
-    pointer-events: none;
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    opacity: 0.035;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
   }
 
-  .sample-console::after {
-    content: "";
-    pointer-events: none;
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    background:
-      radial-gradient(ellipse 80% 50% at 10% -15%, var(--sample-glow-cyan), transparent 55%),
-      radial-gradient(ellipse 60% 45% at 95% 5%, var(--sample-glow-violet), transparent 48%),
-      radial-gradient(ellipse 70% 40% at 50% 105%, var(--sample-glow-amber), transparent 52%);
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border: 1px solid var(--scrollbar-track);
   }
 
-  /*
-   * Rotating border only: conic gradient lives on ::before and is masked to the 2px
-   * padding ring (content-box xor border-box). The card face is a separate opaque layer.
-   */
-  .terminal-card-shell {
-    --terminal-card-radius: 0.375rem;
-    --terminal-border-track: color-mix(in srgb, var(--border) 75%, var(--card));
-    position: relative;
-    display: block;
-    border-radius: var(--terminal-card-radius);
-    padding: 2px;
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
   }
 
-  .terminal-card-shell::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    border-radius: inherit;
-    box-sizing: border-box;
-    padding: 2px;
-    pointer-events: none;
-    background: conic-gradient(
-      from var(--terminal-border-angle),
-      var(--terminal-border-track) 0deg,
-      var(--terminal-border-track) 265deg,
-      var(--ring) 288deg,
-      var(--accent) 304deg,
-      var(--primary) 318deg,
-      var(--success) 332deg,
-      var(--ring) 348deg,
-      var(--terminal-border-track) 360deg
-    );
-    animation: terminal-border-orbit 7s linear infinite;
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask-composite: exclude;
-  }
-
-  .terminal-card-shell > * {
-    position: relative;
-    z-index: 1;
-    min-height: 0;
-    border-radius: calc(var(--terminal-card-radius) - 2px);
-    background-color: var(--card);
-  }
-
-  @keyframes terminal-border-orbit {
-    to {
-      --terminal-border-angle: 360deg;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .terminal-card-shell::before {
-      animation: none;
-      background: linear-gradient(var(--border), var(--border));
-    }
-  }
-
-  /* Sample UI: user can disable rotating borders (see /sample toggle) */
-  .sample-console[data-terminal-borders="off"] .terminal-card-shell {
-    padding: 0;
-  }
-
-  .sample-console[data-terminal-borders="off"] .terminal-card-shell::before {
-    display: none;
-  }
-
-  .sample-console[data-terminal-borders="off"] .terminal-card-shell > * {
-    border-radius: var(--terminal-card-radius);
-    border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  *::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
   }
 }
