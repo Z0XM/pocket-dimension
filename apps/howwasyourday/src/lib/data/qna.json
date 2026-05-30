@@ -1,0 +1,698 @@
+[
+  {
+    "id": 1,
+    "question": "Are you grinding, or staring at the ceiling fan?"
+  },
+  {
+    "id": 2,
+    "question": "If you had to answer with a movie dialogue, how was your day?"
+  },
+  {
+    "id": 3,
+    "question": "Add a line to the poem, \"If I were a day.\""
+  },
+  {
+    "id": 4,
+    "question": "Add a line to the poem, \"If I were a night.\""
+  },
+  {
+    "id": 5,
+    "question": "Which movie character does today represent for you?"
+  },
+  {
+    "id": 6,
+    "question": "Which movie or series villain do you associate your day with?"
+  },
+  {
+    "id": 7,
+    "question": "What's a win for you?"
+  },
+  {
+    "id": 8,
+    "question": "Who's your villain?"
+  },
+  {
+    "id": 9,
+    "question": "Who's your hero?"
+  },
+  {
+    "id": 10,
+    "question": "Who's your main supporting side character?"
+  },
+  {
+    "id": 11,
+    "question": "What's your character anthem?"
+  },
+  {
+    "id": 12,
+    "question": "What flower are you?"
+  },
+  {
+    "id": 13,
+    "question": "What weather are you?"
+  },
+  {
+    "id": 14,
+    "question": "What animal are you?"
+  },
+  {
+    "id": 15,
+    "question": "What bird are you?"
+  },
+  {
+    "id": 16,
+    "question": "When does the sun shine?"
+  },
+  {
+    "id": 17,
+    "question": "What is your favorite cartoon?"
+  },
+  {
+    "id": 18,
+    "question": "What does feeling loved feel like?"
+  },
+  {
+    "id": 19,
+    "question": "What can you eat daily?"
+  },
+  {
+    "id": 20,
+    "question": "What is the purpose of your life?"
+  },
+  {
+    "id": 21,
+    "question": "If you got arrested, what would the crime be?"
+  },
+  {
+    "id": 22,
+    "question": "If you could buy imaginary things, what would you buy?"
+  },
+  {
+    "id": 23,
+    "question": "If you could steal something without anyone knowing, what would you steal?"
+  },
+  {
+    "id": 24,
+    "question": "If you had a slipper, whom would you throw it at?"
+  },
+  {
+    "id": 25,
+    "question": "Kya chahiye?"
+  },
+  {
+    "id": 26,
+    "question": "What are you bad at?"
+  },
+  {
+    "id": 27,
+    "question": "Why do you want a partner?"
+  },
+  {
+    "id": 28,
+    "question": "What do you miss?"
+  },
+  {
+    "id": 29,
+    "question": "When does it end?"
+  },
+  {
+    "id": 30,
+    "question": "What did you win?"
+  },
+  {
+    "id": 31,
+    "question": "What did you lose?"
+  },
+  {
+    "id": 32,
+    "question": "Do you want to win?"
+  },
+  {
+    "id": 33,
+    "question": "What color would you paint your future room?"
+  },
+  {
+    "id": 34,
+    "question": "If you could override a physics phenomenon, what would it be?"
+  },
+  {
+    "id": 35,
+    "question": "If you could change the color of water, seas, and oceans, what would it be?"
+  },
+  {
+    "id": 36,
+    "question": "If you could tell every living person one sentence that they hear directly in their mind, what would it be?"
+  },
+  {
+    "id": 37,
+    "question": "Would you choose a modern, high-tech house built with old cultural principles, or an old cultural house with high-tech embedded?"
+  },
+  {
+    "id": 38,
+    "question": "If you had to replace water with a soft drink, shake, or any other drink, what would you choose?"
+  },
+  {
+    "id": 39,
+    "question": "What veg dish can you cook without any vegetables?"
+  },
+  {
+    "id": 40,
+    "question": "Which shape is the best?"
+  },
+  {
+    "id": 41,
+    "question": "Why don't you give up?"
+  },
+  {
+    "id": 42,
+    "question": "Which vegetable do you hate?"
+  },
+  {
+    "id": 43,
+    "question": "What makes you shine?"
+  },
+  {
+    "id": 44,
+    "question": "What makes you dull?"
+  },
+  {
+    "id": 45,
+    "question": "What made you think you might be a genius?"
+  },
+  {
+    "id": 46,
+    "question": "What's made you think you might actually be a fool?"
+  },
+  {
+    "id": 47,
+    "question": "If you were a superhero, what would your tagline be?"
+  },
+  {
+    "id": 48,
+    "question": "What makes you stylish?"
+  },
+  {
+    "id": 49,
+    "question": "No question today. But what's your answer?"
+  },
+  {
+    "id": 50,
+    "question": "The answer is what you said yesterday. What's the question?"
+  },
+  {
+    "id": 51,
+    "question": "How are you?"
+  },
+  {
+    "id": 52,
+    "question": "If you got 10 rupees right now, what would you do with it?"
+  },
+  {
+    "id": 53,
+    "question": "What would your superhero costume look like?"
+  },
+  {
+    "id": 54,
+    "question": "Sleep or food?"
+  },
+  {
+    "id": 55,
+    "question": "What's on your mind?"
+  },
+  {
+    "id": 56,
+    "question": "What's a toy from your childhood you're attached to?"
+  },
+  {
+    "id": 57,
+    "question": "What is rain to you?"
+  },
+  {
+    "id": 58,
+    "question": "What brings you peace?"
+  },
+  {
+    "id": 59,
+    "question": "What brings you rage?"
+  },
+  {
+    "id": 60,
+    "question": "What makes you want to stay?"
+  },
+  {
+    "id": 61,
+    "question": "What makes you want to leave?"
+  },
+  {
+    "id": 62,
+    "question": "When's the last time you hugged someone?"
+  },
+  {
+    "id": 63,
+    "question": "Which moment would you want to relive?"
+  },
+  {
+    "id": 64,
+    "question": "What's been your bravest moment?"
+  },
+  {
+    "id": 65,
+    "question": "Predict something that will happen to you in August."
+  },
+  {
+    "id": 66,
+    "question": "What do you truly believe in?"
+  },
+  {
+    "id": 67,
+    "question": "What do you truly disbelieve in?"
+  },
+  {
+    "id": 68,
+    "question": "With whom did you have your last fight?"
+  },
+  {
+    "id": 69,
+    "question": "If you were to ban something in your country, what would it be?"
+  },
+  {
+    "id": 70,
+    "question": "If you could urbanize something, what would it be?"
+  },
+  {
+    "id": 71,
+    "question": "If you had to rename August, what would you call it?"
+  },
+  {
+    "id": 72,
+    "question": "It's supposed to be Friendship Day today!"
+  },
+  {
+    "id": 73,
+    "question": "If you were an artist, what would you paint?"
+  },
+  {
+    "id": 74,
+    "question": "If you were a champion athlete, which sport would you choose?"
+  },
+  {
+    "id": 75,
+    "question": "If you were a chef, what new dish would you invent?"
+  },
+  {
+    "id": 76,
+    "question": "If you were a doctor, which disease would you find a cure for?"
+  },
+  {
+    "id": 77,
+    "question": "If you were an astronaut, where would you travel to first?"
+  },
+  {
+    "id": 78,
+    "question": "If you were a king or queen, which country would you want to rule?"
+  },
+  {
+    "id": 79,
+    "question": "If you were a magician, what would you make disappear?"
+  },
+  {
+    "id": 80,
+    "question": "If you were a farmer, what would you farm?"
+  },
+  {
+    "id": 81,
+    "question": "If you were a black magic practitioner, what would you use it for?"
+  },
+  {
+    "id": 82,
+    "question": "If you were a ghost, what would be the method of defeating you?"
+  },
+  {
+    "id": 83,
+    "question": "If you were a lifeless object, what would you choose to be?"
+  },
+  {
+    "id": 84,
+    "question": "If you were a lifeless object, what would you choose to be?"
+  },
+  {
+    "id": 85,
+    "question": "If you were an object, but you could move, speak, and see, what would you be?"
+  },
+  {
+    "id": 86,
+    "question": "Forget but do not forgive, or forgive but do not forget?"
+  },
+  {
+    "id": 87,
+    "question": "If you had to choose a sickness or disease to endure for the rest of your life, what would it be?"
+  },
+  {
+    "id": 88,
+    "question": "If you could talk to another species, which one would it be?"
+  },
+  {
+    "id": 89,
+    "question": "Are your parents your role models?"
+  },
+  {
+    "id": 90,
+    "question": "Are you a good role model?"
+  },
+  {
+    "id": 91,
+    "question": "How many kids do you want?"
+  },
+  {
+    "id": 92,
+    "question": "If you could learn about one day from your future, which day would you choose?"
+  },
+  {
+    "id": 93,
+    "question": "If you could show your past self one day from what you've experienced so they could change it, which one would it be?"
+  },
+  {
+    "id": 94,
+    "question": "What would you do if you were put in jail?"
+  },
+  {
+    "id": 95,
+    "question": "What's that lifeless object you wish was alive?"
+  },
+  {
+    "id": 96,
+    "question": "Is lust sinful?"
+  },
+  {
+    "id": 97,
+    "question": "Choose: everyone on Earth instantly starts following the same — 1) an existing religion, 2) a new religion you create, or 3) no religion at all."
+  },
+  {
+    "id": 98,
+    "question": "Would your life be different in any way if you didn't look the way you do?"
+  },
+  {
+    "id": 99,
+    "question": "If you had to invent a new sport or promote a known game to the level of a sport, what would it be?"
+  },
+  {
+    "id": 100,
+    "question": "What is something you would want to end right now in a snap?"
+  },
+  {
+    "id": 101,
+    "question": "What will you buy if everything in the world had the same price for a second?"
+  },
+  {
+    "id": 102,
+    "question": "Lose the ability to remember new memories, or forget all of your current memories?"
+  },
+  {
+    "id": 103,
+    "question": "What's a lie you would want everyone to believe is true?"
+  },
+  {
+    "id": 104,
+    "question": "What's a truth you would want everyone to believe is a lie?"
+  },
+  {
+    "id": 105,
+    "question": "If you were a teacher, what would you teach?"
+  },
+  {
+    "id": 106,
+    "question": "What's a number you love?"
+  },
+  {
+    "id": 107,
+    "question": "If you could choose between ultimate luck or ultimate skills, what would you pick?"
+  },
+  {
+    "id": 108,
+    "question": "Is there something you want to tell other users of the website?"
+  },
+  {
+    "id": 109,
+    "question": "Is everyone distinctively unique?"
+  },
+  {
+    "id": 110,
+    "question": "If you could swap lives with someone for one day, who would it be?"
+  },
+  {
+    "id": 111,
+    "question": "If you could choose again before college, knowing what your college academics would be like, would you still choose the same?"
+  },
+  {
+    "id": 112,
+    "question": "Choose: everyone always speaks the truth to you, or you always speak the truth to everyone?"
+  },
+  {
+    "id": 113,
+    "question": "Why do you want to give a gift, and to whom?"
+  },
+  {
+    "id": 114,
+    "question": "What do you want as a gift, and from whom?"
+  },
+  {
+    "id": 115,
+    "question": "Go and check up on your friends!"
+  },
+  {
+    "id": 116,
+    "question": "Erase one aspect of humanity!"
+  },
+  {
+    "id": 117,
+    "question": "100 days left before this year ends. What's been the most memorable event in your life so far?"
+  },
+  {
+    "id": 118,
+    "question": "What's your skincare routine?"
+  },
+  {
+    "id": 119,
+    "question": "Who loves you?"
+  },
+  {
+    "id": 120,
+    "question": "Would you marry a robot if it was exactly what you want in a partner?"
+  },
+  {
+    "id": 121,
+    "question": "What will you gift me?"
+  },
+  {
+    "id": 122,
+    "question": "If AI had access to anything and everything across all technologies, what would be your prompt?"
+  },
+  {
+    "id": 123,
+    "question": "If you were an influencer or celebrity, what would be your niche?"
+  },
+  {
+    "id": 124,
+    "question": "Why are you?"
+  },
+  {
+    "id": 125,
+    "question": "Khane mein kya hai?"
+  },
+  {
+    "id": 126,
+    "question": "What is not fine?"
+  },
+  {
+    "id": 127,
+    "question": "What do your friends like about you?"
+  },
+  {
+    "id": 128,
+    "question": "What do you like about your friends?"
+  },
+  {
+    "id": 129,
+    "question": "What do you not like about your friends?"
+  },
+  {
+    "id": 130,
+    "question": "If the world around you were a circus, what would you be?"
+  },
+  {
+    "id": 131,
+    "question": "What do you not like about yourself?"
+  },
+  {
+    "id": 132,
+    "question": "Why does it all even matter?"
+  },
+  {
+    "id": 133,
+    "question": "Who's your favorite superhero or main character from a game or anime?"
+  },
+  {
+    "id": 134,
+    "question": "If you could declare a holiday, what date would you choose and what would its title be?"
+  },
+  {
+    "id": 135,
+    "question": "Aren't you tired of these questions?"
+  },
+  {
+    "id": 136,
+    "question": "If you could buy something you want badly, what non-monetary price would you pay for it?"
+  },
+  {
+    "id": 137,
+    "question": "What's your favorite sweet?"
+  },
+  {
+    "id": 138,
+    "question": "You are given the opportunity to create a new festival for all humans. What is it?"
+  },
+  {
+    "id": 139,
+    "question": "Would you rather live alone in a country with internet, or live in a 1BHK with 10 others without internet?"
+  },
+  {
+    "id": 140,
+    "question": "What would you do differently at your wedding?"
+  },
+  {
+    "id": 141,
+    "question": "If you could recolor your skin like in game avatars, which color would you choose?"
+  },
+  {
+    "id": 142,
+    "question": "Why does the sun go on shining? Why does the sea rush to shore?"
+  },
+  {
+    "id": 143,
+    "question": "You are on death row. Choose someone to fight your case, given that everyone else is fighting against you."
+  },
+  {
+    "id": 144,
+    "question": "How many chances do you give to people?"
+  },
+  {
+    "id": 145,
+    "question": "What's a legend or myth you were afraid of?"
+  },
+  {
+    "id": 146,
+    "question": "What's something you said you would do at the start of this year but haven't done until now?"
+  },
+  {
+    "id": 147,
+    "question": "How many chances do you give to yourself?"
+  },
+  {
+    "id": 148,
+    "question": "On a scale of 1 to 10, how much of a people pleaser are you?"
+  },
+  {
+    "id": 149,
+    "question": "What is something that you can absolutely win no matter who the opponent is?"
+  },
+  {
+    "id": 150,
+    "question": "What do you see when you close your eyes?"
+  },
+  {
+    "id": 151,
+    "question": "If you were a superhero, what powers would your nemesis have?"
+  },
+  {
+    "id": 152,
+    "question": "A day never ends until you end it! What's something you wish you had ended sooner?"
+  },
+  {
+    "id": 153,
+    "question": "A night stays up if you stay up with it. What's something you would want to extend for a few hours, knowing it's going to end soon?"
+  },
+  {
+    "id": 154,
+    "question": "If you had a Ben 10 watch but could transform into any species on Earth, what would you transform into most often?"
+  },
+  {
+    "id": 155,
+    "question": "What's something you would tell your child of the same age as you are right now?"
+  },
+  {
+    "id": 156,
+    "question": "What is something you have always wanted as a gift but can't ask for?"
+  },
+  {
+    "id": 157,
+    "question": "What would you do for me if I gave you 1000 rupees?"
+  },
+  {
+    "id": 158,
+    "question": "What will you ask me to do if you paid me 1000 rupees?"
+  },
+  {
+    "id": 159,
+    "question": "What is a non-food item you would eat if you could make it edible just once?"
+  },
+  {
+    "id": 160,
+    "question": "What are some boundaries you set in your friendships?"
+  },
+  {
+    "id": 161,
+    "question": "What do you do when someone crosses your boundaries?"
+  },
+  {
+    "id": 162,
+    "question": "What is something that feels within reach but always slips away as you reach for it?"
+  },
+  {
+    "id": 163,
+    "question": "If you were a devil, what would you be the devil of?"
+  },
+  {
+    "id": 164,
+    "question": "What would you be the god of?"
+  },
+  {
+    "id": 165,
+    "question": "How would people pray to you if you were a god and they followed your religion?"
+  },
+  {
+    "id": 166,
+    "question": "If you were a devil, how would people summon you?"
+  },
+  {
+    "id": 167,
+    "question": "If you were trapped in one of your past memories on loop for a month, which one would it be?"
+  },
+  {
+    "id": 168,
+    "question": "What would you call your husband or wife?"
+  },
+  {
+    "id": 169,
+    "question": "What would you do if you could control me for one hour?"
+  },
+  {
+    "id": 170,
+    "question": "What is the best thing you own that's under 1000?"
+  },
+  {
+    "id": 171,
+    "question": "What is an opinion you won't change no matter what?"
+  },
+  {
+    "id": 172,
+    "question": "What is an opinion you really want to change for everyone?"
+  },
+  {
+    "id": 173,
+    "question": "What would your legal will look like?"
+  },
+  {
+    "id": 174,
+    "question": "What's something that's 10/10 for you?"
+  }
+]
