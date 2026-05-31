@@ -1,9 +1,22 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
   import { formatMoney } from "$lib/finance/money";
   import { formatMonthKeyShort, type SummaryPeriod } from "$lib/finance/summary";
+  import {
+    DASHBOARD_WIDGETS_STORAGE_KEY,
+    isDashboardWidgetEnabled,
+    parseDashboardWidgets,
+    serializeDashboardWidgets,
+    type DashboardWidgetId,
+  } from "$lib/finance/dashboard-widgets";
   import AppNav from "$lib/components/app-nav.svelte";
   import AppSettings from "$lib/components/app-settings.svelte";
+  import CategoryTrendChart from "$lib/components/category-trend-chart.svelte";
+  import DashboardWidgetPicker from "$lib/components/dashboard-widget-picker.svelte";
+  import IncomeExpenseBars from "$lib/components/income-expense-bars.svelte";
+  import MeterBar from "$lib/components/meter-bar.svelte";
+  import MonthlyTrendChart from "$lib/components/monthly-trend-chart.svelte";
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
@@ -13,12 +26,14 @@
       summary?: SummaryPeriod;
       month?: string;
       year?: number;
+      widgets?: DashboardWidgetId[];
     } = {}
   ) {
     const params = new URLSearchParams();
     const summary = updates.summary ?? data.summaryPeriod;
     const month = updates.month ?? data.selectedMonth;
     const year = updates.year ?? data.selectedYear;
+    const widgets = updates.widgets ?? data.enabledWidgets;
 
     if (summary === "year") {
       params.set("summary", "year");
@@ -30,8 +45,9 @@
       params.set("month", month);
     }
 
-    const query = params.toString();
-    return query ? `/app/dashboards?${query}` : "/app/dashboards";
+    params.set("widgets", serializeDashboardWidgets(widgets));
+
+    return `/app/dashboards?${params.toString()}`;
   }
 
   function setSummaryPeriod(period: SummaryPeriod) {
@@ -58,6 +74,13 @@
     goto(dashboardUrl({ summary: "year", year }), { keepFocus: true, noScroll: true, invalidateAll: true });
   }
 
+  function setEnabledWidgets(widgets: DashboardWidgetId[]) {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(DASHBOARD_WIDGETS_STORAGE_KEY, serializeDashboardWidgets(widgets));
+    }
+    goto(dashboardUrl({ widgets }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
   function transactionsUrl(type?: "income" | "expense") {
     const params = new URLSearchParams();
     if (data.summaryPeriod === "year") {
@@ -73,6 +96,39 @@
     const query = params.toString();
     return query ? `/app?${query}` : "/app";
   }
+
+  onMount(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("widgets") || typeof localStorage === "undefined") return;
+
+    const stored = localStorage.getItem(DASHBOARD_WIDGETS_STORAGE_KEY);
+    if (!stored) return;
+
+    const storedWidgets = parseDashboardWidgets(stored);
+    const currentWidgets = data.enabledWidgets;
+    if (serializeDashboardWidgets(storedWidgets) === serializeDashboardWidgets(currentWidgets)) return;
+
+    goto(dashboardUrl({ widgets: storedWidgets }), { replaceState: true, noScroll: true, invalidateAll: true });
+  });
+
+  const showSummaryRow = $derived(
+    isDashboardWidgetEnabled(data.enabledWidgets, "summary-month") || isDashboardWidgetEnabled(data.enabledWidgets, "summary-all")
+  );
+
+  const showSpendingRow = $derived(
+    isDashboardWidgetEnabled(data.enabledWidgets, "category-spend") ||
+      isDashboardWidgetEnabled(data.enabledWidgets, "tag-spend") ||
+      isDashboardWidgetEnabled(data.enabledWidgets, "merchant-spend") ||
+      isDashboardWidgetEnabled(data.enabledWidgets, "group-spend")
+  );
+
+  const showTrendsRow = $derived(
+    isDashboardWidgetEnabled(data.enabledWidgets, "monthly-trend") ||
+      isDashboardWidgetEnabled(data.enabledWidgets, "category-trend") ||
+      isDashboardWidgetEnabled(data.enabledWidgets, "income-expense")
+  );
+
+  const showGoalsRow = $derived(isDashboardWidgetEnabled(data.enabledWidgets, "budgets") || isDashboardWidgetEnabled(data.enabledWidgets, "goals"));
 </script>
 
 <svelte:head><title>Dashboards · Chhan Chhan</title></svelte:head>
@@ -83,6 +139,7 @@
     <AppNav />
   </div>
   <div class="actions">
+    <DashboardWidgetPicker enabledWidgets={data.enabledWidgets} onchange={setEnabledWidgets} />
     <AppSettings />
   </div>
 </header>
@@ -180,114 +237,192 @@
   </section>
 </section>
 
-<section class="dash-grid">
-  <article class="dash-panel">
-    <h2>This month</h2>
-    <dl class="dash-kv">
-      <div>
-        <dt>In</dt>
-        <dd class="pos">{formatMoney(data.monthly.incomeMinor, data.account.currencyCode)}</dd>
-      </div>
-      <div>
-        <dt>Out</dt>
-        <dd class="neg">{formatMoney(-data.monthly.expenseMinor, data.account.currencyCode)}</dd>
-      </div>
-      <div>
-        <dt>Net</dt>
-        <dd>{formatMoney(data.monthly.netMinor, data.account.currencyCode)}</dd>
-      </div>
-    </dl>
-  </article>
-
-  <article class="dash-panel">
-    <h2>All time</h2>
-    <dl class="dash-kv">
-      <div>
-        <dt>In</dt>
-        <dd class="pos">{formatMoney(data.allTime.incomeMinor, data.account.currencyCode)}</dd>
-      </div>
-      <div>
-        <dt>Out</dt>
-        <dd class="neg">{formatMoney(-data.allTime.expenseMinor, data.account.currencyCode)}</dd>
-      </div>
-      <div>
-        <dt>Net</dt>
-        <dd>{formatMoney(data.allTime.netMinor, data.account.currencyCode)}</dd>
-      </div>
-    </dl>
-  </article>
-</section>
-
-{#if data.categorySpend.length}
-  <section class="dash-section">
-    <h2 class="dash-heading">Spending by category · {data.summaryLabel.toLowerCase()}</h2>
-    <div class="meters">
-      {#each data.categorySpend as row (row.name)}
-        <div class="meter">
-          <div class="meter-top">
-            <span>{row.name}</span>
-            <span>{formatMoney(row.amountMinor, data.account.currencyCode)}</span>
+{#if showSummaryRow}
+  <section class="dash-grid">
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "summary-month") && data.monthly}
+      <article class="dash-panel">
+        <h2>This month</h2>
+        <dl class="dash-kv">
+          <div>
+            <dt>In</dt>
+            <dd class="pos">{formatMoney(data.monthly.incomeMinor, data.account.currencyCode)}</dd>
           </div>
-          <div class="track">
-            <div class="fill" style="width:{row.pct}%; background:{row.color}"></div>
+          <div>
+            <dt>Out</dt>
+            <dd class="neg">{formatMoney(-data.monthly.expenseMinor, data.account.currencyCode)}</dd>
           </div>
-        </div>
-      {/each}
-    </div>
+          <div>
+            <dt>Net</dt>
+            <dd>{formatMoney(data.monthly.netMinor, data.account.currencyCode)}</dd>
+          </div>
+        </dl>
+      </article>
+    {/if}
+
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "summary-all") && data.allTime}
+      <article class="dash-panel">
+        <h2>All time</h2>
+        <dl class="dash-kv">
+          <div>
+            <dt>In</dt>
+            <dd class="pos">{formatMoney(data.allTime.incomeMinor, data.account.currencyCode)}</dd>
+          </div>
+          <div>
+            <dt>Out</dt>
+            <dd class="neg">{formatMoney(-data.allTime.expenseMinor, data.account.currencyCode)}</dd>
+          </div>
+          <div>
+            <dt>Net</dt>
+            <dd>{formatMoney(data.allTime.netMinor, data.account.currencyCode)}</dd>
+          </div>
+        </dl>
+      </article>
+    {/if}
   </section>
 {/if}
 
-<section class="dash-grid">
-  <article class="dash-panel">
-    <h2>Budgets</h2>
-    {#if data.budgetUsage.length === 0}
-      <p class="dim dash-empty">No active budgets.</p>
-    {:else}
-      <div class="dash-meters">
-        {#each data.budgetUsage as budget (budget.id)}
-          <div class="meter">
-            <div class="meter-top">
-              <span>{budget.name}</span>
-              <span>{budget.pct}%</span>
-            </div>
-            <div class="track">
-              <div class="fill" style="width:{budget.pct}%; background:{budget.color}"></div>
-            </div>
-            <p class="meter-meta dim">
-              {formatMoney(budget.spentMinor, data.account.currencyCode)} of
-              {formatMoney(budget.limitMinor, data.account.currencyCode)}
-            </p>
-          </div>
-        {/each}
-      </div>
+{#if showTrendsRow}
+  <section class="dash-grid">
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "monthly-trend") && data.monthlyTrend.length}
+      <article class="dash-panel dash-panel-wide">
+        <h2>Monthly trend · last 12 months</h2>
+        <MonthlyTrendChart rows={data.monthlyTrend} currencyCode={data.account.currencyCode} />
+      </article>
     {/if}
-  </article>
 
-  <article class="dash-panel">
-    <h2>Goals</h2>
-    {#if data.goals.length === 0}
-      <p class="dim dash-empty">No goals yet.</p>
-    {:else}
-      <div class="dash-meters">
-        {#each data.goals as goal (goal.id)}
-          <div class="meter">
-            <div class="meter-top">
-              <span>{goal.name}</span>
-              <span>{goal.pct}%</span>
-            </div>
-            <div class="track">
-              <div class="fill" style="width:{goal.pct}%; background:#00a553"></div>
-            </div>
-            <p class="meter-meta dim">
-              {formatMoney(goal.currentMinor, data.account.currencyCode)} of
-              {formatMoney(goal.targetMinor, data.account.currencyCode)} · {goal.status}
-            </p>
-          </div>
-        {/each}
-      </div>
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "category-trend") && data.categoryTrend?.categories.length}
+      <article class="dash-panel dash-panel-wide">
+        <h2>Category trend · last 12 months</h2>
+        <CategoryTrendChart chart={data.categoryTrend} currencyCode={data.account.currencyCode} />
+      </article>
+    {:else if isDashboardWidgetEnabled(data.enabledWidgets, "category-trend")}
+      <article class="dash-panel dash-panel-wide">
+        <h2>Category trend · last 12 months</h2>
+        <p class="dim dash-empty">No categorized expenses in this period.</p>
+      </article>
     {/if}
-  </article>
-</section>
+
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "income-expense") && data.showIncomeExpense}
+      <article class="dash-panel">
+        <h2>Income vs expense · {data.summaryLabel.toLowerCase()}</h2>
+        <IncomeExpenseBars incomeMinor={data.summary.incomeMinor} expenseMinor={data.summary.expenseMinor} currencyCode={data.account.currencyCode} />
+      </article>
+    {/if}
+  </section>
+{/if}
+
+{#if showSpendingRow}
+  <section class="dash-grid dash-grid-spending">
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "category-spend")}
+      <article class="dash-panel">
+        <h2>Category spend · {data.summaryLabel.toLowerCase()}</h2>
+        {#if data.categorySpend.length === 0}
+          <p class="dim dash-empty">No expenses in this period.</p>
+        {:else}
+          <div class="dash-meters">
+            {#each data.categorySpend as row (row.name)}
+              <MeterBar name={row.name} valueLabel={formatMoney(row.amountMinor, data.account.currencyCode)} pct={row.pct} color={row.color} />
+            {/each}
+          </div>
+        {/if}
+      </article>
+    {/if}
+
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "tag-spend")}
+      <article class="dash-panel">
+        <h2>Tag spend · {data.summaryLabel.toLowerCase()}</h2>
+        {#if data.tagSpend.length === 0}
+          <p class="dim dash-empty">No tagged expenses in this period.</p>
+        {:else}
+          <div class="dash-meters">
+            {#each data.tagSpend as row (row.name)}
+              <MeterBar name={row.name} valueLabel={formatMoney(row.amountMinor, data.account.currencyCode)} pct={row.pct} color={row.color} />
+            {/each}
+          </div>
+        {/if}
+      </article>
+    {/if}
+
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "merchant-spend")}
+      <article class="dash-panel">
+        <h2>Top merchants · {data.summaryLabel.toLowerCase()}</h2>
+        {#if data.merchantSpend.length === 0}
+          <p class="dim dash-empty">No merchant spend in this period.</p>
+        {:else}
+          <div class="dash-meters">
+            {#each data.merchantSpend as row (row.name)}
+              <MeterBar name={row.name} valueLabel={formatMoney(row.amountMinor, data.account.currencyCode)} pct={row.pct} color={row.color} />
+            {/each}
+          </div>
+        {/if}
+      </article>
+    {/if}
+
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "group-spend")}
+      <article class="dash-panel">
+        <h2>Group spend · {data.summaryLabel.toLowerCase()}</h2>
+        {#if data.groupSpend.length === 0}
+          <p class="dim dash-empty">No grouped expenses in this period.</p>
+        {:else}
+          <div class="dash-meters">
+            {#each data.groupSpend as row (row.name)}
+              <MeterBar name={row.name} valueLabel={formatMoney(row.amountMinor, data.account.currencyCode)} pct={row.pct} color={row.color} />
+            {/each}
+          </div>
+        {/if}
+      </article>
+    {/if}
+  </section>
+{/if}
+
+{#if showGoalsRow}
+  <section class="dash-grid">
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "budgets")}
+      <article class="dash-panel">
+        <h2>Budgets</h2>
+        {#if data.budgetUsage.length === 0}
+          <p class="dim dash-empty">No active budgets.</p>
+        {:else}
+          <div class="dash-meters">
+            {#each data.budgetUsage as budget (budget.id)}
+              <MeterBar
+                name={budget.name}
+                valueLabel="{budget.pct}%"
+                pct={budget.pct}
+                color={budget.color}
+                meta="{formatMoney(budget.spentMinor, data.account.currencyCode)} of {formatMoney(budget.limitMinor, data.account.currencyCode)}"
+              />
+            {/each}
+          </div>
+        {/if}
+      </article>
+    {/if}
+
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "goals")}
+      <article class="dash-panel">
+        <h2>Goals</h2>
+        {#if data.goals.length === 0}
+          <p class="dim dash-empty">No goals yet.</p>
+        {:else}
+          <div class="dash-meters">
+            {#each data.goals as goal (goal.id)}
+              <MeterBar
+                name={goal.name}
+                valueLabel="{goal.pct}%"
+                pct={goal.pct}
+                color={goal.color}
+                meta="{formatMoney(goal.currentMinor, data.account.currencyCode)} of {formatMoney(
+                  goal.targetMinor,
+                  data.account.currencyCode
+                )} · {goal.status}"
+              />
+            {/each}
+          </div>
+        {/if}
+      </article>
+    {/if}
+  </section>
+{/if}
 
 <style>
   .balance-card {
@@ -434,11 +569,25 @@
     color: inherit;
   }
 
+  .actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
   .dash-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.85rem;
     margin-bottom: 1.25rem;
+  }
+
+  .dash-grid-spending {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dash-panel-wide {
+    grid-column: 1 / -1;
   }
 
   .dash-panel {
@@ -448,18 +597,13 @@
     box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
   }
 
-  .dash-panel h2,
-  .dash-heading {
+  .dash-panel h2 {
     margin: 0 0 0.75rem;
     font-family: "Archivo Black", sans-serif;
     font-size: 0.72rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--hi-cyan);
-  }
-
-  .dash-section {
-    margin-bottom: 1.25rem;
   }
 
   .dash-kv {
@@ -495,12 +639,6 @@
     gap: 0.85rem;
   }
 
-  .meter-meta {
-    margin: 0.35rem 0 0;
-    font-size: 0.68rem;
-    line-height: 1.35;
-  }
-
   .dash-empty {
     margin: 0;
     font-size: 0.78rem;
@@ -508,8 +646,13 @@
 
   @media (max-width: 900px) {
     .dash-grid,
+    .dash-grid-spending,
     .dash-kv {
       grid-template-columns: 1fr;
+    }
+
+    .dash-panel-wide {
+      grid-column: auto;
     }
   }
 </style>

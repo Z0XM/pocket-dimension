@@ -1,3 +1,4 @@
+import { normalizeMerchant, rankFuzzyMerchants } from "$lib/finance/merchant-match";
 import { parseSqlMinor } from "$lib/finance/money";
 import { isRefundCategoryName } from "$lib/finance/refunds";
 import {
@@ -9,7 +10,7 @@ import {
 import { currentMonthKey, readRowYear, type SummarySelection } from "$lib/finance/summary";
 import { isBalanceSnapshotNewer } from "$lib/server/balance";
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type {
   budgetUpsertSchema,
@@ -703,8 +704,29 @@ export async function listTransactions(accountId: string, query: TransactionsQue
       or(ilike(schema.financeTransactions.merchant, `%${query.search}%`), ilike(schema.financeTransactions.notes, `%${query.search}%`))!
     );
   }
-  if (query.categoryId) {
-    conditions.push(eq(schema.financeTransactions.categoryId, query.categoryId));
+  if (query.categoryIds?.length) {
+    const hasUncategorized = query.categoryIds.includes("uncategorized");
+    const categoryIds = query.categoryIds.filter((id): id is string => id !== "uncategorized");
+
+    if (hasUncategorized && categoryIds.length) {
+      conditions.push(or(isNull(schema.financeTransactions.categoryId), inArray(schema.financeTransactions.categoryId, categoryIds))!);
+    } else if (hasUncategorized) {
+      conditions.push(isNull(schema.financeTransactions.categoryId));
+    } else if (categoryIds.length) {
+      conditions.push(inArray(schema.financeTransactions.categoryId, categoryIds));
+    }
+  }
+  if (query.tagIds?.length) {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM ${schema.financeTransactionTags}
+        WHERE ${schema.financeTransactionTags.transactionId} = ${schema.financeTransactions.id}
+        AND ${schema.financeTransactionTags.tagId} IN (${sql.join(
+          query.tagIds.map((tagId) => sql`${tagId}`),
+          sql`, `
+        )})
+      )`
+    );
   }
   if (query.type) {
     conditions.push(eq(schema.financeTransactions.type, query.type));
@@ -829,6 +851,385 @@ export async function deleteTransaction(accountId: string, transactionId: string
     .where(and(eq(schema.financeTransactions.id, transactionId), eq(schema.financeTransactions.accountId, accountId)))
     .returning({ id: schema.financeTransactions.id });
   return Boolean(removed);
+}
+
+export type SmartCategoryBreakdown = {
+  categoryId: string | null;
+  categoryName: string;
+  count: number;
+};
+
+export type SmartCategoryMerchantGroup = {
+  merchant: string;
+  categories: SmartCategoryBreakdown[];
+};
+
+export type SmartCategorizationPreview = {
+  merchant: string;
+  newCategoryId: string | null;
+  newCategoryName: string;
+  exact: SmartCategoryMerchantGroup | null;
+  fuzzy: SmartCategoryMerchantGroup[];
+};
+
+type SmartCategoryQuery = {
+  merchant: string;
+  newCategoryId: string | null;
+  sourceTransactionId: string;
+  type: "expense" | "income" | "transfer";
+};
+
+type SmartCategoryMigration = {
+  merchant: string;
+  fromCategoryId: string | null;
+  enabled: boolean;
+};
+
+async function listDistinctMerchantsForType(accountId: string, type: SmartCategoryQuery["type"]) {
+  const result = await db.execute(sql`
+    select distinct trim(t.merchant) as merchant
+    from chhanchhan.finance_transactions t
+    where t.account_id = ${accountId}
+      and t.type = ${type}
+      and t.merchant is not null
+      and trim(t.merchant) != ''
+  `);
+
+  return result.rows.map((row) => String((row as { merchant: string }).merchant)).filter(Boolean);
+}
+
+async function getMerchantCategoryBreakdown(
+  accountId: string,
+  merchant: string,
+  type: SmartCategoryQuery["type"],
+  excludeTransactionId?: string
+): Promise<SmartCategoryBreakdown[]> {
+  const excludeFilter = excludeTransactionId ? sql`and t.id != ${excludeTransactionId}` : sql``;
+
+  const result = await db.execute(sql`
+    select
+      t.category_id,
+      coalesce(c.name, 'Uncategorized') as category_name,
+      count(*)::int as row_count
+    from chhanchhan.finance_transactions t
+    left join chhanchhan.finance_categories c on c.id = t.category_id
+    where t.account_id = ${accountId}
+      and t.type = ${type}
+      and lower(trim(t.merchant)) = lower(${merchant})
+      ${excludeFilter}
+    group by t.category_id, c.name
+    order by row_count desc, category_name asc
+  `);
+
+  return result.rows.map((row) => {
+    const typed = row as { category_id: string | null; category_name: string; row_count: number };
+    return {
+      categoryId: typed.category_id ?? null,
+      categoryName: String(typed.category_name),
+      count: Number(typed.row_count),
+    };
+  });
+}
+
+function categoriesNeedingMigration(categories: SmartCategoryBreakdown[], newCategoryId: string | null): SmartCategoryBreakdown[] {
+  return categories.filter((category) => {
+    if (newCategoryId == null) return category.categoryId != null;
+    return category.categoryId !== newCategoryId;
+  });
+}
+
+export async function previewSmartCategorization(accountId: string, query: SmartCategoryQuery): Promise<SmartCategorizationPreview | null> {
+  const merchant = query.merchant.trim();
+  if (!merchant) return null;
+
+  const [newCategoryNameRow] = query.newCategoryId
+    ? await db
+        .select({ name: schema.financeCategories.name })
+        .from(schema.financeCategories)
+        .where(and(eq(schema.financeCategories.id, query.newCategoryId), eq(schema.financeCategories.accountId, accountId)))
+        .limit(1)
+    : [{ name: "Uncategorized" }];
+
+  const exactCategories = await getMerchantCategoryBreakdown(accountId, merchant, query.type, query.sourceTransactionId);
+  const exactMigratable = categoriesNeedingMigration(exactCategories, query.newCategoryId);
+  const exact =
+    exactMigratable.length > 0
+      ? {
+          merchant,
+          categories: exactMigratable,
+        }
+      : null;
+
+  const distinctMerchants = await listDistinctMerchantsForType(accountId, query.type);
+  const fuzzyMerchants = rankFuzzyMerchants(merchant, distinctMerchants).filter(
+    (candidate) => normalizeMerchant(candidate) !== normalizeMerchant(merchant)
+  );
+
+  const fuzzy: SmartCategoryMerchantGroup[] = [];
+  for (const fuzzyMerchant of fuzzyMerchants) {
+    const categories = categoriesNeedingMigration(await getMerchantCategoryBreakdown(accountId, fuzzyMerchant, query.type), query.newCategoryId);
+    if (categories.length) {
+      fuzzy.push({ merchant: fuzzyMerchant, categories });
+    }
+  }
+
+  if (!exact && !fuzzy.length) return null;
+
+  return {
+    merchant,
+    newCategoryId: query.newCategoryId,
+    newCategoryName: newCategoryNameRow?.name ?? "Uncategorized",
+    exact,
+    fuzzy,
+  };
+}
+
+function categoryMatchFilter(fromCategoryId: string | null) {
+  return fromCategoryId ? eq(schema.financeTransactions.categoryId, fromCategoryId) : isNull(schema.financeTransactions.categoryId);
+}
+
+export async function applySmartCategorization(
+  userId: string,
+  accountId: string,
+  payload: {
+    sourceTransactionId: string;
+    newCategoryId: string | null;
+    type: SmartCategoryQuery["type"];
+    migrations: SmartCategoryMigration[];
+  }
+) {
+  await updateTransaction(userId, accountId, payload.sourceTransactionId, {
+    categoryId: payload.newCategoryId,
+  });
+
+  let updatedCount = 0;
+  const seen = new Set<string>();
+
+  for (const migration of payload.migrations) {
+    if (!migration.enabled) continue;
+
+    const merchant = migration.merchant.trim();
+    if (!merchant) continue;
+
+    const key = `${merchant}::${migration.fromCategoryId ?? "null"}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const updated = await db
+      .update(schema.financeTransactions)
+      .set({
+        categoryId: payload.newCategoryId,
+        updatedById: userId,
+      })
+      .where(
+        and(
+          eq(schema.financeTransactions.accountId, accountId),
+          eq(schema.financeTransactions.type, payload.type),
+          sql`lower(trim(${schema.financeTransactions.merchant})) = lower(${merchant})`,
+          categoryMatchFilter(migration.fromCategoryId),
+          ne(schema.financeTransactions.id, payload.sourceTransactionId)
+        )
+      )
+      .returning({ id: schema.financeTransactions.id });
+
+    updatedCount += updated.length;
+  }
+
+  return { updatedCount };
+}
+
+export type SmartTagProfileBreakdown = {
+  tagIds: string[];
+  tagNames: string[];
+  label: string;
+  count: number;
+};
+
+export type SmartTagMerchantGroup = {
+  merchant: string;
+  profiles: SmartTagProfileBreakdown[];
+};
+
+export type SmartTaggingPreview = {
+  merchant: string;
+  newTagId: string;
+  newTagName: string;
+  exact: SmartTagMerchantGroup | null;
+  fuzzy: SmartTagMerchantGroup[];
+};
+
+export type SmartTagApplyMode = "replace" | "append";
+
+type SmartTagQuery = {
+  merchant: string;
+  newTagId: string;
+  sourceTransactionId: string;
+  type: "expense" | "income" | "transfer";
+};
+
+type SmartTagMigration = {
+  merchant: string;
+  fromTagIds: string[] | null;
+  enabled: boolean;
+};
+
+function tagProfileKey(tagIds: string[]): string {
+  return tagIds.length ? [...tagIds].sort().join(",") : "__none__";
+}
+
+function profileMatchesTags(tags: TransactionTag[], fromTagIds: string[] | null): boolean {
+  const ids = tags.map((tag) => tag.id).sort();
+  if (fromTagIds === null) return ids.length === 0;
+  const expected = [...fromTagIds].sort();
+  return ids.length === expected.length && ids.every((id, index) => id === expected[index]);
+}
+
+function profilesNeedingTag(profiles: SmartTagProfileBreakdown[], newTagId: string): SmartTagProfileBreakdown[] {
+  return profiles.filter((profile) => !(profile.tagIds.length === 1 && profile.tagIds[0] === newTagId));
+}
+
+async function listTransactionIdsForMerchant(
+  accountId: string,
+  merchant: string,
+  type: SmartTagQuery["type"],
+  excludeTransactionId?: string
+): Promise<string[]> {
+  const excludeFilter = excludeTransactionId ? sql`and t.id != ${excludeTransactionId}` : sql``;
+
+  const result = await db.execute(sql`
+    select t.id
+    from chhanchhan.finance_transactions t
+    where t.account_id = ${accountId}
+      and t.type = ${type}
+      and lower(trim(t.merchant)) = lower(${merchant})
+      ${excludeFilter}
+  `);
+
+  return result.rows.map((row) => String((row as { id: string }).id));
+}
+
+async function getMerchantTagProfileBreakdown(
+  accountId: string,
+  merchant: string,
+  type: SmartTagQuery["type"],
+  excludeTransactionId?: string
+): Promise<SmartTagProfileBreakdown[]> {
+  const transactionIds = await listTransactionIdsForMerchant(accountId, merchant, type, excludeTransactionId);
+  if (!transactionIds.length) return [];
+
+  const tagsByTransaction = await loadTagsForTransactions(transactionIds);
+  const profileCounts = new Map<string, SmartTagProfileBreakdown>();
+
+  for (const transactionId of transactionIds) {
+    const tags = tagsByTransaction.get(transactionId) ?? [];
+    const tagIds = tags.map((tag) => tag.id).sort();
+    const key = tagProfileKey(tagIds);
+    const existing = profileCounts.get(key);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+
+    profileCounts.set(key, {
+      tagIds,
+      tagNames: tags.map((tag) => tag.name),
+      label: tags.length ? tags.map((tag) => tag.name).join(", ") : "No tags",
+      count: 1,
+    });
+  }
+
+  return [...profileCounts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+export async function previewSmartTagging(accountId: string, query: SmartTagQuery): Promise<SmartTaggingPreview | null> {
+  const merchant = query.merchant.trim();
+  if (!merchant) return null;
+
+  const [newTagRow] = await db
+    .select({ name: schema.financeTags.name })
+    .from(schema.financeTags)
+    .where(and(eq(schema.financeTags.id, query.newTagId), eq(schema.financeTags.accountId, accountId)))
+    .limit(1);
+  if (!newTagRow) return null;
+
+  const exactProfiles = profilesNeedingTag(
+    await getMerchantTagProfileBreakdown(accountId, merchant, query.type, query.sourceTransactionId),
+    query.newTagId
+  );
+  const exact = exactProfiles.length ? { merchant, profiles: exactProfiles } : null;
+
+  const distinctMerchants = await listDistinctMerchantsForType(accountId, query.type);
+  const fuzzyMerchants = rankFuzzyMerchants(merchant, distinctMerchants).filter(
+    (candidate) => normalizeMerchant(candidate) !== normalizeMerchant(merchant)
+  );
+
+  const fuzzy: SmartTagMerchantGroup[] = [];
+  for (const fuzzyMerchant of fuzzyMerchants) {
+    const profiles = profilesNeedingTag(await getMerchantTagProfileBreakdown(accountId, fuzzyMerchant, query.type), query.newTagId);
+    if (profiles.length) fuzzy.push({ merchant: fuzzyMerchant, profiles });
+  }
+
+  if (!exact && !fuzzy.length) return null;
+
+  return {
+    merchant,
+    newTagId: query.newTagId,
+    newTagName: newTagRow.name,
+    exact,
+    fuzzy,
+  };
+}
+
+export async function applySmartTagging(
+  userId: string,
+  accountId: string,
+  payload: {
+    sourceTransactionId: string;
+    newTagId: string;
+    type: SmartTagQuery["type"];
+    mode: SmartTagApplyMode;
+    migrations: SmartTagMigration[];
+  }
+) {
+  await attachTransactionTag(accountId, payload.sourceTransactionId, payload.newTagId);
+
+  let updatedCount = 0;
+  const seen = new Set<string>();
+
+  for (const migration of payload.migrations) {
+    if (!migration.enabled) continue;
+
+    const merchant = migration.merchant.trim();
+    if (!merchant) continue;
+
+    const key = `${merchant}::${tagProfileKey(migration.fromTagIds ?? [])}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const transactionIds = await listTransactionIdsForMerchant(accountId, merchant, payload.type);
+    if (!transactionIds.length) continue;
+
+    const tagsByTransaction = await loadTagsForTransactions(transactionIds);
+
+    for (const transactionId of transactionIds) {
+      if (transactionId === payload.sourceTransactionId) continue;
+
+      const tags = tagsByTransaction.get(transactionId) ?? [];
+      if (!profileMatchesTags(tags, migration.fromTagIds)) continue;
+
+      if (payload.mode === "replace") {
+        await db.delete(schema.financeTransactionTags).where(eq(schema.financeTransactionTags.transactionId, transactionId));
+      } else if (tags.some((tag) => tag.id === payload.newTagId)) {
+        continue;
+      }
+
+      await db.insert(schema.financeTransactionTags).values({ transactionId, tagId: payload.newTagId }).onConflictDoNothing();
+
+      updatedCount += 1;
+    }
+  }
+
+  return { updatedCount };
 }
 
 export async function listBudgets(accountId: string) {
@@ -1009,9 +1410,7 @@ export async function listTransactionPeriods(accountId: string) {
 }
 
 export async function getTransactionSummary(accountId: string, selection: SummarySelection) {
-  const dateFilter = summaryDateFilter(selection);
-  const groupFilter = summaryGroupVisibleFilter(selection.groupId);
-  const searchFilter = summarySearchFilter(selection.search);
+  const filters = summaryTransactionFilters(selection);
 
   const result = await db.execute(sql`
     select
@@ -1019,9 +1418,11 @@ export async function getTransactionSummary(accountId: string, selection: Summar
       coalesce(sum(case when t.type = 'expense' then t.amount_minor else 0 end), 0)::bigint as expense_minor
     from chhanchhan.finance_transactions t
     where t.account_id = ${accountId}
-      and ${dateFilter}
-      and ${groupFilter}
-      and ${searchFilter}
+      and ${filters.dateFilter}
+      and ${filters.groupFilter}
+      and ${filters.searchFilter}
+      and ${filters.categoryFilter}
+      and ${filters.tagFilter}
   `);
   const row = result.rows[0] as Record<string, unknown> | undefined;
   const incomeMinor = parseSqlMinor(row?.income_minor ?? row?.incomeMinor);
@@ -1035,9 +1436,7 @@ export async function getTransactionSummary(accountId: string, selection: Summar
 }
 
 export async function getCategorySpend(accountId: string, selection: SummarySelection) {
-  const dateFilter = summaryDateFilter(selection);
-  const groupFilter = summaryGroupVisibleFilter(selection.groupId);
-  const searchFilter = summarySearchFilter(selection.search);
+  const filters = summaryTransactionFilters(selection);
 
   const categorySpend = await db.execute(sql`
     select
@@ -1047,9 +1446,11 @@ export async function getCategorySpend(accountId: string, selection: SummarySele
     left join chhanchhan.finance_categories c on c.id = t.category_id
     where t.account_id = ${accountId}
       and t.type = 'expense'
-      and ${dateFilter}
-      and ${groupFilter}
-      and ${searchFilter}
+      and ${filters.dateFilter}
+      and ${filters.groupFilter}
+      and ${filters.searchFilter}
+      and ${filters.categoryFilter}
+      and ${filters.tagFilter}
     group by c.name
     order by amount_minor desc
     limit 8
@@ -1058,11 +1459,202 @@ export async function getCategorySpend(accountId: string, selection: SummarySele
   return categorySpend.rows as Array<{ category_name: string; amount_minor: number }>;
 }
 
+export async function getTagSpend(accountId: string, selection: SummarySelection) {
+  const filters = summaryTransactionFilters(selection);
+
+  const result = await db.execute(sql`
+    select
+      tg.name as tag_name,
+      tg.color_hex,
+      coalesce(sum(t.amount_minor), 0)::bigint as amount_minor
+    from chhanchhan.finance_transactions t
+    inner join chhanchhan.finance_transaction_tags ftt on ftt.transaction_id = t.id
+    inner join chhanchhan.finance_tags tg on tg.id = ftt.tag_id
+    where t.account_id = ${accountId}
+      and t.type = 'expense'
+      and ${filters.dateFilter}
+      and ${filters.groupFilter}
+      and ${filters.searchFilter}
+      and ${filters.categoryFilter}
+      and ${filters.tagFilter}
+    group by tg.id, tg.name, tg.color_hex
+    order by amount_minor desc
+    limit 8
+  `);
+
+  return result.rows as Array<{ tag_name: string; color_hex: string | null; amount_minor: number }>;
+}
+
+export async function getMerchantSpend(accountId: string, selection: SummarySelection, limit = 10) {
+  const filters = summaryTransactionFilters(selection);
+
+  const result = await db.execute(sql`
+    select
+      coalesce(nullif(trim(t.merchant), ''), 'Unknown') as merchant_name,
+      coalesce(sum(t.amount_minor), 0)::bigint as amount_minor
+    from chhanchhan.finance_transactions t
+    where t.account_id = ${accountId}
+      and t.type = 'expense'
+      and ${filters.dateFilter}
+      and ${filters.groupFilter}
+      and ${filters.searchFilter}
+      and ${filters.categoryFilter}
+      and ${filters.tagFilter}
+    group by merchant_name
+    order by amount_minor desc
+    limit ${limit}
+  `);
+
+  return result.rows as Array<{ merchant_name: string; amount_minor: number }>;
+}
+
+export async function getGroupSpend(accountId: string, selection: SummarySelection) {
+  const filters = summaryTransactionFilters(selection);
+
+  const result = await db.execute(sql`
+    select
+      g.name as group_name,
+      g.color_hex,
+      coalesce(sum(t.amount_minor), 0)::bigint as amount_minor
+    from chhanchhan.finance_transactions t
+    inner join chhanchhan.finance_transaction_groups ftg
+      on ftg.transaction_id = t.id
+      and ftg.is_hidden = false
+    inner join chhanchhan.finance_groups g on g.id = ftg.group_id
+    where t.account_id = ${accountId}
+      and t.type = 'expense'
+      and ${filters.dateFilter}
+      and ${filters.groupFilter}
+      and ${filters.searchFilter}
+      and ${filters.categoryFilter}
+      and ${filters.tagFilter}
+    group by g.id, g.name, g.color_hex
+    order by amount_minor desc
+    limit 8
+  `);
+
+  return result.rows as Array<{ group_name: string; color_hex: string | null; amount_minor: number }>;
+}
+
+export async function getMonthlyTrend(accountId: string, monthCount = 12) {
+  const safeCount = Math.min(24, Math.max(3, monthCount));
+  const start = new Date();
+  start.setDate(1);
+  start.setHours(0, 0, 0, 0);
+  start.setMonth(start.getMonth() - (safeCount - 1));
+  const dateFrom = start.toISOString().slice(0, 10);
+
+  const result = await db.execute(sql`
+    select
+      to_char(date_trunc('month', t.occurred_on), 'YYYY-MM') as month_key,
+      coalesce(sum(case when t.type = 'income' then t.amount_minor else 0 end), 0)::bigint as income_minor,
+      coalesce(sum(case when t.type = 'expense' then t.amount_minor else 0 end), 0)::bigint as expense_minor
+    from chhanchhan.finance_transactions t
+    where t.account_id = ${accountId}
+      and t.occurred_on >= ${dateFrom}::date
+    group by month_key
+    order by month_key asc
+  `);
+
+  return result.rows.map((row) => {
+    const typed = row as { month_key: string; income_minor: number; expense_minor: number };
+    const incomeMinor = Number(typed.income_minor);
+    const expenseMinor = Number(typed.expense_minor);
+    return {
+      monthKey: String(typed.month_key),
+      incomeMinor,
+      expenseMinor,
+      netMinor: incomeMinor - expenseMinor,
+    };
+  });
+}
+
+export async function getCategoryTrend(accountId: string, monthCount = 12) {
+  const safeCount = Math.min(24, Math.max(3, monthCount));
+  const start = new Date();
+  start.setDate(1);
+  start.setHours(0, 0, 0, 0);
+  start.setMonth(start.getMonth() - (safeCount - 1));
+  const dateFrom = start.toISOString().slice(0, 10);
+
+  const result = await db.execute(sql`
+    select
+      to_char(date_trunc('month', t.occurred_on), 'YYYY-MM') as month_key,
+      coalesce(c.name, 'Uncategorized') as category_name,
+      c.color_hex,
+      coalesce(sum(t.amount_minor), 0)::bigint as amount_minor
+    from chhanchhan.finance_transactions t
+    left join chhanchhan.finance_categories c on c.id = t.category_id
+    where t.account_id = ${accountId}
+      and t.type = 'expense'
+      and t.occurred_on >= ${dateFrom}::date
+    group by month_key, category_name, c.color_hex
+    order by month_key asc, amount_minor desc
+  `);
+
+  return result.rows as Array<{
+    month_key: string;
+    category_name: string;
+    color_hex: string | null;
+    amount_minor: number;
+  }>;
+}
+
 function summarySearchFilter(search?: string) {
   if (!search?.trim()) return sql`true`;
 
   const term = `%${search.trim()}%`;
   return sql`(t.merchant ilike ${term} or coalesce(t.notes, '') ilike ${term})`;
+}
+
+function summaryCategoryFilter(categoryFilters?: string[]) {
+  if (!categoryFilters?.length) return sql`true`;
+
+  const hasUncategorized = categoryFilters.includes("uncategorized");
+  const categoryIds = categoryFilters.filter((value) => value !== "uncategorized");
+
+  if (hasUncategorized && categoryIds.length) {
+    return sql`(t.category_id is null or t.category_id in (${sql.join(
+      categoryIds.map((categoryId) => sql`${categoryId}`),
+      sql`, `
+    )}))`;
+  }
+  if (hasUncategorized) return sql`t.category_id is null`;
+  if (categoryIds.length === 1) return sql`t.category_id = ${categoryIds[0]}`;
+  return sql`t.category_id in (${sql.join(
+    categoryIds.map((categoryId) => sql`${categoryId}`),
+    sql`, `
+  )})`;
+}
+
+function summaryTagFilter(tagIds?: string[]) {
+  if (!tagIds?.length) return sql`true`;
+  if (tagIds.length === 1) {
+    return sql`exists (
+      select 1 from chhanchhan.finance_transaction_tags ftt
+      where ftt.transaction_id = t.id
+        and ftt.tag_id = ${tagIds[0]}
+    )`;
+  }
+
+  return sql`exists (
+    select 1 from chhanchhan.finance_transaction_tags ftt
+    where ftt.transaction_id = t.id
+      and ftt.tag_id in (${sql.join(
+        tagIds.map((tagId) => sql`${tagId}`),
+        sql`, `
+      )})
+  )`;
+}
+
+function summaryTransactionFilters(selection: SummarySelection) {
+  return {
+    dateFilter: summaryDateFilter(selection),
+    groupFilter: summaryGroupVisibleFilter(selection.groupId),
+    searchFilter: summarySearchFilter(selection.search),
+    categoryFilter: summaryCategoryFilter(selection.categoryFilters),
+    tagFilter: summaryTagFilter(selection.tagIds),
+  };
 }
 
 function summaryGroupVisibleFilter(groupId?: string) {

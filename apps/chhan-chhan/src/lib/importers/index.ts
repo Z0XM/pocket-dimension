@@ -2,6 +2,7 @@ import { csvImportRowSchema } from "$lib/validation/finance";
 import type { BankImporter, ImportRow, StatementInput } from "$lib/importers/types";
 import { parseCsvRows, rowsToObjects } from "$lib/server/csv-parse";
 import { kotakImporter } from "$lib/importers/kotak";
+import { iciciImporter } from "$lib/importers/icici";
 
 export const genericImporter: BankImporter = {
   id: "generic",
@@ -29,6 +30,7 @@ export const genericImporter: BankImporter = {
 
 const importers: Record<string, BankImporter> = {
   [kotakImporter.id]: kotakImporter,
+  [iciciImporter.id]: iciciImporter,
   [genericImporter.id]: genericImporter,
 };
 

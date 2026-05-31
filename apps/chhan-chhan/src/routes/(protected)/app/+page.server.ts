@@ -20,6 +20,7 @@ import {
   resolveYearValue,
   summarySelectionToDateRange,
 } from "$lib/finance/summary";
+import { parseMultiFilterParam } from "$lib/finance/filter-params";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ parent, url }) => {
@@ -34,9 +35,17 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const summaryYears = normalizeSummaryYears(periods.years);
   const selectedMonth = resolveMonthKey(url.searchParams.get("month"), periods.months);
   const selectedYear = resolveYearValue(url.searchParams.get("year"), periods.years);
-  const groups = await listGroups(account.id);
+  const [groups, categories, tags] = await Promise.all([listGroups(account.id), listCategories(account.id), listTags(account.id)]);
   const groupParam = url.searchParams.get("group");
   const selectedGroupId = groupParam && groups.some((group) => group.id === groupParam) ? groupParam : null;
+  const categoryParam = url.searchParams.get("category");
+  const categoryParts = parseMultiFilterParam(categoryParam);
+  const selectedCategoryFilters = [
+    ...new Set(categoryParts.filter((part) => part === "uncategorized" || categories.some((category) => category.id === part))),
+  ];
+  const tagParam = url.searchParams.get("tag");
+  const tagParts = parseMultiFilterParam(tagParam);
+  const selectedTagIds = [...new Set(tagParts.filter((part) => tags.some((tag) => tag.id === part)))];
   const searchQuery = url.searchParams.get("search")?.trim() ?? "";
   const linkParam = url.searchParams.get("link");
   const linkClusterIds = linkParam ? await getRefundLinkClusterIds(account.id, linkParam) : null;
@@ -45,10 +54,12 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     ...buildSummarySelection(summaryPeriod, selectedMonth, selectedYear),
     ...(selectedGroupId ? { groupId: selectedGroupId } : {}),
     ...(searchQuery ? { search: searchQuery } : {}),
+    ...(selectedCategoryFilters.length ? { categoryFilters: selectedCategoryFilters } : {}),
+    ...(selectedTagIds.length ? { tagIds: selectedTagIds } : {}),
   };
   const dateRange = summarySelectionToDateRange(summarySelection);
 
-  const [transactions, analytics, summary, currentBalance, categories, tags, categorySpendRows] = await Promise.all([
+  const [transactions, analytics, summary, currentBalance, categorySpendRows] = await Promise.all([
     listTransactions(account.id, {
       pageIndex: 0,
       pageSize,
@@ -58,14 +69,14 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       dateFrom: dateRange.dateFrom,
       dateTo: dateRange.dateTo,
       groupId: selectedGroupId ?? undefined,
+      categoryIds: selectedCategoryFilters.length ? selectedCategoryFilters : undefined,
+      tagIds: selectedTagIds.length ? selectedTagIds : undefined,
       search: searchQuery || undefined,
       linkTransactionId: selectedLinkTransactionId ?? undefined,
     }),
     getAnalytics(account.id),
     getTransactionSummary(account.id, summarySelection),
     getCurrentBalance(account.id),
-    listCategories(account.id),
-    listTags(account.id),
     getCategorySpend(account.id, summarySelection),
   ]);
 
@@ -84,7 +95,12 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     color: ["#bd93f9", "#50fa7b", "#54dbee", "#ee7c02", "#ffb86c"][index % 5],
   }));
 
-  const meterRows = searchQuery ? categorySpend.slice(0, 5) : budgetUsage.length ? budgetUsage : categorySpend.slice(0, 5);
+  const meterRows =
+    searchQuery || selectedCategoryFilters.length || selectedTagIds.length
+      ? categorySpend.slice(0, 5)
+      : budgetUsage.length
+        ? budgetUsage
+        : categorySpend.slice(0, 5);
 
   return {
     account,
@@ -92,6 +108,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     tags,
     groups,
     selectedGroupId,
+    selectedCategoryFilters,
+    selectedTagIds,
     selectedLinkTransactionId,
     linkClusterSize: linkClusterIds?.length ?? 0,
     searchQuery,

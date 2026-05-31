@@ -1,4 +1,23 @@
-import { getAnalytics, getCategorySpend, getCurrentBalance, getTransactionSummary, listTransactionPeriods } from "$lib/server/finance";
+import {
+  getAnalytics,
+  getCategorySpend,
+  getCategoryTrend,
+  getCurrentBalance,
+  getGroupSpend,
+  getMerchantSpend,
+  getMonthlyTrend,
+  getTagSpend,
+  getTransactionSummary,
+  listTransactionPeriods,
+} from "$lib/server/finance";
+import {
+  buildCategoryTrendChart,
+  isDashboardWidgetEnabled,
+  parseDashboardWidgets,
+  toBudgetMeters,
+  toGoalMeters,
+  toSpendMeters,
+} from "$lib/finance/dashboard-widgets";
 import {
   buildSummarySelection,
   getSummaryLabel,
@@ -13,48 +32,110 @@ import type { PageServerLoad } from "./$types";
 export const load: PageServerLoad = async ({ parent, url }) => {
   const { account } = await parent();
   const summaryPeriod = parseSummaryPeriod(url.searchParams.get("summary"));
+  const enabledWidgets = parseDashboardWidgets(url.searchParams.get("widgets"));
   const periods = await listTransactionPeriods(account.id);
   const summaryYears = normalizeSummaryYears(periods.years);
   const selectedMonth = resolveMonthKey(url.searchParams.get("month"), periods.months);
   const selectedYear = resolveYearValue(url.searchParams.get("year"), periods.years);
   const summarySelection = buildSummarySelection(summaryPeriod, selectedMonth, selectedYear);
 
-  const [analytics, summary, currentBalance, categorySpendRows] = await Promise.all([
-    getAnalytics(account.id),
+  const needsSummaryMonth = isDashboardWidgetEnabled(enabledWidgets, "summary-month");
+  const needsSummaryAll = isDashboardWidgetEnabled(enabledWidgets, "summary-all");
+  const needsCategorySpend = isDashboardWidgetEnabled(enabledWidgets, "category-spend");
+  const needsTagSpend = isDashboardWidgetEnabled(enabledWidgets, "tag-spend");
+  const needsMerchantSpend = isDashboardWidgetEnabled(enabledWidgets, "merchant-spend");
+  const needsGroupSpend = isDashboardWidgetEnabled(enabledWidgets, "group-spend");
+  const needsMonthlyTrend = isDashboardWidgetEnabled(enabledWidgets, "monthly-trend");
+  const needsCategoryTrend = isDashboardWidgetEnabled(enabledWidgets, "category-trend");
+  const needsIncomeExpense = isDashboardWidgetEnabled(enabledWidgets, "income-expense");
+  const needsBudgets = isDashboardWidgetEnabled(enabledWidgets, "budgets");
+  const needsGoals = isDashboardWidgetEnabled(enabledWidgets, "goals");
+  const needsAnalytics = needsSummaryMonth || needsSummaryAll || needsBudgets || needsGoals;
+
+  const [
+    analytics,
+    summary,
+    currentBalance,
+    categorySpendRows,
+    tagSpendRows,
+    merchantSpendRows,
+    groupSpendRows,
+    monthlyTrendRows,
+    categoryTrendRows,
+  ] = await Promise.all([
+    needsAnalytics ? getAnalytics(account.id) : Promise.resolve(null),
     getTransactionSummary(account.id, summarySelection),
     getCurrentBalance(account.id),
-    getCategorySpend(account.id, summarySelection),
+    needsCategorySpend ? getCategorySpend(account.id, summarySelection) : Promise.resolve([]),
+    needsTagSpend ? getTagSpend(account.id, summarySelection) : Promise.resolve([]),
+    needsMerchantSpend ? getMerchantSpend(account.id, summarySelection) : Promise.resolve([]),
+    needsGroupSpend ? getGroupSpend(account.id, summarySelection) : Promise.resolve([]),
+    needsMonthlyTrend ? getMonthlyTrend(account.id, 12) : Promise.resolve([]),
+    needsCategoryTrend ? getCategoryTrend(account.id, 12) : Promise.resolve([]),
   ]);
 
   const savingsRate = summary.incomeMinor > 0 ? summary.netMinor / summary.incomeMinor : 0;
 
-  const categorySpend = categorySpendRows.map((row, index) => ({
-    name: row.category_name,
-    amountMinor: Number(row.amount_minor),
-    pct: summary.expenseMinor > 0 ? Math.min(100, Math.round((Number(row.amount_minor) / summary.expenseMinor) * 100)) : 0,
-    color: ["#bd93f9", "#50fa7b", "#54dbee", "#ee7c02", "#ffb86c"][index % 5],
-  }));
+  const categorySpend = toSpendMeters(
+    categorySpendRows.map((row) => ({
+      name: row.category_name,
+      amountMinor: Number(row.amount_minor),
+    })),
+    summary.expenseMinor
+  );
 
-  const budgetUsage = analytics.budgetUsage.map((budget) => ({
-    id: budget.id,
-    name: budget.name,
-    spentMinor: Number(budget.spent_minor),
-    limitMinor: Number(budget.limit_minor),
-    pct: budget.limit_minor > 0 ? Math.min(100, Math.round((Number(budget.spent_minor) / Number(budget.limit_minor)) * 100)) : 0,
-    color: "#50fa7b",
-  }));
+  const tagSpend = toSpendMeters(
+    tagSpendRows.map((row) => ({
+      name: row.tag_name,
+      amountMinor: Number(row.amount_minor),
+      colorHex: row.color_hex,
+    })),
+    summary.expenseMinor
+  );
 
-  const goals = analytics.goals.map((goal) => ({
-    id: goal.id,
-    name: goal.name,
-    status: goal.status,
-    currentMinor: Number(goal.current_minor),
-    targetMinor: Number(goal.target_minor),
-    pct: goal.target_minor > 0 ? Math.min(100, Math.round((Number(goal.current_minor) / Number(goal.target_minor)) * 100)) : 0,
-  }));
+  const merchantSpend = toSpendMeters(
+    merchantSpendRows.map((row) => ({
+      name: row.merchant_name,
+      amountMinor: Number(row.amount_minor),
+    })),
+    summary.expenseMinor
+  );
+
+  const groupSpend = toSpendMeters(
+    groupSpendRows.map((row) => ({
+      name: row.group_name,
+      amountMinor: Number(row.amount_minor),
+      colorHex: row.color_hex,
+    })),
+    summary.expenseMinor
+  );
+
+  const budgetUsage = analytics
+    ? toBudgetMeters(
+        analytics.budgetUsage.map((budget) => ({
+          id: budget.id,
+          name: budget.name,
+          spentMinor: Number(budget.spent_minor),
+          limitMinor: Number(budget.limit_minor),
+        }))
+      )
+    : [];
+
+  const goals = analytics
+    ? toGoalMeters(
+        analytics.goals.map((goal) => ({
+          id: goal.id,
+          name: goal.name,
+          status: goal.status,
+          currentMinor: Number(goal.current_minor),
+          targetMinor: Number(goal.target_minor),
+        }))
+      )
+    : [];
 
   return {
     account,
+    enabledWidgets,
     summaryPeriod,
     selectedMonth,
     selectedYear,
@@ -65,9 +146,15 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     summary: { ...summary, savingsRate },
     currentBalance,
     categorySpend,
+    tagSpend,
+    merchantSpend,
+    groupSpend,
+    monthlyTrend: monthlyTrendRows,
+    categoryTrend: needsCategoryTrend ? buildCategoryTrendChart(categoryTrendRows, 12, 6) : null,
     budgetUsage,
     goals,
-    monthly: analytics.monthly,
-    allTime: analytics.allTime,
+    monthly: needsSummaryMonth && analytics ? analytics.monthly : null,
+    allTime: needsSummaryAll && analytics ? analytics.allTime : null,
+    showIncomeExpense: needsIncomeExpense,
   };
 };

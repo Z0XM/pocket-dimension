@@ -4,9 +4,14 @@
   import { formatMoney } from "$lib/finance/money";
   import { isRefundCategoryName } from "$lib/finance/refunds";
   import { buildSummarySelection, formatMonthKeyShort, summarySelectionToDateRange, type SummaryPeriod } from "$lib/finance/summary";
+  import { serializeMultiFilterParam } from "$lib/finance/filter-params";
   import { infiniteScroll } from "$lib/actions/infinite-scroll";
+  import FilterMultiselect from "$lib/components/filter-multiselect.svelte";
   import AppNav from "$lib/components/app-nav.svelte";
   import AppSettings from "$lib/components/app-settings.svelte";
+  import SmartCategorizePopup, { type SmartCategoryToggle } from "$lib/components/smart-categorize-popup.svelte";
+  import SmartTagPopup, { type SmartTagToggle } from "$lib/components/smart-tag-popup.svelte";
+  import type { SmartCategorizationPreview, SmartTagApplyMode, SmartTaggingPreview } from "$lib/server/finance";
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
@@ -28,6 +33,29 @@
   let noteDraft = $state("");
   let refundLinkModeAnchorId = $state<string | null>(null);
   let savingRefundLinkId = $state<string | null>(null);
+  let smartCatOpen = $state(false);
+  let smartCatApplying = $state(false);
+  let smartCatPreview = $state<SmartCategorizationPreview | null>(null);
+  let smartCatToggles = $state<SmartCategoryToggle[]>([]);
+  let smartCatContext = $state<{
+    transactionId: string;
+    merchant: string;
+    type: PageData["transactions"][number]["type"];
+    newCategoryId: string | null;
+    previousCategoryId: string | null;
+  } | null>(null);
+  let smartTagOpen = $state(false);
+  let smartTagApplying = $state(false);
+  let smartTagMode = $state<SmartTagApplyMode>("append");
+  let smartTagPreview = $state<SmartTaggingPreview | null>(null);
+  let smartTagToggles = $state<SmartTagToggle[]>([]);
+  let smartTagContext = $state<{
+    transactionId: string;
+    merchant: string;
+    type: PageData["transactions"][number]["type"];
+    newTagId: string;
+    previousTags: PageData["transactions"][number]["tags"];
+  } | null>(null);
 
   $effect(() => {
     rows = [...data.transactions];
@@ -61,6 +89,12 @@
     if (dateRange.dateFrom) params.set("dateFrom", dateRange.dateFrom);
     if (dateRange.dateTo) params.set("dateTo", dateRange.dateTo);
     if (data.selectedGroupId) params.set("groupId", data.selectedGroupId);
+    if (data.selectedCategoryFilters.length) {
+      params.set("categoryIds", serializeMultiFilterParam(data.selectedCategoryFilters));
+    }
+    if (data.selectedTagIds.length) {
+      params.set("tagIds", serializeMultiFilterParam(data.selectedTagIds));
+    }
     if (data.searchQuery?.trim()) params.set("search", data.searchQuery.trim());
     if (data.selectedLinkTransactionId) params.set("linkTransactionId", data.selectedLinkTransactionId);
     return params;
@@ -125,6 +159,28 @@
   });
 
   $effect(() => {
+    if (!smartCatOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !smartCatApplying) closeSmartCat(true);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
+  $effect(() => {
+    if (!smartTagOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !smartTagApplying) closeSmartTag(true);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
+  $effect(() => {
     if (!openGroupTxId) return;
 
     function handlePointerDown(event: PointerEvent) {
@@ -167,6 +223,8 @@
       year?: number;
       type?: "income" | "expense" | null;
       group?: string | null;
+      category?: string[] | null;
+      tag?: string[] | null;
       search?: string | null;
       link?: string | null;
     } = {}
@@ -178,6 +236,8 @@
     const year = updates.year ?? data.selectedYear;
     const typeFilter = updates.type === undefined ? data.transactionTypeFilter : updates.type;
     const groupFilter = updates.group === undefined ? data.selectedGroupId : updates.group;
+    const categoryFilter = updates.category === undefined ? data.selectedCategoryFilters : (updates.category ?? []);
+    const tagFilter = updates.tag === undefined ? data.selectedTagIds : (updates.tag ?? []);
     const searchFilter = updates.search === undefined ? (data.searchQuery ?? "") : (updates.search ?? "");
     const linkFilter = updates.link === undefined ? data.selectedLinkTransactionId : updates.link;
 
@@ -195,6 +255,8 @@
 
     if (typeFilter) params.set("type", typeFilter);
     if (groupFilter) params.set("group", groupFilter);
+    if (categoryFilter.length) params.set("category", serializeMultiFilterParam(categoryFilter));
+    if (tagFilter.length) params.set("tag", serializeMultiFilterParam(tagFilter));
     if (searchFilter.trim()) params.set("search", searchFilter.trim());
     if (linkFilter) params.set("link", linkFilter);
 
@@ -238,6 +300,34 @@
   function setGroupFilter(groupId: string | null) {
     goto(appUrl({ group: groupId }), { keepFocus: true, noScroll: true, invalidateAll: true });
   }
+
+  function setCategoryFilters(categoryFilters: string[]) {
+    goto(appUrl({ category: categoryFilters }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  function setTagFilters(tagIds: string[]) {
+    goto(appUrl({ tag: tagIds }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  function selectedCategoryLabels(): string {
+    return data.selectedCategoryFilters
+      .map((id) => {
+        if (id === "uncategorized") return "Uncategorized";
+        return data.categories.find((entry) => entry.id === id)?.name ?? "category";
+      })
+      .join(", ");
+  }
+
+  function selectedTagLabels(): string {
+    return data.selectedTagIds.map((id) => data.tags.find((entry) => entry.id === id)?.name ?? "tag").join(", ");
+  }
+
+  const categoryFilterOptions = $derived([
+    { id: "uncategorized", label: "Uncategorized" },
+    ...data.categories.map((category) => ({ id: category.id, label: category.name })),
+  ]);
+
+  const tagFilterOptions = $derived(data.tags.map((tag) => ({ id: tag.id, label: tag.name })));
 
   function toggleLinkClusterFilter(transactionId: string) {
     goto(appUrl({ link: data.selectedLinkTransactionId ? null : transactionId }), { keepFocus: true, noScroll: true, invalidateAll: true });
@@ -406,19 +496,164 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoryId }),
       });
+      if (!response.ok) return false;
+
+      applyCategoryToRows(transactionId, categoryId);
+      return true;
+    } finally {
+      savingCategoryId = null;
+    }
+  }
+
+  function applyCategoryToRows(transactionId: string, categoryId: string | null) {
+    const category = categoryId ? data.categories.find((entry) => entry.id === categoryId) : null;
+    rows = rows.map((row) =>
+      row.id === transactionId
+        ? {
+            ...row,
+            categoryId: categoryId ?? null,
+            categoryName: category?.name ?? null,
+            categoryColor: category?.colorHex ?? null,
+          }
+        : row
+    );
+  }
+
+  function buildSmartCatToggles(preview: SmartCategorizationPreview): SmartCategoryToggle[] {
+    const toggles: SmartCategoryToggle[] = [];
+    if (preview.exact) {
+      for (const category of preview.exact.categories) {
+        toggles.push({
+          merchant: preview.exact.merchant,
+          fromCategoryId: category.categoryId,
+          enabled: true,
+        });
+      }
+    }
+    for (const group of preview.fuzzy) {
+      for (const category of group.categories) {
+        toggles.push({
+          merchant: group.merchant,
+          fromCategoryId: category.categoryId,
+          enabled: true,
+        });
+      }
+    }
+    return toggles;
+  }
+
+  function closeSmartCat(revertTransaction = true) {
+    if (revertTransaction && smartCatContext) {
+      applyCategoryToRows(smartCatContext.transactionId, smartCatContext.previousCategoryId);
+    }
+    smartCatOpen = false;
+    smartCatPreview = null;
+    smartCatContext = null;
+    smartCatToggles = [];
+  }
+
+  function handleSmartCatToggle(key: string, enabled: boolean) {
+    smartCatToggles = smartCatToggles.map((toggle) =>
+      `${toggle.merchant}::${toggle.fromCategoryId ?? "null"}` === key ? { ...toggle, enabled } : toggle
+    );
+  }
+
+  async function applySmartCat(includeBulk: boolean) {
+    if (!smartCatContext) return;
+
+    smartCatApplying = true;
+    try {
+      if (!includeBulk) {
+        const ok = await updateTransactionCategory(smartCatContext.transactionId, smartCatContext.newCategoryId);
+        if (ok) closeSmartCat(false);
+        return;
+      }
+
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/smart-categorize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceTransactionId: smartCatContext.transactionId,
+          newCategoryId: smartCatContext.newCategoryId,
+          type: smartCatContext.type,
+          migrations: smartCatToggles,
+        }),
+      });
       if (!response.ok) return;
 
-      const category = categoryId ? data.categories.find((entry) => entry.id === categoryId) : null;
-      rows = rows.map((row) =>
-        row.id === transactionId
-          ? {
-              ...row,
-              categoryId: categoryId ?? null,
-              categoryName: category?.name ?? null,
-              categoryColor: category?.colorHex ?? null,
-            }
-          : row
-      );
+      const category = smartCatContext.newCategoryId ? data.categories.find((entry) => entry.id === smartCatContext!.newCategoryId) : null;
+
+      rows = rows.map((row) => {
+        const matched = smartCatToggles.some(
+          (migration) =>
+            migration.enabled &&
+            migration.merchant.trim().toLowerCase() === (row.merchant ?? "").trim().toLowerCase() &&
+            (migration.fromCategoryId ?? null) === (row.categoryId ?? null)
+        );
+
+        if (row.id === smartCatContext!.transactionId || matched) {
+          return {
+            ...row,
+            categoryId: smartCatContext!.newCategoryId,
+            categoryName: category?.name ?? null,
+            categoryColor: category?.colorHex ?? null,
+          };
+        }
+        return row;
+      });
+
+      closeSmartCat(false);
+      await invalidateAll();
+    } finally {
+      smartCatApplying = false;
+    }
+  }
+
+  async function handleCategoryChange(transaction: PageData["transactions"][number], categoryId: string | null) {
+    const previousCategoryId = transaction.categoryId ?? null;
+    if (previousCategoryId === categoryId) return;
+
+    const merchant = transaction.merchant?.trim();
+    if (!merchant) {
+      await updateTransactionCategory(transaction.id, categoryId);
+      return;
+    }
+
+    applyCategoryToRows(transaction.id, categoryId);
+    savingCategoryId = transaction.id;
+
+    try {
+      const params = new URLSearchParams({
+        merchant,
+        sourceTransactionId: transaction.id,
+        type: transaction.type,
+      });
+      if (categoryId) params.set("newCategoryId", categoryId);
+
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/smart-categorize?${params.toString()}`);
+      if (!response.ok) {
+        applyCategoryToRows(transaction.id, previousCategoryId);
+        return;
+      }
+
+      const body = (await response.json()) as { preview: SmartCategorizationPreview | null };
+      if (!body.preview) {
+        await updateTransactionCategory(transaction.id, categoryId);
+        return;
+      }
+
+      smartCatContext = {
+        transactionId: transaction.id,
+        merchant,
+        type: transaction.type,
+        newCategoryId: categoryId,
+        previousCategoryId,
+      };
+      smartCatPreview = body.preview;
+      smartCatToggles = buildSmartCatToggles(body.preview);
+      smartCatOpen = true;
+    } catch {
+      applyCategoryToRows(transaction.id, previousCategoryId);
     } finally {
       savingCategoryId = null;
     }
@@ -512,6 +747,208 @@
           : row
       );
       openTagMenuTxId = null;
+    } finally {
+      savingTagTxId = null;
+    }
+  }
+
+  function applyTagToRows(transactionId: string, tags: PageData["transactions"][number]["tags"]) {
+    rows = rows.map((row) => (row.id === transactionId ? { ...row, tags: [...tags] } : row));
+  }
+
+  function tagProfileKey(tagIds: string[] | null): string {
+    return tagIds?.length ? [...tagIds].sort().join(",") : "none";
+  }
+
+  function buildSmartTagToggles(preview: SmartTaggingPreview): SmartTagToggle[] {
+    const toggles: SmartTagToggle[] = [];
+    if (preview.exact) {
+      for (const profile of preview.exact.profiles) {
+        toggles.push({
+          merchant: preview.exact.merchant,
+          fromTagIds: profile.tagIds.length ? profile.tagIds : null,
+          enabled: true,
+        });
+      }
+    }
+    for (const group of preview.fuzzy) {
+      for (const profile of group.profiles) {
+        toggles.push({
+          merchant: group.merchant,
+          fromTagIds: profile.tagIds.length ? profile.tagIds : null,
+          enabled: true,
+        });
+      }
+    }
+    return toggles;
+  }
+
+  function closeSmartTag(revertTransaction = true) {
+    if (revertTransaction && smartTagContext) {
+      applyTagToRows(smartTagContext.transactionId, smartTagContext.previousTags);
+    }
+    smartTagOpen = false;
+    smartTagPreview = null;
+    smartTagContext = null;
+    smartTagToggles = [];
+    smartTagMode = "append";
+  }
+
+  function handleSmartTagToggle(key: string, enabled: boolean) {
+    smartTagToggles = smartTagToggles.map((toggle) =>
+      `${toggle.merchant}::${tagProfileKey(toggle.fromTagIds)}` === key ? { ...toggle, enabled } : toggle
+    );
+  }
+
+  function rowMatchesTagMigration(row: PageData["transactions"][number], migration: SmartTagToggle, newTagId: string, mode: SmartTagApplyMode) {
+    if (!migration.enabled) return false;
+    if (migration.merchant.trim().toLowerCase() !== (row.merchant ?? "").trim().toLowerCase()) {
+      return false;
+    }
+
+    const rowTagIds = row.tags.map((tag) => tag.id).sort();
+    const fromTagIds = migration.fromTagIds?.slice().sort() ?? [];
+    const matchesProfile =
+      migration.fromTagIds === null
+        ? rowTagIds.length === 0
+        : rowTagIds.length === fromTagIds.length && rowTagIds.every((id, index) => id === fromTagIds[index]);
+
+    if (!matchesProfile) return false;
+    if (mode === "append" && rowTagIds.includes(newTagId)) return false;
+    return true;
+  }
+
+  function tagsAfterSmartApply(
+    currentTags: PageData["transactions"][number]["tags"],
+    newTag: { id: string; name: string; colorHex: string | null },
+    mode: SmartTagApplyMode
+  ) {
+    if (mode === "replace") {
+      return [{ id: newTag.id, name: newTag.name, colorHex: newTag.colorHex }];
+    }
+    if (currentTags.some((tag) => tag.id === newTag.id)) return currentTags;
+    return [...currentTags, { id: newTag.id, name: newTag.name, colorHex: newTag.colorHex }];
+  }
+
+  async function applySmartTag(includeBulk: boolean) {
+    if (!smartTagContext) return;
+
+    smartTagApplying = true;
+    try {
+      if (!includeBulk) {
+        const ok = await addTransactionTagDirect(smartTagContext.transactionId, smartTagContext.newTagId);
+        if (ok) closeSmartTag(false);
+        return;
+      }
+
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/smart-tag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceTransactionId: smartTagContext.transactionId,
+          newTagId: smartTagContext.newTagId,
+          type: smartTagContext.type,
+          mode: smartTagMode,
+          migrations: smartTagToggles,
+        }),
+      });
+      if (!response.ok) return;
+
+      const tag = data.tags.find((entry) => entry.id === smartTagContext!.newTagId);
+      if (!tag) return;
+
+      rows = rows.map((row) => {
+        const matched = smartTagToggles.some((migration) => rowMatchesTagMigration(row, migration, smartTagContext!.newTagId, smartTagMode));
+
+        if (row.id === smartTagContext!.transactionId || matched) {
+          return {
+            ...row,
+            tags: tagsAfterSmartApply(row.tags, tag, smartTagMode),
+          };
+        }
+        return row;
+      });
+
+      closeSmartTag(false);
+      await invalidateAll();
+    } finally {
+      smartTagApplying = false;
+    }
+  }
+
+  async function addTransactionTagDirect(transactionId: string, tagId: string): Promise<boolean> {
+    const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagId }),
+    });
+    if (!response.ok) return false;
+
+    const tag = data.tags.find((entry) => entry.id === tagId);
+    if (!tag) return false;
+
+    rows = rows.map((row) =>
+      row.id === transactionId
+        ? {
+            ...row,
+            tags: [...row.tags, { id: tag.id, name: tag.name, colorHex: tag.colorHex }],
+          }
+        : row
+    );
+    openTagMenuTxId = null;
+    return true;
+  }
+
+  async function handleAddTag(transaction: PageData["transactions"][number], tagId: string) {
+    if (!tagId || transaction.tags.some((tag) => tag.id === tagId)) return;
+
+    const merchant = transaction.merchant?.trim();
+    if (!merchant) {
+      await addTransactionTag(transaction.id, tagId);
+      return;
+    }
+
+    const tag = data.tags.find((entry) => entry.id === tagId);
+    if (!tag) return;
+
+    const previousTags = transaction.tags.map((entry) => ({ ...entry }));
+    applyTagToRows(transaction.id, tagsAfterSmartApply(previousTags, tag, "append"));
+    savingTagTxId = transaction.id;
+    openTagMenuTxId = null;
+
+    try {
+      const params = new URLSearchParams({
+        merchant,
+        newTagId: tagId,
+        sourceTransactionId: transaction.id,
+        type: transaction.type,
+      });
+
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/smart-tag?${params.toString()}`);
+      if (!response.ok) {
+        applyTagToRows(transaction.id, previousTags);
+        return;
+      }
+
+      const body = (await response.json()) as { preview: SmartTaggingPreview | null };
+      if (!body.preview) {
+        await addTransactionTagDirect(transaction.id, tagId);
+        return;
+      }
+
+      smartTagContext = {
+        transactionId: transaction.id,
+        merchant,
+        type: transaction.type,
+        newTagId: tagId,
+        previousTags,
+      };
+      smartTagPreview = body.preview;
+      smartTagToggles = buildSmartTagToggles(body.preview);
+      smartTagMode = "append";
+      smartTagOpen = true;
+    } catch {
+      applyTagToRows(transaction.id, previousTags);
     } finally {
       savingTagTxId = null;
     }
@@ -704,6 +1141,14 @@
           </select>
         </div>
       {/if}
+      <div class="period-tabs filter-multi-wrap">
+        <FilterMultiselect label="Categories" options={categoryFilterOptions} selected={data.selectedCategoryFilters} onchange={setCategoryFilters} />
+      </div>
+      {#if data.tags.length > 0}
+        <div class="period-tabs filter-multi-wrap">
+          <FilterMultiselect label="Tags" options={tagFilterOptions} selected={data.selectedTagIds} onchange={setTagFilters} />
+        </div>
+      {/if}
     </div>
   </div>
   <section class="stats">
@@ -810,6 +1255,10 @@
               No linked transactions found for this refund set.
             {:else if data.selectedGroupId}
               No transactions in this group for the selected period.
+            {:else if data.selectedCategoryFilters.length}
+              No transactions in {selectedCategoryLabels()} for the selected period.
+            {:else if data.selectedTagIds.length}
+              No transactions tagged {selectedTagLabels()} for the selected period.
             {:else if data.transactionTypeFilter === "income"}
               No credits match this filter.
             {:else if data.transactionTypeFilter === "expense"}
@@ -971,7 +1420,7 @@
                   class="cat-select"
                   value={t.categoryId ?? ""}
                   disabled={savingCategoryId === t.id}
-                  onchange={(e) => updateTransactionCategory(t.id, e.currentTarget.value ? e.currentTarget.value : null)}
+                  onchange={(e) => handleCategoryChange(t, e.currentTarget.value ? e.currentTarget.value : null)}
                 >
                   <option value="">Uncategorized</option>
                   {#each categoriesForType(t.type, t.categoryId) as category (category.id)}
@@ -1012,7 +1461,7 @@
                     {#if openTagMenuTxId === t.id}
                       <div class="tag-add-menu" role="menu">
                         {#each availableTagsFor(t) as tag (tag.id)}
-                          <button type="button" role="menuitem" onclick={() => addTransactionTag(t.id, tag.id)}>
+                          <button type="button" role="menuitem" onclick={() => handleAddTag(t, tag.id)}>
                             {tag.name}
                           </button>
                         {/each}
@@ -1037,6 +1486,30 @@
     {#if loading}■ LOADING ■{:else if !hasMore}— END —{:else}↓ SCROLL ↓{/if}
   </div>
 </section>
+
+<SmartCategorizePopup
+  open={smartCatOpen}
+  preview={smartCatPreview}
+  applying={smartCatApplying}
+  toggles={smartCatToggles}
+  onToggle={handleSmartCatToggle}
+  onApplySelected={() => applySmartCat(true)}
+  onThisOnly={() => applySmartCat(false)}
+  onCancel={() => closeSmartCat(true)}
+/>
+
+<SmartTagPopup
+  open={smartTagOpen}
+  preview={smartTagPreview}
+  applying={smartTagApplying}
+  mode={smartTagMode}
+  toggles={smartTagToggles}
+  onModeChange={(mode) => (smartTagMode = mode)}
+  onToggle={handleSmartTagToggle}
+  onApplySelected={() => applySmartTag(true)}
+  onThisOnly={() => applySmartTag(false)}
+  onCancel={() => closeSmartTag(true)}
+/>
 
 <style>
   .balance-card {
@@ -1118,8 +1591,14 @@
     overflow: hidden;
   }
 
+  .filter-multi-wrap {
+    padding: 0;
+    overflow: visible;
+  }
+
   .period-tabs button,
-  .group-filter {
+  .group-filter,
+  :global(.filter-multi-btn) {
     --period-tab-height: 1.625rem;
     box-sizing: border-box;
     height: var(--period-tab-height);

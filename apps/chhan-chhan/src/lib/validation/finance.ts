@@ -7,9 +7,31 @@ export const paginationQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+const multiCategoryIdsSchema = z.preprocess(
+  (value) => {
+    if (value == null || value === "") return undefined;
+    if (Array.isArray(value)) return value;
+    return String(value)
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+  },
+  z.array(z.union([z.string().uuid(), z.literal("uncategorized")])).optional()
+);
+
+const multiTagIdsSchema = z.preprocess((value) => {
+  if (value == null || value === "") return undefined;
+  if (Array.isArray(value)) return value;
+  return String(value)
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}, z.array(z.string().uuid()).optional());
+
 export const transactionsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().optional(),
-  categoryId: z.string().uuid().optional(),
+  categoryIds: multiCategoryIdsSchema,
+  tagIds: multiTagIdsSchema,
   type: z.enum(["expense", "income", "transfer"]).optional(),
   dateFrom: z.string().date().optional(),
   dateTo: z.string().date().optional(),
@@ -144,4 +166,45 @@ export const csvImportRowSchema = z.object({
   externalRef: z.string().trim().optional(),
   balanceMinor: z.number().int().optional(),
   sortOrder: z.number().int().optional(),
+});
+
+export const smartCategorizePreviewSchema = z.object({
+  merchant: z.string().trim().min(1).max(120),
+  newCategoryId: z.string().uuid().nullish(),
+  sourceTransactionId: z.string().uuid(),
+  type: z.enum(["expense", "income", "transfer"]),
+});
+
+export const smartCategorizeApplySchema = z.object({
+  sourceTransactionId: z.string().uuid(),
+  newCategoryId: z.string().uuid().nullish(),
+  type: z.enum(["expense", "income", "transfer"]),
+  migrations: z.array(
+    z.object({
+      merchant: z.string().trim().min(1).max(120),
+      fromCategoryId: z.string().uuid().nullish(),
+      enabled: z.boolean(),
+    })
+  ),
+});
+
+export const smartTagPreviewSchema = z.object({
+  merchant: z.string().trim().min(1).max(120),
+  newTagId: z.string().uuid(),
+  sourceTransactionId: z.string().uuid(),
+  type: z.enum(["expense", "income", "transfer"]),
+});
+
+export const smartTagApplySchema = z.object({
+  sourceTransactionId: z.string().uuid(),
+  newTagId: z.string().uuid(),
+  type: z.enum(["expense", "income", "transfer"]),
+  mode: z.enum(["replace", "append"]),
+  migrations: z.array(
+    z.object({
+      merchant: z.string().trim().min(1).max(120),
+      fromTagIds: z.array(z.string().uuid()).nullable(),
+      enabled: z.boolean(),
+    })
+  ),
 });

@@ -1,11 +1,15 @@
 export type SummaryPeriod = "month" | "year" | "all";
 
+export type SummaryCategoryFilter = "uncategorized" | (string & {});
+
 export type SummarySelection = {
   period: SummaryPeriod;
   month?: string;
   year?: number;
   groupId?: string;
   search?: string;
+  categoryFilters?: SummaryCategoryFilter[];
+  tagIds?: string[];
 };
 
 export function parseSummaryPeriod(value: string | null): SummaryPeriod {
