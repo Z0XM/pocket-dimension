@@ -84,6 +84,10 @@ export const attachTransactionGroupSchema = z.object({
 
 const groupNameSchema = z.string().trim().min(1).max(80);
 
+export const setGroupHiddenSchema = z.object({
+  hidden: z.boolean(),
+});
+
 export const createGroupSchema = z.object({
   name: groupNameSchema,
 });

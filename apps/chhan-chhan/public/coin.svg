@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+  <defs>
+    <linearGradient id="coin-rim" x1="88" y1="64" x2="424" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF4A8"/>
+      <stop offset="0.25" stop-color="#FFD93A"/>
+      <stop offset="0.55" stop-color="#F5B820"/>
+      <stop offset="1" stop-color="#C8840A"/>
+    </linearGradient>
+
+    <radialGradient id="coin-face" cx="0.35" cy="0.28" r="0.76">
+      <stop offset="0" stop-color="#FFE566"/>
+      <stop offset="0.42" stop-color="#FFC926"/>
+      <stop offset="1" stop-color="#E3A015"/>
+    </radialGradient>
+
+    <linearGradient id="coin-rim-inner" x1="256" y1="68" x2="256" y2="444" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF0A0" stop-opacity="0.5"/>
+      <stop offset="0.5" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#7A5200" stop-opacity="0.32"/>
+    </linearGradient>
+
+    <linearGradient id="dollar-fill" x1="188" y1="108" x2="324" y2="404" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF6B8"/>
+      <stop offset="0.35" stop-color="#FFD845"/>
+      <stop offset="1" stop-color="#D89410"/>
+    </linearGradient>
+
+    <linearGradient id="dollar-shadow" x1="188" y1="108" x2="324" y2="404" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B87808"/>
+      <stop offset="1" stop-color="#8A5800"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer rim -->
+  <circle cx="256" cy="256" r="250" fill="url(#coin-rim)"/>
+
+  <!-- Top-left rim highlight -->
+  <path
+    d="M 256 12 A 238 238 0 0 1 462 156"
+    stroke="#FFF8C8"
+    stroke-width="11"
+    stroke-linecap="round"
+    opacity="0.55"
+  />
+
+  <!-- Bottom-right rim shadow -->
+  <path
+    d="M 462 356 A 238 238 0 0 1 256 500"
+    stroke="#9A6808"
+    stroke-width="13"
+    stroke-linecap="round"
+    opacity="0.34"
+  />
+
+  <!-- Inner face -->
+  <circle cx="256" cy="256" r="182" fill="url(#coin-face)"/>
+
+  <!-- Inner rim bevel -->
+  <circle
+    cx="256"
+    cy="256"
+    r="182"
+    fill="none"
+    stroke="url(#coin-rim-inner)"
+    stroke-width="12"
+  />
+
+  <!-- Embossed dollar sign -->
+  <g>
+    <path
+      d="M 256 96 L 256 416 M 278 152 C 278 128 260 112 236 112 C 206 112 184 132 184 158 C 184 180 200 196 228 206 L 284 226 C 312 236 332 258 332 288 C 332 326 302 354 262 354 C 228 354 200 334 194 306"
+      fill="none"
+      stroke="url(#dollar-shadow)"
+      stroke-width="36"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      transform="translate(5 6)"
+      opacity="0.5"
+    />
+
+    <path
+      d="M 256 96 L 256 416 M 278 152 C 278 128 260 112 236 112 C 206 112 184 132 184 158 C 184 180 200 196 228 206 L 284 226 C 312 236 332 258 332 288 C 332 326 302 354 262 354 C 228 354 200 334 194 306"
+      fill="none"
+      stroke="#FFF8C8"
+      stroke-width="36"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      transform="translate(-4 -4)"
+      opacity="0.42"
+    />
+
+    <path
+      d="M 256 96 L 256 416 M 278 152 C 278 128 260 112 236 112 C 206 112 184 132 184 158 C 184 180 200 196 228 206 L 284 226 C 312 236 332 258 332 288 C 332 326 302 354 262 354 C 228 354 200 334 194 306"
+      fill="none"
+      stroke="url(#dollar-fill)"
+      stroke-width="36"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>

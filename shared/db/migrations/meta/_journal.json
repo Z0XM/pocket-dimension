@@ -134,6 +134,13 @@
       "when": 1780230000000,
       "tag": "0018_finance_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1780231000000,
+      "tag": "0019_transaction_group_hidden",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,7 @@ export type SummarySelection = {
   month?: string;
   year?: number;
   groupId?: string;
+  search?: string;
 };
 
 export function parseSummaryPeriod(value: string | null): SummaryPeriod {

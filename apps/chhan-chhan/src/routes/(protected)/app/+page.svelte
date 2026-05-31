@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { Tag, Plus, MessageSquare, Link } from "@lucide/svelte";
+  import { goto, invalidateAll } from "$app/navigation";
+  import { Tag, Plus, MessageSquare, Link, Eye, EyeOff } from "@lucide/svelte";
   import { formatMoney } from "$lib/finance/money";
   import { buildSummarySelection, formatMonthKeyShort, summarySelectionToDateRange, type SummaryPeriod } from "$lib/finance/summary";
   import { infiniteScroll } from "$lib/actions/infinite-scroll";
@@ -14,12 +14,14 @@
   let pageIndex = $state(0);
   let loading = $state(false);
   let hasMore = $state(false);
-  let search = $state("");
+  let searchInput = $state("");
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let savingCategoryId = $state<string | null>(null);
   let savingNotesId = $state<string | null>(null);
   let savingTagTxId = $state<string | null>(null);
   let openTagMenuTxId = $state<string | null>(null);
   let savingGroupTxId = $state<string | null>(null);
+  let savingGroupHiddenId = $state<string | null>(null);
   let openGroupTxId = $state<string | null>(null);
   let openNoteTxId = $state<string | null>(null);
   let noteDraft = $state("");
@@ -28,7 +30,37 @@
     rows = [...data.transactions];
     pageIndex = 0;
     hasMore = data.hasMore;
+    searchInput = data.searchQuery ?? "";
   });
+
+  function handleSearchInput(value: string) {
+    searchInput = value;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      const next = value.trim();
+      const current = (data.searchQuery ?? "").trim();
+      if (next === current) return;
+      goto(appUrl({ search: next || null }), { keepFocus: true, noScroll: true, invalidateAll: true });
+    }, 300);
+  }
+
+  function transactionQueryParams(page: number) {
+    const params = new URLSearchParams({
+      pageIndex: String(page),
+      pageSize: String(data.pageSize),
+      sortBy: "occurredOn",
+      sortDirection: data.sortDirection,
+    });
+    if (data.transactionTypeFilter) {
+      params.set("type", data.transactionTypeFilter);
+    }
+    const dateRange = summarySelectionToDateRange(buildSummarySelection(data.summaryPeriod, data.selectedMonth, data.selectedYear));
+    if (dateRange.dateFrom) params.set("dateFrom", dateRange.dateFrom);
+    if (dateRange.dateTo) params.set("dateTo", dateRange.dateTo);
+    if (data.selectedGroupId) params.set("groupId", data.selectedGroupId);
+    if (data.searchQuery?.trim()) params.set("search", data.searchQuery.trim());
+    return params;
+  }
 
   $effect(() => {
     if (!openTagMenuTxId) return;
@@ -109,15 +141,6 @@
     };
   });
 
-  const filtered = $derived(
-    search.trim()
-      ? rows.filter((row) => {
-          const q = search.trim().toLowerCase();
-          return row.merchant?.toLowerCase().includes(q) || row.notes?.toLowerCase().includes(q);
-        })
-      : rows
-  );
-
   function appUrl(
     updates: {
       sort?: "asc" | "desc";
@@ -126,6 +149,7 @@
       year?: number;
       type?: "income" | "expense" | null;
       group?: string | null;
+      search?: string | null;
     } = {}
   ) {
     const params = new URLSearchParams();
@@ -135,6 +159,7 @@
     const year = updates.year ?? data.selectedYear;
     const typeFilter = updates.type === undefined ? data.transactionTypeFilter : updates.type;
     const groupFilter = updates.group === undefined ? data.selectedGroupId : updates.group;
+    const searchFilter = updates.search === undefined ? (data.searchQuery ?? "") : (updates.search ?? "");
 
     if (sort === "asc") params.set("sort", "asc");
 
@@ -150,6 +175,7 @@
 
     if (typeFilter) params.set("type", typeFilter);
     if (groupFilter) params.set("group", groupFilter);
+    if (searchFilter.trim()) params.set("search", searchFilter.trim());
 
     const query = params.toString();
     return query ? `/app?${query}` : "/app";
@@ -197,19 +223,7 @@
     loading = true;
     try {
       const nextPage = pageIndex + 1;
-      const params = new URLSearchParams({
-        pageIndex: String(nextPage),
-        pageSize: String(data.pageSize),
-        sortBy: "occurredOn",
-        sortDirection: data.sortDirection,
-      });
-      if (data.transactionTypeFilter) {
-        params.set("type", data.transactionTypeFilter);
-      }
-      const dateRange = summarySelectionToDateRange(buildSummarySelection(data.summaryPeriod, data.selectedMonth, data.selectedYear));
-      if (dateRange.dateFrom) params.set("dateFrom", dateRange.dateFrom);
-      if (dateRange.dateTo) params.set("dateTo", dateRange.dateTo);
-      if (data.selectedGroupId) params.set("groupId", data.selectedGroupId);
+      const params = transactionQueryParams(nextPage);
       const response = await fetch(`/api/accounts/${data.account.id}/transactions?${params}`);
       if (!response.ok) return;
       const page = await response.json();
@@ -412,6 +426,25 @@
       savingGroupTxId = null;
     }
   }
+
+  async function toggleGroupHidden(transactionId: string, hidden: boolean) {
+    if (!data.selectedGroupId) return;
+
+    savingGroupHiddenId = transactionId;
+    try {
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/groups/${data.selectedGroupId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hidden }),
+      });
+      if (!response.ok) return;
+
+      rows = rows.map((row) => (row.id === transactionId ? { ...row, groupHidden: hidden } : row));
+      await invalidateAll();
+    } finally {
+      savingGroupHiddenId = null;
+    }
+  }
 </script>
 
 <svelte:head><title>Chhan Chhan</title></svelte:head>
@@ -422,7 +455,13 @@
     <AppNav />
   </div>
   <div class="actions">
-    <input type="search" placeholder="search…" bind:value={search} />
+    <input
+      type="search"
+      placeholder="search…"
+      aria-label="Search transactions"
+      value={searchInput}
+      oninput={(e) => handleSearchInput(e.currentTarget.value)}
+    />
     <a class="cta" href="/app/control">IMPORT</a>
     <AppSettings />
   </div>
@@ -586,10 +625,12 @@
       </tr>
     </thead>
     <tbody>
-      {#if filtered.length === 0}
+      {#if rows.length === 0}
         <tr>
           <td colspan="5" class="dim empty-row">
-            {#if data.selectedGroupId}
+            {#if data.searchQuery?.trim()}
+              No transactions match “{data.searchQuery}”.
+            {:else if data.selectedGroupId}
               No transactions in this group for the selected period.
             {:else if data.transactionTypeFilter === "income"}
               No credits match this filter.
@@ -601,12 +642,28 @@
           </td>
         </tr>
       {:else}
-        {#each filtered as t (t.id)}
-          <tr>
+        {#each rows as t (t.id)}
+          <tr class:group-hidden={Boolean(data.selectedGroupId && t.groupHidden)}>
             <td class="mono dim">{t.occurredOn}</td>
             <td class="merchant-cell">
               <div class="merchant-row">
                 <span class="merchant">{t.merchant ?? "—"}</span>
+                {#if data.selectedGroupId}
+                  <button
+                    type="button"
+                    class="group-hidden-btn"
+                    class:is-hidden={t.groupHidden}
+                    aria-label="{t.groupHidden ? 'Show in group' : 'Hide in group'} for {t.merchant ?? 'transaction'}"
+                    disabled={savingGroupHiddenId === t.id}
+                    onclick={() => toggleGroupHidden(t.id, !t.groupHidden)}
+                  >
+                    {#if t.groupHidden}
+                      <EyeOff size={12} strokeWidth={1.5} aria-hidden="true" />
+                    {:else}
+                      <Eye size={12} strokeWidth={1.5} aria-hidden="true" />
+                    {/if}
+                  </button>
+                {/if}
                 <div class="note-wrap">
                   <button
                     type="button"
@@ -649,10 +706,10 @@
                     </button>
                     {#if openGroupTxId === t.id}
                       <div class="group-popup" role="dialog" aria-label="Transaction group">
-                        <label class="group-popup-label" for="group-{t.id}">Group</label>
                         <select
                           id="group-{t.id}"
                           class="group-select"
+                          aria-label="Link transaction to group"
                           value={primaryGroupId(t)}
                           disabled={savingGroupTxId === t.id}
                           onchange={(e) => setTransactionGroup(t.id, e.currentTarget.value ? e.currentTarget.value : null)}
@@ -741,11 +798,9 @@
     </tbody>
   </table>
 
-  {#if !search.trim()}
-    <div class="sentinel" use:infiniteScroll={{ onLoad: loadMore, disabled: loading || !hasMore }}>
-      {#if loading}■ LOADING ■{:else if !hasMore}— END —{:else}↓ SCROLL ↓{/if}
-    </div>
-  {/if}
+  <div class="sentinel" use:infiniteScroll={{ onLoad: loadMore, disabled: loading || !hasMore }}>
+    {#if loading}■ LOADING ■{:else if !hasMore}— END —{:else}↓ SCROLL ↓{/if}
+  </div>
 </section>
 
 <style>
@@ -1059,6 +1114,37 @@
     cursor: wait;
   }
 
+  tr.group-hidden {
+    opacity: 0.45;
+  }
+
+  tr.group-hidden .merchant,
+  tr.group-hidden .amt {
+    color: var(--muted);
+  }
+
+  .group-hidden-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .group-hidden-btn:hover,
+  .group-hidden-btn.is-hidden {
+    color: var(--hi-cyan);
+  }
+
+  .group-hidden-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
   .group-preview {
     position: absolute;
     left: calc(100% + 0.35rem);
@@ -1096,15 +1182,6 @@
     background: var(--surface);
     border: 2px solid var(--chrome-line);
     box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
-  }
-
-  .group-popup-label {
-    display: block;
-    margin-bottom: 0.35rem;
-    font-size: 0.62rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
   }
 
   .group-select {

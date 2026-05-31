@@ -86,6 +86,25 @@ async function loadGroupsForTransactions(transactionIds: string[]) {
   return groupsByTransaction;
 }
 
+async function loadGroupHiddenForTransactions(transactionIds: string[], groupId: string) {
+  if (!transactionIds.length) return new Map<string, boolean>();
+
+  const hiddenRows = await db
+    .select({
+      transactionId: schema.financeTransactionGroups.transactionId,
+      isHidden: schema.financeTransactionGroups.isHidden,
+    })
+    .from(schema.financeTransactionGroups)
+    .where(and(eq(schema.financeTransactionGroups.groupId, groupId), inArray(schema.financeTransactionGroups.transactionId, transactionIds)));
+
+  const hiddenByTransaction = new Map<string, boolean>();
+  for (const row of hiddenRows) {
+    hiddenByTransaction.set(row.transactionId, row.isHidden);
+  }
+
+  return hiddenByTransaction;
+}
+
 const sortMap = {
   occurredOn: schema.financeTransactions.occurredOn,
   amountMinor: schema.financeTransactions.amountMinor,
@@ -380,6 +399,30 @@ export async function detachTransactionTag(accountId: string, transactionId: str
   return Boolean(removed);
 }
 
+export async function setTransactionGroupHidden(accountId: string, transactionId: string, groupId: string, hidden: boolean) {
+  const [transaction] = await db
+    .select({ id: schema.financeTransactions.id })
+    .from(schema.financeTransactions)
+    .where(and(eq(schema.financeTransactions.id, transactionId), eq(schema.financeTransactions.accountId, accountId)))
+    .limit(1);
+  if (!transaction) return null;
+
+  const [group] = await db
+    .select({ id: schema.financeGroups.id })
+    .from(schema.financeGroups)
+    .where(and(eq(schema.financeGroups.id, groupId), eq(schema.financeGroups.accountId, accountId)))
+    .limit(1);
+  if (!group) return null;
+
+  const [updated] = await db
+    .update(schema.financeTransactionGroups)
+    .set({ isHidden: hidden })
+    .where(and(eq(schema.financeTransactionGroups.transactionId, transactionId), eq(schema.financeTransactionGroups.groupId, groupId)))
+    .returning({ isHidden: schema.financeTransactionGroups.isHidden });
+
+  return updated ?? null;
+}
+
 export async function listTransactions(accountId: string, query: TransactionsQuery) {
   const conditions = [eq(schema.financeTransactions.accountId, accountId)];
 
@@ -442,12 +485,19 @@ export async function listTransactions(accountId: string, query: TransactionsQue
   const loaded = offset + rows.length;
   const tagsByTransaction = await loadTagsForTransactions(rows.map((row) => row.id));
   const groupsByTransaction = await loadGroupsForTransactions(rows.map((row) => row.id));
+  const hiddenByTransaction = query.groupId
+    ? await loadGroupHiddenForTransactions(
+        rows.map((row) => row.id),
+        query.groupId
+      )
+    : null;
 
   return {
     rows: rows.map((row) => ({
       ...row,
       tags: tagsByTransaction.get(row.id) ?? [],
       groups: groupsByTransaction.get(row.id) ?? [],
+      ...(query.groupId ? { groupHidden: hiddenByTransaction?.get(row.id) ?? false } : {}),
     })),
     total,
     hasMore: loaded < total,
@@ -678,7 +728,8 @@ export async function listTransactionPeriods(accountId: string) {
 
 export async function getTransactionSummary(accountId: string, selection: SummarySelection) {
   const dateFilter = summaryDateFilter(selection);
-  const groupFilter = summaryGroupFilter(selection.groupId);
+  const groupFilter = summaryGroupVisibleFilter(selection.groupId);
+  const searchFilter = summarySearchFilter(selection.search);
 
   const result = await db.execute(sql`
     select
@@ -688,6 +739,7 @@ export async function getTransactionSummary(accountId: string, selection: Summar
     where t.account_id = ${accountId}
       and ${dateFilter}
       and ${groupFilter}
+      and ${searchFilter}
   `);
   const row = result.rows[0] as Record<string, unknown> | undefined;
   const incomeMinor = parseSqlMinor(row?.income_minor ?? row?.incomeMinor);
@@ -702,7 +754,8 @@ export async function getTransactionSummary(accountId: string, selection: Summar
 
 export async function getCategorySpend(accountId: string, selection: SummarySelection) {
   const dateFilter = summaryDateFilter(selection);
-  const groupFilter = summaryGroupFilter(selection.groupId);
+  const groupFilter = summaryGroupVisibleFilter(selection.groupId);
+  const searchFilter = summarySearchFilter(selection.search);
 
   const categorySpend = await db.execute(sql`
     select
@@ -714,6 +767,7 @@ export async function getCategorySpend(accountId: string, selection: SummarySele
       and t.type = 'expense'
       and ${dateFilter}
       and ${groupFilter}
+      and ${searchFilter}
     group by c.name
     order by amount_minor desc
     limit 8
@@ -722,13 +776,21 @@ export async function getCategorySpend(accountId: string, selection: SummarySele
   return categorySpend.rows as Array<{ category_name: string; amount_minor: number }>;
 }
 
-function summaryGroupFilter(groupId?: string) {
+function summarySearchFilter(search?: string) {
+  if (!search?.trim()) return sql`true`;
+
+  const term = `%${search.trim()}%`;
+  return sql`(t.merchant ilike ${term} or coalesce(t.notes, '') ilike ${term})`;
+}
+
+function summaryGroupVisibleFilter(groupId?: string) {
   if (!groupId) return sql`true`;
 
   return sql`exists (
     select 1 from chhanchhan.finance_transaction_groups ftg
     where ftg.transaction_id = t.id
       and ftg.group_id = ${groupId}
+      and ftg.is_hidden = false
   )`;
 }
 

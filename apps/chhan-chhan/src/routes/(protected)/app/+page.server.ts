@@ -36,9 +36,11 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const groups = await listGroups(account.id);
   const groupParam = url.searchParams.get("group");
   const selectedGroupId = groupParam && groups.some((group) => group.id === groupParam) ? groupParam : null;
+  const searchQuery = url.searchParams.get("search")?.trim() ?? "";
   const summarySelection = {
     ...buildSummarySelection(summaryPeriod, selectedMonth, selectedYear),
     ...(selectedGroupId ? { groupId: selectedGroupId } : {}),
+    ...(searchQuery ? { search: searchQuery } : {}),
   };
   const dateRange = summarySelectionToDateRange(summarySelection);
 
@@ -52,6 +54,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       dateFrom: dateRange.dateFrom,
       dateTo: dateRange.dateTo,
       groupId: selectedGroupId ?? undefined,
+      search: searchQuery || undefined,
     }),
     getAnalytics(account.id),
     getTransactionSummary(account.id, summarySelection),
@@ -76,12 +79,15 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     color: ["#bd93f9", "#50fa7b", "#54dbee", "#ee7c02", "#ffb86c"][index % 5],
   }));
 
+  const meterRows = searchQuery ? categorySpend.slice(0, 5) : budgetUsage.length ? budgetUsage : categorySpend.slice(0, 5);
+
   return {
     account,
     categories,
     tags,
     groups,
     selectedGroupId,
+    searchQuery,
     transactions: transactions.rows,
     hasMore: transactions.hasMore,
     total: transactions.total,
@@ -97,6 +103,6 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     summaryPrefix: getSummaryPrefix(summarySelection),
     summary: { ...summary, savingsRate },
     currentBalance,
-    budgetUsage: budgetUsage.length ? budgetUsage : categorySpend.slice(0, 5),
+    budgetUsage: meterRows,
   };
 };
