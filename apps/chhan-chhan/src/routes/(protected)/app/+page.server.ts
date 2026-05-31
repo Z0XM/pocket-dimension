@@ -2,6 +2,7 @@ import {
   getAnalytics,
   getCategorySpend,
   getCurrentBalance,
+  getRefundLinkClusterIds,
   getTransactionSummary,
   listCategories,
   listGroups,
@@ -37,6 +38,9 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const groupParam = url.searchParams.get("group");
   const selectedGroupId = groupParam && groups.some((group) => group.id === groupParam) ? groupParam : null;
   const searchQuery = url.searchParams.get("search")?.trim() ?? "";
+  const linkParam = url.searchParams.get("link");
+  const linkClusterIds = linkParam ? await getRefundLinkClusterIds(account.id, linkParam) : null;
+  const selectedLinkTransactionId = linkParam && linkClusterIds?.includes(linkParam) ? linkParam : null;
   const summarySelection = {
     ...buildSummarySelection(summaryPeriod, selectedMonth, selectedYear),
     ...(selectedGroupId ? { groupId: selectedGroupId } : {}),
@@ -55,6 +59,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       dateTo: dateRange.dateTo,
       groupId: selectedGroupId ?? undefined,
       search: searchQuery || undefined,
+      linkTransactionId: selectedLinkTransactionId ?? undefined,
     }),
     getAnalytics(account.id),
     getTransactionSummary(account.id, summarySelection),
@@ -87,6 +92,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     tags,
     groups,
     selectedGroupId,
+    selectedLinkTransactionId,
+    linkClusterSize: linkClusterIds?.length ?? 0,
     searchQuery,
     transactions: transactions.rows,
     hasMore: transactions.hasMore,

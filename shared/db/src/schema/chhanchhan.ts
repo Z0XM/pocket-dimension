@@ -194,6 +194,22 @@ export const financeTransactionGroups = chhanSchema.table(
   (table) => [primaryKey({ columns: [table.transactionId, table.groupId] }), index("finance_transaction_groups_group_id_idx").on(table.groupId)]
 );
 
+export const financeTransactionRefundLinks = chhanSchema.table(
+  "finance_transaction_refund_links",
+  {
+    creditTransactionId: uuid("credit_transaction_id")
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: "cascade" }),
+    expenseTransactionId: uuid("expense_transaction_id")
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.creditTransactionId, table.expenseTransactionId] }),
+    index("finance_transaction_refund_links_expense_id_idx").on(table.expenseTransactionId),
+  ]
+);
+
 export const financeAccountRelations = relations(financeAccounts, ({ one, many }) => ({
   owner: one(auth.user, {
     fields: [financeAccounts.ownerUserId],
@@ -243,6 +259,8 @@ export const financeTransactionRelations = relations(financeTransactions, ({ one
   }),
   transactionTags: many(financeTransactionTags),
   transactionGroups: many(financeTransactionGroups),
+  creditRefundLinks: many(financeTransactionRefundLinks, { relationName: "creditRefundLinks" }),
+  expenseRefundLinks: many(financeTransactionRefundLinks, { relationName: "expenseRefundLinks" }),
 }));
 
 export const financeTagRelations = relations(financeTags, ({ one, many }) => ({
@@ -280,6 +298,19 @@ export const financeTransactionGroupRelations = relations(financeTransactionGrou
   group: one(financeGroups, {
     fields: [financeTransactionGroups.groupId],
     references: [financeGroups.id],
+  }),
+}));
+
+export const financeTransactionRefundLinkRelations = relations(financeTransactionRefundLinks, ({ one }) => ({
+  creditTransaction: one(financeTransactions, {
+    fields: [financeTransactionRefundLinks.creditTransactionId],
+    references: [financeTransactions.id],
+    relationName: "creditRefundLinks",
+  }),
+  expenseTransaction: one(financeTransactions, {
+    fields: [financeTransactionRefundLinks.expenseTransactionId],
+    references: [financeTransactions.id],
+    relationName: "expenseRefundLinks",
   }),
 }));
 

@@ -14,6 +14,7 @@ export const transactionsQuerySchema = paginationQuerySchema.extend({
   dateFrom: z.string().date().optional(),
   dateTo: z.string().date().optional(),
   groupId: z.string().uuid().optional(),
+  linkTransactionId: z.string().uuid().optional(),
   sortBy: z.enum(sortableColumns).default("occurredOn"),
   sortDirection: z.enum(["asc", "desc"]).default("desc"),
 });
@@ -80,6 +81,10 @@ export const attachTransactionTagSchema = z.object({
 
 export const attachTransactionGroupSchema = z.object({
   groupId: z.string().uuid(),
+});
+
+export const attachRefundLinkSchema = z.object({
+  expenseTransactionId: z.string().uuid(),
 });
 
 const groupNameSchema = z.string().trim().min(1).max(80);

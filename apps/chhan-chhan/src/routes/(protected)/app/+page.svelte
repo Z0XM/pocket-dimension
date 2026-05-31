@@ -1,7 +1,8 @@
 <script lang="ts">
   import { goto, invalidateAll } from "$app/navigation";
-  import { Tag, Plus, MessageSquare, Link, Eye, EyeOff } from "@lucide/svelte";
+  import { Tag, Plus, MessageSquare, Link, Layers, Eye, EyeOff, ArrowLeftRight, TriangleAlert } from "@lucide/svelte";
   import { formatMoney } from "$lib/finance/money";
+  import { isRefundCategoryName } from "$lib/finance/refunds";
   import { buildSummarySelection, formatMonthKeyShort, summarySelectionToDateRange, type SummaryPeriod } from "$lib/finance/summary";
   import { infiniteScroll } from "$lib/actions/infinite-scroll";
   import AppNav from "$lib/components/app-nav.svelte";
@@ -25,6 +26,11 @@
   let openGroupTxId = $state<string | null>(null);
   let openNoteTxId = $state<string | null>(null);
   let noteDraft = $state("");
+  let openRefundLinkTxId = $state<string | null>(null);
+  let refundLinkSearch = $state("");
+  let refundLinkOptions = $state<Array<{ id: string; occurredOn: string; merchant: string | null; amountMinor: number }>>([]);
+  let savingRefundLinkId = $state<string | null>(null);
+  let refundLinkSearchTimer: ReturnType<typeof setTimeout> | undefined;
 
   $effect(() => {
     rows = [...data.transactions];
@@ -59,6 +65,7 @@
     if (dateRange.dateTo) params.set("dateTo", dateRange.dateTo);
     if (data.selectedGroupId) params.set("groupId", data.selectedGroupId);
     if (data.searchQuery?.trim()) params.set("search", data.searchQuery.trim());
+    if (data.selectedLinkTransactionId) params.set("linkTransactionId", data.selectedLinkTransactionId);
     return params;
   }
 
@@ -141,6 +148,42 @@
     };
   });
 
+  $effect(() => {
+    if (!openRefundLinkTxId) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".refund-link-wrap")) return;
+      openRefundLinkTxId = null;
+      refundLinkSearch = "";
+      refundLinkOptions = [];
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        openRefundLinkTxId = null;
+        refundLinkSearch = "";
+        refundLinkOptions = [];
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  });
+
+  $effect(() => {
+    if (!openRefundLinkTxId) return;
+    const query = refundLinkSearch;
+    clearTimeout(refundLinkSearchTimer);
+    refundLinkSearchTimer = setTimeout(() => {
+      void loadRefundLinkOptions(query);
+    }, 250);
+  });
+
   function appUrl(
     updates: {
       sort?: "asc" | "desc";
@@ -150,6 +193,7 @@
       type?: "income" | "expense" | null;
       group?: string | null;
       search?: string | null;
+      link?: string | null;
     } = {}
   ) {
     const params = new URLSearchParams();
@@ -160,6 +204,7 @@
     const typeFilter = updates.type === undefined ? data.transactionTypeFilter : updates.type;
     const groupFilter = updates.group === undefined ? data.selectedGroupId : updates.group;
     const searchFilter = updates.search === undefined ? (data.searchQuery ?? "") : (updates.search ?? "");
+    const linkFilter = updates.link === undefined ? data.selectedLinkTransactionId : updates.link;
 
     if (sort === "asc") params.set("sort", "asc");
 
@@ -176,6 +221,7 @@
     if (typeFilter) params.set("type", typeFilter);
     if (groupFilter) params.set("group", groupFilter);
     if (searchFilter.trim()) params.set("search", searchFilter.trim());
+    if (linkFilter) params.set("link", linkFilter);
 
     const query = params.toString();
     return query ? `/app?${query}` : "/app";
@@ -216,6 +262,83 @@
 
   function setGroupFilter(groupId: string | null) {
     goto(appUrl({ group: groupId }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  function toggleLinkClusterFilter(transactionId: string) {
+    goto(appUrl({ link: data.selectedLinkTransactionId ? null : transactionId }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  function clearLinkClusterFilter() {
+    goto(appUrl({ link: null }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  async function loadRefundLinkOptions(query: string) {
+    if (!openRefundLinkTxId) return;
+
+    const transaction = rows.find((row) => row.id === openRefundLinkTxId);
+    if (!transaction) return;
+
+    const linkedIds = new Set(transaction.refundLinks.map((link) => link.id));
+    const params = new URLSearchParams({
+      pageIndex: "0",
+      pageSize: "25",
+      sortBy: "occurredOn",
+      sortDirection: "desc",
+      type: "expense",
+    });
+    if (query.trim()) params.set("search", query.trim());
+
+    const response = await fetch(`/api/accounts/${data.account.id}/transactions?${params}`);
+    if (!response.ok) return;
+
+    const page = await response.json();
+    refundLinkOptions = page.rows.filter((row: { id: string }) => row.id !== openRefundLinkTxId && !linkedIds.has(row.id));
+  }
+
+  function openRefundLinkEditor(transaction: PageData["transactions"][number]) {
+    openRefundLinkTxId = openRefundLinkTxId === transaction.id ? null : transaction.id;
+    refundLinkSearch = "";
+    refundLinkOptions = [];
+    if (openRefundLinkTxId) {
+      void loadRefundLinkOptions("");
+    }
+  }
+
+  async function attachRefundLink(creditTransactionId: string, expenseTransactionId: string) {
+    savingRefundLinkId = creditTransactionId;
+    try {
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${creditTransactionId}/refund-links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expenseTransactionId }),
+      });
+      if (!response.ok) return;
+      await invalidateAll();
+    } finally {
+      savingRefundLinkId = null;
+    }
+  }
+
+  async function detachRefundLink(creditTransactionId: string, expenseTransactionId: string) {
+    savingRefundLinkId = creditTransactionId;
+    try {
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${creditTransactionId}/refund-links/${expenseTransactionId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) return;
+      await invalidateAll();
+    } finally {
+      savingRefundLinkId = null;
+    }
+  }
+
+  function refundLinkLabel(link: PageData["transactions"][number]["refundLinks"][number]) {
+    const merchant = link.merchant ?? "Expense";
+    return `${link.occurredOn} · ${merchant}`;
+  }
+
+  function warningPreview(transaction: PageData["transactions"][number]) {
+    return transaction.warnings.map((warning) => warning.message).join(" · ");
   }
 
   async function loadMore() {
@@ -603,6 +726,16 @@
   </section>
 {/if}
 
+{#if data.selectedLinkTransactionId}
+  <div class="link-filter-banner">
+    <span>
+      Showing {data.linkClusterSize} linked refund{data.linkClusterSize === 1 ? "" : "s"}
+      <span class="dim">· period filter ignored</span>
+    </span>
+    <button type="button" class="link-filter-clear" onclick={clearLinkClusterFilter}>Show all</button>
+  </div>
+{/if}
+
 <section class="table-block">
   <table>
     <thead>
@@ -630,6 +763,8 @@
           <td colspan="5" class="dim empty-row">
             {#if data.searchQuery?.trim()}
               No transactions match “{data.searchQuery}”.
+            {:else if data.selectedLinkTransactionId}
+              No linked transactions found for this refund set.
             {:else if data.selectedGroupId}
               No transactions in this group for the selected period.
             {:else if data.transactionTypeFilter === "income"}
@@ -648,6 +783,99 @@
             <td class="merchant-cell">
               <div class="merchant-row">
                 <span class="merchant">{t.merchant ?? "—"}</span>
+                {#if t.refundLinks.length > 0}
+                  <div class="refund-cluster-wrap">
+                    <button
+                      type="button"
+                      class="refund-cluster-btn"
+                      class:active={Boolean(data.selectedLinkTransactionId)}
+                      aria-label={data.selectedLinkTransactionId ? "Show all transactions" : "Show linked transactions only"}
+                      aria-pressed={Boolean(data.selectedLinkTransactionId)}
+                      onclick={() => toggleLinkClusterFilter(t.id)}
+                    >
+                      <ArrowLeftRight size={12} strokeWidth={1.5} aria-hidden="true" />
+                    </button>
+                    <span class="refund-cluster-preview" role="tooltip">
+                      {t.refundLinks.length} linked · click to {data.selectedLinkTransactionId ? "show all" : "filter"}
+                    </span>
+                  </div>
+                {/if}
+                {#if t.warnings.length > 0}
+                  <div class="warning-wrap">
+                    <span class="warning-btn" aria-label="Transaction warning">
+                      <TriangleAlert size={12} strokeWidth={1.5} aria-hidden="true" />
+                    </span>
+                    <span class="warning-preview" role="tooltip">{warningPreview(t)}</span>
+                  </div>
+                {/if}
+                {#if isRefundCategoryName(t.categoryName)}
+                  <div class="refund-link-wrap">
+                    <button
+                      type="button"
+                      class="refund-link-btn"
+                      class:has-links={t.refundLinks.length > 0}
+                      aria-label="{t.refundLinks.length ? 'Edit refund links' : 'Link to expenses'} for {t.merchant ?? 'transaction'}"
+                      aria-expanded={openRefundLinkTxId === t.id}
+                      disabled={savingRefundLinkId === t.id}
+                      onclick={() => openRefundLinkEditor(t)}
+                    >
+                      <Link size={12} strokeWidth={1.5} aria-hidden="true" />
+                    </button>
+                    {#if openRefundLinkTxId === t.id}
+                      <div class="refund-link-popup" role="dialog" aria-label="Refund links">
+                        {#if t.refundLinks.length > 0}
+                          <ul class="refund-link-list">
+                            {#each t.refundLinks as link (link.id)}
+                              <li>
+                                <span>{refundLinkLabel(link)}</span>
+                                <span class="mono dim">{formatMoney(link.amountMinor, data.account.currencyCode)}</span>
+                                <button
+                                  type="button"
+                                  class="refund-link-remove"
+                                  aria-label="Remove link to {link.merchant ?? 'expense'}"
+                                  disabled={savingRefundLinkId === t.id}
+                                  onclick={() => detachRefundLink(t.id, link.id)}
+                                >
+                                  ×
+                                </button>
+                              </li>
+                            {/each}
+                          </ul>
+                        {/if}
+                        <input
+                          type="search"
+                          class="refund-link-search"
+                          placeholder="Search expenses…"
+                          aria-label="Search expenses to link"
+                          bind:value={refundLinkSearch}
+                        />
+                        <ul class="refund-link-options">
+                          {#if refundLinkOptions.length === 0}
+                            <li class="dim">No matching expenses</li>
+                          {:else}
+                            {#each refundLinkOptions as option (option.id)}
+                              <li>
+                                <button
+                                  type="button"
+                                  class="refund-link-option"
+                                  disabled={savingRefundLinkId === t.id}
+                                  onclick={() => attachRefundLink(t.id, option.id)}
+                                >
+                                  <span>{option.occurredOn} · {option.merchant ?? "—"}</span>
+                                  <span class="mono dim">{formatMoney(option.amountMinor, data.account.currencyCode)}</span>
+                                </button>
+                              </li>
+                            {/each}
+                          {/if}
+                        </ul>
+                      </div>
+                    {:else if t.refundLinks.length > 0}
+                      <span class="refund-link-preview" role="tooltip">
+                        {t.refundLinks.map((link) => refundLinkLabel(link)).join(", ")}
+                      </span>
+                    {/if}
+                  </div>
+                {/if}
                 {#if data.selectedGroupId}
                   <button
                     type="button"
@@ -702,7 +930,7 @@
                       disabled={savingGroupTxId === t.id}
                       onclick={() => (openGroupTxId = openGroupTxId === t.id ? null : t.id)}
                     >
-                      <Link size={12} strokeWidth={1.5} aria-hidden="true" />
+                      <Layers size={12} strokeWidth={1.5} aria-hidden="true" />
                     </button>
                     {#if openGroupTxId === t.id}
                       <div class="group-popup" role="dialog" aria-label="Transaction group">
@@ -1143,6 +1371,174 @@
   .group-hidden-btn:disabled {
     opacity: 0.55;
     cursor: wait;
+  }
+
+  .link-filter-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.65rem;
+    padding: 0.55rem 0.75rem;
+    background: color-mix(in srgb, var(--hi-green) 12%, var(--surface));
+    border: 2px solid color-mix(in srgb, var(--hi-green) 45%, var(--chrome-line));
+    font-size: 0.74rem;
+  }
+
+  .link-filter-clear {
+    border: none;
+    background: transparent;
+    color: var(--hi-green);
+    cursor: pointer;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .refund-cluster-wrap,
+  .refund-link-wrap,
+  .warning-wrap {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  .refund-cluster-btn,
+  .refund-link-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .refund-cluster-btn:hover,
+  .refund-cluster-btn.active {
+    color: var(--hi-green);
+  }
+
+  .refund-link-btn.has-links,
+  .refund-link-btn:hover,
+  .refund-link-btn[aria-expanded="true"] {
+    color: var(--brand-accent-light);
+  }
+
+  .refund-link-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .warning-btn {
+    display: inline-flex;
+    align-items: center;
+    color: var(--brand-accent);
+  }
+
+  .refund-cluster-preview,
+  .refund-link-preview,
+  .warning-preview {
+    position: absolute;
+    left: calc(100% + 0.35rem);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 15;
+    width: max-content;
+    max-width: 16rem;
+    padding: 0.45rem 0.55rem;
+    background: var(--surface);
+    border: 2px solid var(--chrome-line);
+    box-shadow: 3px 3px 0 rgba(234, 242, 240, 0.12);
+    color: var(--main-text);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .refund-cluster-wrap:hover .refund-cluster-preview,
+  .refund-link-wrap:has(.refund-link-btn.has-links):hover .refund-link-preview,
+  .warning-wrap:hover .warning-preview {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .refund-link-popup {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 0.35rem);
+    z-index: 20;
+    width: min(18rem, 70vw);
+    padding: 0.55rem;
+    background: var(--surface);
+    border: 2px solid var(--chrome-line);
+    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+  }
+
+  .refund-link-list,
+  .refund-link-options {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .refund-link-list li,
+  .refund-link-options li {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+  }
+
+  .refund-link-list li + li,
+  .refund-link-options li + li {
+    margin-top: 0.35rem;
+  }
+
+  .refund-link-remove {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .refund-link-search {
+    width: 100%;
+    margin-top: 0.45rem;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid var(--chrome-line);
+    background: transparent;
+    color: var(--main-text);
+    font-size: 0.72rem;
+  }
+
+  .refund-link-options {
+    margin-top: 0.45rem;
+    max-height: 10rem;
+    overflow: auto;
+  }
+
+  .refund-link-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.25rem 0;
+    border: none;
+    background: transparent;
+    color: var(--main-text);
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.72rem;
+  }
+
+  .refund-link-option:hover {
+    color: var(--hi-cyan);
   }
 
   .group-preview {

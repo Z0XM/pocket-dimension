@@ -1,4 +1,11 @@
 import { parseSqlMinor } from "$lib/finance/money";
+import { isRefundCategoryName } from "$lib/finance/refunds";
+import {
+  computeRefundLinkWarnings,
+  type RefundLinkRow,
+  type RefundWarningTransaction,
+  type TransactionWarning,
+} from "$lib/finance/transaction-warnings";
 import { currentMonthKey, readRowYear, type SummarySelection } from "$lib/finance/summary";
 import { isBalanceSnapshotNewer } from "$lib/server/balance";
 import { db, schema } from "@pocket-dimension/db";
@@ -35,6 +42,18 @@ type TransactionGroup = {
   name: string;
   colorHex: string | null;
 };
+
+type RefundLinkPeer = {
+  id: string;
+  occurredOn: string;
+  merchant: string | null;
+  amountMinor: number;
+  type: string;
+  categoryName: string | null;
+  role: "credit" | "expense";
+};
+
+export type { TransactionWarning };
 
 async function loadTagsForTransactions(transactionIds: string[]) {
   if (!transactionIds.length) return new Map<string, TransactionTag[]>();
@@ -103,6 +122,251 @@ async function loadGroupHiddenForTransactions(transactionIds: string[], groupId:
   }
 
   return hiddenByTransaction;
+}
+
+async function loadRefundLinksForTransactions(transactionIds: string[]) {
+  if (!transactionIds.length) return new Map<string, RefundLinkPeer[]>();
+
+  const rawLinks = await db
+    .select({
+      creditTransactionId: schema.financeTransactionRefundLinks.creditTransactionId,
+      expenseTransactionId: schema.financeTransactionRefundLinks.expenseTransactionId,
+    })
+    .from(schema.financeTransactionRefundLinks)
+    .where(
+      or(
+        inArray(schema.financeTransactionRefundLinks.creditTransactionId, transactionIds),
+        inArray(schema.financeTransactionRefundLinks.expenseTransactionId, transactionIds)
+      )
+    );
+
+  if (!rawLinks.length) return new Map<string, RefundLinkPeer[]>();
+
+  const peerIds = new Set<string>();
+  for (const link of rawLinks) {
+    if (transactionIds.includes(link.creditTransactionId)) peerIds.add(link.expenseTransactionId);
+    if (transactionIds.includes(link.expenseTransactionId)) peerIds.add(link.creditTransactionId);
+  }
+
+  const peerRows = await db
+    .select({
+      id: schema.financeTransactions.id,
+      occurredOn: schema.financeTransactions.occurredOn,
+      merchant: schema.financeTransactions.merchant,
+      amountMinor: schema.financeTransactions.amountMinor,
+      type: schema.financeTransactions.type,
+      categoryName: schema.financeCategories.name,
+    })
+    .from(schema.financeTransactions)
+    .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
+    .where(inArray(schema.financeTransactions.id, [...peerIds]));
+
+  const peersById = new Map(peerRows.map((row) => [row.id, row]));
+  const linksByTransaction = new Map<string, RefundLinkPeer[]>();
+
+  for (const link of rawLinks) {
+    if (transactionIds.includes(link.creditTransactionId)) {
+      const peer = peersById.get(link.expenseTransactionId);
+      if (!peer) continue;
+      const peers = linksByTransaction.get(link.creditTransactionId) ?? [];
+      peers.push({ ...peer, role: "expense" });
+      linksByTransaction.set(link.creditTransactionId, peers);
+    }
+    if (transactionIds.includes(link.expenseTransactionId)) {
+      const peer = peersById.get(link.creditTransactionId);
+      if (!peer) continue;
+      const peers = linksByTransaction.get(link.expenseTransactionId) ?? [];
+      peers.push({ ...peer, role: "credit" });
+      linksByTransaction.set(link.expenseTransactionId, peers);
+    }
+  }
+
+  return linksByTransaction;
+}
+
+async function loadRefundLinkRowsForTransactions(transactionIds: string[]) {
+  if (!transactionIds.length) return [] as RefundLinkRow[];
+
+  const knownIds = new Set(transactionIds);
+  const collected = new Map<string, RefundLinkRow>();
+  let frontier = [...knownIds];
+
+  while (frontier.length) {
+    const batch = await db
+      .select({
+        creditTransactionId: schema.financeTransactionRefundLinks.creditTransactionId,
+        expenseTransactionId: schema.financeTransactionRefundLinks.expenseTransactionId,
+      })
+      .from(schema.financeTransactionRefundLinks)
+      .where(
+        or(
+          inArray(schema.financeTransactionRefundLinks.creditTransactionId, frontier),
+          inArray(schema.financeTransactionRefundLinks.expenseTransactionId, frontier)
+        )
+      );
+
+    const nextFrontier: string[] = [];
+    for (const row of batch) {
+      const key = `${row.creditTransactionId}:${row.expenseTransactionId}`;
+      collected.set(key, row);
+      if (!knownIds.has(row.creditTransactionId)) {
+        knownIds.add(row.creditTransactionId);
+        nextFrontier.push(row.creditTransactionId);
+      }
+      if (!knownIds.has(row.expenseTransactionId)) {
+        knownIds.add(row.expenseTransactionId);
+        nextFrontier.push(row.expenseTransactionId);
+      }
+    }
+
+    frontier = nextFrontier;
+  }
+
+  return [...collected.values()];
+}
+
+async function loadRefundWarningTransactions(linkRows: RefundLinkRow[]) {
+  const transactionIds = [...new Set(linkRows.flatMap((row) => [row.creditTransactionId, row.expenseTransactionId]))];
+  if (!transactionIds.length) return new Map<string, RefundWarningTransaction>();
+
+  const rows = await db
+    .select({
+      id: schema.financeTransactions.id,
+      amountMinor: schema.financeTransactions.amountMinor,
+      categoryName: schema.financeCategories.name,
+    })
+    .from(schema.financeTransactions)
+    .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
+    .where(inArray(schema.financeTransactions.id, transactionIds));
+
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        id: row.id,
+        amountMinor: row.amountMinor,
+        categoryName: row.categoryName,
+      },
+    ])
+  );
+}
+
+function formatDifferenceMinor(differenceMinor: number) {
+  const major = Math.abs(differenceMinor) / 100;
+  return major.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function buildRefundWarningsForTransactions(transactionIds: string[]) {
+  const linkRows = await loadRefundLinkRowsForTransactions(transactionIds);
+  if (!linkRows.length) return new Map<string, TransactionWarning[]>();
+
+  const transactions = await loadRefundWarningTransactions(linkRows);
+  return computeRefundLinkWarnings(linkRows, transactions, formatDifferenceMinor);
+}
+
+export async function getRefundLinkClusterIds(accountId: string, seedTransactionId: string) {
+  const [seed] = await db
+    .select({ id: schema.financeTransactions.id })
+    .from(schema.financeTransactions)
+    .where(and(eq(schema.financeTransactions.id, seedTransactionId), eq(schema.financeTransactions.accountId, accountId)))
+    .limit(1);
+  if (!seed) return null;
+
+  const linkRows = await loadRefundLinkRowsForTransactions([seedTransactionId]);
+  if (!linkRows.length) return null;
+
+  const ids = new Set<string>();
+  for (const row of linkRows) {
+    ids.add(row.creditTransactionId);
+    ids.add(row.expenseTransactionId);
+  }
+
+  const clusterIds = [...ids];
+  const accountRows = await db
+    .select({ id: schema.financeTransactions.id })
+    .from(schema.financeTransactions)
+    .where(and(inArray(schema.financeTransactions.id, clusterIds), eq(schema.financeTransactions.accountId, accountId)));
+
+  return accountRows.length === clusterIds.length ? clusterIds : null;
+}
+
+export async function attachRefundLink(accountId: string, creditTransactionId: string, expenseTransactionId: string) {
+  const [credit] = await db
+    .select({
+      id: schema.financeTransactions.id,
+      type: schema.financeTransactions.type,
+      categoryName: schema.financeCategories.name,
+    })
+    .from(schema.financeTransactions)
+    .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
+    .where(and(eq(schema.financeTransactions.id, creditTransactionId), eq(schema.financeTransactions.accountId, accountId)))
+    .limit(1);
+  if (!credit || !isRefundCategoryName(credit.categoryName)) return null;
+
+  const [expense] = await db
+    .select({
+      id: schema.financeTransactions.id,
+      type: schema.financeTransactions.type,
+    })
+    .from(schema.financeTransactions)
+    .where(
+      and(
+        eq(schema.financeTransactions.id, expenseTransactionId),
+        eq(schema.financeTransactions.accountId, accountId),
+        eq(schema.financeTransactions.type, "expense")
+      )
+    )
+    .limit(1);
+  if (!expense) return null;
+
+  await db.insert(schema.financeTransactionRefundLinks).values({ creditTransactionId, expenseTransactionId }).onConflictDoNothing();
+
+  const [peer] = await db
+    .select({
+      id: schema.financeTransactions.id,
+      occurredOn: schema.financeTransactions.occurredOn,
+      merchant: schema.financeTransactions.merchant,
+      amountMinor: schema.financeTransactions.amountMinor,
+      type: schema.financeTransactions.type,
+      categoryName: schema.financeCategories.name,
+    })
+    .from(schema.financeTransactions)
+    .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
+    .where(eq(schema.financeTransactions.id, expenseTransactionId))
+    .limit(1);
+
+  if (!peer) return null;
+
+  return {
+    id: peer.id,
+    occurredOn: peer.occurredOn,
+    merchant: peer.merchant,
+    amountMinor: peer.amountMinor,
+    type: peer.type,
+    categoryName: peer.categoryName,
+    role: "expense" as const,
+  };
+}
+
+export async function detachRefundLink(accountId: string, creditTransactionId: string, expenseTransactionId: string) {
+  const [credit] = await db
+    .select({ id: schema.financeTransactions.id })
+    .from(schema.financeTransactions)
+    .where(and(eq(schema.financeTransactions.id, creditTransactionId), eq(schema.financeTransactions.accountId, accountId)))
+    .limit(1);
+  if (!credit) return false;
+
+  const [removed] = await db
+    .delete(schema.financeTransactionRefundLinks)
+    .where(
+      and(
+        eq(schema.financeTransactionRefundLinks.creditTransactionId, creditTransactionId),
+        eq(schema.financeTransactionRefundLinks.expenseTransactionId, expenseTransactionId)
+      )
+    )
+    .returning({ creditTransactionId: schema.financeTransactionRefundLinks.creditTransactionId });
+
+  return Boolean(removed);
 }
 
 const sortMap = {
@@ -425,6 +689,14 @@ export async function setTransactionGroupHidden(accountId: string, transactionId
 
 export async function listTransactions(accountId: string, query: TransactionsQuery) {
   const conditions = [eq(schema.financeTransactions.accountId, accountId)];
+  let linkClusterIds: string[] | null = null;
+
+  if (query.linkTransactionId) {
+    linkClusterIds = await getRefundLinkClusterIds(accountId, query.linkTransactionId);
+    if (linkClusterIds?.length) {
+      conditions.push(inArray(schema.financeTransactions.id, linkClusterIds));
+    }
+  }
 
   if (query.search) {
     conditions.push(
@@ -437,11 +709,13 @@ export async function listTransactions(accountId: string, query: TransactionsQue
   if (query.type) {
     conditions.push(eq(schema.financeTransactions.type, query.type));
   }
-  if (query.dateFrom) {
-    conditions.push(gte(schema.financeTransactions.occurredOn, query.dateFrom));
-  }
-  if (query.dateTo) {
-    conditions.push(lte(schema.financeTransactions.occurredOn, query.dateTo));
+  if (!linkClusterIds?.length) {
+    if (query.dateFrom) {
+      conditions.push(gte(schema.financeTransactions.occurredOn, query.dateFrom));
+    }
+    if (query.dateTo) {
+      conditions.push(lte(schema.financeTransactions.occurredOn, query.dateTo));
+    }
   }
   if (query.groupId) {
     conditions.push(
@@ -485,6 +759,8 @@ export async function listTransactions(accountId: string, query: TransactionsQue
   const loaded = offset + rows.length;
   const tagsByTransaction = await loadTagsForTransactions(rows.map((row) => row.id));
   const groupsByTransaction = await loadGroupsForTransactions(rows.map((row) => row.id));
+  const refundLinksByTransaction = await loadRefundLinksForTransactions(rows.map((row) => row.id));
+  const warningsByTransaction = await buildRefundWarningsForTransactions(rows.map((row) => row.id));
   const hiddenByTransaction = query.groupId
     ? await loadGroupHiddenForTransactions(
         rows.map((row) => row.id),
@@ -497,6 +773,8 @@ export async function listTransactions(accountId: string, query: TransactionsQue
       ...row,
       tags: tagsByTransaction.get(row.id) ?? [],
       groups: groupsByTransaction.get(row.id) ?? [],
+      refundLinks: refundLinksByTransaction.get(row.id) ?? [],
+      warnings: warningsByTransaction.get(row.id) ?? [],
       ...(query.groupId ? { groupHidden: hiddenByTransaction?.get(row.id) ?? false } : {}),
     })),
     total,

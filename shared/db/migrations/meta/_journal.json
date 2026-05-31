@@ -141,6 +141,13 @@
       "when": 1780231000000,
       "tag": "0019_transaction_group_hidden",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1780232000000,
+      "tag": "0020_finance_transaction_refund_links",
+      "breakpoints": true
     }
   ]
 }
