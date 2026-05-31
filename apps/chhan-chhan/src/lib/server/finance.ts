@@ -930,28 +930,31 @@ export async function upsertGoal(userId: string, accountId: string, payload: Goa
 }
 
 export async function getCurrentBalance(accountId: string) {
-  const [latestTxnDate] = await db
-    .select({ occurredOn: schema.financeTransactions.occurredOn })
-    .from(schema.financeTransactions)
-    .where(eq(schema.financeTransactions.accountId, accountId))
-    .orderBy(desc(schema.financeTransactions.occurredOn), desc(schema.financeTransactions.sortOrder), desc(schema.financeTransactions.createdAt))
-    .limit(1);
+  const [[latestTxnDate], account, [txnBalance], [transactionCountRow]] = await Promise.all([
+    db
+      .select({ occurredOn: schema.financeTransactions.occurredOn })
+      .from(schema.financeTransactions)
+      .where(eq(schema.financeTransactions.accountId, accountId))
+      .orderBy(desc(schema.financeTransactions.occurredOn), desc(schema.financeTransactions.sortOrder), desc(schema.financeTransactions.createdAt))
+      .limit(1),
+    db.query.financeAccounts.findFirst({
+      where: eq(schema.financeAccounts.id, accountId),
+      columns: { balanceMinor: true, balanceAsOf: true },
+    }),
+    db
+      .select({
+        balanceMinor: schema.financeTransactions.balanceMinor,
+        occurredOn: schema.financeTransactions.occurredOn,
+        sortOrder: schema.financeTransactions.sortOrder,
+      })
+      .from(schema.financeTransactions)
+      .where(and(eq(schema.financeTransactions.accountId, accountId), isNotNull(schema.financeTransactions.balanceMinor)))
+      .orderBy(desc(schema.financeTransactions.occurredOn), desc(schema.financeTransactions.sortOrder), desc(schema.financeTransactions.createdAt))
+      .limit(1),
+    db.select({ total: count() }).from(schema.financeTransactions).where(eq(schema.financeTransactions.accountId, accountId)),
+  ]);
 
-  const account = await db.query.financeAccounts.findFirst({
-    where: eq(schema.financeAccounts.id, accountId),
-    columns: { balanceMinor: true, balanceAsOf: true },
-  });
-
-  const [txnBalance] = await db
-    .select({
-      balanceMinor: schema.financeTransactions.balanceMinor,
-      occurredOn: schema.financeTransactions.occurredOn,
-      sortOrder: schema.financeTransactions.sortOrder,
-    })
-    .from(schema.financeTransactions)
-    .where(and(eq(schema.financeTransactions.accountId, accountId), isNotNull(schema.financeTransactions.balanceMinor)))
-    .orderBy(desc(schema.financeTransactions.occurredOn), desc(schema.financeTransactions.sortOrder), desc(schema.financeTransactions.createdAt))
-    .limit(1);
+  const transactionCount = Number(transactionCountRow?.total ?? 0);
 
   const candidates = [];
   if (account?.balanceMinor != null && account.balanceAsOf) {
@@ -980,6 +983,7 @@ export async function getCurrentBalance(accountId: string) {
     asOf: latest.asOf,
     latestTransactionOn: latestActivityOn,
     isStale: latestActivityOn > latest.asOf,
+    transactionCount,
   };
 }
 

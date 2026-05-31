@@ -83,6 +83,27 @@ export function extractKotakExternalRef(description: string): {
   };
 }
 
+/** Kotak PDFs append page footers after the last txn on each page. */
+export function stripKotakPdfChunkFooter(chunk: string): string {
+  const footerPatterns = [
+    /\sStatement Generated on/i,
+    /\sPage \d+ of\d+/i,
+    /\sSavings Account Transactions/i,
+    /\sMUKUL SINGH Account No\./i,
+    /\sAccount Statement \d/i,
+  ];
+
+  let end = chunk.length;
+  for (const pattern of footerPatterns) {
+    const match = chunk.match(pattern);
+    if (match?.index != null && match.index > 0) {
+      end = Math.min(end, match.index);
+    }
+  }
+
+  return chunk.slice(0, end).trim();
+}
+
 export function extractKotakMetadata(text: string): Record<string, string> {
   const metadata: Record<string, string> = {};
   const accountMatch = text.match(/Account No\.?\s*(\d+)/i);

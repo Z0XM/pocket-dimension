@@ -90,7 +90,10 @@
 {#if data.currentBalance}
   <section class="balance-card" class:stale={data.currentBalance.isStale}>
     <span class="balance-k">Balance</span>
-    <span class="balance-v">{formatMoney(data.currentBalance.balanceMinor, data.account.currencyCode)}</span>
+    <div class="balance-value-wrap">
+      <span class="balance-v">{formatMoney(data.currentBalance.balanceMinor, data.account.currencyCode)}</span>
+      <span class="balance-txn-count">{data.currentBalance.transactionCount.toLocaleString()} txns</span>
+    </div>
     <span class="balance-asof dim">
       {#if data.currentBalance.isStale}
         as of {data.currentBalance.asOf} · latest txn {data.currentBalance.latestTransactionOn} —
@@ -311,6 +314,19 @@
     font-size: 1.35rem;
     font-variant-numeric: tabular-nums;
     color: var(--main-text);
+  }
+
+  .balance-value-wrap {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.45rem;
+  }
+
+  .balance-txn-count {
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
   }
 
   .balance-card.stale {

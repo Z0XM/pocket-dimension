@@ -1,6 +1,12 @@
 import { parseIndianAmount } from "$lib/finance/money";
 import type { ImportRow } from "$lib/importers/types";
-import { extractKotakExternalRef, extractKotakMetadata, merchantFromDescription, parseKotakPdfDate } from "$lib/importers/kotak-shared";
+import {
+  extractKotakExternalRef,
+  extractKotakMetadata,
+  merchantFromDescription,
+  parseKotakPdfDate,
+  stripKotakPdfChunkFooter,
+} from "$lib/importers/kotak-shared";
 
 const TXN_START = /(\d+)\s+(\d{1,2}\s+\w{3}\s+\d{4})\s+/g;
 const TRAILING_AMOUNTS = /([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
@@ -16,7 +22,7 @@ export function parseKotakPdf(text: string): { rows: ImportRow[]; metadata: Reco
     const match = starts[index];
     const chunkStart = match.index ?? 0;
     const chunkEnd = starts[index + 1]?.index ?? text.length;
-    const chunk = text.slice(chunkStart, chunkEnd).trim();
+    const chunk = stripKotakPdfChunkFooter(text.slice(chunkStart, chunkEnd).trim());
     const [, serial, dateRaw] = match;
 
     if (/opening balance/i.test(chunk)) continue;
@@ -24,6 +30,7 @@ export function parseKotakPdf(text: string): { rows: ImportRow[]; metadata: Reco
     const amountMatch = chunk.match(TRAILING_AMOUNTS);
     if (!amountMatch) continue;
 
+    const transactionAmountMinor = parseIndianAmount(amountMatch[1]);
     const balanceMinor = parseIndianAmount(amountMatch[2]);
     let body = chunk
       .slice(0, amountMatch.index)
@@ -41,7 +48,7 @@ export function parseKotakPdf(text: string): { rows: ImportRow[]; metadata: Reco
 
     parsedRows.push({
       occurredOn: parseKotakPdfDate(dateRaw),
-      amountMinor: Math.abs(deltaMinor),
+      amountMinor: transactionAmountMinor,
       type: deltaMinor > 0 ? "income" : "expense",
       merchant: merchantFromDescription(body),
       externalRef,
