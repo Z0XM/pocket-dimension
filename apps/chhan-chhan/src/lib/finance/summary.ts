@@ -4,6 +4,7 @@ export type SummarySelection = {
   period: SummaryPeriod;
   month?: string;
   year?: number;
+  groupId?: string;
 };
 
 export function parseSummaryPeriod(value: string | null): SummaryPeriod {

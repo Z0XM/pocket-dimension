@@ -678,6 +678,7 @@ export async function listTransactionPeriods(accountId: string) {
 
 export async function getTransactionSummary(accountId: string, selection: SummarySelection) {
   const dateFilter = summaryDateFilter(selection);
+  const groupFilter = summaryGroupFilter(selection.groupId);
 
   const result = await db.execute(sql`
     select
@@ -686,6 +687,7 @@ export async function getTransactionSummary(accountId: string, selection: Summar
     from chhanchhan.finance_transactions t
     where t.account_id = ${accountId}
       and ${dateFilter}
+      and ${groupFilter}
   `);
   const row = result.rows[0] as Record<string, unknown> | undefined;
   const incomeMinor = parseSqlMinor(row?.income_minor ?? row?.incomeMinor);
@@ -700,6 +702,7 @@ export async function getTransactionSummary(accountId: string, selection: Summar
 
 export async function getCategorySpend(accountId: string, selection: SummarySelection) {
   const dateFilter = summaryDateFilter(selection);
+  const groupFilter = summaryGroupFilter(selection.groupId);
 
   const categorySpend = await db.execute(sql`
     select
@@ -710,12 +713,23 @@ export async function getCategorySpend(accountId: string, selection: SummarySele
     where t.account_id = ${accountId}
       and t.type = 'expense'
       and ${dateFilter}
+      and ${groupFilter}
     group by c.name
     order by amount_minor desc
     limit 8
   `);
 
   return categorySpend.rows as Array<{ category_name: string; amount_minor: number }>;
+}
+
+function summaryGroupFilter(groupId?: string) {
+  if (!groupId) return sql`true`;
+
+  return sql`exists (
+    select 1 from chhanchhan.finance_transaction_groups ftg
+    where ftg.transaction_id = t.id
+      and ftg.group_id = ${groupId}
+  )`;
 }
 
 function summaryDateFilter(selection: SummarySelection) {

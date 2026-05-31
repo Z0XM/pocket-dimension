@@ -33,11 +33,14 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const summaryYears = normalizeSummaryYears(periods.years);
   const selectedMonth = resolveMonthKey(url.searchParams.get("month"), periods.months);
   const selectedYear = resolveYearValue(url.searchParams.get("year"), periods.years);
-  const summarySelection = buildSummarySelection(summaryPeriod, selectedMonth, selectedYear);
-  const dateRange = summarySelectionToDateRange(summarySelection);
   const groups = await listGroups(account.id);
   const groupParam = url.searchParams.get("group");
   const selectedGroupId = groupParam && groups.some((group) => group.id === groupParam) ? groupParam : null;
+  const summarySelection = {
+    ...buildSummarySelection(summaryPeriod, selectedMonth, selectedYear),
+    ...(selectedGroupId ? { groupId: selectedGroupId } : {}),
+  };
+  const dateRange = summarySelectionToDateRange(summarySelection);
 
   const [transactions, analytics, summary, currentBalance, categories, tags, categorySpendRows] = await Promise.all([
     listTransactions(account.id, {
@@ -64,13 +67,13 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     id: budget.id,
     name: budget.name,
     pct: budget.limit_minor > 0 ? Math.min(100, Math.round((budget.spent_minor / budget.limit_minor) * 100)) : 0,
-    color: "#634bdd",
+    color: "#54dbee",
   }));
 
   const categorySpend = categorySpendRows.map((row, index) => ({
     name: row.category_name,
     pct: summary.expenseMinor > 0 ? Math.min(100, Math.round((Number(row.amount_minor) / summary.expenseMinor) * 100)) : 0,
-    color: ["#634bdd", "#00a553", "#a50036", "#9180e3", "#21094e"][index % 5],
+    color: ["#bd93f9", "#50fa7b", "#54dbee", "#ee7c02", "#ffb86c"][index % 5],
   }));
 
   return {

@@ -20,7 +20,7 @@
 
   .beta-label {
     padding: 0.12rem 0.4rem;
-    background: var(--accent);
+    background: var(--hi-green);
     color: var(--background);
     font-size: 0.62rem;
     font-weight: 700;

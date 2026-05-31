@@ -499,17 +499,19 @@
         </button>
       </div>
       {#if data.groups.length > 0}
-        <select
-          class="period-select group-filter"
-          aria-label="Filter by group"
-          value={data.selectedGroupId ?? ""}
-          onchange={(e) => setGroupFilter(e.currentTarget.value || null)}
-        >
-          <option value="">All groups</option>
-          {#each data.groups as group (group.id)}
-            <option value={group.id}>{group.name}</option>
-          {/each}
-        </select>
+        <div class="period-tabs group-filter-wrap">
+          <select
+            class="group-filter"
+            aria-label="Filter by group"
+            value={data.selectedGroupId ?? ""}
+            onchange={(e) => setGroupFilter(e.currentTarget.value || null)}
+          >
+            <option value="">All groups</option>
+            {#each data.groups as group (group.id)}
+              <option value={group.id}>{group.name}</option>
+            {/each}
+          </select>
+        </div>
       {/if}
     </div>
   </div>
@@ -689,7 +691,7 @@
             <td class="tags">
               <div class="tag-list">
                 {#each t.tags as tag (tag.id)}
-                  <span class="tag tx-tag" style="--tag-color: {tag.colorHex ?? '#634bdd'}">
+                  <span class="tag tx-tag" style="--tag-color: {tag.colorHex ?? '#ee7c02'}">
                     <Tag size={12} strokeWidth={1.25} class="tag-icon" aria-hidden="true" />
                     {tag.name}
                     <button
@@ -774,7 +776,7 @@
   }
 
   .balance-card.stale {
-    border-color: color-mix(in srgb, var(--accent) 55%, var(--chrome-line));
+    border-color: color-mix(in srgb, var(--hi-purple) 55%, var(--chrome-line));
   }
 
   .balance-asof {
@@ -785,7 +787,7 @@
   }
 
   .balance-asof a {
-    color: var(--accent);
+    color: var(--hi-cyan);
   }
 
   .stats-block {
@@ -808,8 +810,46 @@
     flex-wrap: wrap;
   }
 
+  .group-filter-wrap {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .period-tabs button,
   .group-filter {
+    --period-tab-height: 1.625rem;
+    box-sizing: border-box;
+    height: var(--period-tab-height);
+    font-family: inherit;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+  }
+
+  .group-filter {
+    display: block;
     min-width: 7rem;
+    width: 100%;
+    margin: 0;
+    padding: 0 1.65rem 0 0.65rem;
+    border: none;
+    background: var(--surface2)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23e8e4f0' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E")
+      no-repeat right 0.55rem center;
+    color: var(--main-text);
+    line-height: var(--period-tab-height);
+    text-transform: uppercase;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .group-filter:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--hi-focus);
+  }
+
+  .group-filter option {
+    text-transform: none;
+    letter-spacing: 0.04em;
   }
 
   .stats-label {
@@ -841,7 +881,8 @@
 
   .period-select:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: var(--hi-focus);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
   }
 
   .period-static {
@@ -858,14 +899,14 @@
   }
 
   .period-tabs button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: var(--surface2);
     border: none;
     border-right: 2px solid var(--chrome-line);
     color: var(--muted);
-    padding: 0.35rem 0.65rem;
-    font-family: inherit;
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
+    padding: 0 0.65rem;
     text-transform: uppercase;
     cursor: pointer;
   }
@@ -875,12 +916,12 @@
   }
 
   .period-tabs button.active {
-    background: var(--accent);
+    background: var(--hi-purple);
     color: var(--background);
   }
 
   .period-tabs button:hover:not(.active) {
-    color: var(--main-text);
+    color: var(--hi-purple);
   }
 
   .empty-row {
@@ -924,7 +965,7 @@
   .note-btn.has-note,
   .note-btn:hover,
   .note-btn[aria-expanded="true"] {
-    color: var(--accent);
+    color: var(--hi-cyan);
   }
 
   .note-btn:disabled {
@@ -986,6 +1027,7 @@
 
   .note-textarea:focus {
     outline: none;
+    box-shadow: inset 0 0 0 1px var(--hi-focus);
   }
 
   .group-link-wrap {
@@ -1009,7 +1051,7 @@
   .group-link-btn.has-group,
   .group-link-btn:hover,
   .group-link-btn[aria-expanded="true"] {
-    color: var(--accent);
+    color: var(--hi-purple);
   }
 
   .group-link-btn:disabled {
@@ -1078,6 +1120,7 @@
 
   .group-select:focus {
     outline: none;
+    box-shadow: inset 0 0 0 1px var(--hi-focus);
   }
 
   .note-textarea:disabled {
@@ -1100,11 +1143,11 @@
   }
 
   .sort-btn:hover {
-    color: var(--main-text);
+    color: var(--hi-green);
   }
 
   .sort-mark {
-    color: var(--accent);
+    color: var(--hi-cyan);
     font-size: 0.75rem;
     line-height: 1;
   }
@@ -1153,6 +1196,7 @@
 
   .cat-select:focus {
     outline: none;
+    box-shadow: inset 0 0 0 1px var(--hi-focus);
   }
 
   .cat-select option {
@@ -1202,7 +1246,7 @@
     width: 1.35rem;
     height: 1.35rem;
     background: var(--surface2);
-    border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+    border: 1px solid color-mix(in srgb, var(--hi-purple) 32%, transparent);
     color: var(--muted);
     padding: 0;
     cursor: pointer;
@@ -1210,8 +1254,8 @@
 
   .tag-add-btn:hover:not(:disabled),
   .tag-add-wrap:has(.tag-add-menu) .tag-add-btn {
-    color: var(--accent);
-    border-color: var(--accent);
+    color: var(--hi-green);
+    border-color: var(--hi-green);
   }
 
   .tag-add-btn:disabled {
@@ -1226,7 +1270,7 @@
     min-width: 8rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 3px 3px 0 color-mix(in srgb, var(--accent) 25%, transparent);
+    box-shadow: 3px 3px 0 color-mix(in srgb, var(--hi-purple) 25%, transparent);
     z-index: 15;
     display: flex;
     flex-direction: column;
@@ -1249,7 +1293,7 @@
   }
 
   .tag-add-menu button:hover {
-    background: var(--surface2);
-    color: var(--accent);
+    background: color-mix(in srgb, var(--hi-cyan) 10%, var(--surface2));
+    color: var(--hi-green);
   }
 </style>

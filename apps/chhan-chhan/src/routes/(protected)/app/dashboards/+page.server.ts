@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     name: row.category_name,
     amountMinor: Number(row.amount_minor),
     pct: summary.expenseMinor > 0 ? Math.min(100, Math.round((Number(row.amount_minor) / summary.expenseMinor) * 100)) : 0,
-    color: ["#634bdd", "#00a553", "#a50036", "#9180e3", "#21094e"][index % 5],
+    color: ["#bd93f9", "#50fa7b", "#54dbee", "#ee7c02", "#ffb86c"][index % 5],
   }));
 
   const budgetUsage = analytics.budgetUsage.map((budget) => ({
@@ -41,7 +41,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     spentMinor: Number(budget.spent_minor),
     limitMinor: Number(budget.limit_minor),
     pct: budget.limit_minor > 0 ? Math.min(100, Math.round((Number(budget.spent_minor) / Number(budget.limit_minor)) * 100)) : 0,
-    color: "#634bdd",
+    color: "#50fa7b",
   }));
 
   const goals = analytics.goals.map((goal) => ({

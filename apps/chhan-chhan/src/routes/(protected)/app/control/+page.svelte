@@ -201,7 +201,7 @@
         <option value="income">Income</option>
         <option value="transfer">Transfer</option>
       </select>
-      <input name="colorHex" type="color" value="#634bdd" aria-label="Category color" />
+      <input name="colorHex" type="color" value="#ee7c02" aria-label="Category color" />
       <button type="submit" disabled={addingCategory}>{addingCategory ? "ADDING…" : "ADD"}</button>
     </form>
     <ul class="list">
@@ -231,7 +231,7 @@
                   <option value="income" selected={category.kind === "income"}>Income</option>
                   <option value="transfer" selected={category.kind === "transfer"}>Transfer</option>
                 </select>
-                <input name="colorHex" type="color" value={category.colorHex ?? "#634bdd"} aria-label="Category color" />
+                <input name="colorHex" type="color" value={category.colorHex ?? "#ee7c02"} aria-label="Category color" />
                 <div class="edit-actions">
                   <button type="submit" disabled={savingCategoryId === category.id}>
                     {savingCategoryId === category.id ? "SAVING…" : "SAVE"}
@@ -240,7 +240,7 @@
                 </div>
               </form>
             {:else}
-              <span class="cat"><span class="sq" style="background:{category.colorHex ?? '#634bdd'}"></span>{category.name}</span>
+              <span class="cat"><span class="sq" style="background:{category.colorHex ?? '#ee7c02'}"></span>{category.name}</span>
               <span class="kind kind-{category.kind}">{category.kind}</span>
               <div class="row-actions">
                 <button type="button" class="icon-btn" aria-label="Edit {category.name}" onclick={() => (editingId = category.id)}>
@@ -290,7 +290,7 @@
       }}
     >
       <input name="name" placeholder="Tag name" required />
-      <input name="colorHex" type="color" value="#634bdd" aria-label="Tag color" />
+      <input name="colorHex" type="color" value="#ee7c02" aria-label="Tag color" />
       <button type="submit" disabled={addingTag}>{addingTag ? "ADDING…" : "ADD"}</button>
     </form>
     <ul class="list">
@@ -315,7 +315,7 @@
               >
                 <input type="hidden" name="id" value={tag.id} />
                 <input name="name" value={tag.name} required />
-                <input name="colorHex" type="color" value={tag.colorHex ?? "#634bdd"} aria-label="Tag color" />
+                <input name="colorHex" type="color" value={tag.colorHex ?? "#ee7c02"} aria-label="Tag color" />
                 <div class="edit-actions">
                   <button type="submit" disabled={savingTagId === tag.id}>
                     {savingTagId === tag.id ? "SAVING…" : "SAVE"}
@@ -325,7 +325,7 @@
               </form>
             {:else}
               <span class="tag-chip">
-                <Tag size={14} strokeWidth={1.25} class="tag-icon" style="color: {tag.colorHex ?? '#634bdd'}" aria-hidden="true" />
+                <Tag size={14} strokeWidth={1.25} class="tag-icon" style="color: {tag.colorHex ?? '#ee7c02'}" aria-hidden="true" />
                 {tag.name}
               </span>
               <div class="row-actions">
@@ -449,7 +449,7 @@
   .flash {
     margin: 0 0 1rem;
     padding: 0.65rem 0.85rem;
-    border: 1px solid var(--accent);
+    border: 1px solid var(--hi-purple);
     font-size: 0.78rem;
   }
 
@@ -469,7 +469,7 @@
     background: none;
     border: none;
     padding: 0;
-    color: var(--accent);
+    color: var(--hi-cyan);
     font-family: inherit;
     font-size: inherit;
     text-decoration: underline;
@@ -492,7 +492,7 @@
 
   .import-progress-bar {
     height: 100%;
-    background: var(--accent);
+    background: linear-gradient(90deg, var(--hi-purple), var(--hi-cyan));
     transition: width 180ms ease;
   }
 
@@ -528,6 +528,13 @@
     font-size: 0.8rem;
     text-transform: none;
     letter-spacing: normal;
+  }
+
+  .field select:focus,
+  .field input[type="file"]:focus-visible {
+    outline: none;
+    border-color: var(--hi-focus);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
   }
 
   .export-link {
@@ -636,8 +643,8 @@
   }
 
   .ghost:hover {
-    color: var(--main-text);
-    border-color: var(--accent);
+    color: var(--hi-green);
+    border-color: var(--hi-purple);
   }
 
   .ghost.danger {
@@ -670,8 +677,8 @@
   }
 
   .icon-btn:hover:not(:disabled) {
-    color: var(--main-text);
-    border-color: var(--accent);
+    color: var(--hi-green);
+    border-color: var(--hi-cyan);
   }
 
   .icon-btn:disabled {

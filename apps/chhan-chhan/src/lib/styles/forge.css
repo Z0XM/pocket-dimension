@@ -6,18 +6,59 @@
     --table-line: var(--brand-table);
     --chrome-line: var(--brand-cards);
     --muted: var(--muted-foreground);
-    --cyan: var(--accent);
-    --acid: var(--accent);
+    --cyan: var(--hi-cyan);
+    --acid: var(--hi-green);
     --pos: var(--success);
     --neg: var(--danger);
     min-height: 100vh;
     background: var(--bg);
     color: var(--main-text);
     font-family: "Fira Mono", ui-monospace, monospace;
+    --grid-step: 40px;
+    --grid-cycle: 160px;
     background-image:
-      linear-gradient(color-mix(in srgb, var(--accent) 4%, transparent) 1px, transparent 1px),
-      linear-gradient(90deg, color-mix(in srgb, var(--accent) 28%, transparent) 1px, transparent 1px);
-    background-size: 40px 40px;
+      linear-gradient(color-mix(in srgb, var(--hi-purple) 14%, transparent) 1px, transparent 1px),
+      linear-gradient(color-mix(in srgb, var(--hi-green) 14%, transparent) 1px, transparent 1px),
+      linear-gradient(color-mix(in srgb, var(--hi-cyan) 14%, transparent) 1px, transparent 1px),
+      linear-gradient(color-mix(in srgb, var(--brand-accent-light) 14%, transparent) 1px, transparent 1px),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--hi-purple) 18%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--hi-green) 18%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--hi-cyan) 18%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--brand-accent-light) 18%, transparent) 1px,
+        transparent 1px
+      );
+    background-size:
+      100% var(--grid-cycle),
+      100% var(--grid-cycle),
+      100% var(--grid-cycle),
+      100% var(--grid-cycle),
+      var(--grid-cycle) 100%,
+      var(--grid-cycle) 100%,
+      var(--grid-cycle) 100%,
+      var(--grid-cycle) 100%;
+    background-position:
+      0 0,
+      0 var(--grid-step),
+      0 calc(var(--grid-step) * 2),
+      0 calc(var(--grid-step) * 3),
+      0 0,
+      var(--grid-step) 0,
+      calc(var(--grid-step) * 2) 0,
+      calc(var(--grid-step) * 3) 0;
   }
 
   .forge-shell {
@@ -52,8 +93,8 @@
 
   .forge .settings-btn:hover,
   .forge .settings.open .settings-btn {
-    border-color: var(--accent);
-    color: var(--accent);
+    border-color: var(--hi-purple);
+    color: var(--hi-green);
   }
 
   .forge .settings-menu {
@@ -63,7 +104,7 @@
     min-width: 11rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 4px 4px 0 color-mix(in srgb, var(--accent) 35%, transparent);
+    box-shadow: 4px 4px 0 color-mix(in srgb, var(--hi-purple) 35%, transparent);
     z-index: 20;
     display: flex;
     flex-direction: column;
@@ -92,8 +133,8 @@
 
   .forge .settings-menu a:hover,
   .forge .settings-menu button:hover {
-    background: var(--surface2);
-    color: var(--accent);
+    background: color-mix(in srgb, var(--hi-cyan) 10%, var(--surface2));
+    color: var(--hi-green);
   }
 
   .forge .settings-menu button:last-child:hover {
@@ -125,12 +166,12 @@
   }
 
   .forge .app-nav a:hover {
-    color: var(--main-text);
+    color: var(--hi-green);
   }
 
   .forge .app-nav a.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
+    color: var(--hi-purple);
+    border-bottom-color: var(--hi-purple);
     font-weight: 700;
   }
 
@@ -157,7 +198,7 @@
   }
 
   .forge .acid {
-    color: var(--acid);
+    color: var(--accent);
   }
 
   .forge .sub {
@@ -185,11 +226,12 @@
 
   .forge .actions input:focus {
     outline: none;
-    border-color: var(--cyan);
+    border-color: var(--hi-focus);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
   }
 
   .forge .cta {
-    background: var(--acid);
+    background: var(--accent);
     color: var(--background);
     border: 2px solid var(--chrome-line);
     padding: 0.45rem 0.85rem;
@@ -211,7 +253,7 @@
     font-weight: 700;
     border: 2px solid var(--chrome-line);
     padding: 0.45rem 0.8rem;
-    box-shadow: 3px 3px 0 var(--acid);
+    box-shadow: 3px 3px 0 var(--hi-purple);
   }
 
   .forge .stats {
@@ -240,24 +282,24 @@
     width: 100%;
   }
 
-  .forge button.stat.active {
-    border-color: var(--accent);
-    box-shadow: 4px 4px 0 color-mix(in srgb, var(--accent) 35%, transparent);
+  .forge button.stat.active:not(.net) {
+    border-color: var(--hi-purple);
+    box-shadow: 4px 4px 0 color-mix(in srgb, var(--hi-purple) 35%, transparent);
   }
 
   .forge button.stat.net.active {
     box-shadow: 6px 6px 0 var(--chrome-line);
-    outline: 2px solid var(--background);
+    outline: 2px solid var(--hi-focus);
     outline-offset: -4px;
   }
 
   .forge .stat:hover {
     transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(234, 242, 240, 0.2);
+    box-shadow: 6px 6px 0 color-mix(in srgb, var(--hi-green) 22%, transparent);
   }
 
   .forge .stat.net {
-    background: var(--acid);
+    background: var(--accent);
     color: var(--background);
     box-shadow: 6px 6px 0 var(--chrome-line);
   }
@@ -348,7 +390,7 @@
   }
 
   .forge tbody tr:hover {
-    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    background: color-mix(in srgb, var(--hi-cyan) 9%, transparent);
   }
 
   .forge .merchant {
@@ -403,12 +445,12 @@
     line-height: 1;
     font-size: 0.68rem;
     color: var(--main-text);
-    border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+    border: 1px solid color-mix(in srgb, var(--hi-purple) 32%, transparent);
     padding: 0.25rem 0.45rem;
   }
 
   .forge .tag-icon {
-    color: var(--tag-color, var(--accent));
+    color: var(--tag-color, var(--hi-green));
     flex-shrink: 0;
   }
 
@@ -448,7 +490,7 @@
     font-family: "Archivo Black", sans-serif;
     font-size: 0.78rem;
     letter-spacing: 0.08em;
-    color: var(--acid);
+    color: var(--hi-cyan);
   }
 
   .forge .list {
@@ -484,7 +526,7 @@
 
   .forge .add {
     width: 100%;
-    background: var(--acid);
+    background: var(--accent);
     border: 2px solid var(--chrome-line);
     color: var(--background);
     font-family: "Archivo Black", sans-serif;
@@ -512,11 +554,12 @@
 
   .forge .tag-add input:focus {
     outline: none;
-    border-color: var(--cyan);
+    border-color: var(--hi-focus);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
   }
 
   .forge .tag-add button {
-    background: var(--cyan);
+    background: var(--hi-green);
     border: 2px solid var(--chrome-line);
     color: var(--background);
     font-weight: 700;
@@ -535,7 +578,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+    border: 1px solid color-mix(in srgb, var(--hi-purple) 32%, transparent);
     padding: 0.25rem 0.5rem;
     font-size: 0.78rem;
     color: var(--main-text);

@@ -11,11 +11,23 @@
   /* Locked palette */
   --brand-black: #060b0f;
   --brand-white: #e8e4f0;
-  --brand-accent: #634bdd;
+  --brand-accent: #ee7c02;
+  --brand-accent-light: #ffb86c;
   --brand-table: #060b0f;
-  --brand-cards: #21094e;
+  --brand-cards: #4a3010;
   --brand-danger: #a50036;
   --brand-success: #00a553;
+  --brand-hi-purple: #bd93f9;
+  --brand-hi-green: #50fa7b;
+  --brand-hi-cyan: #54dbee;
+
+  /* Interactive highlight roles */
+  --hi-purple: var(--brand-hi-purple);
+  --hi-green: var(--brand-hi-green);
+  --hi-cyan: var(--brand-hi-cyan);
+  --hi-hover: var(--brand-hi-green);
+  --hi-focus: var(--brand-accent-light);
+  --hi-select: var(--brand-hi-purple);
 
   /* Derived theme tokens */
   --background: var(--brand-black);
@@ -32,12 +44,12 @@
   --accent: var(--brand-accent);
   --accent-foreground: var(--brand-black);
   --border: var(--brand-table);
-  --ring: var(--brand-accent);
   --success: var(--brand-success);
   --danger: var(--brand-danger);
+  --ring: var(--hi-focus);
   --scrollbar-thumb: var(--brand-accent);
   --scrollbar-track: var(--brand-black);
-  --scrollbar-thumb-hover: var(--brand-accent);
+  --scrollbar-thumb-hover: var(--brand-accent-light);
 }
 
 @theme inline {
@@ -84,6 +96,11 @@
   h5,
   h6 {
     font-family: var(--font-heading);
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--hi-purple) 38%, transparent);
+    color: var(--main-text);
   }
 
   *::-webkit-scrollbar {

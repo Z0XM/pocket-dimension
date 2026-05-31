@@ -314,7 +314,7 @@
   }
 
   .balance-card.stale {
-    border-color: color-mix(in srgb, var(--accent) 55%, var(--chrome-line));
+    border-color: color-mix(in srgb, var(--hi-purple) 55%, var(--chrome-line));
   }
 
   .balance-asof {
@@ -325,7 +325,7 @@
   }
 
   .balance-asof a {
-    color: var(--accent);
+    color: var(--hi-cyan);
   }
 
   .stats-block {
@@ -370,7 +370,8 @@
 
   .period-select:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: var(--hi-focus);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
   }
 
   .period-static {
@@ -404,12 +405,12 @@
   }
 
   .period-tabs button.active {
-    background: var(--accent);
+    background: var(--hi-purple);
     color: var(--background);
   }
 
   .period-tabs button:hover:not(.active) {
-    color: var(--main-text);
+    color: var(--hi-purple);
   }
 
   .stats a.stat {
@@ -438,7 +439,7 @@
     font-size: 0.72rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--acid);
+    color: var(--hi-cyan);
   }
 
   .dash-section {
