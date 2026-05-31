@@ -5,10 +5,6 @@ type InfiniteScrollParams = {
   disabled?: boolean;
 };
 
-/**
- * Svelte action: invokes `onLoad` when the sentinel element scrolls into view.
- * Attach to a small element placed at the bottom of a scrollable list.
- */
 export const infiniteScroll: Action<HTMLElement, InfiniteScrollParams> = (node, params) => {
   let current = params;
 

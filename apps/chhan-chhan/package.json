@@ -7,7 +7,8 @@
     "dev": "bun --bun vite dev",
     "build": "bun --bun vite build",
     "preview": "bun --bun vite preview",
-    "start": "bun --env-file=.env ./build/index.js",
+    "start": "bun ./build/index.js",
+    "start:local": "bun --env-file=.env ./build/index.js",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
@@ -42,10 +43,12 @@
     "@fontsource/fira-mono": "^5.2.7",
     "@fontsource/marcellus": "^5.2.8",
     "@fontsource/shippori-mincho": "^5.2.8",
+    "@lucide/svelte": "^1.17.0",
     "@pocket-dimension/auth": "workspace:*",
     "@pocket-dimension/db": "workspace:*",
     "better-auth": "^1.4.10",
     "drizzle-orm": "^0.45.1",
+    "unpdf": "^1.6.2",
     "zod": "^4.2.1"
   }
 }

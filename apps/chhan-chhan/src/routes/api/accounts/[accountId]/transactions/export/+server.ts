@@ -23,7 +23,14 @@ export async function GET({ locals, params }) {
     .orderBy(schema.financeTransactions.occurredOn, schema.financeTransactions.id);
 
   if (!rows.length) {
-    throw error(404, "No transaction rows available to export");
+    const csv = toCsv([], ["occurredOn", "amountMinor", "type", "merchant", "notes", "categoryName"]);
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="transactions-${params.accountId}.csv"`,
+      },
+    });
   }
 
   const csv = toCsv(

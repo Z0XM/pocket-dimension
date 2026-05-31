@@ -1,0 +1,1 @@
+ALTER TABLE "chhanchhan"."finance_transactions" ADD COLUMN "balance_minor" bigint;

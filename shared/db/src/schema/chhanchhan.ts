@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { bigint, boolean, date, index, integer, pgSchema, text, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, date, index, integer, pgSchema, primaryKey, text, unique, uuid } from "drizzle-orm/pg-core";
 import * as auth from "./auth";
 import { actionsByUser, id, timestamps } from "./common";
 
@@ -23,6 +23,8 @@ export const financeAccounts = chhanSchema.table(
     currencyCode: text("currency_code").notNull().default("USD"),
     timezone: text("timezone").notNull().default("UTC"),
     isArchived: boolean("is_archived").notNull().default(false),
+    balanceMinor: bigint("balance_minor", { mode: "number" }),
+    balanceAsOf: date("balance_as_of"),
   },
   (table) => [index("finance_accounts_owner_user_id_idx").on(table.ownerUserId)]
 );
@@ -84,6 +86,7 @@ export const financeTransactions = chhanSchema.table(
     merchant: text("merchant"),
     notes: text("notes"),
     externalRef: text("external_ref"),
+    balanceMinor: bigint("balance_minor", { mode: "number" }),
     sortOrder: integer("sort_order").notNull().default(0),
   },
   (table) => [
@@ -131,6 +134,65 @@ export const financeGoals = chhanSchema.table(
   (table) => [index("finance_goals_account_id_idx").on(table.accountId)]
 );
 
+export const financeTags = chhanSchema.table(
+  "finance_tags",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => financeAccounts.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    colorHex: text("color_hex"),
+  },
+  (table) => [unique("finance_tags_account_id_name_unique").on(table.accountId, table.name), index("finance_tags_account_id_idx").on(table.accountId)]
+);
+
+export const financeTransactionTags = chhanSchema.table(
+  "finance_transaction_tags",
+  {
+    transactionId: uuid("transaction_id")
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => financeTags.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.transactionId, table.tagId] }), index("finance_transaction_tags_tag_id_idx").on(table.tagId)]
+);
+
+export const financeGroups = chhanSchema.table(
+  "finance_groups",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => financeAccounts.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    colorHex: text("color_hex"),
+  },
+  (table) => [
+    unique("finance_groups_account_id_name_unique").on(table.accountId, table.name),
+    index("finance_groups_account_id_idx").on(table.accountId),
+  ]
+);
+
+export const financeTransactionGroups = chhanSchema.table(
+  "finance_transaction_groups",
+  {
+    transactionId: uuid("transaction_id")
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => financeGroups.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.transactionId, table.groupId] }), index("finance_transaction_groups_group_id_idx").on(table.groupId)]
+);
+
 export const financeAccountRelations = relations(financeAccounts, ({ one, many }) => ({
   owner: one(auth.user, {
     fields: [financeAccounts.ownerUserId],
@@ -141,6 +203,8 @@ export const financeAccountRelations = relations(financeAccounts, ({ one, many }
   transactions: many(financeTransactions),
   budgets: many(financeBudgets),
   goals: many(financeGoals),
+  tags: many(financeTags),
+  groups: many(financeGroups),
 }));
 
 export const financeAccountMemberRelations = relations(financeAccountMembers, ({ one }) => ({
@@ -167,7 +231,7 @@ export const financeCategoryRelations = relations(financeCategories, ({ one, man
   budgets: many(financeBudgets),
 }));
 
-export const financeTransactionRelations = relations(financeTransactions, ({ one }) => ({
+export const financeTransactionRelations = relations(financeTransactions, ({ one, many }) => ({
   account: one(financeAccounts, {
     fields: [financeTransactions.accountId],
     references: [financeAccounts.id],
@@ -175,6 +239,46 @@ export const financeTransactionRelations = relations(financeTransactions, ({ one
   category: one(financeCategories, {
     fields: [financeTransactions.categoryId],
     references: [financeCategories.id],
+  }),
+  transactionTags: many(financeTransactionTags),
+  transactionGroups: many(financeTransactionGroups),
+}));
+
+export const financeTagRelations = relations(financeTags, ({ one, many }) => ({
+  account: one(financeAccounts, {
+    fields: [financeTags.accountId],
+    references: [financeAccounts.id],
+  }),
+  transactionTags: many(financeTransactionTags),
+}));
+
+export const financeTransactionTagRelations = relations(financeTransactionTags, ({ one }) => ({
+  transaction: one(financeTransactions, {
+    fields: [financeTransactionTags.transactionId],
+    references: [financeTransactions.id],
+  }),
+  tag: one(financeTags, {
+    fields: [financeTransactionTags.tagId],
+    references: [financeTags.id],
+  }),
+}));
+
+export const financeGroupRelations = relations(financeGroups, ({ one, many }) => ({
+  account: one(financeAccounts, {
+    fields: [financeGroups.accountId],
+    references: [financeAccounts.id],
+  }),
+  transactionGroups: many(financeTransactionGroups),
+}));
+
+export const financeTransactionGroupRelations = relations(financeTransactionGroups, ({ one }) => ({
+  transaction: one(financeTransactions, {
+    fields: [financeTransactionGroups.transactionId],
+    references: [financeTransactions.id],
+  }),
+  group: one(financeGroups, {
+    fields: [financeTransactionGroups.groupId],
+    references: [financeGroups.id],
   }),
 }));
 

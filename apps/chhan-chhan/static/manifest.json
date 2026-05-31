@@ -1,7 +1,7 @@
 {
   "name": "Chhan Chhan",
   "short_name": "Chhan",
-  "description": "Sample personal budgeting and transaction tracking app.",
+  "description": "Personal finance and transaction tracking — beta.",
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#060b0f",

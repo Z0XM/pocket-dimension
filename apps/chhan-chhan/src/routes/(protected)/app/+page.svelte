@@ -1,101 +1,1255 @@
 <script lang="ts">
-  import { generateTransactions, MAX_PAGES, formatMoney, sampleSummary, sampleBudgetUsage } from "$lib/demo/mock-data";
-  import { infiniteScroll } from "$lib/demo/infinite-scroll";
+  import { goto } from "$app/navigation";
+  import { Tag, Plus, MessageSquare, Link } from "@lucide/svelte";
+  import { formatMoney } from "$lib/finance/money";
+  import { buildSummarySelection, formatMonthKeyShort, summarySelectionToDateRange, type SummaryPeriod } from "$lib/finance/summary";
+  import { infiniteScroll } from "$lib/actions/infinite-scroll";
+  import AppNav from "$lib/components/app-nav.svelte";
+  import AppSettings from "$lib/components/app-settings.svelte";
+  import type { PageData } from "./$types";
 
-  let rows = $state(generateTransactions(0));
+  const { data }: { data: PageData } = $props();
+
+  let rows = $state<PageData["transactions"]>([]);
   let pageIndex = $state(0);
   let loading = $state(false);
-  const hasMore = $derived(pageIndex < MAX_PAGES - 1);
+  let hasMore = $state(false);
+  let search = $state("");
+  let savingCategoryId = $state<string | null>(null);
+  let savingNotesId = $state<string | null>(null);
+  let savingTagTxId = $state<string | null>(null);
+  let openTagMenuTxId = $state<string | null>(null);
+  let savingGroupTxId = $state<string | null>(null);
+  let openGroupTxId = $state<string | null>(null);
+  let openNoteTxId = $state<string | null>(null);
+  let noteDraft = $state("");
 
-  function loadMore() {
-    if (loading || !hasMore) return;
-    loading = true;
-    setTimeout(() => {
-      pageIndex += 1;
-      rows = [...rows, ...generateTransactions(pageIndex)];
-      loading = false;
-    }, 220);
+  $effect(() => {
+    rows = [...data.transactions];
+    pageIndex = 0;
+    hasMore = data.hasMore;
+  });
+
+  $effect(() => {
+    if (!openTagMenuTxId) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest(".tag-add-wrap")) {
+        openTagMenuTxId = null;
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") openTagMenuTxId = null;
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  });
+
+  $effect(() => {
+    if (!openNoteTxId) return;
+    queueMicrotask(() => {
+      document.querySelector<HTMLTextAreaElement>(".note-textarea")?.focus();
+    });
+  });
+
+  $effect(() => {
+    if (!openNoteTxId) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".note-wrap")) return;
+
+      const transaction = rows.find((row) => row.id === openNoteTxId);
+      if (transaction) {
+        void saveNoteEditor(transaction.id, transaction.notes ?? "");
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && openNoteTxId) {
+        const transaction = rows.find((row) => row.id === openNoteTxId);
+        noteDraft = transaction?.notes ?? "";
+        openNoteTxId = null;
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  });
+
+  $effect(() => {
+    if (!openGroupTxId) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".group-link-wrap")) return;
+      openGroupTxId = null;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") openGroupTxId = null;
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  });
+
+  const filtered = $derived(
+    search.trim()
+      ? rows.filter((row) => {
+          const q = search.trim().toLowerCase();
+          return row.merchant?.toLowerCase().includes(q) || row.notes?.toLowerCase().includes(q);
+        })
+      : rows
+  );
+
+  function appUrl(
+    updates: {
+      sort?: "asc" | "desc";
+      summary?: SummaryPeriod;
+      month?: string;
+      year?: number;
+      type?: "income" | "expense" | null;
+      group?: string | null;
+    } = {}
+  ) {
+    const params = new URLSearchParams();
+    const sort = updates.sort ?? data.sortDirection;
+    const summary = updates.summary ?? data.summaryPeriod;
+    const month = updates.month ?? data.selectedMonth;
+    const year = updates.year ?? data.selectedYear;
+    const typeFilter = updates.type === undefined ? data.transactionTypeFilter : updates.type;
+    const groupFilter = updates.group === undefined ? data.selectedGroupId : updates.group;
+
+    if (sort === "asc") params.set("sort", "asc");
+
+    if (summary === "year") {
+      params.set("summary", "year");
+      params.set("year", String(year));
+    } else if (summary === "all") {
+      params.set("summary", "all");
+    } else {
+      params.set("summary", "month");
+      params.set("month", month);
+    }
+
+    if (typeFilter) params.set("type", typeFilter);
+    if (groupFilter) params.set("group", groupFilter);
+
+    const query = params.toString();
+    return query ? `/app?${query}` : "/app";
   }
 
-  const periodLabel = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date());
+  function setSummaryPeriod(period: SummaryPeriod) {
+    const updates: {
+      summary: SummaryPeriod;
+      month?: string;
+      year?: number;
+    } = { summary: period };
+
+    if (period === "year") {
+      updates.year = data.summaryYears.includes(data.selectedYear) ? data.selectedYear : (data.summaryYears[0] ?? new Date().getFullYear());
+    } else if (period === "month") {
+      updates.month = data.selectedMonth;
+    }
+
+    goto(appUrl(updates), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  function setSummaryMonth(month: string) {
+    goto(appUrl({ summary: "month", month }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  function setSummaryYear(year: number) {
+    goto(appUrl({ summary: "year", year }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  function toggleDateSort() {
+    const next = data.sortDirection === "desc" ? "asc" : "desc";
+    goto(appUrl({ sort: next }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  function setTypeFilter(type: "income" | "expense" | null) {
+    goto(appUrl({ type }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  function setGroupFilter(groupId: string | null) {
+    goto(appUrl({ group: groupId }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  }
+
+  async function loadMore() {
+    if (loading || !hasMore) return;
+    loading = true;
+    try {
+      const nextPage = pageIndex + 1;
+      const params = new URLSearchParams({
+        pageIndex: String(nextPage),
+        pageSize: String(data.pageSize),
+        sortBy: "occurredOn",
+        sortDirection: data.sortDirection,
+      });
+      if (data.transactionTypeFilter) {
+        params.set("type", data.transactionTypeFilter);
+      }
+      const dateRange = summarySelectionToDateRange(buildSummarySelection(data.summaryPeriod, data.selectedMonth, data.selectedYear));
+      if (dateRange.dateFrom) params.set("dateFrom", dateRange.dateFrom);
+      if (dateRange.dateTo) params.set("dateTo", dateRange.dateTo);
+      if (data.selectedGroupId) params.set("groupId", data.selectedGroupId);
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions?${params}`);
+      if (!response.ok) return;
+      const page = await response.json();
+      rows = [...rows, ...page.rows];
+      pageIndex = nextPage;
+      hasMore = page.hasMore;
+    } finally {
+      loading = false;
+    }
+  }
+
+  function displayAmount(type: string, amountMinor: number) {
+    return type === "expense" ? -amountMinor : amountMinor;
+  }
+
+  function categoriesForType(type: string, categoryId?: string | null) {
+    const matching = data.categories.filter((category) => category.kind === type);
+    if (!categoryId || matching.some((category) => category.id === categoryId)) {
+      return matching;
+    }
+
+    const current = data.categories.find((category) => category.id === categoryId);
+    return current ? [current, ...matching] : matching;
+  }
+
+  async function updateTransactionCategory(transactionId: string, categoryId: string | null) {
+    savingCategoryId = transactionId;
+    try {
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId }),
+      });
+      if (!response.ok) return;
+
+      const category = categoryId ? data.categories.find((entry) => entry.id === categoryId) : null;
+      rows = rows.map((row) =>
+        row.id === transactionId
+          ? {
+              ...row,
+              categoryId: categoryId ?? null,
+              categoryName: category?.name ?? null,
+              categoryColor: category?.colorHex ?? null,
+            }
+          : row
+      );
+    } finally {
+      savingCategoryId = null;
+    }
+  }
+
+  async function updateTransactionNotes(transactionId: string, nextNotes: string, previousNotes: string) {
+    const normalized = nextNotes.trim();
+    if (normalized === previousNotes.trim()) return;
+
+    savingNotesId = transactionId;
+    try {
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: normalized }),
+      });
+      if (!response.ok) return;
+
+      rows = rows.map((row) => (row.id === transactionId ? { ...row, notes: normalized || null } : row));
+    } finally {
+      savingNotesId = null;
+    }
+  }
+
+  function openNoteEditor(transaction: PageData["transactions"][number]) {
+    if (openNoteTxId && openNoteTxId !== transaction.id) {
+      const previous = rows.find((row) => row.id === openNoteTxId);
+      if (previous) void saveNoteEditor(previous.id, previous.notes ?? "");
+    }
+
+    if (openNoteTxId === transaction.id) {
+      void saveNoteEditor(transaction.id, transaction.notes ?? "");
+      return;
+    }
+
+    openNoteTxId = transaction.id;
+    noteDraft = transaction.notes ?? "";
+  }
+
+  async function saveNoteEditor(transactionId: string, previousNotes: string) {
+    await updateTransactionNotes(transactionId, noteDraft, previousNotes);
+    openNoteTxId = null;
+  }
+
+  function handleNoteKeydown(event: KeyboardEvent, transaction: PageData["transactions"][number]) {
+    if (event.key !== "Enter") return;
+
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      const textarea = event.currentTarget as HTMLTextAreaElement;
+      const start = textarea.selectionStart ?? noteDraft.length;
+      const end = textarea.selectionEnd ?? noteDraft.length;
+      noteDraft = `${noteDraft.slice(0, start)}\n${noteDraft.slice(end)}`;
+      queueMicrotask(() => {
+        textarea.selectionStart = start + 1;
+        textarea.selectionEnd = start + 1;
+      });
+      return;
+    }
+
+    event.preventDefault();
+    void saveNoteEditor(transaction.id, transaction.notes ?? "");
+  }
+
+  function availableTagsFor(transaction: PageData["transactions"][number]) {
+    const attached = new Set(transaction.tags.map((tag) => tag.id));
+    return data.tags.filter((tag) => !attached.has(tag.id));
+  }
+
+  async function addTransactionTag(transactionId: string, tagId: string) {
+    if (!tagId) return;
+
+    savingTagTxId = transactionId;
+    try {
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tagId }),
+      });
+      if (!response.ok) return;
+
+      const tag = data.tags.find((entry) => entry.id === tagId);
+      if (!tag) return;
+
+      rows = rows.map((row) =>
+        row.id === transactionId
+          ? {
+              ...row,
+              tags: [...row.tags, { id: tag.id, name: tag.name, colorHex: tag.colorHex }],
+            }
+          : row
+      );
+      openTagMenuTxId = null;
+    } finally {
+      savingTagTxId = null;
+    }
+  }
+
+  async function removeTransactionTag(transactionId: string, tagId: string) {
+    savingTagTxId = transactionId;
+    try {
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/tags/${tagId}`, { method: "DELETE" });
+      if (!response.ok) return;
+
+      rows = rows.map((row) => (row.id === transactionId ? { ...row, tags: row.tags.filter((tag) => tag.id !== tagId) } : row));
+    } finally {
+      savingTagTxId = null;
+    }
+  }
+
+  function groupLabelFor(transaction: PageData["transactions"][number]) {
+    return transaction.groups.map((group) => group.name).join(", ");
+  }
+
+  function primaryGroupId(transaction: PageData["transactions"][number]) {
+    return transaction.groups[0]?.id ?? "";
+  }
+
+  async function setTransactionGroup(transactionId: string, groupId: string | null) {
+    const transaction = rows.find((row) => row.id === transactionId);
+    if (!transaction) return;
+
+    savingGroupTxId = transactionId;
+    try {
+      for (const group of transaction.groups) {
+        const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/groups/${group.id}`, { method: "DELETE" });
+        if (!response.ok) return;
+      }
+
+      if (groupId) {
+        const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/groups`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ groupId }),
+        });
+        if (!response.ok) return;
+      }
+
+      const group = groupId ? data.groups.find((entry) => entry.id === groupId) : null;
+      if (data.selectedGroupId && groupId !== data.selectedGroupId) {
+        rows = rows.filter((row) => row.id !== transactionId);
+      } else {
+        rows = rows.map((row) =>
+          row.id === transactionId
+            ? {
+                ...row,
+                groups: group ? [{ id: group.id, name: group.name, colorHex: group.colorHex }] : [],
+              }
+            : row
+        );
+      }
+      openGroupTxId = null;
+    } finally {
+      savingGroupTxId = null;
+    }
+  }
 </script>
 
-<svelte:head><title>Transactions · Chhan Chhan</title></svelte:head>
+<svelte:head><title>Chhan Chhan</title></svelte:head>
 
 <header class="topbar">
   <div>
-    <h1><span>TRANS</span><span class="acid">ACTIONS</span></h1>
-    <p class="sub">{periodLabel}</p>
+    <h1><span>CHHAN</span><span class="acid"> CHHAN</span></h1>
+    <AppNav />
   </div>
   <div class="actions">
-    <input type="search" placeholder="search…" />
-    <button class="cta" type="button">+ NEW</button>
+    <input type="search" placeholder="search…" bind:value={search} />
+    <a class="cta" href="/app/control">IMPORT</a>
+    <AppSettings />
   </div>
 </header>
 
-<section class="stats">
-  <article class="stat net">
-    <span class="k">NET</span>
-    <span class="v">{formatMoney(sampleSummary.netMinor)}</span>
-  </article>
-  <article class="stat">
-    <span class="k">IN</span>
-    <span class="v pos">{formatMoney(sampleSummary.incomeMinor)}</span>
-  </article>
-  <article class="stat">
-    <span class="k">OUT</span>
-    <span class="v neg">{formatMoney(-sampleSummary.expenseMinor)}</span>
-  </article>
-  <article class="stat">
-    <span class="k">SAVED</span>
-    <span class="v">{Math.round(sampleSummary.savingsRate * 100)}%</span>
-  </article>
+{#if data.currentBalance}
+  <section class="balance-card" class:stale={data.currentBalance.isStale}>
+    <span class="balance-k">Balance</span>
+    <span class="balance-v">{formatMoney(data.currentBalance.balanceMinor, data.account.currencyCode)}</span>
+    <span class="balance-asof dim">
+      {#if data.currentBalance.isStale}
+        as of {data.currentBalance.asOf} · latest txn {data.currentBalance.latestTransactionOn} —
+        <a href="/app/control">re-import statement</a> to refresh
+      {:else}
+        as of {data.currentBalance.asOf}
+      {/if}
+    </span>
+  </section>
+{/if}
+
+<section class="stats-block">
+  <div class="stats-head">
+    <div class="stats-label">
+      <span>Summary</span>
+      {#if data.summaryPeriod === "month"}
+        <select class="period-select" aria-label="Select month" value={data.selectedMonth} onchange={(e) => setSummaryMonth(e.currentTarget.value)}>
+          {#each data.summaryMonths as monthKey}
+            <option value={monthKey}>{formatMonthKeyShort(monthKey)}</option>
+          {/each}
+        </select>
+      {:else if data.summaryPeriod === "year"}
+        <select
+          class="period-select"
+          aria-label="Select year"
+          value={String(data.selectedYear)}
+          onchange={(e) => setSummaryYear(Number(e.currentTarget.value))}
+        >
+          {#each data.summaryYears as year (year)}
+            <option value={String(year)}>{year}</option>
+          {/each}
+        </select>
+      {:else}
+        <span class="period-static">All time</span>
+      {/if}
+    </div>
+    <div class="head-filters">
+      <div class="period-tabs" role="tablist" aria-label="Summary period">
+        <button
+          type="button"
+          role="tab"
+          class:active={data.summaryPeriod === "month"}
+          aria-selected={data.summaryPeriod === "month"}
+          onclick={() => setSummaryPeriod("month")}
+        >
+          Month
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class:active={data.summaryPeriod === "year"}
+          aria-selected={data.summaryPeriod === "year"}
+          onclick={() => setSummaryPeriod("year")}
+        >
+          Year
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class:active={data.summaryPeriod === "all"}
+          aria-selected={data.summaryPeriod === "all"}
+          onclick={() => setSummaryPeriod("all")}
+        >
+          All
+        </button>
+      </div>
+      {#if data.groups.length > 0}
+        <select
+          class="period-select group-filter"
+          aria-label="Filter by group"
+          value={data.selectedGroupId ?? ""}
+          onchange={(e) => setGroupFilter(e.currentTarget.value || null)}
+        >
+          <option value="">All groups</option>
+          {#each data.groups as group (group.id)}
+            <option value={group.id}>{group.name}</option>
+          {/each}
+        </select>
+      {/if}
+    </div>
+  </div>
+  <section class="stats">
+    <button
+      type="button"
+      class="stat net"
+      class:active={!data.transactionTypeFilter}
+      aria-pressed={!data.transactionTypeFilter}
+      onclick={() => setTypeFilter(null)}
+    >
+      <span class="k">{data.summaryPrefix} NET</span>
+      <span class="v">{formatMoney(data.summary.netMinor, data.account.currencyCode)}</span>
+    </button>
+    <button
+      type="button"
+      class="stat"
+      class:active={data.transactionTypeFilter === "income"}
+      aria-pressed={data.transactionTypeFilter === "income"}
+      onclick={() => setTypeFilter("income")}
+    >
+      <span class="k">{data.summaryPrefix} IN</span>
+      <span class="v pos">{formatMoney(data.summary.incomeMinor, data.account.currencyCode)}</span>
+    </button>
+    <button
+      type="button"
+      class="stat"
+      class:active={data.transactionTypeFilter === "expense"}
+      aria-pressed={data.transactionTypeFilter === "expense"}
+      onclick={() => setTypeFilter("expense")}
+    >
+      <span class="k">{data.summaryPrefix} OUT</span>
+      <span class="v neg">{formatMoney(-data.summary.expenseMinor, data.account.currencyCode)}</span>
+    </button>
+    <article class="stat">
+      <span class="k">{data.summaryPrefix} SAVED</span>
+      <span class="v">{Math.round(data.summary.savingsRate * 100)}%</span>
+    </article>
+  </section>
 </section>
 
-<section class="meters">
-  {#each sampleBudgetUsage as b}
-    <div class="meter">
-      <div class="meter-top"><span>{b.name}</span><span>{b.pct}%</span></div>
-      <div class="track"><div class="fill" style="width:{b.pct}%; background:{b.color}"></div></div>
-    </div>
-  {/each}
-</section>
+{#if data.budgetUsage.length}
+  <section class="meters">
+    {#each data.budgetUsage as b}
+      <div class="meter">
+        <div class="meter-top"><span>{b.name}</span><span>{b.pct}%</span></div>
+        <div class="track"><div class="fill" style="width:{b.pct}%; background:{b.color}"></div></div>
+      </div>
+    {/each}
+  </section>
+{/if}
 
 <section class="table-block">
   <table>
     <thead>
       <tr>
-        <th>Date</th>
+        <th>
+          <button
+            type="button"
+            class="sort-btn"
+            aria-label="Sort by date, {data.sortDirection === 'desc' ? 'newest first' : 'oldest first'}"
+            onclick={toggleDateSort}
+          >
+            Date
+            <span class="sort-mark" aria-hidden="true">{data.sortDirection === "desc" ? "↓" : "↑"}</span>
+          </button>
+        </th>
         <th>Merchant</th>
         <th>Category</th>
         <th>Tags</th>
-        <th>Account</th>
         <th class="right">Amount</th>
       </tr>
     </thead>
     <tbody>
-      {#each rows as t (t.id)}
+      {#if filtered.length === 0}
         <tr>
-          <td class="mono dim">{t.occurredOn}</td>
-          <td class="merchant">{t.merchant}</td>
-          <td>
-            <span class="cat"><span class="sq" style="background:{t.categoryColor}"></span>{t.category}</span>
-          </td>
-          <td class="tags">
-            <div class="tag-list">
-              {#each t.tags as tag}<span class="tag"><span class="tag-hash" aria-hidden="true">#</span>{tag}</span>{/each}
-            </div>
-          </td>
-          <td class="dim">{t.account}</td>
-          <td class="right mono amt" class:pos={t.amountMinor > 0} class:neg={t.amountMinor < 0}>
-            {formatMoney(t.amountMinor)}
+          <td colspan="5" class="dim empty-row">
+            {#if data.selectedGroupId}
+              No transactions in this group for the selected period.
+            {:else if data.transactionTypeFilter === "income"}
+              No credits match this filter.
+            {:else if data.transactionTypeFilter === "expense"}
+              No debits match this filter.
+            {:else}
+              No transactions yet. Import a bank statement from Control.
+            {/if}
           </td>
         </tr>
-      {/each}
+      {:else}
+        {#each filtered as t (t.id)}
+          <tr>
+            <td class="mono dim">{t.occurredOn}</td>
+            <td class="merchant-cell">
+              <div class="merchant-row">
+                <span class="merchant">{t.merchant ?? "—"}</span>
+                <div class="note-wrap">
+                  <button
+                    type="button"
+                    class="note-btn"
+                    class:has-note={Boolean(t.notes)}
+                    aria-label="{t.notes ? 'Edit note' : 'Add note'} for {t.merchant ?? 'transaction'}"
+                    aria-expanded={openNoteTxId === t.id}
+                    disabled={savingNotesId === t.id}
+                    onclick={() => openNoteEditor(t)}
+                  >
+                    <MessageSquare size={12} strokeWidth={1.5} aria-hidden="true" />
+                  </button>
+                  {#if openNoteTxId === t.id}
+                    <div class="note-popup" role="dialog" aria-label="Transaction note">
+                      <textarea
+                        class="note-textarea"
+                        bind:value={noteDraft}
+                        placeholder="Add a note…"
+                        disabled={savingNotesId === t.id}
+                        rows="3"
+                        onkeydown={(e) => handleNoteKeydown(e, t)}
+                      ></textarea>
+                    </div>
+                  {:else if t.notes}
+                    <span class="note-preview" role="tooltip">{t.notes}</span>
+                  {/if}
+                </div>
+                {#if data.groups.length > 0}
+                  <div class="group-link-wrap">
+                    <button
+                      type="button"
+                      class="group-link-btn"
+                      class:has-group={t.groups.length > 0}
+                      aria-label="{t.groups.length ? `Linked to ${groupLabelFor(t)}` : 'Link to group'} for {t.merchant ?? 'transaction'}"
+                      aria-expanded={openGroupTxId === t.id}
+                      disabled={savingGroupTxId === t.id}
+                      onclick={() => (openGroupTxId = openGroupTxId === t.id ? null : t.id)}
+                    >
+                      <Link size={12} strokeWidth={1.5} aria-hidden="true" />
+                    </button>
+                    {#if openGroupTxId === t.id}
+                      <div class="group-popup" role="dialog" aria-label="Transaction group">
+                        <label class="group-popup-label" for="group-{t.id}">Group</label>
+                        <select
+                          id="group-{t.id}"
+                          class="group-select"
+                          value={primaryGroupId(t)}
+                          disabled={savingGroupTxId === t.id}
+                          onchange={(e) => setTransactionGroup(t.id, e.currentTarget.value ? e.currentTarget.value : null)}
+                        >
+                          <option value="">None</option>
+                          {#each data.groups as group (group.id)}
+                            <option value={group.id}>{group.name}</option>
+                          {/each}
+                        </select>
+                      </div>
+                    {:else if t.groups.length > 0}
+                      <span class="group-preview" role="tooltip">{groupLabelFor(t)}</span>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+            </td>
+            <td class="category-cell">
+              <label class="sr-only" for="category-{t.id}">Category for {t.merchant ?? "transaction"}</label>
+              <div class="cat-picker">
+                <span class="cat-bar" style="background:{t.categoryColor ?? 'var(--chrome-line)'}" aria-hidden="true"></span>
+                <select
+                  id="category-{t.id}"
+                  class="cat-select"
+                  value={t.categoryId ?? ""}
+                  disabled={savingCategoryId === t.id}
+                  onchange={(e) => updateTransactionCategory(t.id, e.currentTarget.value ? e.currentTarget.value : null)}
+                >
+                  <option value="">Uncategorized</option>
+                  {#each categoriesForType(t.type, t.categoryId) as category (category.id)}
+                    <option value={category.id}>{category.name}</option>
+                  {/each}
+                </select>
+              </div>
+            </td>
+            <td class="tags">
+              <div class="tag-list">
+                {#each t.tags as tag (tag.id)}
+                  <span class="tag tx-tag" style="--tag-color: {tag.colorHex ?? '#634bdd'}">
+                    <Tag size={12} strokeWidth={1.25} class="tag-icon" aria-hidden="true" />
+                    {tag.name}
+                    <button
+                      type="button"
+                      class="tag-remove"
+                      aria-label="Remove {tag.name}"
+                      disabled={savingTagTxId === t.id}
+                      onclick={() => removeTransactionTag(t.id, tag.id)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                {/each}
+                {#if data.tags.length > 0 && availableTagsFor(t).length > 0}
+                  <div class="tag-add-wrap">
+                    <button
+                      type="button"
+                      class="tag-add-btn"
+                      aria-label="Add tag to {t.merchant ?? 'transaction'}"
+                      aria-expanded={openTagMenuTxId === t.id}
+                      disabled={savingTagTxId === t.id}
+                      onclick={() => (openTagMenuTxId = openTagMenuTxId === t.id ? null : t.id)}
+                    >
+                      <Plus size={12} strokeWidth={2} aria-hidden="true" />
+                    </button>
+                    {#if openTagMenuTxId === t.id}
+                      <div class="tag-add-menu" role="menu">
+                        {#each availableTagsFor(t) as tag (tag.id)}
+                          <button type="button" role="menuitem" onclick={() => addTransactionTag(t.id, tag.id)}>
+                            {tag.name}
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
+                  </div>
+                {:else if t.tags.length === 0}
+                  <span class="dim">—</span>
+                {/if}
+              </div>
+            </td>
+            <td class="right mono amt" class:pos={t.type === "income"} class:neg={t.type === "expense"}>
+              {formatMoney(displayAmount(t.type, t.amountMinor), data.account.currencyCode)}
+            </td>
+          </tr>
+        {/each}
+      {/if}
     </tbody>
   </table>
 
-  <div class="sentinel" use:infiniteScroll={{ onLoad: loadMore, disabled: loading || !hasMore }}>
-    {#if loading}■ LOADING ■{:else if !hasMore}— END —{:else}↓ SCROLL ↓{/if}
-  </div>
+  {#if !search.trim()}
+    <div class="sentinel" use:infiniteScroll={{ onLoad: loadMore, disabled: loading || !hasMore }}>
+      {#if loading}■ LOADING ■{:else if !hasMore}— END —{:else}↓ SCROLL ↓{/if}
+    </div>
+  {/if}
 </section>
+
+<style>
+  .balance-card {
+    display: flex;
+    align-items: baseline;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+    padding: 0.75rem 0.9rem;
+    background: var(--surface);
+    border: 2px solid var(--chrome-line);
+    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+  }
+
+  .balance-k {
+    font-size: 0.66rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .balance-v {
+    font-family: "Archivo Black", sans-serif;
+    font-size: 1.35rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--main-text);
+  }
+
+  .balance-card.stale {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--chrome-line));
+  }
+
+  .balance-asof {
+    font-size: 0.72rem;
+    margin-left: auto;
+    text-align: right;
+    line-height: 1.4;
+  }
+
+  .balance-asof a {
+    color: var(--accent);
+  }
+
+  .stats-block {
+    margin-bottom: 0.85rem;
+  }
+
+  .stats-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .head-filters {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .group-filter {
+    min-width: 7rem;
+  }
+
+  .stats-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .period-select {
+    background: var(--surface2);
+    border: 2px solid var(--chrome-line);
+    color: var(--main-text);
+    padding: 0.35rem 0.45rem;
+    font-family: inherit;
+    font-size: 0.68rem;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    min-width: 0;
+    width: auto;
+    cursor: pointer;
+    vertical-align: middle;
+  }
+
+  .period-select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .period-static {
+    font-size: 0.68rem;
+    line-height: 1;
+    color: var(--main-text);
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+
+  .period-tabs {
+    display: inline-flex;
+    border: 2px solid var(--chrome-line);
+  }
+
+  .period-tabs button {
+    background: var(--surface2);
+    border: none;
+    border-right: 2px solid var(--chrome-line);
+    color: var(--muted);
+    padding: 0.35rem 0.65rem;
+    font-family: inherit;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .period-tabs button:last-child {
+    border-right: none;
+  }
+
+  .period-tabs button.active {
+    background: var(--accent);
+    color: var(--background);
+  }
+
+  .period-tabs button:hover:not(.active) {
+    color: var(--main-text);
+  }
+
+  .empty-row {
+    text-align: center;
+    padding: 1.5rem !important;
+  }
+
+  .merchant-cell {
+    min-width: 8rem;
+  }
+
+  .merchant-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: 100%;
+  }
+
+  .merchant-row .merchant {
+    min-width: 0;
+  }
+
+  .note-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .note-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .note-btn.has-note,
+  .note-btn:hover,
+  .note-btn[aria-expanded="true"] {
+    color: var(--accent);
+  }
+
+  .note-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .note-preview {
+    position: absolute;
+    left: calc(100% + 0.35rem);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 15;
+    width: max-content;
+    max-width: 16rem;
+    padding: 0.45rem 0.55rem;
+    background: var(--surface);
+    border: 2px solid var(--chrome-line);
+    box-shadow: 3px 3px 0 rgba(234, 242, 240, 0.12);
+    color: var(--main-text);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    white-space: normal;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .note-wrap:has(.note-btn.has-note):hover .note-preview {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .note-popup {
+    position: absolute;
+    left: calc(100% + 0.35rem);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 25;
+    width: 14rem;
+    padding: 0.45rem;
+    background: var(--surface);
+    border: 2px solid var(--chrome-line);
+    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+  }
+
+  .note-textarea {
+    width: 100%;
+    min-height: 4.5rem;
+    resize: vertical;
+    background: var(--surface2);
+    border: none;
+    color: var(--main-text);
+    padding: 0.4rem 0.45rem;
+    font-family: inherit;
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  .note-textarea:focus {
+    outline: none;
+  }
+
+  .group-link-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .group-link-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .group-link-btn.has-group,
+  .group-link-btn:hover,
+  .group-link-btn[aria-expanded="true"] {
+    color: var(--accent);
+  }
+
+  .group-link-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .group-preview {
+    position: absolute;
+    left: calc(100% + 0.35rem);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 15;
+    width: max-content;
+    max-width: 14rem;
+    padding: 0.45rem 0.55rem;
+    background: var(--surface);
+    border: 2px solid var(--chrome-line);
+    box-shadow: 3px 3px 0 rgba(234, 242, 240, 0.12);
+    color: var(--main-text);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    white-space: normal;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .group-link-wrap:has(.group-link-btn.has-group):hover .group-preview {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .group-popup {
+    position: absolute;
+    left: calc(100% + 0.35rem);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 25;
+    width: 12rem;
+    padding: 0.45rem;
+    background: var(--surface);
+    border: 2px solid var(--chrome-line);
+    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+  }
+
+  .group-popup-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .group-select {
+    width: 100%;
+    background: var(--surface2);
+    border: none;
+    color: var(--main-text);
+    padding: 0.4rem 0.45rem;
+    font-family: inherit;
+    font-size: 0.72rem;
+    cursor: pointer;
+  }
+
+  .group-select:focus {
+    outline: none;
+  }
+
+  .note-textarea:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+  }
+
+  .sort-btn:hover {
+    color: var(--main-text);
+  }
+
+  .sort-mark {
+    color: var(--accent);
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .category-cell {
+    min-width: 9rem;
+  }
+
+  .cat-picker {
+    display: flex;
+    align-items: stretch;
+    max-width: 12rem;
+    background: var(--surface2);
+  }
+
+  .cat-bar {
+    width: 4px;
+    flex-shrink: 0;
+  }
+
+  .cat-select {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    background: var(--surface2);
+    border: none;
+    color: var(--main-text);
+    padding: 0.3rem 0.45rem;
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .cat-select:focus {
+    outline: none;
+  }
+
+  .cat-select option {
+    background: var(--surface2);
+    color: var(--main-text);
+  }
+
+  .cat-select:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .tx-tag {
+    gap: 0.25rem;
+  }
+
+  .tag-remove {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+    margin-left: 0.1rem;
+    line-height: 1;
+    font-size: 0.85rem;
+  }
+
+  .tag-remove:hover:not(:disabled) {
+    color: var(--main-text);
+  }
+
+  .tag-remove:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .tag-add-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .tag-add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    background: var(--surface2);
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+    color: var(--muted);
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .tag-add-btn:hover:not(:disabled),
+  .tag-add-wrap:has(.tag-add-menu) .tag-add-btn {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .tag-add-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .tag-add-menu {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    min-width: 8rem;
+    background: var(--surface);
+    border: 2px solid var(--chrome-line);
+    box-shadow: 3px 3px 0 color-mix(in srgb, var(--accent) 25%, transparent);
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tag-add-menu button {
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--table-line);
+    color: var(--main-text);
+    font-family: inherit;
+    font-size: 0.68rem;
+    padding: 0.45rem 0.55rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .tag-add-menu button:last-child {
+    border-bottom: none;
+  }
+
+  .tag-add-menu button:hover {
+    background: var(--surface2);
+    color: var(--accent);
+  }
+</style>
