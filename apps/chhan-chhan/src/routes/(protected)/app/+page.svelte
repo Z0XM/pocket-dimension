@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto, invalidateAll } from "$app/navigation";
-  import { Tag, Plus, MessageSquare, Link, Layers, Eye, EyeOff, ArrowLeftRight, TriangleAlert, Check, X } from "@lucide/svelte";
+  import { Tag, Plus, MessageSquare, Link, Layers, Eye, EyeOff, ArrowLeftRight, TriangleAlert, Check, X, Calculator } from "@lucide/svelte";
   import { formatMoney } from "$lib/finance/money";
   import { isRefundCategoryName } from "$lib/finance/refunds";
   import { buildSummarySelection, formatMonthKeyShort, summarySelectionToDateRange, type SummaryPeriod } from "$lib/finance/summary";
@@ -11,6 +11,7 @@
   import AppSettings from "$lib/components/app-settings.svelte";
   import SmartCategorizePopup, { type SmartCategoryToggle } from "$lib/components/smart-categorize-popup.svelte";
   import SmartTagPopup, { type SmartTagToggle } from "$lib/components/smart-tag-popup.svelte";
+  import CalculateWidget from "$lib/components/calculate-widget.svelte";
   import type { SmartCategorizationPreview, SmartTagApplyMode, SmartTaggingPreview } from "$lib/server/finance";
   import type { PageData } from "./$types";
 
@@ -56,6 +57,8 @@
     newTagId: string;
     previousTags: PageData["transactions"][number]["tags"];
   } | null>(null);
+  let calculateModeActive = $state(false);
+  let calculateSelectionIds = $state<string[]>([]);
 
   $effect(() => {
     rows = [...data.transactions];
@@ -215,6 +218,26 @@
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   });
 
+  $effect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("input, textarea, select")) return;
+
+      if (event.key === "Escape" && calculateModeActive) {
+        exitCalculateMode();
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "x") {
+        event.preventDefault();
+        toggleCalculateMode();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
   function appUrl(
     updates: {
       sort?: "asc" | "desc";
@@ -329,6 +352,56 @@
 
   const tagFilterOptions = $derived(data.tags.map((tag) => ({ id: tag.id, label: tag.name })));
 
+  const calculateStats = $derived.by(() => {
+    const selected = new Set(calculateSelectionIds);
+    let count = 0;
+    let sumMinor = 0;
+
+    for (const row of rows) {
+      if (!selected.has(row.id)) continue;
+      count += 1;
+      sumMinor += displayAmount(row.type, row.amountMinor);
+    }
+
+    return { count, sumMinor };
+  });
+
+  function isCalculateSelected(transactionId: string) {
+    return calculateSelectionIds.includes(transactionId);
+  }
+
+  function toggleCalculateSelection(transactionId: string) {
+    if (calculateSelectionIds.includes(transactionId)) {
+      calculateSelectionIds = calculateSelectionIds.filter((id) => id !== transactionId);
+      return;
+    }
+    calculateSelectionIds = [...calculateSelectionIds, transactionId];
+  }
+
+  function enterCalculateMode() {
+    exitRefundLinkMode();
+    openNoteTxId = null;
+    openGroupTxId = null;
+    openTagMenuTxId = null;
+    closeSmartCat(true);
+    closeSmartTag(true);
+    calculateModeActive = true;
+  }
+
+  function exitCalculateMode() {
+    calculateModeActive = false;
+    calculateSelectionIds = [];
+  }
+
+  function toggleCalculateMode() {
+    if (calculateModeActive) exitCalculateMode();
+    else enterCalculateMode();
+  }
+
+  function clearCalculateSelection() {
+    calculateSelectionIds = [];
+  }
+
   function toggleLinkClusterFilter(transactionId: string) {
     goto(appUrl({ link: data.selectedLinkTransactionId ? null : transactionId }), { keepFocus: true, noScroll: true, invalidateAll: true });
   }
@@ -346,6 +419,7 @@
   }
 
   function enterRefundLinkMode(transactionId: string) {
+    exitCalculateMode();
     openNoteTxId = null;
     openGroupTxId = null;
     openTagMenuTxId = null;
@@ -395,13 +469,20 @@
     return resolveRefundLinkPair(anchor, transaction) !== null;
   }
 
-  function isLinkModeInteractiveTarget(target: HTMLElement) {
+  function isRowInteractiveTarget(target: HTMLElement) {
     return Boolean(target.closest("button, select, textarea, input, a"));
   }
 
+  function handleCalculateRowClick(event: MouseEvent, transaction: PageData["transactions"][number]) {
+    if (!calculateModeActive) return;
+    if (isRowInteractiveTarget(event.target as HTMLElement)) return;
+    toggleCalculateSelection(transaction.id);
+  }
+
   async function handleLinkModeRowClick(event: MouseEvent, transaction: PageData["transactions"][number]) {
+    if (calculateModeActive) return;
     if (!refundLinkModeAnchorId || savingRefundLinkId) return;
-    if (isLinkModeInteractiveTarget(event.target as HTMLElement)) return;
+    if (isRowInteractiveTarget(event.target as HTMLElement)) return;
     if (transaction.id === refundLinkModeAnchorId) return;
 
     const anchor = rows.find((row) => row.id === refundLinkModeAnchorId);
@@ -1048,6 +1129,18 @@
       value={searchInput}
       oninput={(e) => handleSearchInput(e.currentTarget.value)}
     />
+    <button
+      type="button"
+      class="calc-mode-btn"
+      class:active={calculateModeActive}
+      aria-pressed={calculateModeActive}
+      aria-label="Calculate mode (Ctrl+X)"
+      title="Calculate mode (Ctrl+X)"
+      onclick={() => toggleCalculateMode()}
+    >
+      <Calculator size={14} strokeWidth={2} aria-hidden="true" />
+      CALC
+    </button>
     <a class="cta" href="/app/control">IMPORT</a>
     <AppSettings />
   </div>
@@ -1200,6 +1293,15 @@
   </section>
 {/if}
 
+{#if calculateModeActive}
+  <div class="calc-mode-banner">
+    <span>Calculate mode — click rows to add or remove from sum</span>
+    <button type="button" class="calc-mode-exit-btn" aria-label="Exit calculate mode" onclick={() => exitCalculateMode()}>
+      <X size={14} strokeWidth={2} aria-hidden="true" />
+    </button>
+  </div>
+{/if}
+
 {#if refundLinkModeAnchorId}
   <div class="link-mode-banner">
     <span>Link mode — click rows to link or unlink</span>
@@ -1224,7 +1326,7 @@
   </div>
 {/if}
 
-<section class="table-block">
+<section class="table-block" class:calc-mode-on={calculateModeActive}>
   <table>
     <thead>
       <tr>
@@ -1272,11 +1374,16 @@
         {#each rows as t (t.id)}
           <tr
             class:group-hidden={Boolean(data.selectedGroupId && t.groupHidden)}
+            class:calc-mode-active={calculateModeActive}
+            class:calc-mode-selected={isCalculateSelected(t.id)}
             class:link-mode-anchor={refundLinkModeAnchorId === t.id}
             class:link-mode-target={isLinkModeTarget(t)}
             class:link-mode-linked={isLinkedToAnchor(t)}
             class:link-mode-busy={savingRefundLinkId !== null}
-            onclick={(event) => handleLinkModeRowClick(event, t)}
+            onclick={(event) => {
+              handleCalculateRowClick(event, t);
+              void handleLinkModeRowClick(event, t);
+            }}
           >
             <td class="mono dim">{t.occurredOn}</td>
             <td class="merchant-cell">
@@ -1511,7 +1618,84 @@
   onCancel={() => closeSmartTag(true)}
 />
 
+{#if calculateModeActive}
+  <CalculateWidget
+    count={calculateStats.count}
+    sumMinor={calculateStats.sumMinor}
+    currencyCode={data.account.currencyCode}
+    onClear={clearCalculateSelection}
+    onClose={exitCalculateMode}
+  />
+{/if}
+
 <style>
+  .calc-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 2px solid var(--chrome-line);
+    background: var(--surface2);
+    color: var(--main-text);
+    font-family: inherit;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.55rem;
+    cursor: pointer;
+  }
+
+  .calc-mode-btn:hover,
+  .calc-mode-btn.active {
+    color: var(--hi-cyan);
+    border-color: color-mix(in srgb, var(--hi-cyan) 55%, var(--chrome-line));
+    background: color-mix(in srgb, var(--hi-cyan) 8%, var(--surface2));
+  }
+
+  .calc-mode-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.65rem;
+    padding: 0.55rem 0.75rem;
+    background: color-mix(in srgb, var(--hi-cyan) 12%, var(--surface));
+    border: 2px solid color-mix(in srgb, var(--hi-cyan) 45%, var(--chrome-line));
+    font-size: 0.74rem;
+  }
+
+  .calc-mode-exit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.15rem;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .calc-mode-exit-btn:hover {
+    color: var(--brand-accent);
+  }
+
+  .table-block.calc-mode-on {
+    padding-bottom: 4.5rem;
+  }
+
+  tr.calc-mode-active {
+    cursor: pointer;
+  }
+
+  tr.calc-mode-selected {
+    background: color-mix(in srgb, var(--hi-cyan) 12%, transparent);
+    outline: 2px solid color-mix(in srgb, var(--hi-cyan) 55%, var(--chrome-line));
+    outline-offset: -2px;
+  }
+
+  tr.calc-mode-active:not(.calc-mode-selected):hover {
+    background: color-mix(in srgb, var(--hi-cyan) 6%, transparent);
+  }
+
   .balance-card {
     display: flex;
     align-items: baseline;
