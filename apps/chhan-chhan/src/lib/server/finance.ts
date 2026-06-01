@@ -1,6 +1,7 @@
 import { normalizeMerchant, rankFuzzyMerchants } from "$lib/finance/merchant-match";
 import { parseSqlMinor } from "$lib/finance/money";
 import { isRefundCategoryName } from "$lib/finance/refunds";
+import { buildSummarySearchFilterSql, buildTransactionSearchCondition } from "$lib/finance/transaction-search";
 import {
   computeRefundLinkWarnings,
   type RefundLinkRow,
@@ -10,7 +11,7 @@ import {
 import { currentMonthKey, readRowYear, type SummarySelection } from "$lib/finance/summary";
 import { isBalanceSnapshotNewer } from "$lib/server/balance";
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type {
   budgetUpsertSchema,
@@ -701,7 +702,11 @@ export async function listTransactions(accountId: string, query: TransactionsQue
 
   if (query.search) {
     conditions.push(
-      or(ilike(schema.financeTransactions.merchant, `%${query.search}%`), ilike(schema.financeTransactions.notes, `%${query.search}%`))!
+      buildTransactionSearchCondition(query.search, {
+        merchant: schema.financeTransactions.merchant,
+        notes: schema.financeTransactions.notes,
+        amountMinor: schema.financeTransactions.amountMinor,
+      })
     );
   }
   if (query.categoryIds?.length) {
@@ -1601,10 +1606,7 @@ export async function getCategoryTrend(accountId: string, monthCount = 12) {
 }
 
 function summarySearchFilter(search?: string) {
-  if (!search?.trim()) return sql`true`;
-
-  const term = `%${search.trim()}%`;
-  return sql`(t.merchant ilike ${term} or coalesce(t.notes, '') ilike ${term})`;
+  return buildSummarySearchFilterSql(search);
 }
 
 function summaryCategoryFilter(categoryFilters?: string[]) {
