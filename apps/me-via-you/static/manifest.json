@@ -1,0 +1,17 @@
+{
+  "name": "Me Via You",
+  "short_name": "MeViaYou",
+  "description": "Connect through the people who know you best.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#060b0f",
+  "background_color": "#060b0f",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

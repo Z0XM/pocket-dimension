@@ -22,6 +22,7 @@
     spending: "Spending",
     trends: "Trends",
     goals: "Budgets & goals",
+    billing: "Billing",
   };
 
   const categories = $derived([...new Set(DASHBOARD_WIDGET_CATALOG.map((widget) => widget.category))] as DashboardWidgetCategory[]);

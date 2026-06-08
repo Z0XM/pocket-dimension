@@ -1,0 +1,33 @@
+/*
+ * Me Via You — locked theme
+ *
+ * Do not change these values without an explicit design decision.
+ * Use Tailwind tokens (bg-background, text-primary, etc.) in components.
+ * Programmatic reference: src/lib/theme.ts
+ */
+
+:root {
+  --background: #060b0f;
+  --foreground: #e8e4f0;
+  --card: #0a1016;
+  --card-foreground: #e8e4f0;
+  --primary: #a50036;
+  --primary-foreground: #e8e4f0;
+  --secondary: #0f151c;
+  --secondary-foreground: #e8e4f0;
+  --muted: #0f151c;
+  --muted-foreground: color-mix(in srgb, #e8e4f0 55%, #060b0f);
+  --accent: #5d0ec0;
+  --accent-foreground: #e8e4f0;
+  --positive: #0e7a36;
+  --positive-foreground: #e8e4f0;
+  --border: color-mix(in srgb, #a50036 14%, color-mix(in srgb, #5d0ec0 10%, #060b0f));
+  --ring: #a50036;
+  --input: #0f151c;
+  --popover: #0a1016;
+  --popover-foreground: #e8e4f0;
+  --destructive: #e5484d;
+  --destructive-foreground: #ffffff;
+  --danger: #e5484d;
+  --success: #4ade80;
+}

@@ -1,0 +1,24 @@
+---
+description: Me Via You locked color theme and UI token usage
+globs: apps/me-via-you/**
+alwaysApply: false
+---
+
+# Me Via You theme (locked)
+
+Canonical source: `src/lib/styles/theme.css` and `src/lib/theme.ts`.
+
+| Token | Hex | Use |
+|-------|-----|-----|
+| background | `#060B0F` | Page canvas |
+| foreground | `#E8E4F0` | Body text (off-white) |
+| primary | `#A50036` | Main CTAs, negatives, active states, primary links, focus rings |
+| positive | `#0E7A36` | Positive answers, positive form classification |
+| accent | `#5D0EC0` | Secondary actions, info surfaces, outline/ghost hovers |
+| destructive | `#E5484D` | Close actions, errors, validation failures, irreversible actions |
+
+## Rules
+
+- Use Tailwind semantic tokens (`bg-background`, `text-foreground`, `text-primary`, `text-accent`, `border-border`) — never hardcode hex in components.
+- Do not change palette values without an explicit user request.
+- Icons and PWA manifest must stay aligned with `theme.ts` (`background`, `primary`, `accent`).

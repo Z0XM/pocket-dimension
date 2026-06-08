@@ -1,0 +1,81 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+@plugin "@tailwindcss/typography";
+@import "tw-animate-css";
+@import "@fontsource-variable/nunito-sans";
+@import "@fontsource/fira-mono";
+@import "./lib/styles/theme.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Nunito Sans Variable", sans-serif;
+  --font-mono: "Fira Mono", monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-positive: var(--positive);
+  --color-positive-foreground: var(--positive-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body {
+    @apply min-h-screen bg-background font-mono text-foreground;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+    color: var(--foreground);
+  }
+
+  button {
+    @apply cursor-pointer disabled:cursor-not-allowed;
+  }
+}
+
+@layer components {
+  .auth-form {
+    @apply p-6 md:p-8;
+  }
+
+  .auth-field {
+    @apply w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50;
+  }
+
+  .auth-btn {
+    @apply rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50;
+  }
+
+  .auth-btn-secondary {
+    @apply w-full rounded border border-border bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .auth-error {
+    @apply mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive;
+  }
+
+  .auth-notice {
+    @apply mb-4 rounded-md border border-accent/35 bg-accent/10 p-4 text-sm text-foreground;
+  }
+}

@@ -13,6 +13,7 @@
   import AppNav from "$lib/components/app-nav.svelte";
   import AppSettings from "$lib/components/app-settings.svelte";
   import CategoryTrendChart from "$lib/components/category-trend-chart.svelte";
+  import BillingPanel from "$lib/components/billing-panel.svelte";
   import DashboardWidgetPicker from "$lib/components/dashboard-widget-picker.svelte";
   import IncomeExpenseBars from "$lib/components/income-expense-bars.svelte";
   import MeterBar from "$lib/components/meter-bar.svelte";
@@ -129,6 +130,10 @@
   );
 
   const showGoalsRow = $derived(isDashboardWidgetEnabled(data.enabledWidgets, "budgets") || isDashboardWidgetEnabled(data.enabledWidgets, "goals"));
+
+  const showBillingRow = $derived(
+    isDashboardWidgetEnabled(data.enabledWidgets, "monthly-bills") || isDashboardWidgetEnabled(data.enabledWidgets, "yearly-bills")
+  );
 </script>
 
 <svelte:head><title>Dashboards · Chhan Chhan</title></svelte:head>
@@ -424,6 +429,24 @@
   </section>
 {/if}
 
+{#if showBillingRow}
+  <section class="dash-grid dash-grid-billing">
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "monthly-bills")}
+      <article class="dash-panel">
+        <h2>Monthly bills · {data.monthlyBillsLabel.toLowerCase()}</h2>
+        <BillingPanel categories={data.monthlyBills} currencyCode={data.account.currencyCode} mode="monthly" periodLabel={data.monthlyBillsLabel} />
+      </article>
+    {/if}
+
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "yearly-bills")}
+      <article class="dash-panel dash-panel-wide">
+        <h2>Yearly bills · {data.billingYear}</h2>
+        <BillingPanel categories={data.yearlyBills} currencyCode={data.account.currencyCode} mode="yearly" periodLabel={String(data.billingYear)} />
+      </article>
+    {/if}
+  </section>
+{/if}
+
 <style>
   .balance-card {
     display: flex;
@@ -583,6 +606,10 @@
   }
 
   .dash-grid-spending {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dash-grid-billing {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

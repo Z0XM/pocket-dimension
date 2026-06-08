@@ -9,9 +9,11 @@ export type DashboardWidgetId =
   | "category-trend"
   | "income-expense"
   | "budgets"
-  | "goals";
+  | "goals"
+  | "monthly-bills"
+  | "yearly-bills";
 
-export type DashboardWidgetCategory = "summary" | "spending" | "trends" | "goals";
+export type DashboardWidgetCategory = "summary" | "spending" | "trends" | "goals" | "billing";
 
 export type DashboardWidgetDefinition = {
   id: DashboardWidgetId;
@@ -86,6 +88,18 @@ export const DASHBOARD_WIDGET_CATALOG: DashboardWidgetDefinition[] = [
     label: "Goals",
     description: "Savings goal progress meters",
     category: "goals",
+  },
+  {
+    id: "monthly-bills",
+    label: "Monthly bills",
+    description: "Bill-category merchants grouped by category for the selected month",
+    category: "billing",
+  },
+  {
+    id: "yearly-bills",
+    label: "Yearly bills",
+    description: "Bill-category merchants with monthly breakdown for the year",
+    category: "billing",
   },
 ];
 

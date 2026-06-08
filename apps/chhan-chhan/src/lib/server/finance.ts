@@ -1,4 +1,5 @@
 import { normalizeMerchant, rankFuzzyMerchants } from "$lib/finance/merchant-match";
+import { billCategorySqlFilter } from "$lib/finance/bill-categories";
 import { parseSqlMinor } from "$lib/finance/money";
 import { isRefundCategoryName } from "$lib/finance/refunds";
 import { buildSummarySearchFilterSql, buildTransactionSearchCondition } from "$lib/finance/transaction-search";
@@ -1539,6 +1540,76 @@ export async function getGroupSpend(accountId: string, selection: SummarySelecti
   `);
 
   return result.rows as Array<{ group_name: string; color_hex: string | null; amount_minor: number }>;
+}
+
+export async function getCategoryMerchantBills(accountId: string, selection: SummarySelection) {
+  const filters = summaryTransactionFilters(selection);
+
+  const result = await db.execute(sql`
+    select
+      t.category_id,
+      c.name as category_name,
+      c.color_hex as category_color,
+      coalesce(nullif(trim(t.merchant), ''), 'Unknown') as merchant_name,
+      to_char(date_trunc('month', t.occurred_on), 'YYYY-MM') as month_key,
+      coalesce(sum(t.amount_minor), 0)::bigint as amount_minor,
+      count(*)::int as txn_count
+    from chhanchhan.finance_transactions t
+    inner join chhanchhan.finance_categories c on c.id = t.category_id
+    left join chhanchhan.finance_categories parent on parent.id = c.parent_category_id
+    where t.account_id = ${accountId}
+      and t.type = 'expense'
+      and ${billCategorySqlFilter()}
+      and ${filters.dateFilter}
+      and ${filters.groupFilter}
+      and ${filters.searchFilter}
+      and ${filters.categoryFilter}
+      and ${filters.tagFilter}
+    group by t.category_id, c.name, c.color_hex, merchant_name, month_key
+    order by category_name asc, merchant_name asc, month_key asc
+  `);
+
+  return result.rows as Array<{
+    category_id: string | null;
+    category_name: string;
+    category_color: string | null;
+    merchant_name: string;
+    month_key: string;
+    amount_minor: number;
+    txn_count: number;
+  }>;
+}
+
+export async function getCategoryMerchantBillsForYear(accountId: string, year: number) {
+  const result = await db.execute(sql`
+    select
+      t.category_id,
+      c.name as category_name,
+      c.color_hex as category_color,
+      coalesce(nullif(trim(t.merchant), ''), 'Unknown') as merchant_name,
+      to_char(date_trunc('month', t.occurred_on), 'YYYY-MM') as month_key,
+      coalesce(sum(t.amount_minor), 0)::bigint as amount_minor,
+      count(*)::int as txn_count
+    from chhanchhan.finance_transactions t
+    inner join chhanchhan.finance_categories c on c.id = t.category_id
+    left join chhanchhan.finance_categories parent on parent.id = c.parent_category_id
+    where t.account_id = ${accountId}
+      and t.type = 'expense'
+      and ${billCategorySqlFilter()}
+      and extract(year from t.occurred_on) = ${year}
+    group by t.category_id, c.name, c.color_hex, merchant_name, month_key
+    order by category_name asc, merchant_name asc, month_key asc
+  `);
+
+  return result.rows as Array<{
+    category_id: string | null;
+    category_name: string;
+    category_color: string | null;
+    merchant_name: string;
+    month_key: string;
+    amount_minor: number;
+    txn_count: number;
+  }>;
 }
 
 export async function getMonthlyTrend(accountId: string, monthCount = 12) {

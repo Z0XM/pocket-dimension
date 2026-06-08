@@ -1,5 +1,7 @@
 import {
   getAnalytics,
+  getCategoryMerchantBills,
+  getCategoryMerchantBillsForYear,
   getCategorySpend,
   getCategoryTrend,
   getCurrentBalance,
@@ -10,6 +12,7 @@ import {
   getTransactionSummary,
   listTransactionPeriods,
 } from "$lib/server/finance";
+import { buildBillingByCategory, resolveBillingMonthKey, resolveBillingYear } from "$lib/finance/billing";
 import {
   buildCategoryTrendChart,
   isDashboardWidgetEnabled,
@@ -26,6 +29,7 @@ import {
   parseSummaryPeriod,
   resolveMonthKey,
   resolveYearValue,
+  formatMonthKeyShort,
 } from "$lib/finance/summary";
 import type { PageServerLoad } from "./$types";
 
@@ -50,7 +54,10 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const needsIncomeExpense = isDashboardWidgetEnabled(enabledWidgets, "income-expense");
   const needsBudgets = isDashboardWidgetEnabled(enabledWidgets, "budgets");
   const needsGoals = isDashboardWidgetEnabled(enabledWidgets, "goals");
+  const needsMonthlyBills = isDashboardWidgetEnabled(enabledWidgets, "monthly-bills");
+  const needsYearlyBills = isDashboardWidgetEnabled(enabledWidgets, "yearly-bills");
   const needsAnalytics = needsSummaryMonth || needsSummaryAll || needsBudgets || needsGoals;
+  const billingYear = resolveBillingYear(summarySelection, summaryYears);
 
   const [
     analytics,
@@ -62,6 +69,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     groupSpendRows,
     monthlyTrendRows,
     categoryTrendRows,
+    monthlyBillRows,
+    yearlyBillRows,
   ] = await Promise.all([
     needsAnalytics ? getAnalytics(account.id) : Promise.resolve(null),
     getTransactionSummary(account.id, summarySelection),
@@ -72,6 +81,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     needsGroupSpend ? getGroupSpend(account.id, summarySelection) : Promise.resolve([]),
     needsMonthlyTrend ? getMonthlyTrend(account.id, 12) : Promise.resolve([]),
     needsCategoryTrend ? getCategoryTrend(account.id, 12) : Promise.resolve([]),
+    needsMonthlyBills ? getCategoryMerchantBills(account.id, summarySelection) : Promise.resolve([]),
+    needsYearlyBills ? getCategoryMerchantBillsForYear(account.id, billingYear) : Promise.resolve([]),
   ]);
 
   const savingsRate = summary.incomeMinor > 0 ? summary.netMinor / summary.incomeMinor : 0;
@@ -133,6 +144,12 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       )
     : [];
 
+  const billingMonthKey = resolveBillingMonthKey(summarySelection);
+  const monthlyBills = needsMonthlyBills ? buildBillingByCategory(monthlyBillRows, { monthKey: billingMonthKey }) : [];
+  const yearlyBills = needsYearlyBills ? buildBillingByCategory(yearlyBillRows) : [];
+  const monthlyBillsLabel =
+    summarySelection.period === "month" && summarySelection.month ? formatMonthKeyShort(summarySelection.month) : getSummaryLabel(summarySelection);
+
   return {
     account,
     enabledWidgets,
@@ -156,5 +173,9 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     monthly: needsSummaryMonth && analytics ? analytics.monthly : null,
     allTime: needsSummaryAll && analytics ? analytics.allTime : null,
     showIncomeExpense: needsIncomeExpense,
+    monthlyBills,
+    yearlyBills,
+    billingYear,
+    monthlyBillsLabel,
   };
 };
