@@ -1,0 +1,9 @@
+**/node_modules
+**/.svelte-kit
+**/.turbo
+**/build
+.git
+.env
+.env.*
+!.env.example
+.cursor
