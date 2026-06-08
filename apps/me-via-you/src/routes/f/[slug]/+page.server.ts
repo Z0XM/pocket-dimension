@@ -11,8 +11,14 @@ export const load: PageServerLoad = async ({ params }) => {
     error(404, "Form not found.");
   }
 
+  const ownerUsername = await getUsernameByUserId(form.userId);
+  if (!ownerUsername) {
+    error(404, "Form not found.");
+  }
+
   return {
     form,
+    ownerUsername,
     closed: !isFormAcceptingResponses(form),
   };
 };

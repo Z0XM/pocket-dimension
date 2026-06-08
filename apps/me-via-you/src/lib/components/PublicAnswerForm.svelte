@@ -7,16 +7,18 @@
   import { Textarea } from "$lib/components/ui/textarea";
   import OptionalFieldSection from "$lib/components/OptionalFieldSection.svelte";
   import { MAX_ANSWERS_PER_SUBMIT, type AnswerDraft } from "$lib/form-utils";
+  import { userHomePath } from "$lib/paths";
   import { countWords, PRIMARY_ANSWER_MAX_WORDS, PRIMARY_ANSWER_TARGET_WORDS } from "$lib/word-count";
   import { Plus, X } from "@lucide/svelte";
 
   type Props = {
     question: string;
+    ownerUsername: string;
     closed: boolean;
     form?: HTMLFormElement;
   };
 
-  let { question, closed, form = $bindable() }: Props = $props();
+  let { question, ownerUsername, closed, form = $bindable() }: Props = $props();
 
   let primaryAnswer = $state("");
   let respondentName = $state("");
@@ -90,6 +92,10 @@
 <div class="space-y-8">
   <header class="space-y-3 text-center">
     <p class="text-xs uppercase tracking-[0.2em] text-accent">Answer for a cookie</p>
+    <p class="text-sm text-muted-foreground">
+      For
+      <a href={userHomePath(ownerUsername)} class="font-medium text-accent hover:underline">@{ownerUsername}</a>
+    </p>
     <h1 class="text-2xl font-semibold leading-snug text-foreground">{question}</h1>
   </header>
 
