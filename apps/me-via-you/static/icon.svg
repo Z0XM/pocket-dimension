@@ -15,8 +15,8 @@
 <stop offset="1" stop-color="#3F0015"/>
 </linearGradient>
 <linearGradient id="paint1_linear_163_4" x1="932" y1="500" x2="932" y2="1192" gradientUnits="userSpaceOnUse">
-<stop stop-color="#A50036"/>
-<stop offset="1" stop-color="#3F0015"/>
+<stop stop-color="#5D0EC0"/>
+<stop offset="1" stop-color="#2C075A"/>
 </linearGradient>
 <clipPath id="clip0_163_4">
 <rect width="1000" height="1000" fill="white"/>
