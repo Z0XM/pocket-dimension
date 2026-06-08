@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "./scripts/turbo-no-prefix.sh run build",
+    "build": "./scripts/turbo-no-prefix.sh run build --concurrency=1",
     "dev": "./scripts/turbo-no-prefix.sh run dev",
     "build:shared:auth": "./scripts/turbo-no-prefix.sh run build --filter=@pocket-dimension/auth",
     "build:shared:db": "./scripts/turbo-no-prefix.sh run build --filter=@pocket-dimension/db",
@@ -28,7 +28,7 @@
     "lint": "./scripts/turbo-no-prefix.sh run lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "turbo run typecheck --concurrency=1",
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
     "changeset": "changeset",
@@ -59,6 +59,9 @@
     "shared/**",
     "scripts/**"
   ],
+  "overrides": {
+    "kysely": "0.28.17"
+  },
   "dependencies": {
     "@elysiajs/cors": "^1.4.0",
     "better-auth": "^1.4.9",
