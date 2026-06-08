@@ -1,4 +1,4 @@
-import { parseAnswerInput, submitAnswer } from "$lib/server/answers";
+import { parseAnswersInput, submitAnswers } from "$lib/server/answers";
 import { getFormBySlug, isFormAcceptingResponses } from "$lib/server/forms";
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
@@ -29,12 +29,12 @@ export const actions: Actions = {
     const formData = await request.formData();
 
     try {
-      const input = parseAnswerInput(formData);
-      await submitAnswer(form.id, input);
-      return { success: true };
+      const inputs = parseAnswersInput(formData);
+      const answers = await submitAnswers(form.id, inputs);
+      return { success: true, count: answers.length };
     } catch (error) {
       return fail(400, {
-        error: error instanceof Error ? error.message : "Could not submit answer.",
+        error: error instanceof Error ? error.message : "Could not submit answers.",
       });
     }
   },

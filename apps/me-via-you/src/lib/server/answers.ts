@@ -1,9 +1,12 @@
 import { db, schema } from "@pocket-dimension/db";
 import { desc, eq, inArray, and } from "drizzle-orm";
+import { MAX_ANSWERS_PER_SUBMIT, type AnswerDraft } from "$lib/form-utils";
 import { dedupeAnswers } from "$lib/server/dedupe";
 import type { FormRow } from "$lib/server/forms";
 import type { FormWithPreview } from "$lib/types";
 import { validatePrimaryAnswer } from "$lib/server/validation";
+
+export { MAX_ANSWERS_PER_SUBMIT, type AnswerDraft };
 
 export type AnswerRow = typeof schema.answers.$inferSelect;
 
@@ -16,24 +19,39 @@ export type AnswerInput = {
 };
 
 export async function submitAnswer(formId: string, input: AnswerInput) {
-  const validation = validatePrimaryAnswer(input.primaryAnswer);
-  if (!validation.ok) {
-    throw new Error(validation.error);
+  const [answer] = await submitAnswers(formId, [input]);
+  return answer;
+}
+
+export async function submitAnswers(formId: string, inputs: AnswerInput[]) {
+  if (inputs.length === 0) {
+    throw new Error("At least one answer is required.");
   }
 
-  const [answer] = await db
-    .insert(schema.answers)
-    .values({
-      formId,
-      primaryAnswer: input.primaryAnswer.trim(),
-      expandDetail: input.expandDetail ?? null,
-      notes: input.notes ?? null,
-      respondentName: input.isAnonymous ? null : (input.respondentName?.trim() ?? null),
-      isAnonymous: input.isAnonymous,
-    })
-    .returning();
+  if (inputs.length > MAX_ANSWERS_PER_SUBMIT) {
+    throw new Error(`You can submit up to ${MAX_ANSWERS_PER_SUBMIT} answers at a time.`);
+  }
 
-  return answer;
+  for (const input of inputs) {
+    const validation = validatePrimaryAnswer(input.primaryAnswer);
+    if (!validation.ok) {
+      throw new Error(validation.error);
+    }
+  }
+
+  return db
+    .insert(schema.answers)
+    .values(
+      inputs.map((input) => ({
+        formId,
+        primaryAnswer: input.primaryAnswer.trim(),
+        expandDetail: input.expandDetail ?? null,
+        notes: input.notes ?? null,
+        respondentName: input.isAnonymous ? null : (input.respondentName?.trim() ?? null),
+        isAnonymous: input.isAnonymous,
+      }))
+    )
+    .returning();
 }
 
 export async function listAnswersForForm(formId: string, limit?: number) {
@@ -109,18 +127,36 @@ export async function getFormsWithPreviews(forms: FormRow[], previewLimit = 3): 
   );
 }
 
-export function parseAnswerInput(formData: FormData): AnswerInput {
+export function parseAnswersInput(formData: FormData): AnswerInput[] {
   const isAnonymous = formData.get("isAnonymous") === "on" || formData.get("isAnonymous") === "true";
-  const primaryAnswer = String(formData.get("primaryAnswer") ?? "");
-  const expandDetail = String(formData.get("expandDetail") ?? "").trim() || null;
-  const notes = String(formData.get("notes") ?? "").trim() || null;
   const respondentName = String(formData.get("respondentName") ?? "").trim() || null;
 
-  return {
-    primaryAnswer,
-    expandDetail,
-    notes,
+  const answersJson = String(formData.get("answers") ?? "[]");
+  let drafts: AnswerDraft[];
+
+  try {
+    const parsed = JSON.parse(answersJson);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Invalid answer data.");
+    }
+    drafts = parsed;
+  } catch {
+    throw new Error("Invalid answer data.");
+  }
+
+  if (drafts.length === 0) {
+    throw new Error("At least one answer is required.");
+  }
+
+  if (drafts.length > MAX_ANSWERS_PER_SUBMIT) {
+    throw new Error(`You can submit up to ${MAX_ANSWERS_PER_SUBMIT} answers at a time.`);
+  }
+
+  return drafts.map((draft) => ({
+    primaryAnswer: String(draft.primaryAnswer ?? ""),
+    expandDetail: draft.expandDetail ? String(draft.expandDetail).trim() || null : null,
+    notes: draft.notes ? String(draft.notes).trim() || null : null,
     respondentName,
     isAnonymous,
-  };
+  }));
 }

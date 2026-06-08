@@ -6,7 +6,9 @@
   import { Switch } from "$lib/components/ui/switch";
   import { Textarea } from "$lib/components/ui/textarea";
   import OptionalFieldSection from "$lib/components/OptionalFieldSection.svelte";
+  import { MAX_ANSWERS_PER_SUBMIT, type AnswerDraft } from "$lib/form-utils";
   import { countWords, PRIMARY_ANSWER_MAX_WORDS, PRIMARY_ANSWER_TARGET_WORDS } from "$lib/word-count";
+  import { Plus, X } from "@lucide/svelte";
 
   type Props = {
     question: string;
@@ -23,24 +25,74 @@
   let notes = $state("");
   let showExpand = $state(false);
   let showNotes = $state(false);
-  let submitted = $state(false);
+  let drafts = $state<AnswerDraft[]>([]);
+  let submittedCount = $state(0);
   let error = $state("");
   let submitting = $state(false);
 
   const wordCount = $derived(countWords(primaryAnswer));
   const overTarget = $derived(wordCount > PRIMARY_ANSWER_TARGET_WORDS);
   const overMax = $derived(wordCount > PRIMARY_ANSWER_MAX_WORDS);
-  const canSubmit = $derived(!closed && !overMax && primaryAnswer.trim().length > 0 && !submitting);
+  const currentValid = $derived(!overMax && primaryAnswer.trim().length > 0);
+  const atAnswerLimit = $derived(submitCount >= MAX_ANSWERS_PER_SUBMIT);
+  const canAddAnother = $derived(!closed && currentValid && !submitting && drafts.length < MAX_ANSWERS_PER_SUBMIT - 1);
+  const answersToSubmit = $derived.by(() => {
+    const answers = [...drafts];
+    if (primaryAnswer.trim()) {
+      answers.push({
+        primaryAnswer,
+        expandDetail: expandDetail.trim() || null,
+        notes: notes.trim() || null,
+      });
+    }
+    return answers;
+  });
+  const submitCount = $derived(answersToSubmit.length);
+  const canSubmit = $derived(
+    !closed &&
+      !submitting &&
+      submitCount > 0 &&
+      submitCount <= MAX_ANSWERS_PER_SUBMIT &&
+      answersToSubmit.every((answer) => {
+        const words = countWords(answer.primaryAnswer);
+        return words > 0 && words <= PRIMARY_ANSWER_MAX_WORDS;
+      })
+  );
+  const answersJson = $derived(JSON.stringify(answersToSubmit));
 
-  function resetForm() {
+  function clearCurrentAnswer() {
     primaryAnswer = "";
-    respondentName = "";
-    isAnonymous = false;
     expandDetail = "";
     notes = "";
     showExpand = false;
     showNotes = false;
-    submitted = false;
+  }
+
+  function addAnotherAnswer() {
+    if (!currentValid || drafts.length >= MAX_ANSWERS_PER_SUBMIT - 1) return;
+
+    drafts = [
+      ...drafts,
+      {
+        primaryAnswer: primaryAnswer.trim(),
+        expandDetail: expandDetail.trim() || null,
+        notes: notes.trim() || null,
+      },
+    ];
+    clearCurrentAnswer();
+    error = "";
+  }
+
+  function removeDraft(index: number) {
+    drafts = drafts.filter((_, i) => i !== index);
+  }
+
+  function resetForm() {
+    drafts = [];
+    clearCurrentAnswer();
+    respondentName = "";
+    isAnonymous = false;
+    submittedCount = 0;
     error = "";
   }
 </script>
@@ -56,11 +108,13 @@
       <p class="text-foreground">This form is closed.</p>
       <p class="mt-2 text-sm text-muted-foreground">Thanks for stopping by — responses are no longer being collected.</p>
     </div>
-  {:else if submitted}
+  {:else if submittedCount > 0}
     <div class="space-y-4 rounded-lg border border-accent/30 bg-accent/5 px-4 py-6 text-center">
-      <p class="text-lg text-foreground">Thank you — your answer was sent.</p>
-      <p class="text-sm text-muted-foreground">Have another thought? You can add as many answers as you like.</p>
-      <Button type="button" variant="outline" onclick={resetForm}>Add another answer</Button>
+      <p class="text-lg text-foreground">
+        Thank you — your {submittedCount === 1 ? "answer was" : `${submittedCount} answers were`} sent.
+      </p>
+      <p class="text-sm text-muted-foreground">Have more to share? You can send up to {MAX_ANSWERS_PER_SUBMIT} answers at a time.</p>
+      <Button type="button" variant="outline" onclick={resetForm}>Add more answers</Button>
     </div>
   {:else}
     <form
@@ -78,23 +132,50 @@
             return;
           }
           if (result.type === "success") {
-            submitted = true;
+            submittedCount = (result.data?.count as number) ?? submitCount;
             await update({ reset: false });
           }
         };
       }}
     >
+      {#if drafts.length > 0}
+        <div class="space-y-2">
+          <p class="text-sm font-medium text-foreground">
+            {drafts.length}
+            {drafts.length === 1 ? "answer" : "answers"} ready to send
+            <span class="font-normal text-muted-foreground">({submitCount} / {MAX_ANSWERS_PER_SUBMIT} max)</span>
+          </p>
+          <ul class="space-y-2">
+            {#each drafts as draft, index (index)}
+              <li class="flex items-start gap-3 rounded-lg border border-border bg-background/40 px-3 py-2">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm text-foreground">{draft.primaryAnswer}</p>
+                  {#if draft.expandDetail}
+                    <p class="mt-1 text-xs text-muted-foreground">Expand: {draft.expandDetail}</p>
+                  {/if}
+                  {#if draft.notes}
+                    <p class="mt-1 text-xs text-muted-foreground">Notes: {draft.notes}</p>
+                  {/if}
+                </div>
+                <button
+                  type="button"
+                  class="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground"
+                  onclick={() => removeDraft(index)}
+                  aria-label="Remove answer {index + 1}"
+                >
+                  <X class="size-4" />
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+
       <div class="grid gap-2">
-        <Label for="primaryAnswer">Your answer</Label>
-        <Input
-          id="primaryAnswer"
-          name="primaryAnswer"
-          type="text"
-          bind:value={primaryAnswer}
-          placeholder="Keep it short and honest"
-          autocomplete="off"
-          required
-        />
+        <Label for="primaryAnswer">
+          {drafts.length > 0 ? "Another answer" : "Your answer"}
+        </Label>
+        <Input id="primaryAnswer" type="text" bind:value={primaryAnswer} placeholder="Keep it short and honest" autocomplete="off" />
         <div class="flex items-center justify-between text-xs">
           <span class="text-muted-foreground">{wordCount} / {PRIMARY_ANSWER_MAX_WORDS} words</span>
           {#if overTarget && !overMax}
@@ -130,20 +211,32 @@
       </div>
 
       <OptionalFieldSection bind:open={showExpand} title="Expand" hint="Use this if 3 words were not enough :)">
-        <Textarea id="expandDetail" name="expandDetail" rows={4} bind:value={expandDetail} placeholder="Tell them more about your answer…" />
+        <Textarea id="expandDetail" rows={4} bind:value={expandDetail} placeholder="Tell them more about your answer…" />
       </OptionalFieldSection>
 
       <OptionalFieldSection bind:open={showNotes} title="Notes" hint="Leave a note for your person!">
-        <Textarea id="notes" name="notes" rows={3} bind:value={notes} placeholder="Share anything else on your mind…" />
+        <Textarea id="notes" rows={3} bind:value={notes} placeholder="Share anything else on your mind…" />
       </OptionalFieldSection>
+
+      <input type="hidden" name="answers" value={answersJson} />
+
+      {#if atAnswerLimit && !error}
+        <p class="text-sm text-muted-foreground">You've reached the maximum of {MAX_ANSWERS_PER_SUBMIT} answers for this submission.</p>
+      {/if}
 
       {#if error}
         <p class="auth-error">{error}</p>
       {/if}
 
-      <Button type="submit" class="w-full" disabled={!canSubmit}>
-        {submitting ? "Sending…" : "Submit answer"}
-      </Button>
+      <div class="flex flex-col gap-3 sm:flex-row">
+        <Button type="button" variant="outline" class="sm:flex-1" disabled={!canAddAnother} onclick={addAnotherAnswer}>
+          <Plus class="size-4" />
+          Add another answer
+        </Button>
+        <Button type="submit" class="sm:flex-1" disabled={!canSubmit}>
+          {submitting ? "Sending…" : submitCount === 1 ? "Submit answer" : `Submit ${submitCount} answers`}
+        </Button>
+      </div>
     </form>
   {/if}
 </div>
