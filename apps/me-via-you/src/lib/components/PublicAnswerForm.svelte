@@ -26,7 +26,6 @@
   let showExpand = $state(false);
   let showNotes = $state(false);
   let drafts = $state<AnswerDraft[]>([]);
-  let submittedCount = $state(0);
   let error = $state("");
   let submitting = $state(false);
 
@@ -86,15 +85,6 @@
   function removeDraft(index: number) {
     drafts = drafts.filter((_, i) => i !== index);
   }
-
-  function resetForm() {
-    drafts = [];
-    clearCurrentAnswer();
-    respondentName = "";
-    isAnonymous = false;
-    submittedCount = 0;
-    error = "";
-  }
 </script>
 
 <div class="space-y-8">
@@ -107,14 +97,6 @@
     <div class="rounded-lg border border-border bg-background/60 px-4 py-6 text-center">
       <p class="text-foreground">This form is closed.</p>
       <p class="mt-2 text-sm text-muted-foreground">Thanks for stopping by — responses are no longer being collected.</p>
-    </div>
-  {:else if submittedCount > 0}
-    <div class="space-y-4 rounded-lg border border-accent/30 bg-accent/5 px-4 py-6 text-center">
-      <p class="text-lg text-foreground">
-        Thank you — your {submittedCount === 1 ? "answer was" : `${submittedCount} answers were`} sent.
-      </p>
-      <p class="text-sm text-muted-foreground">Have more to share? You can send up to {MAX_ANSWERS_PER_SUBMIT} answers at a time.</p>
-      <Button type="button" variant="outline" onclick={resetForm}>Add more answers</Button>
     </div>
   {:else}
     <form
@@ -131,10 +113,7 @@
             error = (result.data?.error as string) ?? "Something went wrong. Please try again.";
             return;
           }
-          if (result.type === "success") {
-            submittedCount = (result.data?.count as number) ?? submitCount;
-            await update({ reset: false });
-          }
+          await update();
         };
       }}
     >
@@ -214,7 +193,7 @@
         <Textarea id="expandDetail" rows={4} bind:value={expandDetail} placeholder="Tell them more about your answer…" />
       </OptionalFieldSection>
 
-      <OptionalFieldSection bind:open={showNotes} title="Notes" hint="Leave a note for your person!">
+      <OptionalFieldSection bind:open={showNotes} title="Notes" hint="Leave a private note for your person! <3">
         <Textarea id="notes" rows={3} bind:value={notes} placeholder="Share anything else on your mind…" />
       </OptionalFieldSection>
 

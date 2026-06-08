@@ -6,7 +6,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import type { FormClassification } from "$lib/form-utils";
-  import { X } from "@lucide/svelte";
+  import { CircleHelp, X } from "@lucide/svelte";
 
   type Props = {
     open: boolean;
@@ -20,6 +20,7 @@
   let classification = $state<FormClassification>("positive");
   let closesAt = $state("");
   let submitting = $state(false);
+  let classificationHelpOpen = $state(false);
 
   function closeSheet() {
     open = false;
@@ -114,7 +115,33 @@
           </div>
 
           <fieldset class="space-y-2">
-            <legend class="text-sm font-medium text-foreground">Classification</legend>
+            <legend class="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              Classification
+              <span
+                class="relative inline-flex"
+                onmouseenter={() => (classificationHelpOpen = true)}
+                onmouseleave={() => (classificationHelpOpen = false)}
+              >
+                <button
+                  type="button"
+                  class="inline-flex rounded-sm text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="What is classification?"
+                  aria-expanded={classificationHelpOpen}
+                >
+                  <CircleHelp class="size-3.5" aria-hidden="true" />
+                </button>
+                {#if classificationHelpOpen}
+                  <span class="absolute left-0 top-full z-30 block pt-1">
+                    <span
+                      class="block w-64 rounded-lg border border-border bg-popover p-2.5 text-xs leading-relaxed text-popover-foreground shadow-md"
+                      role="tooltip"
+                    >
+                      What aspect of you will the answers indicate ? Positive or Negative ? Or Is it just a general question ?
+                    </span>
+                  </span>
+                {/if}
+              </span>
+            </legend>
             <div class="flex flex-wrap gap-2">
               {#each ["positive", "negative", "general"] as value}
                 <label class="cursor-pointer">

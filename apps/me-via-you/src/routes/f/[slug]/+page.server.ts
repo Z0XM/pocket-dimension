@@ -1,6 +1,8 @@
 import { parseAnswersInput, submitAnswers } from "$lib/server/answers";
 import { getFormBySlug, isFormAcceptingResponses } from "$lib/server/forms";
-import { error, fail } from "@sveltejs/kit";
+import { userHomePath } from "$lib/paths";
+import { getUsernameByUserId } from "$lib/server/users";
+import { error, fail, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -30,12 +32,18 @@ export const actions: Actions = {
 
     try {
       const inputs = parseAnswersInput(formData);
-      const answers = await submitAnswers(form.id, inputs);
-      return { success: true, count: answers.length };
-    } catch (error) {
+      await submitAnswers(form.id, inputs);
+    } catch (submitError) {
       return fail(400, {
-        error: error instanceof Error ? error.message : "Could not submit answers.",
+        error: submitError instanceof Error ? submitError.message : "Could not submit answers.",
       });
     }
+
+    const username = await getUsernameByUserId(form.userId);
+    if (!username) {
+      return fail(500, { error: "Could not find the form owner." });
+    }
+
+    redirect(303, userHomePath(username));
   },
 };
