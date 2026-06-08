@@ -1,10 +1,17 @@
 # syntax=docker/dockerfile:1
+#
+# Monorepo build — Dokploy settings:
+#   Build path (root directory): /
+#   Dockerfile path: apps/me-via-you/Dockerfile
+#   Docker context path: /          <-- required; do not use apps/me-via-you
+#
+# Equivalent local build from repo root:
+#   docker build -f apps/me-via-you/Dockerfile .
 
 FROM oven/bun:1.3.5 AS builder
 WORKDIR /app
 
 COPY package.json bun.lock turbo.json ./
-COPY scripts/turbo-no-prefix.sh scripts/
 COPY scripts/package.json scripts/
 COPY apps/me-via-you/package.json apps/me-via-you/
 COPY shared/auth/package.json shared/auth/
@@ -23,9 +30,8 @@ RUN bun install --frozen-lockfile
 
 COPY apps/me-via-you apps/me-via-you
 COPY shared shared
-COPY scripts scripts
 
-RUN bun build:app:me-via-you
+RUN bunx turbo run build --filter=@pocket-dimension/me-via-you
 
 FROM oven/bun:1.3.5-slim AS runner
 WORKDIR /app
