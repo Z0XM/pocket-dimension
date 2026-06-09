@@ -6,6 +6,10 @@ export function userFormPath(username: string, formId: string): string {
   return `/u/${username}/forms/${formId}`;
 }
 
+export function publicFormPath(slug: string): string {
+  return `/f/${slug}`;
+}
+
 export function userHomePathOrLogin(username: string | null | undefined): string {
   return username ? userHomePath(username) : "/login";
 }

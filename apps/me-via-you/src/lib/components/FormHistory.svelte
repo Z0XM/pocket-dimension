@@ -2,9 +2,9 @@
   import { goto } from "$app/navigation";
   import AnswerCard from "$lib/components/AnswerCard.svelte";
   import { classificationLabel } from "$lib/form-utils";
-  import { userFormPath } from "$lib/paths";
+  import { publicFormPath, userFormPath } from "$lib/paths";
   import type { FormWithPreview } from "$lib/types";
-  import { Copy, Expand, Eye, EyeOff, Lock } from "@lucide/svelte";
+  import { Copy, Expand, Eye, EyeOff, Lock, PenLine } from "@lucide/svelte";
 
   type Props = {
     forms: FormWithPreview[];
@@ -69,6 +69,21 @@
             </div>
 
             <div class="flex shrink-0 items-center gap-1">
+              {#if !isOwner && form.status === "active"}
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90"
+                  title="Add your answer"
+                  onclick={(event) => {
+                    event.preventDefault();
+                    goto(publicFormPath(form.publicSlug));
+                  }}
+                >
+                  <PenLine size={14} aria-hidden="true" />
+                  Add answer
+                </button>
+              {/if}
+
               {#if isOwner}
                 <form method="POST" action="?/toggleFormVisibility">
                   <input type="hidden" name="formId" value={form.id} />
