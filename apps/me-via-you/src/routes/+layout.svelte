@@ -3,10 +3,13 @@
   import { onMount } from "svelte";
   import icon from "$lib/assets/icon.svg";
   import { authClient } from "$lib/auth-client";
+  import { applyThemeMode, getThemeMode } from "$lib/theme-mode";
 
   const { children } = $props();
 
   onMount(() => {
+    applyThemeMode(getThemeMode());
+
     const session = authClient.useSession();
     const unsubSession = session.subscribe(() => {});
 

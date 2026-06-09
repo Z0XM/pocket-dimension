@@ -7,6 +7,36 @@
  */
 
 :root {
+  color-scheme: light;
+
+  --background: #f9f4ea;
+  --foreground: #241c14;
+  --card: #fffdf7;
+  --card-foreground: #241c14;
+  --primary: #a50036;
+  --primary-foreground: #ffffff;
+  --secondary: #f1e8d8;
+  --secondary-foreground: #241c14;
+  --muted: #efe6d6;
+  --muted-foreground: color-mix(in srgb, #241c14 50%, #f9f4ea);
+  --accent: #5d0ec0;
+  --accent-foreground: #ffffff;
+  --positive: #0e7a36;
+  --positive-foreground: #ffffff;
+  --border: color-mix(in srgb, #a50036 10%, color-mix(in srgb, #5d0ec0 8%, #f9f4ea));
+  --ring: #a50036;
+  --input: #fffdf7;
+  --popover: #fffdf7;
+  --popover-foreground: #241c14;
+  --destructive: #d93a3f;
+  --destructive-foreground: #ffffff;
+  --danger: #d93a3f;
+  --success: #16a34a;
+}
+
+.dark {
+  color-scheme: dark;
+
   --background: #060b0f;
   --foreground: #e8e4f0;
   --card: #0a1016;

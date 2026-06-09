@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import AnswerCard from "$lib/components/AnswerCard.svelte";
+  import ThemeToggle from "$lib/components/ThemeToggle.svelte";
   import { classificationLabel } from "$lib/form-utils";
   import { userHomePath } from "$lib/paths";
   import { ArrowLeft, Copy, Lock } from "@lucide/svelte";
@@ -27,6 +28,8 @@
     </button>
 
     <div class="flex items-center gap-2">
+      <ThemeToggle />
+
       {#if data.publicUrl}
         <button
           type="button"

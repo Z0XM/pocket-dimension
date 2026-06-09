@@ -1,5 +1,6 @@
 <script lang="ts">
   import PublicAnswerForm from "$lib/components/PublicAnswerForm.svelte";
+  import ThemeToggle from "$lib/components/ThemeToggle.svelte";
 
   const { data } = $props();
 </script>
@@ -9,6 +10,9 @@
 </svelte:head>
 
 <main class="mx-auto min-h-svh max-w-xl px-6 py-12">
+  <div class="mb-6 flex justify-end">
+    <ThemeToggle />
+  </div>
   {#if data.form}
     <PublicAnswerForm question={data.form.question} owner={data.owner} closed={data.closed} />
   {:else}

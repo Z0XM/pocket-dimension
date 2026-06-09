@@ -3,6 +3,7 @@
   import CreateFormSheet from "$lib/components/CreateFormSheet.svelte";
   import FormHero from "$lib/components/FormHero.svelte";
   import FormHistory from "$lib/components/FormHistory.svelte";
+  import ThemeToggle from "$lib/components/ThemeToggle.svelte";
   import { authClient } from "$lib/auth-client";
   import { LogOut, Plus } from "@lucide/svelte";
 
@@ -34,8 +35,8 @@
     <p class="text-sm text-accent">@{data.profileUser.username}</p>
   </div>
 
-  {#if data.isOwner}
-    <div class="flex items-center gap-2">
+  <div class="flex items-center gap-2">
+    {#if data.isOwner}
       <button
         type="button"
         class="inline-flex items-center gap-2 rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90"
@@ -47,7 +48,11 @@
         <Plus size={14} aria-hidden="true" />
         New Form
       </button>
+    {/if}
 
+    <ThemeToggle />
+
+    {#if data.isOwner}
       <button
         type="button"
         class="inline-flex items-center gap-2 rounded border border-accent/40 px-3 py-1.5 text-sm text-accent hover:bg-accent/10 disabled:opacity-50"
@@ -57,8 +62,8 @@
         <LogOut size={14} aria-hidden="true" />
         {signingOut ? "Signing out…" : "Sign out"}
       </button>
-    </div>
-  {/if}
+    {/if}
+  </div>
 </header>
 
 <main class="mx-auto max-w-4xl space-y-12 px-6 py-10">
