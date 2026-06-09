@@ -1,6 +1,6 @@
 <script lang="ts">
   import PublicAnswerForm from "$lib/components/PublicAnswerForm.svelte";
-  import ThemeToggle from "$lib/components/ThemeToggle.svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
 
   const { data } = $props();
 </script>
@@ -9,10 +9,9 @@
   <title>{data.form?.question ?? "Form"} · {data.owner?.displayName ?? "User"} · Me Via You</title>
 </svelte:head>
 
-<main class="mx-auto min-h-svh max-w-xl px-6 py-12">
-  <div class="mb-6 flex justify-end">
-    <ThemeToggle />
-  </div>
+<SiteHeader subtitle={data.owner ? `@${data.owner.username}` : undefined} currentUsername={data.owner?.username} viewer={data.user} />
+
+<main class="mx-auto max-w-xl px-6 py-12">
   {#if data.form}
     <PublicAnswerForm question={data.form.question} owner={data.owner} closed={data.closed} />
   {:else}

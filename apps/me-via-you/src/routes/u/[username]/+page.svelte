@@ -3,7 +3,7 @@
   import CreateFormSheet from "$lib/components/CreateFormSheet.svelte";
   import FormHero from "$lib/components/FormHero.svelte";
   import FormHistory from "$lib/components/FormHistory.svelte";
-  import ThemeToggle from "$lib/components/ThemeToggle.svelte";
+  import SiteHeader from "$lib/components/SiteHeader.svelte";
   import { authClient } from "$lib/auth-client";
   import { LogOut, Plus } from "@lucide/svelte";
 
@@ -29,13 +29,8 @@
   <title>@{data.profileUser.username} · Me Via You</title>
 </svelte:head>
 
-<header class="flex items-center justify-between border-b border-border px-6 py-4">
-  <div>
-    <h1 class="text-lg font-bold tracking-wide">Me Via You</h1>
-    <p class="text-sm text-accent">@{data.profileUser.username}</p>
-  </div>
-
-  <div class="flex items-center gap-2">
+<SiteHeader subtitle="@{data.profileUser.username}" currentUsername={data.profileUser.username} viewer={data.user}>
+  {#snippet leadingActions()}
     {#if data.isOwner}
       <button
         type="button"
@@ -49,22 +44,23 @@
         New Form
       </button>
     {/if}
+  {/snippet}
 
-    <ThemeToggle />
-
+  {#snippet trailingActions()}
     {#if data.isOwner}
       <button
         type="button"
-        class="inline-flex items-center gap-2 rounded border border-accent/40 px-3 py-1.5 text-sm text-accent hover:bg-accent/10 disabled:opacity-50"
+        class="inline-flex items-center gap-2 rounded border border-accent/40 p-2 text-sm text-accent hover:bg-accent/10 disabled:opacity-50 sm:px-3 sm:py-1.5"
+        aria-label={signingOut ? "Signing out" : "Sign out"}
         onclick={signOut}
         disabled={signingOut}
       >
         <LogOut size={14} aria-hidden="true" />
-        {signingOut ? "Signing out…" : "Sign out"}
+        <span class="hidden sm:inline">{signingOut ? "Signing out…" : "Sign out"}</span>
       </button>
     {/if}
-  </div>
-</header>
+  {/snippet}
+</SiteHeader>
 
 <main class="mx-auto max-w-4xl space-y-12 px-6 py-10">
   <section class="space-y-4">
