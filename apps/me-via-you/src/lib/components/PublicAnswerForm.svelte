@@ -6,19 +6,19 @@
   import { Switch } from "$lib/components/ui/switch";
   import { Textarea } from "$lib/components/ui/textarea";
   import OptionalFieldSection from "$lib/components/OptionalFieldSection.svelte";
-  import { MAX_ANSWERS_PER_SUBMIT, type AnswerDraft } from "$lib/form-utils";
+  import { MAX_ANSWERS_PER_SUBMIT, type AnswerDraft, type PublicUserProfile } from "$lib/form-utils";
   import { userHomePath } from "$lib/paths";
   import { countWords, PRIMARY_ANSWER_MAX_WORDS, PRIMARY_ANSWER_TARGET_WORDS } from "$lib/word-count";
   import { Plus, X } from "@lucide/svelte";
 
   type Props = {
     question: string;
-    ownerUsername: string;
+    owner: PublicUserProfile;
     closed: boolean;
     form?: HTMLFormElement;
   };
 
-  let { question, ownerUsername, closed, form = $bindable() }: Props = $props();
+  let { question, owner, closed, form = $bindable() }: Props = $props();
 
   let primaryAnswer = $state("");
   let respondentName = $state("");
@@ -92,9 +92,15 @@
 <div class="space-y-8">
   <header class="space-y-3 text-center">
     <p class="text-xs uppercase tracking-[0.2em] text-accent">Answer for a cookie</p>
-    <p class="text-sm text-muted-foreground">
+    <p class="text-base text-muted-foreground">
       For
-      <a href={userHomePath(ownerUsername)} class="font-medium text-accent hover:underline">@{ownerUsername}</a>
+      <a
+        href={userHomePath(owner.username)}
+        class="inline-flex flex-wrap items-baseline justify-center gap-x-1.5 font-semibold text-primary hover:underline"
+      >
+        <span class="text-lg">{owner.displayName}</span>
+        <span class="text-base">@{owner.username}</span>
+      </a>
     </p>
     <h1 class="text-2xl font-semibold leading-snug text-foreground">{question}</h1>
   </header>
@@ -123,6 +129,14 @@
         };
       }}
     >
+      <div class="rounded-lg border border-primary/25 bg-primary/5 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+        <p>
+          <span class="font-medium text-foreground">Public:</span>
+          your answer, name, and expand details will be visible on
+          <span class="font-medium text-primary">{owner.displayName}</span>'s profile. Notes stay private.
+        </p>
+      </div>
+
       {#if drafts.length > 0}
         <div class="space-y-2">
           <p class="text-sm font-medium text-foreground">
@@ -160,6 +174,7 @@
         <Label for="primaryAnswer">
           {drafts.length > 0 ? "Another answer" : "Your answer"}
         </Label>
+        <p class="text-xs text-muted-foreground">Public — shown on their profile.</p>
         <Input id="primaryAnswer" type="text" bind:value={primaryAnswer} placeholder="Keep it short and honest" autocomplete="off" />
         <div class="flex items-center justify-between text-xs">
           <span class="text-muted-foreground">{wordCount} / {PRIMARY_ANSWER_MAX_WORDS} words</span>
@@ -174,6 +189,7 @@
 
       <div class="grid gap-2">
         <Label for="respondentName">Your name (optional)</Label>
+        <p class="text-xs text-muted-foreground">Public — unless you stay anonymous.</p>
         <Input
           id="respondentName"
           name="respondentName"
@@ -195,7 +211,7 @@
         <input type="hidden" name="isAnonymous" value={isAnonymous ? "true" : "false"} />
       </div>
 
-      <OptionalFieldSection bind:open={showExpand} title="Expand" hint="Use this if 3 words were not enough :)">
+      <OptionalFieldSection bind:open={showExpand} title="Expand" hint="Use this if 3 words were not enough :) — public on their profile">
         <Textarea id="expandDetail" rows={4} bind:value={expandDetail} placeholder="Tell them more about your answer…" />
       </OptionalFieldSection>
 

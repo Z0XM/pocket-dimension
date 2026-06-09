@@ -1,16 +1,30 @@
 import { db, schema } from "@pocket-dimension/db";
+import type { PublicUserProfile } from "$lib/form-utils";
 import { eq } from "drizzle-orm";
 
-export async function getUsernameByUserId(userId: string) {
+export type { PublicUserProfile };
+
+export async function getPublicProfileByUserId(userId: string): Promise<PublicUserProfile | null> {
   const [user] = await db
     .select({
       username: schema.user.username,
+      displayName: schema.user.name,
     })
     .from(schema.user)
     .where(eq(schema.user.id, userId))
     .limit(1);
 
-  return user?.username ?? null;
+  if (!user?.username) return null;
+
+  return {
+    username: user.username,
+    displayName: user.displayName,
+  };
+}
+
+export async function getUsernameByUserId(userId: string) {
+  const profile = await getPublicProfileByUserId(userId);
+  return profile?.username ?? null;
 }
 
 export async function getUserByUsername(username: string) {

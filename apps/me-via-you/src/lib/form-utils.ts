@@ -1,5 +1,10 @@
 export const MAX_ANSWERS_PER_SUBMIT = 10;
 
+export type PublicUserProfile = {
+  username: string;
+  displayName: string;
+};
+
 export type AnswerDraft = {
   primaryAnswer: string;
   expandDetail?: string | null;
