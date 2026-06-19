@@ -1,3 +1,5 @@
+import { parseIndianAmount } from "$lib/finance/money";
+
 const MONTHS: Record<string, string> = {
   Jan: "01",
   Feb: "02",
@@ -83,6 +85,36 @@ export function extractKotakExternalRef(description: string): {
   };
 }
 
+/** Kotak monthly PDFs (Account # header, txn time, signed debit/credit column). */
+export function isKotakMonthlyPdf(text: string): boolean {
+  return /#\s*TRANSACTION\s+DATE\s+VALUE\s+DATE/i.test(text) || (/Account\s#/i.test(text) && /\d{1,2}:\d{2}\s+(?:AM|PM)/i.test(text));
+}
+
+/** Monthly Kotak PDFs repeat page headers and use a lowercase "Statement generated on" footer. */
+export function stripKotakMonthlyPdfChunkFooter(chunk: string): string {
+  const footerPatterns = [/\sStatement generated on/i, /\sPage \d+ of\d+/i, /\sMUKUL SINGH Account Statement/i, /\s# TRANSACTION DATE VALUE DATE/i];
+
+  let end = chunk.length;
+  for (const pattern of footerPatterns) {
+    const match = chunk.match(pattern);
+    if (match?.index != null && match.index > 0) {
+      end = Math.min(end, match.index);
+    }
+  }
+
+  return chunk.slice(0, end).trim();
+}
+
+export function parseSignedIndianAmount(raw: string): {
+  amountMinor: number;
+  type: "income" | "expense";
+} {
+  const trimmed = raw.trim();
+  const type = trimmed.startsWith("+") ? "income" : "expense";
+  const amountMinor = parseIndianAmount(trimmed.replace(/^[+-]/, ""));
+  return { amountMinor, type };
+}
+
 /** Kotak PDFs append page footers after the last txn on each page. */
 export function stripKotakPdfChunkFooter(chunk: string): string {
   const footerPatterns = [
@@ -106,10 +138,10 @@ export function stripKotakPdfChunkFooter(chunk: string): string {
 
 export function extractKotakMetadata(text: string): Record<string, string> {
   const metadata: Record<string, string> = {};
-  const accountMatch = text.match(/Account No\.?\s*(\d+)/i);
+  const accountMatch = text.match(/Account(?: No\.?| #)\s*(\d+)/i);
   if (accountMatch) metadata.accountNumber = accountMatch[1];
 
-  const periodMatch = text.match(/Account Statement\s+([\d\s\w-]+?\d{4})\s*-\s*([\d\s\w-]+?\d{4})/i);
+  const periodMatch = text.match(/(\d{1,2}\s+\w{3}\s+\d{4})\s*-\s*(\d{1,2}\s+\w{3}\s+\d{4})/i);
   if (periodMatch) metadata.period = `${periodMatch[1].trim()} - ${periodMatch[2].trim()}`;
 
   const ifscMatch = text.match(/IFSC(?: Code)?\s*([A-Z0-9]+)/i);

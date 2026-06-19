@@ -63,3 +63,6 @@ next-env.d.ts
 .svelte-kit/
 
 **/.output/
+
+# chhan-chhan local data (bank statements, imports, etc.)
+apps/chhan-chhan/data/

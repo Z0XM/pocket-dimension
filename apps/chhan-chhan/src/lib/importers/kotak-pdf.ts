@@ -3,15 +3,20 @@ import type { ImportRow } from "$lib/importers/types";
 import {
   extractKotakExternalRef,
   extractKotakMetadata,
+  isKotakMonthlyPdf,
   merchantFromDescription,
   parseKotakPdfDate,
+  parseSignedIndianAmount,
+  stripKotakMonthlyPdfChunkFooter,
   stripKotakPdfChunkFooter,
 } from "$lib/importers/kotak-shared";
 
 const TXN_START = /(\d+)\s+(\d{1,2}\s+\w{3}\s+\d{4})\s+/g;
+const MONTHLY_TXN_START = /(\d+)\s+(\d{1,2}\s+\w{3}\s+\d{4})\s+\d{1,2}:\d{2}\s+(?:AM|PM)\s+(\d{1,2}\s+\w{3}\s+\d{4})\s+/g;
 const TRAILING_AMOUNTS = /([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
+const MONTHLY_TRAILING_AMOUNTS = /([+-][\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
 
-export function parseKotakPdf(text: string): { rows: ImportRow[]; metadata: Record<string, string> } {
+function parseKotakLegacyPdf(text: string): { rows: ImportRow[]; metadata: Record<string, string> } {
   const metadata = extractKotakMetadata(text);
   const starts = [...text.matchAll(TXN_START)];
 
@@ -60,4 +65,56 @@ export function parseKotakPdf(text: string): { rows: ImportRow[]; metadata: Reco
   }
 
   return { rows: parsedRows, metadata };
+}
+
+function parseKotakMonthlyPdf(text: string): { rows: ImportRow[]; metadata: Record<string, string> } {
+  const metadata = extractKotakMetadata(text);
+  const starts = [...text.matchAll(MONTHLY_TXN_START)];
+
+  const parsedRows: ImportRow[] = [];
+
+  for (let index = 0; index < starts.length; index += 1) {
+    const match = starts[index];
+    const chunkStart = match.index ?? 0;
+    const chunkEnd = starts[index + 1]?.index ?? text.length;
+    const chunk = stripKotakMonthlyPdfChunkFooter(text.slice(chunkStart, chunkEnd).trim());
+    const [, serial, , valueDateRaw] = match;
+
+    if (/opening balance/i.test(chunk)) continue;
+
+    const amountMatch = chunk.match(MONTHLY_TRAILING_AMOUNTS);
+    if (!amountMatch) continue;
+
+    const { amountMinor, type } = parseSignedIndianAmount(amountMatch[1]);
+    const balanceMinor = parseIndianAmount(amountMatch[2]);
+    let body = chunk
+      .slice(0, amountMatch.index)
+      .replace(/^\d+\s+\d{1,2}\s+\w{3}\s+\d{4}\s+\d{1,2}:\d{2}\s+(?:AM|PM)\s+\d{1,2}\s+\w{3}\s+\d{4}\s+/, "")
+      .trim();
+
+    const { externalRef, body: description } = extractKotakExternalRef(body);
+    body = description;
+
+    parsedRows.push({
+      occurredOn: parseKotakPdfDate(valueDateRaw),
+      amountMinor,
+      type,
+      merchant: merchantFromDescription(body),
+      externalRef,
+      balanceMinor,
+      sortOrder: /^\d+$/.test(serial) ? Number(serial) : undefined,
+    });
+  }
+
+  parsedRows.reverse();
+
+  return { rows: parsedRows, metadata };
+}
+
+export function parseKotakPdf(text: string): { rows: ImportRow[]; metadata: Record<string, string> } {
+  if (isKotakMonthlyPdf(text)) {
+    return parseKotakMonthlyPdf(text);
+  }
+
+  return parseKotakLegacyPdf(text);
 }
