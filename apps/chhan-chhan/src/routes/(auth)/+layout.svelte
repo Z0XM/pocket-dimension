@@ -1,5 +1,5 @@
 <script lang="ts">
-  import icon from "$lib/assets/icon.svg";
+  import icon from "$lib/assets/icon.png";
 
   const { children } = $props();
 </script>
