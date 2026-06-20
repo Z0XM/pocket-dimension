@@ -2,6 +2,7 @@
   import {
     CheckIcon,
     ChevronDownIcon,
+    ChartColumnIcon,
     CircleQuestionMarkIcon,
     CopyIcon,
     LoaderCircleIcon,
@@ -469,6 +470,9 @@
           </Button>
         {:else}
           <a href={selectedView?.href || "/"} class="text-xl font-bold hover:underline">{selectedView?.name || "Watchlist"}</a>
+          <a href="/dashboard" class="inline-flex items-center justify-center h-6 w-6 hover:text-accent transition-colors" title="Dashboard">
+            <ChartColumnIcon class="size-4" />
+          </a>
           <a href="/about" class="inline-flex items-center justify-center h-6 w-6 hover:text-accent transition-colors" title="About">
             <CircleQuestionMarkIcon class="size-4" />
           </a>
