@@ -77,6 +77,16 @@ function slugify(value: string): string {
     .replace(/-{2,}/g, "-");
 }
 
+function deriveSlug(title: string, order: number | undefined, path: string): string {
+  const baseSlug = slugify(title) || slugify(path.split("/").pop()?.replace(/\.md$/i, "") || path) || "piece";
+
+  if (order !== undefined) {
+    return `${baseSlug}-${order}`;
+  }
+
+  return baseSlug;
+}
+
 function deriveContentType(frontmatter: RhymeFrontmatter): ContentType {
   if (typeof frontmatter.content_type === "string" && CONTENT_TYPES.includes(frontmatter.content_type as ContentType)) {
     return frontmatter.content_type as ContentType;
@@ -151,7 +161,7 @@ export function parseRhymes(
 
       return {
         id: path,
-        slug: slugify(title),
+        slug: deriveSlug(title, order, path),
         content,
         pages,
         contentType: deriveContentType(frontmatter),

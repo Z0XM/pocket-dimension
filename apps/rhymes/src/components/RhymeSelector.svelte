@@ -30,6 +30,7 @@
 
   let searchQuery = $state("");
   let activeContentType = $state<"all" | ContentType>("all");
+  let isHydratingFromUrl = $state(true);
 
   const contentTypeOptions = $derived.by(() => {
     const counts = new Map<"all" | ContentType, number>([["all", rhymes.length]]);
@@ -77,10 +78,9 @@
     });
   });
 
-  // Get default order (first visible rhyme's order)
-  const getDefaultOrder = (): number => {
-    if (displayedRhymes.length === 0) return 0;
-    return displayedRhymes[0].frontmatter.order ?? 0;
+  // Get default visible rhyme
+  const getDefaultRhyme = (): Rhyme | undefined => {
+    return displayedRhymes[0];
   };
 
   // Find visible rhyme by order
@@ -88,30 +88,122 @@
     return displayedRhymes.find((rhyme) => rhyme.frontmatter.order === order);
   }
 
-  // Get initial order from URL
-  function getOrderFromUrl(): number {
-    if (typeof window === "undefined") return getDefaultOrder();
+  function findRhymeBySlug(slug: string): Rhyme | undefined {
+    return displayedRhymes.find((rhyme) => rhyme.slug === slug);
+  }
+
+  function getQuickTypeFromUrl(): "all" | ContentType {
+    if (typeof window === "undefined") return "all";
+
+    const type = new URLSearchParams(window.location.search).get("kind");
+
+    if (type === "all" || type === "poem" || type === "article" || type === "song" || type === "diary") {
+      return type;
+    }
+
+    return "all";
+  }
+
+  function getSearchQueryFromUrl(): string {
+    if (typeof window === "undefined") return "";
+
+    return new URLSearchParams(window.location.search).get("q")?.trim() ?? "";
+  }
+
+  function getSelectedRhymeFromUrl(): Rhyme | undefined {
+    if (typeof window === "undefined") return getDefaultRhyme();
+
     try {
       const params = new URLSearchParams(window.location.search);
+      const pieceSlug = params.get("piece");
+
+      if (pieceSlug) {
+        const rhymeBySlug = findRhymeBySlug(pieceSlug);
+        if (rhymeBySlug) {
+          return rhymeBySlug;
+        }
+      }
+
       const orderParam = params.get("rhyme");
-      if (orderParam !== null) {
+      if (orderParam) {
         const order = parseInt(orderParam, 10);
-        if (!Number.isNaN(order) && findRhymeByOrder(order)) {
-          return order;
+        const rhymeByOrder = Number.isNaN(order) ? undefined : findRhymeByOrder(order);
+        if (rhymeByOrder) {
+          return rhymeByOrder;
         }
       }
     } catch (e) {
-      // Fallback to default if URL parsing fails
+      // Fallback to default if URL parsing fails.
     }
-    return getDefaultOrder();
+
+    return getDefaultRhyme();
   }
 
-  // Update URL when selection changes
-  function updateUrl(order: number) {
+  function writeReaderStateToUrl(historyMode: "push" | "replace" = "replace") {
     if (typeof window === "undefined") return;
+
     const url = new URL(window.location.href);
-    url.searchParams.set("rhyme", order.toString());
-    window.history.pushState({}, "", url);
+    const selectedSlug = selectedRhyme?.slug;
+
+    if (selectedSlug) {
+      url.searchParams.set("piece", selectedSlug);
+    } else {
+      url.searchParams.delete("piece");
+    }
+
+    url.searchParams.delete("rhyme");
+
+    if (searchQuery.trim()) {
+      url.searchParams.set("q", searchQuery.trim());
+    } else {
+      url.searchParams.delete("q");
+    }
+
+    if (activeContentType !== "all") {
+      url.searchParams.set("kind", activeContentType);
+    } else {
+      url.searchParams.delete("kind");
+    }
+
+    if (selectedRhyme && selectedRhyme.pages.length > 1) {
+      url.searchParams.set("view", pageMode);
+
+      if (pageMode === "paged") {
+        url.searchParams.set("page", String(selectedPageIndex + 1));
+      } else {
+        url.searchParams.delete("page");
+      }
+    } else {
+      url.searchParams.delete("view");
+      url.searchParams.delete("page");
+    }
+
+    if (historyMode === "push") {
+      window.history.pushState({}, "", url);
+      return;
+    }
+
+    window.history.replaceState({}, "", url);
+  }
+
+  function getReaderModeFromUrl(rhyme: Rhyme | undefined): ReaderMode | undefined {
+    if (typeof window === "undefined" || !rhyme || rhyme.pages.length <= 1) return undefined;
+
+    const view = new URLSearchParams(window.location.search).get("view");
+    return view === "paged" || view === "continuous" ? view : undefined;
+  }
+
+  function getPageFromUrl(rhyme: Rhyme | undefined): number {
+    if (typeof window === "undefined" || !rhyme || rhyme.pages.length <= 1) return 0;
+
+    const pageParam = new URLSearchParams(window.location.search).get("page");
+    const page = Number(pageParam);
+
+    if (!Number.isInteger(page) || page < 1) {
+      return 0;
+    }
+
+    return Math.min(page - 1, rhyme.pages.length - 1);
   }
 
   // Initialize selected order
@@ -121,24 +213,34 @@
   let titleContainer: HTMLDivElement | null = $state(null);
   let contentArea: HTMLDivElement | null = $state(null);
 
+  $effect(() => {
+    if (typeof window === "undefined") return;
+
+    searchQuery = getSearchQueryFromUrl();
+    activeContentType = getQuickTypeFromUrl();
+    isHydratingFromUrl = false;
+  });
+
   // Initialize from URL on client side, or use default
   $effect(() => {
-    if (typeof window !== "undefined" && displayedRhymes.length > 0) {
-      const orderFromUrl = getOrderFromUrl();
-      const validOrder = findRhymeByOrder(orderFromUrl) ? orderFromUrl : getDefaultOrder();
-      selectedOrder = validOrder;
-      // Update URL if it wasn't set
-      if (!new URLSearchParams(window.location.search).has("rhyme")) {
-        updateUrl(validOrder);
-      }
+    if (typeof window === "undefined" || isHydratingFromUrl || displayedRhymes.length === 0) return;
+
+    const selectedFromUrl = getSelectedRhymeFromUrl();
+
+    if (selectedFromUrl?.frontmatter.order !== undefined) {
+      selectedOrder = selectedFromUrl.frontmatter.order;
+    } else if (getDefaultRhyme()?.frontmatter.order !== undefined) {
+      selectedOrder = getDefaultRhyme()!.frontmatter.order!;
     }
   });
 
   // Handle title click
   function selectRhyme(order: number) {
     selectedOrder = order;
-    updateUrl(order);
     scrollToTitle(order);
+    selectedPageIndex = 0;
+    pageMode = getPreferredReaderMode(findRhymeByOrder(order));
+    writeReaderStateToUrl("push");
   }
 
   // Scroll to selected title
@@ -159,10 +261,14 @@
 
   // Handle browser back/forward buttons
   function handlePopState() {
-    const newOrder = getOrderFromUrl();
-    if (newOrder !== selectedOrder) {
-      selectedOrder = newOrder;
-      scrollToTitle(newOrder);
+    searchQuery = getSearchQueryFromUrl();
+    activeContentType = getQuickTypeFromUrl();
+
+    const selectedFromUrl = getSelectedRhymeFromUrl();
+
+    if (selectedFromUrl?.frontmatter.order !== undefined) {
+      selectedOrder = selectedFromUrl.frontmatter.order;
+      scrollToTitle(selectedOrder);
     }
   }
 
@@ -202,8 +308,8 @@
 
     if (!hasSelectedRhyme && fallbackOrder !== undefined && fallbackOrder !== selectedOrder) {
       selectedOrder = fallbackOrder;
-      updateUrl(fallbackOrder);
       scrollToTitle(fallbackOrder);
+      writeReaderStateToUrl("replace");
     }
   });
 
@@ -223,23 +329,30 @@
 
     if (!rhyme) return;
 
-    pageMode = getPreferredReaderMode(rhyme);
-    selectedPageIndex = 0;
+    const urlReaderMode = getReaderModeFromUrl(rhyme);
+    pageMode = urlReaderMode ?? getPreferredReaderMode(rhyme);
+    selectedPageIndex = pageMode === "paged" ? getPageFromUrl(rhyme) : 0;
   });
 
   function setPageMode(mode: ReaderMode) {
     pageMode = mode;
+    if (mode === "continuous") {
+      selectedPageIndex = 0;
+    }
+    writeReaderStateToUrl("replace");
   }
 
   function goToPreviousPage() {
     if (selectedPageIndex > 0) {
       selectedPageIndex -= 1;
+      writeReaderStateToUrl("replace");
     }
   }
 
   function goToNextPage() {
     if (selectedRhyme && selectedPageIndex < selectedRhyme.pages.length - 1) {
       selectedPageIndex += 1;
+      writeReaderStateToUrl("replace");
     }
   }
 
@@ -251,6 +364,11 @@
       pageMode === "paged" && selectedRhyme.pages[selectedPageIndex] ? selectedRhyme.pages[selectedPageIndex] : selectedRhyme.content;
 
     return marked.parse(activeContent) as string;
+  });
+
+  $effect(() => {
+    if (typeof window === "undefined" || isHydratingFromUrl || displayedRhymes.length === 0) return;
+    writeReaderStateToUrl("replace");
   });
 
   // Get next rhyme order
