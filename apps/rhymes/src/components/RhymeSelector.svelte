@@ -1,6 +1,6 @@
 <script lang="ts">
   import { marked } from "marked";
-  import type { ReaderMode } from "../lib/rhymes";
+  import type { ContentType, ReaderMode } from "../lib/rhymes";
   import { filteredRhymes, type Rhyme } from "../stores/filterStore";
 
   interface Props {
@@ -28,15 +28,64 @@
   // Configure marked to allow HTML (for <br> tags) and GitHub Flavored Markdown
   marked.setOptions({ breaks: true, gfm: true });
 
-  // Get default order (first rhyme's order)
+  let searchQuery = $state("");
+  let activeContentType = $state<"all" | ContentType>("all");
+
+  const contentTypeOptions = $derived.by(() => {
+    const counts = new Map<"all" | ContentType, number>([["all", rhymes.length]]);
+
+    rhymes.forEach((rhyme) => {
+      counts.set(rhyme.contentType, (counts.get(rhyme.contentType) ?? 0) + 1);
+    });
+
+    return [
+      { value: "all" as const, label: "All", count: counts.get("all") ?? 0 },
+      { value: "poem" as const, label: "Poems", count: counts.get("poem") ?? 0 },
+      { value: "article" as const, label: "Articles", count: counts.get("article") ?? 0 },
+      { value: "song" as const, label: "Songs", count: counts.get("song") ?? 0 },
+      { value: "diary" as const, label: "Diaries", count: counts.get("diary") ?? 0 },
+    ].filter((option) => option.value === "all" || option.count > 0);
+  });
+
+  function matchesSearch(rhyme: Rhyme, query: string): boolean {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    const haystack = [
+      rhyme.frontmatter.title,
+      rhyme.summary,
+      rhyme.contentType,
+      rhyme.frontmatter.status,
+      rhyme.frontmatter.phase,
+      ...(rhyme.frontmatter.tags ?? []),
+      rhyme.content,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(normalizedQuery);
+  }
+
+  const displayedRhymes = $derived.by(() => {
+    return rhymes.filter((rhyme) => {
+      const matchesContentType = activeContentType === "all" || rhyme.contentType === activeContentType;
+      return matchesContentType && matchesSearch(rhyme, searchQuery);
+    });
+  });
+
+  // Get default order (first visible rhyme's order)
   const getDefaultOrder = (): number => {
-    if (rhymes.length === 0) return 0;
-    return rhymes[0].frontmatter.order ?? 0;
+    if (displayedRhymes.length === 0) return 0;
+    return displayedRhymes[0].frontmatter.order ?? 0;
   };
 
-  // Find rhyme by order
+  // Find visible rhyme by order
   function findRhymeByOrder(order: number): Rhyme | undefined {
-    return rhymes.find((rhyme) => rhyme.frontmatter.order === order);
+    return displayedRhymes.find((rhyme) => rhyme.frontmatter.order === order);
   }
 
   // Get initial order from URL
@@ -74,7 +123,7 @@
 
   // Initialize from URL on client side, or use default
   $effect(() => {
-    if (typeof window !== "undefined" && rhymes.length > 0) {
+    if (typeof window !== "undefined" && displayedRhymes.length > 0) {
       const orderFromUrl = getOrderFromUrl();
       const validOrder = findRhymeByOrder(orderFromUrl) ? orderFromUrl : getDefaultOrder();
       selectedOrder = validOrder;
@@ -96,46 +145,14 @@
   function scrollToTitle(order: number) {
     if (!titleContainer) return;
 
-    // Use setTimeout to ensure DOM is updated
     setTimeout(() => {
       const targetElement = titleContainer?.querySelector(`[data-rhyme-order="${order}"]`) as HTMLElement;
 
-      if (targetElement && titleContainer) {
-        const containerRect = titleContainer.getBoundingClientRect();
-        const elementRect = targetElement.getBoundingClientRect();
-
-        // Check if we're on large screen (vertical scroll) or small screen (horizontal scroll)
-        const isLargeScreen = window.innerWidth >= 1024; // lg breakpoint
-
-        if (isLargeScreen) {
-          // Vertical scrolling for large screens
-          const scrollTop = titleContainer.scrollTop;
-          const elementTop = elementRect.top - containerRect.top + scrollTop;
-          const elementHeight = elementRect.height;
-          const containerHeight = containerRect.height;
-
-          // Center the element in the container vertically
-          const targetScroll = elementTop - containerHeight / 2 + elementHeight / 2;
-
-          titleContainer.scrollTo({
-            top: targetScroll,
-            behavior: "smooth",
-          });
-        } else {
-          // Horizontal scrolling for small screens
-          const scrollLeft = titleContainer.scrollLeft;
-          const elementLeft = elementRect.left - containerRect.left + scrollLeft;
-          const elementWidth = elementRect.width;
-          const containerWidth = containerRect.width;
-
-          // Center the element in the container
-          const targetScroll = elementLeft - containerWidth / 2 + elementWidth / 2;
-
-          titleContainer.scrollTo({
-            left: targetScroll,
-            behavior: "smooth",
-          });
-        }
+      if (targetElement) {
+        targetElement.scrollIntoView({
+          block: "nearest",
+          behavior: "smooth",
+        });
       }
     }, 0);
   }
@@ -163,7 +180,6 @@
   // Scroll to initial selected title on mount and when container is ready
   $effect(() => {
     if (titleContainer) {
-      // Use a small delay to ensure DOM is fully rendered
       const timeoutId = setTimeout(() => {
         scrollToTitle(selectedOrder);
       }, 100);
@@ -172,46 +188,14 @@
     }
   });
 
-  // Make scroll more sensitive with wheel event
-  $effect(() => {
-    if (!titleContainer) return;
-
-    function handleWheel(e: WheelEvent) {
-      if (titleContainer && e.deltaY !== 0) {
-        // Check if we're on large screen (vertical scroll) or small screen (horizontal scroll)
-        const isLargeScreen = window.innerWidth >= 1024; // lg breakpoint
-
-        // Increase scroll sensitivity by multiplying delta
-        const sensitivity = 2; // Adjust this value to make it more/less sensitive
-
-        if (isLargeScreen) {
-          // Vertical scrolling for large screens
-          titleContainer.scrollTop += e.deltaY * sensitivity;
-        } else {
-          // Horizontal scrolling for small screens
-          titleContainer.scrollLeft += e.deltaY * sensitivity;
-        }
-        e.preventDefault();
-      }
-    }
-
-    titleContainer.addEventListener("wheel", handleWheel, { passive: false });
-
-    return () => {
-      if (titleContainer) {
-        titleContainer.removeEventListener("wheel", handleWheel);
-      }
-    };
-  });
-
   const selectedRhyme = $derived.by(() => {
     const rhyme = findRhymeByOrder(selectedOrder);
     // If no rhyme found, fallback to first rhyme
-    return rhyme ?? (rhymes.length > 0 ? rhymes[0] : undefined);
+    return rhyme ?? (displayedRhymes.length > 0 ? displayedRhymes[0] : undefined);
   });
 
   $effect(() => {
-    if (typeof window === "undefined" || rhymes.length === 0) return;
+    if (typeof window === "undefined" || displayedRhymes.length === 0) return;
 
     const hasSelectedRhyme = findRhymeByOrder(selectedOrder);
     const fallbackOrder = selectedRhyme?.frontmatter.order;
@@ -271,12 +255,12 @@
 
   // Get next rhyme order
   function getNextRhymeOrder(): number | null {
-    if (rhymes.length === 0) return null;
-    const currentIndex = rhymes.findIndex((r) => (r.frontmatter.order ?? 0) === selectedOrder);
+    if (displayedRhymes.length === 0) return null;
+    const currentIndex = displayedRhymes.findIndex((r) => (r.frontmatter.order ?? 0) === selectedOrder);
     if (currentIndex === -1) return null;
     // Since rhymes are sorted descending, next is previous index
     if (currentIndex > 0) {
-      const nextRhyme = rhymes[currentIndex - 1];
+      const nextRhyme = displayedRhymes[currentIndex - 1];
       return nextRhyme.frontmatter.order ?? null;
     }
     return null;
@@ -284,12 +268,12 @@
 
   // Get previous rhyme order
   function getPreviousRhymeOrder(): number | null {
-    if (rhymes.length === 0) return null;
-    const currentIndex = rhymes.findIndex((r) => (r.frontmatter.order ?? 0) === selectedOrder);
+    if (displayedRhymes.length === 0) return null;
+    const currentIndex = displayedRhymes.findIndex((r) => (r.frontmatter.order ?? 0) === selectedOrder);
     if (currentIndex === -1) return null;
     // Since rhymes are sorted descending, previous is next index
-    if (currentIndex < rhymes.length - 1) {
-      const prevRhyme = rhymes[currentIndex + 1];
+    if (currentIndex < displayedRhymes.length - 1) {
+      const prevRhyme = displayedRhymes[currentIndex + 1];
       return prevRhyme.frontmatter.order ?? null;
     }
     return null;
@@ -388,89 +372,157 @@
   });
 </script>
 
-<div class="flex flex-col lg:flex-row items-center w-full h-full mt-2 min-h-0 gap-4 lg:px-4">
-  <!-- Titles container: horizontal on small screens, vertical on large screens -->
-  <div class="relative w-screen lg:w-64 lg:h-full shrink-0 lg:shrink-0 lg:order-2 title-container-wrapper">
-    <div
-      bind:this={titleContainer}
-      class="flex flex-row lg:flex-col overflow-x-scroll lg:overflow-x-hidden lg:overflow-y-scroll overflow-y-hidden flex-nowrap gap-2 w-full lg:h-full px-[50vw] lg:px-0 lg:py-[50vh] title-scroll-container"
-    >
-      {#each rhymes as rhyme, index}
-        {@const order = rhyme.frontmatter.order ?? index + 1000}
-        <button
-          data-rhyme-order={order}
-          type="button"
-          onclick={() => selectRhyme(order)}
-          class="text-sm lg:text-lg font-heading px-4 py-2 bg-theme-pink-1 border-x-2 lg:border-x-0 lg:border-y-2 border-t-2 border-theme-pink-5 whitespace-nowrap shrink-0 lg:w-full transition-all cursor-pointer hover:bg-theme-pink-2 {selectedOrder ===
-          order
-            ? 'scale-110'
-            : 'opacity-70'}"
-        >
-          {rhyme.frontmatter.title || "Untitled" + order}
-        </button>
-      {/each}
+<div class="grid h-full min-h-0 gap-4 px-4 pb-4 md:px-6 lg:grid-cols-[22rem_minmax(0,1fr)]">
+  <aside class="min-h-0 overflow-hidden border border-theme-red-2/50 bg-theme-pink-4/90">
+    <div class="border-b border-theme-red-2/30 px-4 py-4">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="font-heading text-xl text-theme-peach-1">Browse the library</h2>
+          <p class="mt-1 text-xs text-theme-peach-3">
+            Search within the current filtered set and keep the poem in view.
+          </p>
+        </div>
+        <span class="text-xs font-heading text-theme-peach-3">{displayedRhymes.length} visible</span>
+      </div>
+
+      <input
+        type="search"
+        bind:value={searchQuery}
+        placeholder="Search titles, tags, or lines"
+        class="mt-4 w-full border border-theme-red-2/40 bg-theme-pink-3 px-3 py-2 text-sm text-theme-peach-1 outline-none placeholder:text-theme-peach-3"
+      />
+
+      <div class="mt-4 flex flex-wrap gap-2">
+        {#each contentTypeOptions as option}
+          <button
+            type="button"
+            onclick={() => (activeContentType = option.value)}
+            class="cursor-pointer border px-3 py-1 text-xs font-heading transition-colors {activeContentType === option.value
+              ? 'border-theme-peach-2 bg-theme-peach-2 text-theme-pink-5'
+              : 'border-theme-red-2/40 bg-theme-pink-3 text-theme-peach-2 hover:border-theme-peach-3'}"
+          >
+            {option.label} ({option.count})
+          </button>
+        {/each}
+      </div>
     </div>
-    <!-- Fade overlay for horizontal scroll end (small screens) -->
-    <div class="absolute top-0 right-0 w-16 h-full pointer-events-none bg-gradient-to-l from-theme-pink-4 to-transparent lg:hidden"></div>
-    <div class="absolute top-0 left-0 w-16 h-full pointer-events-none bg-gradient-to-r from-theme-pink-4 to-transparent lg:hidden"></div>
-    <!-- Fade overlay for vertical scroll end (large screens) -->
-    <div class="hidden lg:block absolute bottom-0 left-0 w-full h-32 pointer-events-none bg-gradient-to-t from-theme-pink-5 to-transparent"></div>
-    <div class="hidden lg:block absolute top-0 right-0 w-full h-32 pointer-events-none bg-gradient-to-b from-theme-pink-4 to-transparent"></div>
-  </div>
-  <!-- Content area: full width on small screens, flex-1 on large screens -->
-  <div class="flex flex-col w-full lg:flex-1 min-h-0 h-full lg:order-1">
+
+    <div bind:this={titleContainer} class="title-scroll-container h-full overflow-y-auto px-3 py-3">
+      <div class="flex flex-col gap-3 pb-32">
+        {#if displayedRhymes.length > 0}
+          {#each displayedRhymes as rhyme, index}
+            {@const order = rhyme.frontmatter.order ?? index + 1000}
+            <button
+              data-rhyme-order={order}
+              type="button"
+              onclick={() => selectRhyme(order)}
+              class="w-full cursor-pointer border p-3 text-left transition-all {selectedOrder === order
+                ? 'border-theme-peach-2 bg-theme-pink-2 shadow-[0_0_0_1px_rgba(247,244,238,0.2)]'
+                : 'border-theme-red-2/30 bg-theme-pink-3 hover:border-theme-peach-3/60 hover:bg-theme-pink-2/80'}"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="font-heading text-base text-theme-peach-1">{rhyme.frontmatter.title}</div>
+                  <div class="mt-2 line-clamp-3 text-xs leading-5 text-theme-peach-3">{rhyme.summary}</div>
+                </div>
+                <span class="shrink-0 border border-theme-red-2/40 px-2 py-1 text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-2">
+                  {rhyme.contentType}
+                </span>
+              </div>
+
+              <div class="mt-3 flex flex-wrap items-center gap-2 text-[0.625rem] font-heading text-theme-peach-3">
+                {#if rhyme.frontmatter.thought_on}
+                  <span>{rhyme.frontmatter.thought_on?.replaceAll("/", "-")}</span>
+                {/if}
+                {#if rhyme.pages.length > 1}
+                  <span>• {rhyme.pages.length} pages</span>
+                {/if}
+                {#if rhyme.frontmatter.status}
+                  <span>• {rhyme.frontmatter.status}</span>
+                {/if}
+              </div>
+            </button>
+          {/each}
+        {:else}
+          <div class="border border-theme-red-2/30 bg-theme-pink-3 px-4 py-6 text-sm text-theme-peach-3">
+            No pieces match the current search and filters.
+          </div>
+        {/if}
+      </div>
+    </div>
+  </aside>
+
+  <section class="flex min-h-0 flex-col overflow-hidden border border-theme-red-2/50 bg-theme-pink-4/80">
     {#if selectedRhyme}
-      <div class="flex flex-col gap-3 w-full mt-4 lg:mt-0 shrink-0">
-        <div class="flex flex-wrap justify-between items-center gap-3">
-          <div class="flex flex-wrap gap-2 px-2 justify-start items-center">
-            <span class="text-[0.625rem] lg:text-sm font-heading bg-theme-pink-2 border-2 border-theme-pink-5 text-theme-peach-1 px-2 py-1 capitalize">
-              {selectedRhyme.contentType}
-            </span>
-            {#each selectedRhyme.frontmatter.tags ?? [] as tag}
-              <span class="text-[0.625rem] lg:text-sm font-heading bg-theme-red-2 border-2 border-theme-red-1 text-theme-peach-1 px-2 py-1">{tag}</span>
-            {/each}
+      <div class="border-b border-theme-red-2/30 px-4 py-4 lg:px-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="max-w-3xl">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="border border-theme-red-2/40 bg-theme-pink-2 px-2 py-1 text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-2">
+                {selectedRhyme.contentType}
+              </span>
+              {#if selectedRhyme.frontmatter.status}
+                <span class="text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-3">
+                  {selectedRhyme.frontmatter.status}
+                </span>
+              {/if}
+            </div>
+
+            <h1 class="mt-4 font-heading text-2xl text-theme-peach-1 md:text-4xl">
+              {selectedRhyme.frontmatter.title}
+            </h1>
+            <p class="mt-3 max-w-2xl text-sm leading-6 text-theme-peach-3">
+              {selectedRhyme.summary}
+            </p>
           </div>
 
-          <div class="flex flex-wrap items-center justify-end gap-2 px-2">
+          <div class="flex flex-col gap-3 text-sm text-theme-peach-2 lg:items-end">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-heading text-theme-peach-1">{selectedRhyme.frontmatter.rating}/10</span>
+              {#if selectedRhyme.frontmatter.thought_on}
+                <span>{selectedRhyme.frontmatter.thought_on?.replaceAll("/", "-")}</span>
+              {/if}
+              {#if selectedRhyme.pages.length > 1}
+                <span>{selectedRhyme.pages.length} pages</span>
+              {/if}
+            </div>
+
             {#if hasMultiplePages}
-              <div class="flex items-center gap-1">
+              <div class="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onclick={() => setPageMode("continuous")}
-                  class="text-[0.625rem] lg:text-sm font-heading px-2 py-1 border-2 cursor-pointer transition-colors {pageMode === 'continuous'
-                    ? 'bg-theme-red-2 border-theme-red-1 text-theme-peach-1'
-                    : 'bg-theme-pink-1 border-theme-pink-5 text-theme-peach-1'}"
+                  class="border px-3 py-1 text-xs font-heading cursor-pointer transition-colors {pageMode === 'continuous'
+                    ? 'border-theme-peach-2 bg-theme-peach-2 text-theme-pink-5'
+                    : 'border-theme-red-2/40 bg-theme-pink-3 text-theme-peach-2'}"
                 >
                   Continuous
                 </button>
                 <button
                   type="button"
                   onclick={() => setPageMode("paged")}
-                  class="text-[0.625rem] lg:text-sm font-heading px-2 py-1 border-2 cursor-pointer transition-colors {pageMode === 'paged'
-                    ? 'bg-theme-red-2 border-theme-red-1 text-theme-peach-1'
-                    : 'bg-theme-pink-1 border-theme-pink-5 text-theme-peach-1'}"
+                  class="border px-3 py-1 text-xs font-heading cursor-pointer transition-colors {pageMode === 'paged'
+                    ? 'border-theme-peach-2 bg-theme-peach-2 text-theme-pink-5'
+                    : 'border-theme-red-2/40 bg-theme-pink-3 text-theme-peach-2'}"
                 >
                   Paged
                 </button>
               </div>
             {/if}
-
-            <span class="text-[0.625rem] lg:text-sm text-theme-peach-1 px-2 py-1 font-heading">{selectedRhyme.frontmatter.status}</span>
           </div>
         </div>
 
         {#if hasMultiplePages && pageMode === "paged"}
-          <div class="flex flex-wrap items-center justify-between gap-2 px-2">
-            <span class="text-[0.625rem] lg:text-sm font-heading text-theme-peach-1">
+          <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-theme-red-2/20 pt-4">
+            <span class="text-xs font-heading uppercase tracking-[0.18em] text-theme-peach-3">
               Page {selectedPageIndex + 1} / {pageCount}
             </span>
-
             <div class="flex items-center gap-2">
               <button
                 type="button"
                 onclick={goToPreviousPage}
                 disabled={selectedPageIndex === 0}
-                class="text-[0.625rem] lg:text-sm font-heading px-2 py-1 border-2 border-theme-pink-5 bg-theme-pink-1 text-theme-peach-1 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                class="border border-theme-red-2/40 bg-theme-pink-3 px-3 py-2 text-xs font-heading text-theme-peach-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 Previous page
               </button>
@@ -478,7 +530,7 @@
                 type="button"
                 onclick={goToNextPage}
                 disabled={selectedPageIndex >= pageCount - 1}
-                class="text-[0.625rem] lg:text-sm font-heading px-2 py-1 border-2 border-theme-pink-5 bg-theme-pink-1 text-theme-peach-1 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                class="border border-theme-red-2/40 bg-theme-pink-3 px-3 py-2 text-xs font-heading text-theme-peach-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 Next page
               </button>
@@ -486,41 +538,32 @@
           </div>
         {/if}
       </div>
-      <div
-        bind:this={contentArea}
-        class="w-full bg-theme-light-pink-1 px-4 lg:px-8 pt-4 pb-32 lg:pb-8 flex-1 min-h-0 h-full overflow-y-auto border-2 border-theme-pin-5"
-      >
-        <div class="text-xs lg:text-lg font-heading flex flex-row gap-2 justify-between items-center">
-          <span class="text-theme-red-2">
-            {selectedRhyme.frontmatter.title}
-          </span>
-          <div class="flex flex-row gap-2 justify-end items-center">
-            <span class=""
-              >{selectedRhyme.frontmatter.rating}
-              <span class="text-[0.625rem] lg:text-xs">/ 10</span>
-              ,
-            </span>
-            <span class="">{selectedRhyme.frontmatter.thought_on?.replaceAll("/", "-") || ""}</span>
+
+      <div bind:this={contentArea} class="min-h-0 flex-1 overflow-y-auto px-4 py-5 lg:px-10 lg:py-8">
+        <div class="mx-auto max-w-4xl border border-theme-red-2/25 bg-theme-light-pink-1 px-5 py-6 text-theme-pink-5 shadow-[0_24px_60px_rgba(0,0,0,0.25)] lg:px-10 lg:py-10">
+          <div class="flex flex-wrap gap-2">
+            {#each selectedRhyme.frontmatter.tags ?? [] as tag}
+              <span class="border border-theme-red-2/30 px-2 py-1 text-[0.625rem] font-heading uppercase tracking-[0.16em] text-theme-red-2">
+                {tag}
+              </span>
+            {/each}
           </div>
-        </div>
-        <div class="text-[0.625rem] lg:text-sm text-theme-red-2 mt-2">
-          {selectedRhyme.summary}
-        </div>
-        <div class="content-text mt-4">
-          {@html processedContent || ""}
+          <div class="content-text mt-6">
+            {@html processedContent || ""}
+          </div>
         </div>
       </div>
     {:else}
-      <div class="w-full h-full flex items-center justify-center px-6">
-        <div class="max-w-md text-center border-2 border-theme-pink-5 bg-theme-light-pink-1 px-6 py-8">
-          <h2 class="font-heading text-xl text-theme-red-2">No matching pieces</h2>
-          <p class="mt-3 text-sm text-theme-pink-4">
-            Adjust the current filters to keep browsing the rhymes library.
+      <div class="flex h-full items-center justify-center px-6">
+        <div class="max-w-md border border-theme-red-2/30 bg-theme-pink-3 px-6 py-8 text-center">
+          <h2 class="font-heading text-xl text-theme-peach-1">No matching pieces</h2>
+          <p class="mt-3 text-sm text-theme-peach-3">
+            Adjust the current filters or search terms to keep browsing the library.
           </p>
         </div>
       </div>
     {/if}
-  </div>
+  </section>
 </div>
 
 <style>
@@ -581,29 +624,5 @@
 
   .title-scroll-container {
     scroll-behavior: smooth;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  @media (width >= 1024px) {
-    .title-scroll-container {
-      scroll-snap-type: y proximity;
-      scroll-padding: 0;
-    }
-  }
-
-  .title-scroll-container button {
-    scroll-snap-align: center;
-  }
-
-  /* Increase scroll sensitivity */
-  .title-scroll-container {
-    scroll-padding: 0 50vw;
-  }
-
-  @media (width >= 1024px) {
-    .title-scroll-container {
-      scroll-padding: 0;
-    }
   }
 </style>
