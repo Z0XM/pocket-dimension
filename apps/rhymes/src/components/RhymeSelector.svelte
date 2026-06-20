@@ -1,5 +1,6 @@
 <script lang="ts">
   import { marked } from "marked";
+  import type { ReaderMode } from "../lib/rhymes";
   import { filteredRhymes, type Rhyme } from "../stores/filterStore";
 
   interface Props {
@@ -66,6 +67,8 @@
 
   // Initialize selected order
   let selectedOrder = $state(0);
+  let pageMode = $state<ReaderMode>("continuous");
+  let selectedPageIndex = $state(0);
   let titleContainer: HTMLDivElement | null = $state(null);
   let contentArea: HTMLDivElement | null = $state(null);
 
@@ -207,10 +210,63 @@
     return rhyme ?? (rhymes.length > 0 ? rhymes[0] : undefined);
   });
 
+  $effect(() => {
+    if (typeof window === "undefined" || rhymes.length === 0) return;
+
+    const hasSelectedRhyme = findRhymeByOrder(selectedOrder);
+    const fallbackOrder = selectedRhyme?.frontmatter.order;
+
+    if (!hasSelectedRhyme && fallbackOrder !== undefined && fallbackOrder !== selectedOrder) {
+      selectedOrder = fallbackOrder;
+      updateUrl(fallbackOrder);
+      scrollToTitle(fallbackOrder);
+    }
+  });
+
+  function getPreferredReaderMode(rhyme: Rhyme | undefined): ReaderMode {
+    if (!rhyme || rhyme.pages.length <= 1) {
+      return "continuous";
+    }
+
+    return rhyme.defaultReaderMode;
+  }
+
+  const pageCount = $derived(selectedRhyme?.pages.length ?? 0);
+  const hasMultiplePages = $derived(pageCount > 1);
+
+  $effect(() => {
+    const rhyme = selectedRhyme;
+
+    if (!rhyme) return;
+
+    pageMode = getPreferredReaderMode(rhyme);
+    selectedPageIndex = 0;
+  });
+
+  function setPageMode(mode: ReaderMode) {
+    pageMode = mode;
+  }
+
+  function goToPreviousPage() {
+    if (selectedPageIndex > 0) {
+      selectedPageIndex -= 1;
+    }
+  }
+
+  function goToNextPage() {
+    if (selectedRhyme && selectedPageIndex < selectedRhyme.pages.length - 1) {
+      selectedPageIndex += 1;
+    }
+  }
+
   // Process markdown content to HTML
   const processedContent = $derived.by(() => {
     if (!selectedRhyme) return "";
-    return marked.parse(selectedRhyme.content) as string;
+
+    const activeContent =
+      pageMode === "paged" && selectedRhyme.pages[selectedPageIndex] ? selectedRhyme.pages[selectedPageIndex] : selectedRhyme.content;
+
+    return marked.parse(activeContent) as string;
   });
 
   // Get next rhyme order
@@ -364,30 +420,103 @@
   <!-- Content area: full width on small screens, flex-1 on large screens -->
   <div class="flex flex-col w-full lg:flex-1 min-h-0 h-full lg:order-1">
     {#if selectedRhyme}
-      <div class="flex flex-row justify-between items-center w-full mt-4 lg:mt-0 shrink-0">
-        <div class="flex flex-row gap-2 px-2 justify-end items-center">
-          {#each selectedRhyme.frontmatter.tags as tag}
-            <span class="text-[0.625rem] lg:text-sm font-heading bg-theme-red-2 border-2 border-theme-red-1 text-theme-peach-1 px-2 py-1">{tag}</span>
-          {/each}
+      <div class="flex flex-col gap-3 w-full mt-4 lg:mt-0 shrink-0">
+        <div class="flex flex-wrap justify-between items-center gap-3">
+          <div class="flex flex-wrap gap-2 px-2 justify-start items-center">
+            <span class="text-[0.625rem] lg:text-sm font-heading bg-theme-pink-2 border-2 border-theme-pink-5 text-theme-peach-1 px-2 py-1 capitalize">
+              {selectedRhyme.contentType}
+            </span>
+            {#each selectedRhyme.frontmatter.tags ?? [] as tag}
+              <span class="text-[0.625rem] lg:text-sm font-heading bg-theme-red-2 border-2 border-theme-red-1 text-theme-peach-1 px-2 py-1">{tag}</span>
+            {/each}
+          </div>
+
+          <div class="flex flex-wrap items-center justify-end gap-2 px-2">
+            {#if hasMultiplePages}
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  onclick={() => setPageMode("continuous")}
+                  class="text-[0.625rem] lg:text-sm font-heading px-2 py-1 border-2 cursor-pointer transition-colors {pageMode === 'continuous'
+                    ? 'bg-theme-red-2 border-theme-red-1 text-theme-peach-1'
+                    : 'bg-theme-pink-1 border-theme-pink-5 text-theme-peach-1'}"
+                >
+                  Continuous
+                </button>
+                <button
+                  type="button"
+                  onclick={() => setPageMode("paged")}
+                  class="text-[0.625rem] lg:text-sm font-heading px-2 py-1 border-2 cursor-pointer transition-colors {pageMode === 'paged'
+                    ? 'bg-theme-red-2 border-theme-red-1 text-theme-peach-1'
+                    : 'bg-theme-pink-1 border-theme-pink-5 text-theme-peach-1'}"
+                >
+                  Paged
+                </button>
+              </div>
+            {/if}
+
+            <span class="text-[0.625rem] lg:text-sm text-theme-peach-1 px-2 py-1 font-heading">{selectedRhyme.frontmatter.status}</span>
+          </div>
         </div>
-        <div>
-          <span class="text-[0.625rem] lg:text-sm text-theme-peach-1 px-2 py-1 font-heading">{selectedRhyme.frontmatter.status}</span>
-        </div>
+
+        {#if hasMultiplePages && pageMode === "paged"}
+          <div class="flex flex-wrap items-center justify-between gap-2 px-2">
+            <span class="text-[0.625rem] lg:text-sm font-heading text-theme-peach-1">
+              Page {selectedPageIndex + 1} / {pageCount}
+            </span>
+
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                onclick={goToPreviousPage}
+                disabled={selectedPageIndex === 0}
+                class="text-[0.625rem] lg:text-sm font-heading px-2 py-1 border-2 border-theme-pink-5 bg-theme-pink-1 text-theme-peach-1 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Previous page
+              </button>
+              <button
+                type="button"
+                onclick={goToNextPage}
+                disabled={selectedPageIndex >= pageCount - 1}
+                class="text-[0.625rem] lg:text-sm font-heading px-2 py-1 border-2 border-theme-pink-5 bg-theme-pink-1 text-theme-peach-1 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Next page
+              </button>
+            </div>
+          </div>
+        {/if}
       </div>
       <div
         bind:this={contentArea}
         class="w-full bg-theme-light-pink-1 px-4 lg:px-8 pt-4 pb-32 lg:pb-8 flex-1 min-h-0 h-full overflow-y-auto border-2 border-theme-pin-5"
       >
-        <div class="text-xs lg:text-lg font-heading flex flex-row gap-2 justify-end items-center">
-          <span class=""
-            >{selectedRhyme.frontmatter.rating}
-            <span class="text-[0.625rem] lg:text-xs">/ 10</span>
-            ,
+        <div class="text-xs lg:text-lg font-heading flex flex-row gap-2 justify-between items-center">
+          <span class="text-theme-red-2">
+            {selectedRhyme.frontmatter.title}
           </span>
-          <span class="">{selectedRhyme.frontmatter.thought_on?.replaceAll("/", "-") || ""}</span>
+          <div class="flex flex-row gap-2 justify-end items-center">
+            <span class=""
+              >{selectedRhyme.frontmatter.rating}
+              <span class="text-[0.625rem] lg:text-xs">/ 10</span>
+              ,
+            </span>
+            <span class="">{selectedRhyme.frontmatter.thought_on?.replaceAll("/", "-") || ""}</span>
+          </div>
+        </div>
+        <div class="text-[0.625rem] lg:text-sm text-theme-red-2 mt-2">
+          {selectedRhyme.summary}
         </div>
         <div class="content-text mt-4">
           {@html processedContent || ""}
+        </div>
+      </div>
+    {:else}
+      <div class="w-full h-full flex items-center justify-center px-6">
+        <div class="max-w-md text-center border-2 border-theme-pink-5 bg-theme-light-pink-1 px-6 py-8">
+          <h2 class="font-heading text-xl text-theme-red-2">No matching pieces</h2>
+          <p class="mt-3 text-sm text-theme-pink-4">
+            Adjust the current filters to keep browsing the rhymes library.
+          </p>
         </div>
       </div>
     {/if}

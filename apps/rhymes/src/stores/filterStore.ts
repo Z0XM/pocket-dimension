@@ -1,16 +1,6 @@
 import { writable } from "svelte/store";
+import type { Rhyme } from "../lib/rhymes";
 
-export interface Rhyme {
-  frontmatter: {
-    title?: string;
-    thought_on?: string;
-    order?: number;
-    rating?: number;
-    tags?: string[];
-    status?: string;
-    [key: string]: any;
-  };
-  content: string;
-}
+export type { Rhyme } from "../lib/rhymes";
 
 export const filteredRhymes = writable<Rhyme[]>([]);
