@@ -1,3 +1,5 @@
+import matter from "gray-matter";
+
 export type ContentType = "poem" | "article" | "song" | "diary";
 export type ContentVisibility = "public" | "hidden" | "draft";
 export type ReaderMode = "continuous" | "paged";
@@ -29,37 +31,13 @@ export interface Rhyme {
   frontmatter: RhymeFrontmatter;
 }
 
-interface ParsedMarkdownModule {
-  frontmatter: Record<string, unknown>;
-}
-
-interface RawMarkdownModule {
-  default: string;
-}
-
-const FRONTMATTER_REGEX = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/;
 const PAGE_BREAK_REGEX = /\n---\s*\n/g;
 const CONTENT_TYPES: ContentType[] = ["poem", "article", "song", "diary"];
 const VISIBILITY_VALUES: ContentVisibility[] = ["public", "hidden", "draft"];
 const READER_MODES: ReaderMode[] = ["continuous", "paged"];
 
-function parseOrder(frontmatter: RhymeFrontmatter, rawDocument: string): number | undefined {
+function parseOrder(frontmatter: RhymeFrontmatter): number | undefined {
   let order = frontmatter.order;
-
-  if ((order === undefined || order === null) && rawDocument) {
-    const match = rawDocument.match(FRONTMATTER_REGEX);
-    const frontmatterText = match?.[1];
-    const orderMatch = frontmatterText?.match(/^order:\s*(.+?)(?:\n|$)/m);
-
-    if (orderMatch) {
-      const orderValue = orderMatch[1].trim().replace(/^['"]|['"]$/g, "");
-      const parsedOrder = Number(orderValue);
-
-      if (!Number.isNaN(parsedOrder)) {
-        order = parsedOrder;
-      }
-    }
-  }
 
   if (order === undefined || order === null) {
     return undefined;
@@ -140,22 +118,14 @@ function deriveSummary(content: string): string {
   );
 }
 
-function extractContent(rawDocument: string): string {
-  const match = rawDocument.match(FRONTMATTER_REGEX);
-  return match ? match[2].trim() : rawDocument.trim();
-}
-
-export function parseRhymes(
-  rhymeModules: Record<string, unknown>,
-  rawRhymeModules: Record<string, unknown>
-): Rhyme[] {
-  return Object.keys(rhymeModules)
+export function parseRhymes(rawRhymeModules: Record<string, string>): Rhyme[] {
+  return Object.keys(rawRhymeModules)
     .map((path) => {
-      const parsed = rhymeModules[path] as ParsedMarkdownModule;
-      const raw = rawRhymeModules[path] as RawMarkdownModule;
-      const content = extractContent(raw.default);
-      const frontmatter = parsed.frontmatter as RhymeFrontmatter;
-      const order = parseOrder(frontmatter, raw.default);
+      const rawDocument = rawRhymeModules[path];
+      const parsed = matter(rawDocument);
+      const content = parsed.content.trim();
+      const frontmatter = parsed.data as RhymeFrontmatter;
+      const order = parseOrder(frontmatter);
       const title = frontmatter.title?.trim() || `Untitled ${order ?? path}`;
       const pages = splitPages(content);
 

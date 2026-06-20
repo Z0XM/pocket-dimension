@@ -1,11 +1,11 @@
 import { parseRhymes, type Rhyme } from "./rhymes";
 
 export function loadRhymes(): Rhyme[] {
-  const rhymeModules = import.meta.glob("../assets/rhymes/*.md", { eager: true });
   const rawRhymeModules = import.meta.glob("../assets/rhymes/*.md", {
     eager: true,
     query: "?raw",
-  });
+    import: "default",
+  }) as Record<string, string>;
 
-  return parseRhymes(rhymeModules, rawRhymeModules);
+  return parseRhymes(rawRhymeModules);
 }

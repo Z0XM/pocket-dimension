@@ -9,22 +9,22 @@
     initialSlug?: string;
   }
 
-  const { rhymes: initialRhymes, useFiltered = false, initialSlug }: Props = $props();
+  let { rhymes: initialRhymes, useFiltered = false, initialSlug }: Props = $props();
 
   // Use filtered rhymes from store if useFiltered is true, otherwise use initial rhymes
-  let rhymes = $state(initialRhymes);
+  let rhymes = $state<Rhyme[]>([]);
 
-  if (useFiltered) {
-    $effect(() => {
+  $effect(() => {
+    if (useFiltered) {
       const unsubscribe = filteredRhymes.subscribe((value) => {
         // Always use the filtered value, even if empty (empty means no matches)
         rhymes = value;
       });
       return unsubscribe;
-    });
-  } else {
+    }
+
     rhymes = initialRhymes;
-  }
+  });
 
   // Configure marked to allow HTML (for <br> tags) and GitHub Flavored Markdown
   marked.setOptions({ breaks: true, gfm: true });
@@ -503,9 +503,7 @@
       <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="font-heading text-xl text-theme-peach-1">Browse the library</h2>
-          <p class="mt-1 text-xs text-theme-peach-3">
-            Search within the current filtered set and keep the poem in view.
-          </p>
+          <p class="mt-1 text-xs text-theme-peach-3">Search within the current filtered set and keep the poem in view.</p>
         </div>
         <span class="text-xs font-heading text-theme-peach-3">{displayedRhymes.length} visible</span>
       </div>
@@ -550,7 +548,9 @@
                   <div class="font-heading text-base text-theme-peach-1">{rhyme.frontmatter.title}</div>
                   <div class="mt-2 line-clamp-3 text-xs leading-5 text-theme-peach-3">{rhyme.summary}</div>
                 </div>
-                <span class="shrink-0 border border-theme-red-2/40 px-2 py-1 text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-2">
+                <span
+                  class="shrink-0 border border-theme-red-2/40 px-2 py-1 text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-2"
+                >
                   {rhyme.contentType}
                 </span>
               </div>
@@ -583,7 +583,9 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="border border-theme-red-2/40 bg-theme-pink-2 px-2 py-1 text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-2">
+              <span
+                class="border border-theme-red-2/40 bg-theme-pink-2 px-2 py-1 text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-2"
+              >
                 {selectedRhyme.contentType}
               </span>
               {#if selectedRhyme.frontmatter.status}
@@ -665,7 +667,9 @@
       </div>
 
       <div bind:this={contentArea} class="min-h-0 flex-1 overflow-y-auto px-4 py-5 lg:px-10 lg:py-8">
-        <div class="mx-auto max-w-4xl border border-theme-red-2/25 bg-theme-light-pink-1 px-5 py-6 text-theme-pink-5 shadow-[0_24px_60px_rgba(0,0,0,0.25)] lg:px-10 lg:py-10">
+        <div
+          class="mx-auto max-w-4xl border border-theme-red-2/25 bg-theme-light-pink-1 px-5 py-6 text-theme-pink-5 shadow-[0_24px_60px_rgba(0,0,0,0.25)] lg:px-10 lg:py-10"
+        >
           <div class="flex flex-wrap gap-2">
             {#each selectedRhyme.frontmatter.tags ?? [] as tag}
               <span class="border border-theme-red-2/30 px-2 py-1 text-[0.625rem] font-heading uppercase tracking-[0.16em] text-theme-red-2">
@@ -682,9 +686,7 @@
       <div class="flex h-full items-center justify-center px-6">
         <div class="max-w-md border border-theme-red-2/30 bg-theme-pink-3 px-6 py-8 text-center">
           <h2 class="font-heading text-xl text-theme-peach-1">No matching pieces</h2>
-          <p class="mt-3 text-sm text-theme-peach-3">
-            Adjust the current filters or search terms to keep browsing the library.
-          </p>
+          <p class="mt-3 text-sm text-theme-peach-3">Adjust the current filters or search terms to keep browsing the library.</p>
         </div>
       </div>
     {/if}
