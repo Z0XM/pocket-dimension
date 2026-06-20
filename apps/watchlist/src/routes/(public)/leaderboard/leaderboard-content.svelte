@@ -3,15 +3,18 @@
   import { page } from "$app/state";
   import FilterDropdown from "$routes/(public)/data-table-helpers/filter-dropdown.svelte";
   import * as Card from "$lib/components/ui/card";
-  import { METRIC_LABELS, type LeaderboardData, type LeaderboardMetric } from "$lib/server/leaderboard";
+  import {
+    LEADERBOARD_METRICS,
+    METRIC_LABELS,
+    type LeaderboardData,
+    type LeaderboardMetric,
+  } from "$lib/leaderboard";
 
   type Props = {
     leaderboard: LeaderboardData;
   };
 
   const { leaderboard }: Props = $props();
-
-  const METRICS: LeaderboardMetric[] = ["watched", "watching", "watch_later", "dropped", "all_rated"];
 
   const RANK_COLORS: Record<number, string> = {
     1: "#fbbf24",
@@ -97,7 +100,7 @@
     </div>
 
     <div class="metric-toggle" role="tablist" aria-label="Leaderboard metric">
-      {#each METRICS as metric}
+      {#each LEADERBOARD_METRICS as metric}
         <button
           type="button"
           role="tab"

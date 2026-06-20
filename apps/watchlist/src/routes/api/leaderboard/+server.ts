@@ -1,4 +1,5 @@
-import { getLeaderboardData, parseLeaderboardParams } from "$lib/server/leaderboard";
+import { parseLeaderboardParams } from "$lib/leaderboard";
+import { getLeaderboardData } from "$lib/server/leaderboard";
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 
