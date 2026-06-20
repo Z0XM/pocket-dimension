@@ -1,6 +1,6 @@
 <script lang="ts">
   import * as Card from "$lib/components/ui/card";
-  import type { LeaderboardData } from "$lib/server/leaderboard";
+  import type { LeaderboardData } from "$lib/leaderboard";
   import LeaderboardContent from "./leaderboard-content.svelte";
 
   const { data } = $props();
