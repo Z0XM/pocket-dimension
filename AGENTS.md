@@ -15,8 +15,9 @@ This is the **Pocket Dimension** Bun + Turbo monorepo. Standard commands live in
 | `chhan-chhan` (SvelteKit) | 3005 | yes | `bun run dev:app:chhan-chhan` |
 | `me-via-you` (SvelteKit) | 3006 | yes | `bun run dev:app:me-via-you` |
 | `markitdown` (SvelteKit) | 3006 | no (needs Python) | `bun run dev:app:markitdown` |
+| `pocket` (SvelteKit) | 3007 | no (hub app) | `bun run dev:app:pocket` |
 
-The auth-backed apps need PostgreSQL **and** the `auth-service` running. `rhymes` and `markitdown` are standalone.
+The auth-backed apps need PostgreSQL **and** the `auth-service` running. `rhymes`, `markitdown`, and `pocket` are standalone.
 
 ### Database: PostgreSQL 18 is required (not 16)
 
