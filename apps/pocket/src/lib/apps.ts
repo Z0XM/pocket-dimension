@@ -1,5 +1,4 @@
 export type AppId =
-  | "auth"
   | "watchlist"
   | "rhymes"
   | "howwasyourday"
@@ -15,12 +14,6 @@ export type AppEntry = {
 };
 
 export const appCatalog: AppEntry[] = [
-  {
-    id: "auth",
-    name: "Auth Service",
-    description: "Central authentication for all Pocket Dimension apps.",
-    envKey: "POCKET_APP_AUTH_URL",
-  },
   {
     id: "watchlist",
     name: "Watchlist",
