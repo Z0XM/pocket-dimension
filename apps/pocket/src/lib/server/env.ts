@@ -1,6 +1,6 @@
 import { validateEnv } from "@pocket-dimension/utils";
 import { z } from "zod";
-import { appCatalog, type LinkedApp } from "$lib/apps";
+import { appCatalog, type AppEntry, type LinkedApp } from "$lib/apps";
 
 const envSchema = z.object({
   PORT: z.coerce.number().default(3007),
@@ -17,9 +17,9 @@ const envSchema = z.object({
 export const env = validateEnv("pocket", envSchema, Bun.env);
 
 export function getLinkedApps(): LinkedApp[] {
-  return appCatalog.flatMap((app) => {
+  return appCatalog.flatMap((app: AppEntry) => {
     const url = env[app.envKey as keyof typeof env];
     if (typeof url !== "string" || !url) return [];
-    return [{ ...app, url }];
+    return [{ id: app.id, name: app.name, description: app.description, url }];
   });
 }

@@ -1,8 +1,11 @@
 <script lang="ts">
   import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
+  import { appIcons } from "$lib/app-icons";
   import type { LinkedApp } from "$lib/apps";
 
   const { app }: { app: LinkedApp } = $props();
+
+  const Icon = $derived(appIcons[app.id]);
 </script>
 
 <a
@@ -15,7 +18,7 @@
     <div
       class="flex size-10 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary transition-colors group-hover:border-primary/40 group-hover:bg-primary/15"
     >
-      <app.icon class="size-5" />
+      <Icon class="size-5" />
     </div>
     <ArrowUpRightIcon
       class="size-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary"
