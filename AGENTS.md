@@ -1,0 +1,60 @@
+# AGENTS.md
+
+## Cursor Cloud specific instructions
+
+This is the **Pocket Dimension** Bun + Turbo monorepo. Standard commands live in `README.md` and root `package.json` scripts; the notes below cover only non-obvious caveats discovered during environment setup.
+
+### Services overview
+
+| App | Port | Auth/DB? | Run (dev) |
+| --- | --- | --- | --- |
+| `auth-service` (Elysia) | 5001 | owns auth, uses DB | `bun run dev:app:auth` |
+| `watchlist` (SvelteKit) | 3002 | yes | `bun run dev:app:watchlist` |
+| `rhymes` (Astro) | 3003 | no (standalone) | `bun run dev:app:rhymes` |
+| `howwasyourday` (SvelteKit) | 3004 | yes | `bun run dev:app:howwasyourday` |
+| `chhan-chhan` (SvelteKit) | 3005 | yes | `bun run dev:app:chhan-chhan` |
+| `me-via-you` (SvelteKit) | 3006 | yes | `bun run dev:app:me-via-you` |
+| `markitdown` (SvelteKit) | 3006 | no (needs Python) | `bun run dev:app:markitdown` |
+
+The auth-backed apps need PostgreSQL **and** the `auth-service` running. `rhymes` and `markitdown` are standalone.
+
+### Database: PostgreSQL 18 is required (not 16)
+
+The Drizzle schema defaults ids to the native `uuidv7()` function (`shared/db/src/schema/common.ts`), which only exists in **PostgreSQL 18+**. On 16 migrations fail with `function uuidv7() does not exist`. PG18 is installed in the VM snapshot but is **not auto-started** — start it each session:
+
+```bash
+sudo pg_ctlcluster 18 main start    # or: sudo service postgresql start
+```
+
+Connection: `postgresql://postgres:postgres@localhost:5432/postgres` (user `postgres`, password `postgres`, db `postgres`). Tables live in named schemas (`auth`, `watchlist`, `howwasyourday`, `chhanchhan`, `meviayou`), not `public`. Apply schema with `bun run db:migrate` (not in the update script — needs the DB running).
+
+### `.env` files (gitignored — recreate per session)
+
+Each app/package reads a local `.env` (Bun auto-loads it from the cwd; Turbo runs each task in the package dir). Copy from each `.env.example` and note:
+
+- **`RESEND_API_KEY` must be NON-EMPTY** or `auth-service` crashes at startup — the Resend client is constructed at module load (`shared/auth/src/lib/emails.ts`). A placeholder like `re_placeholder_local_dev_only` is enough to boot; real email delivery needs a valid key, but signup/account-creation works without it (the verification email is fire-and-forget).
+- **`BETTER_AUTH_SECRET` must be set** and identical across `auth-service` and every frontend app.
+- `auth-service` runs on **port 5001** (the README's mention of 3001 is stale). Frontend apps point `PUBLIC_BASE_AUTH_URL=http://localhost:5001`.
+- `shared/db/.env` only needs `DATABASE_URL`.
+
+### Build before running apps
+
+Apps import the **built** `dist/` of `@pocket-dimension/{auth,db,utils}`. Run `bun run build` (or the `build:shared:*` scripts) before starting an app or running tests. `auth-service` has no build step (Bun runs TS directly).
+
+### Lint / format caveats (pre-existing)
+
+- `bun run lint` runs `prettier --check .` per package; in a subdir Prettier does **not** read the root `.prettierignore`, so it flags built `dist/` files after a build. This is a pre-existing config quirk, not a real failure.
+- `bun run format:check` (root prettier, respects `.prettierignore`) flags a few **pre-existing** committed files (`apps/chhan-chhan/*.md`, `apps/rhymes/src/pages/index.astro`) and generated `apps/rhymes/.astro/*` files. Unrelated to local setup.
+- `bun run typecheck` (5 packages have the script) passes.
+
+### Tests
+
+Only `auth-service` defines a `test` script and it runs with `--passWithNoTests`. `bun run test` passes with no real test files.
+
+### Auth session caveat (local browser)
+
+Better Auth is configured with `secure: true` / `sameSite: "none"` cookies (`shared/auth/src/index.ts`). Over plain `http://localhost` the browser will not persist the session cookie, so a full logged-in session may not stick locally. Account **creation/signup** works fine; verifying users typically requires flipping `email_verified` in the DB since email delivery is disabled by default.
+
+### markitdown (optional, standalone)
+
+Needs a Python venv plus `ffmpeg` + `exiftool` (both installed in the snapshot): `cd apps/markitdown && bun run setup:python`. Defaults to port 3006 — conflicts with `me-via-you`; run only one or change `PORT`.
