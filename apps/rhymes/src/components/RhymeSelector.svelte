@@ -6,9 +6,10 @@
   interface Props {
     rhymes: Rhyme[];
     useFiltered?: boolean;
+    initialSlug?: string;
   }
 
-  const { rhymes: initialRhymes, useFiltered = false }: Props = $props();
+  const { rhymes: initialRhymes, useFiltered = false, initialSlug }: Props = $props();
 
   // Use filtered rhymes from store if useFiltered is true, otherwise use initial rhymes
   let rhymes = $state(initialRhymes);
@@ -31,6 +32,7 @@
   let searchQuery = $state("");
   let activeContentType = $state<"all" | ContentType>("all");
   let isHydratingFromUrl = $state(true);
+  let preserveRootPath = $state(false);
 
   const contentTypeOptions = $derived.by(() => {
     const counts = new Map<"all" | ContentType, number>([["all", rhymes.length]]);
@@ -115,7 +117,8 @@
 
     try {
       const params = new URLSearchParams(window.location.search);
-      const pieceSlug = params.get("piece");
+      const pathSlug = window.location.pathname.replace(/^\/+|\/+$/g, "");
+      const pieceSlug = pathSlug || params.get("piece") || initialSlug;
 
       if (pieceSlug) {
         const rhymeBySlug = findRhymeBySlug(pieceSlug);
@@ -139,18 +142,17 @@
     return getDefaultRhyme();
   }
 
+  function getPathForSelectedRhyme(rhyme: Rhyme | undefined): string {
+    if (!rhyme) return "/";
+    return preserveRootPath ? "/" : `/${rhyme.slug}`;
+  }
+
   function writeReaderStateToUrl(historyMode: "push" | "replace" = "replace") {
     if (typeof window === "undefined") return;
 
     const url = new URL(window.location.href);
-    const selectedSlug = selectedRhyme?.slug;
-
-    if (selectedSlug) {
-      url.searchParams.set("piece", selectedSlug);
-    } else {
-      url.searchParams.delete("piece");
-    }
-
+    url.pathname = getPathForSelectedRhyme(selectedRhyme);
+    url.searchParams.delete("piece");
     url.searchParams.delete("rhyme");
 
     if (searchQuery.trim()) {
@@ -216,6 +218,7 @@
   $effect(() => {
     if (typeof window === "undefined") return;
 
+    preserveRootPath = window.location.pathname === "/" && !new URLSearchParams(window.location.search).has("piece");
     searchQuery = getSearchQueryFromUrl();
     activeContentType = getQuickTypeFromUrl();
     isHydratingFromUrl = false;
@@ -236,6 +239,7 @@
 
   // Handle title click
   function selectRhyme(order: number) {
+    preserveRootPath = false;
     selectedOrder = order;
     scrollToTitle(order);
     selectedPageIndex = 0;
@@ -335,6 +339,7 @@
   });
 
   function setPageMode(mode: ReaderMode) {
+    preserveRootPath = false;
     pageMode = mode;
     if (mode === "continuous") {
       selectedPageIndex = 0;
@@ -344,6 +349,7 @@
 
   function goToPreviousPage() {
     if (selectedPageIndex > 0) {
+      preserveRootPath = false;
       selectedPageIndex -= 1;
       writeReaderStateToUrl("replace");
     }
@@ -351,6 +357,7 @@
 
   function goToNextPage() {
     if (selectedRhyme && selectedPageIndex < selectedRhyme.pages.length - 1) {
+      preserveRootPath = false;
       selectedPageIndex += 1;
       writeReaderStateToUrl("replace");
     }
