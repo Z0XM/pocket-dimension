@@ -5,7 +5,6 @@ import { appCatalog, type AppEntry, type LinkedApp } from "$lib/apps";
 const envSchema = z.object({
   PORT: z.coerce.number().default(3007),
   HOST: z.string().default("0.0.0.0"),
-  POCKET_APP_AUTH_URL: z.string().url().optional(),
   POCKET_APP_WATCHLIST_URL: z.string().url().optional(),
   POCKET_APP_RHYMES_URL: z.string().url().optional(),
   POCKET_APP_HOWWASYOURDAY_URL: z.string().url().optional(),
