@@ -105,6 +105,7 @@
       selectedTags = [];
       newTagInput = "";
       validationErrors = {};
+      isSaving = false;
     }
   });
 
