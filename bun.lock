@@ -182,6 +182,35 @@
         "vite": "^7.2.6",
       },
     },
+    "apps/pocket": {
+      "name": "@pocket-dimension/pocket",
+      "version": "0.0.1",
+      "dependencies": {
+        "@fontsource-variable/nunito-sans": "^5.2.7",
+        "@fontsource/fira-mono": "^5.2.7",
+        "@pocket-dimension/utils": "workspace:*",
+        "zod": "^4.3.4",
+      },
+      "devDependencies": {
+        "@lucide/svelte": "^0.561.0",
+        "@sveltejs/kit": "^2.49.1",
+        "@sveltejs/vite-plugin-svelte": "^6.2.1",
+        "@tailwindcss/forms": "^0.5.10",
+        "@tailwindcss/typography": "^0.5.19",
+        "@tailwindcss/vite": "^4.1.17",
+        "@types/bun": "latest",
+        "clsx": "^2.1.1",
+        "svelte": "^5.45.6",
+        "svelte-adapter-bun": "^1.0.1",
+        "svelte-check": "^4.3.4",
+        "tailwind-merge": "^3.4.0",
+        "tailwind-variants": "^3.2.2",
+        "tailwindcss": "^4.1.17",
+        "tw-animate-css": "^1.4.0",
+        "typescript": "^5.9.3",
+        "vite": "^7.2.6",
+      },
+    },
     "apps/rhymes": {
       "name": "@pocket-dimension/rhymes",
       "version": "0.0.1",
@@ -680,6 +709,8 @@
     "@pocket-dimension/markitdown": ["@pocket-dimension/markitdown@workspace:apps/markitdown"],
 
     "@pocket-dimension/me-via-you": ["@pocket-dimension/me-via-you@workspace:apps/me-via-you"],
+
+    "@pocket-dimension/pocket": ["@pocket-dimension/pocket@workspace:apps/pocket"],
 
     "@pocket-dimension/rhymes": ["@pocket-dimension/rhymes@workspace:apps/rhymes"],
 
@@ -2132,6 +2163,10 @@
     "@pocket-dimension/markitdown/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@pocket-dimension/me-via-you/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@pocket-dimension/pocket/@lucide/svelte": ["@lucide/svelte@0.561.0", "", { "peerDependencies": { "svelte": "^5" } }, "sha512-vofKV2UFVrKE6I4ewKJ3dfCXSV6iP6nWVmiM83MLjsU91EeJcEg7LoWUABLp/aOTxj1HQNbJD1f3g3L0JQgH9A=="],
+
+    "@pocket-dimension/pocket/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@pocket-dimension/rhymes/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
