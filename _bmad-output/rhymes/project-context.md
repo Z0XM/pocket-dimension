@@ -1,12 +1,12 @@
-## RIMES project context
+## rhymes project context
 
 ### Project identity
-- Product name for planning artifacts: `RIMES`.
+- Product name for planning artifacts: `rhymes`.
 - Current implementation lives at `apps/rhymes/` inside the Pocket Dimension monorepo.
 - The revamp is a brownfield redesign and platform upgrade, not a greenfield app.
 
 ### Product intent
-- RIMES is a reader-first literary publishing product for poems, articles, songs, and diaries.
+- `rhymes` is a reader-first literary publishing product for poems, articles, songs, and diaries.
 - The public experience must prioritize instant reading over click-through navigation.
 - The authoring experience must prioritize very fast creation and editing for admins and future contributors.
 
@@ -26,7 +26,7 @@
 
 ### Collaboration and permissions
 - Plan for multi-author support from the start.
-- Prefer Rhymes-specific memberships/roles over relying only on global auth roles.
+- Prefer rhymes-specific memberships/roles over relying only on global auth roles.
 - Support piece-level edit access in addition to project-level roles.
 
 ### Technical direction

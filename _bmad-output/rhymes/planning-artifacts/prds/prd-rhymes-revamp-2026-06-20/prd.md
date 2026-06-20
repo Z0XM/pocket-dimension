@@ -1,21 +1,21 @@
 ---
-title: RIMES Revamp PRD
+title: rhymes revamp PRD
 status: draft
 created: 2026-06-20
 updated: 2026-06-20
 ---
 
-# RIMES Revamp PRD
+# rhymes revamp PRD
 
 ## Executive Summary
 
-RIMES is the next evolution of the current `apps/rhymes` experience: a literary publishing product for poems, articles, songs, and diaries that keeps reading friction low and creation friction even lower. The current reader-centric behavior should be preserved and strengthened, while the underlying platform evolves from static markdown files into an authenticated, structured, multi-author-ready publishing system.
+`rhymes` is the next evolution of the current `apps/rhymes` experience: a literary publishing product for poems, articles, songs, and diaries that keeps reading friction low and creation friction even lower. The current reader-centric behavior should be preserved and strengthened, while the underlying platform evolves from static markdown files into an authenticated, structured, multi-author-ready publishing system.
 
 The first major release of the revamp should establish the new reading layout, the new authoring model, the richer content model, ratings, page breaks, and title-art support. The goal is not only to improve presentation, but to make the platform durable for future contributors and future media features.
 
 ## Problem Statement
 
-The current Rhymes app has three structural limitations:
+The current rhymes app has three structural limitations:
 
 1. It is content-source constrained because content lives as markdown files in the repo.
 2. It lacks live authoring and permissions, so admin workflows are manual and future contributor workflows are not yet practical.
@@ -50,8 +50,8 @@ The system should support permissions, ratings, revisions, and future multi-auth
 ### Contributor
 - Can create and edit content they own or are assigned.
 
-### Rhymes admin
-- Can create, edit, publish, manage permissions, and configure Rhymes-specific access for users.
+### rhymes admin
+- Can create, edit, publish, manage permissions, and configure rhymes-specific access for users.
 
 ## Functional Requirements
 
@@ -123,11 +123,11 @@ The system shall allow a user to update their prior rating.
 
 ### Permissions and collaboration
 
-#### FR-21 Rhymes-specific membership
-The system shall support Rhymes-specific user access separate from any global platform role.
+#### FR-21 rhymes-specific membership
+The system shall support rhymes-specific user access separate from any global platform role.
 
 #### FR-22 Admin access management
-Rhymes admins shall be able to mark a user account as having Rhymes admin or editor access through an administrative user-management surface.
+rhymes admins shall be able to mark a user account as having rhymes admin or editor access through an administrative user-management surface.
 
 #### FR-23 Piece-level edit access
 The system shall support granting edit access to specific content pieces.

@@ -1,5 +1,5 @@
 ---
-title: RIMES UX Design
+title: rhymes UX Design
 status: draft
 created: 2026-06-20
 updated: 2026-06-20
@@ -7,7 +7,7 @@ updated: 2026-06-20
 
 # Brand & Style
 
-RIMES should feel like a contemporary literary room: dark, quiet, tactile, and expressive without looking decorative for its own sake. The shell should be restrained so the writing can carry personality. Public chrome should lean off-black and off-white. Content itself may become more expressive through creator-applied formatting.
+`rhymes` should feel like a contemporary literary room: dark, quiet, tactile, and expressive without looking decorative for its own sake. The shell should be restrained so the writing can carry personality. Public chrome should lean off-black and off-white. Content itself may become more expressive through creator-applied formatting.
 
 ## Colors
 

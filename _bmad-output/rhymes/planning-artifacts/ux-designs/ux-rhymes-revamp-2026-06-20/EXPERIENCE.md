@@ -1,5 +1,5 @@
 ---
-title: RIMES UX Experience
+title: rhymes UX Experience
 status: draft
 created: 2026-06-20
 updated: 2026-06-20
@@ -29,7 +29,7 @@ updated: 2026-06-20
 - Bottom quick composer
 - Expanded editor
 - Piece management actions
-- Rhymes people/settings surface for role assignment
+- rhymes people/settings surface for role assignment
 
 # Voice and Tone
 
@@ -85,7 +85,7 @@ updated: 2026-06-20
 - public viewer
 - logged-in user
 - contributor/editor
-- Rhymes admin
+- rhymes admin
 
 ## Editor states
 - quick compose
@@ -113,7 +113,7 @@ updated: 2026-06-20
 - save draft / publish
 
 ## Admin interactions
-- grant Rhymes-specific role
+- grant rhymes-specific role
 - assign edit access
 - manage content ownership
 
@@ -128,13 +128,13 @@ updated: 2026-06-20
 # Key Flows
 
 ## Flow 1: Reader opens and starts reading
-1. A reader lands on RIMES.
+1. A reader lands on `rhymes`.
 2. The reader immediately sees a selected work on the reading canvas.
 3. The reader scans the browse rail and switches pieces without losing context.
 4. The reader reads the selected piece in either continuous or paged mode.
 
 ## Flow 2: Admin captures a short poem quickly
-1. A Rhymes admin logs in.
+1. A rhymes admin logs in.
 2. The bottom composer is visible immediately.
 3. The admin writes a short piece and triggers the quick submit action.
 4. The piece appears in the content stream with minimal friction.

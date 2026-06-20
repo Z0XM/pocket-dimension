@@ -1,8 +1,8 @@
-# RIMES Revamp Architecture
+# rhymes revamp architecture
 
 ## 1. Overview
 
-RIMES should evolve from a standalone Astro + markdown reader into a reader-first publishing platform integrated with the monorepo's shared auth and database patterns. The architecture must support live authoring, rich document formatting, page breaks, ratings, permissions, title art, and future multi-author workflows while preserving the fast inline reading behavior that already differentiates the current app.
+`rhymes` should evolve from a standalone Astro + markdown reader into a reader-first publishing platform integrated with the monorepo's shared auth and database patterns. The architecture must support live authoring, rich document formatting, page breaks, ratings, permissions, title art, and future multi-author workflows while preserving the fast inline reading behavior that already differentiates the current app.
 
 This architecture is intentionally provisional. It captures the current best-fit technical direction before the remaining product questions are resolved.
 
@@ -17,7 +17,7 @@ This architecture is intentionally provisional. It captures the current best-fit
 
 ### 3.1 Application framework
 
-Preferred direction: migrate the Rhymes app to an auth-friendly full-stack application pattern aligned with the monorepo's SvelteKit apps.
+Preferred direction: migrate the rhymes app to an auth-friendly full-stack application pattern aligned with the monorepo's SvelteKit apps.
 
 Reasoning:
 - faster reuse of existing session and route-protection patterns

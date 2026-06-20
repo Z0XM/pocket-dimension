@@ -11,11 +11,13 @@
 # ─────────────────────────────────────────────────────────────────
 
 [core]
-output_folder = "_bmad-output/rimes"
+output_folder = "_bmad-output/rhymes"
+project_name = "rhymes"
+document_output_language = "English"
 
 [modules.bmm]
-planning_artifacts = "{project-root}/_bmad-output/rimes/planning-artifacts"
-implementation_artifacts = "{project-root}/_bmad-output/rimes/implementation-artifacts"
+planning_artifacts = "{project-root}/_bmad-output/rhymes/planning-artifacts"
+implementation_artifacts = "{project-root}/_bmad-output/rhymes/implementation-artifacts"
 project_knowledge = "docs"
 
 [agents.bmad-agent-analyst]
