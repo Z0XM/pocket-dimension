@@ -5,7 +5,7 @@
 
   const { app }: { app: LinkedApp } = $props();
 
-  const Icon = $derived(appIcons[app.id]);
+  const iconSrc = $derived(appIcons[app.id]);
 </script>
 
 <a
@@ -14,12 +14,14 @@
   rel="noopener noreferrer"
   target="_blank"
 >
-  <div class="mb-4 flex items-start justify-between">
-    <div
-      class="flex size-10 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary transition-colors group-hover:border-primary/40 group-hover:bg-primary/15"
-    >
-      <Icon class="size-5" />
-    </div>
+  <div class="mb-4 flex items-start {iconSrc ? 'justify-between' : 'justify-end'}">
+    {#if iconSrc}
+      <div
+        class="flex size-10 items-center justify-center overflow-hidden rounded-lg border border-primary/20 bg-primary/10 transition-colors group-hover:border-primary/40 group-hover:bg-primary/15"
+      >
+        <img src={iconSrc} alt="" class="size-full object-cover" />
+      </div>
+    {/if}
     <ArrowUpRightIcon
       class="size-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary"
     />

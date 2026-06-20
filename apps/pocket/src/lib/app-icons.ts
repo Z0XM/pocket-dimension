@@ -1,17 +1,15 @@
-import type { Component } from "svelte";
-import BookOpenIcon from "@lucide/svelte/icons/book-open";
-import CalendarHeartIcon from "@lucide/svelte/icons/calendar-heart";
-import FileTextIcon from "@lucide/svelte/icons/file-text";
-import FilmIcon from "@lucide/svelte/icons/film";
-import HeartHandshakeIcon from "@lucide/svelte/icons/heart-handshake";
-import WalletIcon from "@lucide/svelte/icons/wallet";
 import type { AppId } from "$lib/apps";
+import chhanChhanIcon from "../../../chhan-chhan/static/icon.png";
+import howwasyourdayIcon from "../../../howwasyourday/static/icon.svg";
+import meViaYouIcon from "../../../me-via-you/static/icon.svg";
+import rhymesIcon from "../../../rhymes/public/rhyme_icon.svg";
+import watchlistIcon from "../../../watchlist/static/icon.svg";
 
-export const appIcons: Record<AppId, Component> = {
-  watchlist: FilmIcon,
-  rhymes: BookOpenIcon,
-  howwasyourday: CalendarHeartIcon,
-  "chhan-chhan": WalletIcon,
-  "me-via-you": HeartHandshakeIcon,
-  markitdown: FileTextIcon,
+/** App icons sourced from each project's own favicon/static assets. */
+export const appIcons: Partial<Record<AppId, string>> = {
+  watchlist: watchlistIcon,
+  rhymes: rhymesIcon,
+  howwasyourday: howwasyourdayIcon,
+  "chhan-chhan": chhanChhanIcon,
+  "me-via-you": meViaYouIcon,
 };
