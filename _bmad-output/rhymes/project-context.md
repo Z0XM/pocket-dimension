@@ -14,7 +14,8 @@
 - Keep a persistent reading surface visible on first load.
 - Do not reduce the product to a card grid or a list-only blog.
 - Browsing, filtering, and reading should happen in one continuous flow.
-- Admin creation should support a bottom-docked quick composer with `Enter`-to-save behavior.
+- Admin creation should support a bottom-docked quick composer with draft-first saving on `Enter`.
+- The quick composer should expose a separate publish action beside the save action.
 - The visual theme should be quiet, off-black/off-white, and typography-led.
 
 ### Content rules
@@ -22,6 +23,11 @@
 - Content must support plain text, Markdown, and sanitized HTML editing.
 - Content titles must support both styled text and optional uploaded cover/title art.
 - Page breaks are first-class and in current scope.
+- Drafts are never public.
+- Published content is public by default and can also be hidden by the creator/admin.
+- Any logged-in user can rate eligible content.
+- Default reader mode is configured per content piece, not rigidly by content type.
+- The creator chooses the visible title treatment, but title art takes precedence and text title remains the fallback.
 - Future background page-image repetition is explicitly deferred, but current data structures must allow it later.
 
 ### Collaboration and permissions
@@ -37,4 +43,4 @@
 ### Spec posture
 - Use BMAD artifacts as the canonical planning source for this revamp.
 - Capture unresolved user decisions explicitly instead of hiding them in assumptions.
-- Do not create implementation stories until the user resolves the current open product questions.
+- The current foundational product questions for the revamp are resolved and can now be translated into epics/stories.

@@ -41,7 +41,7 @@ The system should support permissions, ratings, revisions, and future multi-auth
 
 ### Public reader
 - Browses and reads published content.
-- May rate content if allowed by final permissions policy.
+- Can rate content when logged in.
 
 ### Logged-in community user
 - Can rate content.
@@ -83,6 +83,12 @@ The product shall show a bottom-docked quick composer for users with create acce
 #### FR-8 Fast submit workflow
 The quick composer shall support single-action submission behavior optimized for short-form writing.
 
+#### FR-8a Draft-first quick capture
+Pressing `Enter` in the quick composer shall save the content as a draft by default.
+
+#### FR-8b Separate publish action
+The quick composer shall expose a separate publish action beside the save action so a creator can directly publish when desired.
+
 #### FR-9 Expanded editor
 The product shall provide an expanded editor for longer-form and more structured content creation.
 
@@ -107,13 +113,19 @@ Users with edit access shall be able to insert, remove, and reorder explicit pag
 #### FR-16 Draft and publish states
 The system shall support at least draft and published states for content.
 
+#### FR-16a Draft privacy
+Draft content shall never be publicly visible.
+
+#### FR-16b Hidden published content
+Published content shall be public by default and may also be marked hidden by the creator or an authorized editor/admin.
+
 ### Ratings and interaction
 
 #### FR-17 Creator rating
 The system shall allow the creator of a content piece to rate that content from 0 to 10.
 
 #### FR-18 User ratings
-The system shall allow eligible blog users to rate content from 0 to 10.
+The system shall allow any logged-in user to rate content from 0 to 10.
 
 #### FR-19 Aggregate rating views
 The system shall store and expose creator rating, user rating summary, rating count, and average rating as separate values where relevant.
@@ -185,12 +197,15 @@ The title model shall support:
 - rich styled text title
 - title art / cover image
 - accessibility-safe fallback text
+- creator-controlled display preference between text title and title art
+- title art precedence when title art is selected for display
 
 ### Document model
 The document model shall support:
 - styled inline spans
 - paragraphs/blocks
 - explicit page breaks
+- per-content default reader mode metadata for paged vs continuous rendering
 - future per-page background configuration
 
 ## UX Requirements Summary
@@ -200,6 +215,7 @@ The document model shall support:
 - The browse surface must not obscure the reading surface.
 - Authoring controls must stay hidden for non-editors.
 - Editing advanced formatting must not make short-form authoring feel heavy.
+- The default reading mode should be chosen per content piece rather than inferred from content type alone.
 
 ## Out of Scope for This Phase
 
@@ -207,14 +223,15 @@ The document model shall support:
 - Broad social features beyond ratings.
 - Rich media/audio playback requirements for songs.
 
-## Risks and Open Questions
+## Risks and Follow-up Notes
 
-### Open questions
-- Should quick composer `Enter` publish or draft by default?
-- Can diaries be private or unlisted?
-- Which users may rate content?
-- What should the default reading mode be for paged vs continuous documents?
-- Should title art replace the visible text title or supplement it?
+### Resolved decisions to carry into implementation
+- Quick composer saves drafts by default and offers a separate publish button.
+- Drafts are never public.
+- Published content is public by default and can be hidden.
+- Any logged-in user can rate content.
+- Default reading mode is selected per content piece.
+- Title art may be chosen by the creator and takes precedence; text title remains the fallback.
 
 ### Primary risks
 - Migrating from repo-backed markdown to structured content without losing tone or formatting.
@@ -225,4 +242,4 @@ The document model shall support:
 
 - UX design artifacts (`DESIGN.md` and `EXPERIENCE.md`) for the reading layout and authoring flows.
 - Architecture document for the data model, auth integration, migration path, and rendering strategy.
-- Epics and stories only after the user resolves the remaining product questions.
+- Epics and stories can now be created from the current requirements baseline.

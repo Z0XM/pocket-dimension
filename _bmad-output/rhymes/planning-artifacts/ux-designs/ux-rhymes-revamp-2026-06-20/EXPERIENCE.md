@@ -52,12 +52,14 @@ updated: 2026-06-20
   - styled title
   - multi-page navigation
   - continuous reading when chosen
+  - per-piece default mode for paged vs continuous presentation
   - creator rating and community rating display
 
 ## Bottom quick composer
 - Visible only to users with create access.
 - Single-line or compact multiline by default.
-- `Enter` action is reserved for the quick-save/create behavior, subject to final product decision.
+- `Enter` saves a draft by default.
+- A separate publish button sits beside the save action for direct publishing.
 - Expansion path reveals richer controls for type, title, formatting, tags, publish state, and page structure.
 
 ## Expanded editor
@@ -79,6 +81,7 @@ updated: 2026-06-20
 ## Content piece states
 - draft
 - published
+- hidden-published
 - archived later if needed
 
 ## Permission states
@@ -110,7 +113,11 @@ updated: 2026-06-20
 - edit title styling
 - add page break
 - upload title art
-- save draft / publish
+- save draft
+- publish directly
+- hide published content
+- choose per-piece default reader mode
+- choose whether title art or text title is displayed
 
 ## Admin interactions
 - grant rhymes-specific role
@@ -131,14 +138,15 @@ updated: 2026-06-20
 1. A reader lands on `rhymes`.
 2. The reader immediately sees a selected work on the reading canvas.
 3. The reader scans the browse rail and switches pieces without losing context.
-4. The reader reads the selected piece in either continuous or paged mode.
+4. The reader sees the piece in its configured default mode, either continuous or paged.
+5. The reader may switch modes when the piece supports both.
 
 ## Flow 2: Admin captures a short poem quickly
 1. A rhymes admin logs in.
 2. The bottom composer is visible immediately.
-3. The admin writes a short piece and triggers the quick submit action.
-4. The piece appears in the content stream with minimal friction.
-5. The admin optionally expands it later for deeper formatting.
+3. The admin writes a short piece and presses `Enter`.
+4. The piece is saved as a draft with minimal friction.
+5. The admin can publish immediately using the separate publish button or expand it later for deeper formatting.
 
 ## Flow 3: Admin creates a styled multi-page article
 1. The admin opens the expanded editor.
@@ -146,7 +154,8 @@ updated: 2026-06-20
 3. The admin writes in Markdown, HTML, or rich editing mode.
 4. The admin inserts page breaks.
 5. The admin styles sections and title text, or uploads title art.
-6. The admin previews and saves/publishes.
+6. The admin chooses the default reader mode for that specific piece.
+7. The admin previews and saves/publishes.
 
 ## Flow 4: Community user rates a piece
 1. A logged-in user opens a published piece.
@@ -154,9 +163,12 @@ updated: 2026-06-20
 3. The user submits or updates a 0-10 rating.
 4. The aggregate updates without disrupting reading.
 
-# Open UX Questions
+# Locked UX Decisions
 
-- Whether quick composer should default to draft or publish.
-- Whether the public default view for multi-page content should be paged or continuous.
-- Whether diaries support private or unlisted visibility.
-- Whether title art replaces or complements the visible text title.
+- Quick composer saves drafts by default on `Enter`.
+- Publish is exposed as a separate action beside save.
+- Drafts are never public.
+- Published content can also be hidden.
+- Any logged-in user can rate content.
+- Reader mode default is configured per piece.
+- Creator chooses whether title art or text title is displayed; title art takes precedence and text title remains the fallback.

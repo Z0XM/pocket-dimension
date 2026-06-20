@@ -4,7 +4,7 @@
 
 `rhymes` should evolve from a standalone Astro + markdown reader into a reader-first publishing platform integrated with the monorepo's shared auth and database patterns. The architecture must support live authoring, rich document formatting, page breaks, ratings, permissions, title art, and future multi-author workflows while preserving the fast inline reading behavior that already differentiates the current app.
 
-This architecture is intentionally provisional. It captures the current best-fit technical direction before the remaining product questions are resolved.
+This architecture is intentionally provisional. It captures the current best-fit technical direction before implementation details are broken into epics and stories.
 
 ## 2. Current-state summary
 
@@ -44,7 +44,7 @@ Do not use CDN as the primary text store.
 - `slug`
 - `content_type` (`poem`, `article`, `song`, `diary`)
 - `status` (`draft`, `published`)
-- `visibility` (final values pending product decision)
+- `visibility` (`public`, `hidden`)
 - `author_id`
 - `created_by_id`
 - `updated_by_id`
@@ -53,9 +53,11 @@ Do not use CDN as the primary text store.
 - `reader_average_rating`
 - `reader_rating_count`
 - `title_mode` (`text`, `art`, `hybrid`)
+- `display_title_mode` (`text`, `art`)
 - `title_text_plain`
 - `title_rich_json`
 - `title_art_asset_id`
+- `default_reader_mode` (`paged`, `continuous`)
 
 ### 4.2 Content body
 
@@ -128,6 +130,7 @@ Recommendation:
 - canonical structured JSON document
 - imported/exported views for Markdown and HTML
 - sanitized HTML render output for public display
+- workflow metadata for draft-first save, publish action, and hidden-published state
 
 Rationale:
 - raw Markdown alone cannot represent all requested formatting cleanly
@@ -173,6 +176,7 @@ Minimum server capabilities:
 - create piece
 - update piece
 - publish/unpublish piece
+- hide/unhide published piece
 - upload title art
 - assign membership/permissions
 - create/update rating
@@ -200,11 +204,16 @@ Minimum server capabilities:
 - Page-break nodes keep editing simpler and still satisfy current requirements.
 - Recommendation: page-break nodes now, evolve later if needed.
 
-## 11. Preconditions before implementation stories
+## 11. Locked product decisions
 
-The following product questions should be resolved before epics/stories are finalized:
-- quick composer submit behavior
-- diary visibility rules
-- rating eligibility rules
-- default paged vs continuous view
-- title art replacement vs supplement behavior
+- Quick composer saves drafts by default on `Enter`.
+- Publish is exposed as a separate action beside save.
+- Drafts are never public.
+- Published content is public by default and can be hidden.
+- Any logged-in user can rate content.
+- Default reading mode is stored per content piece rather than derived from content type.
+- Creator chooses whether title art or text title is displayed; title art takes precedence and text title remains the fallback.
+
+## 12. Implementation readiness
+
+The current planning set is ready to be translated into epics/stories for implementation.

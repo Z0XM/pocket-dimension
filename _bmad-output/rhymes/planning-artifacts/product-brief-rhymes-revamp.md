@@ -18,6 +18,8 @@ For readers, the risk is losing the best part of the current experience if the s
 
 The product should support content as structured documents rather than only raw markdown files. That allows page-aware rendering, mixed authoring modes, styling of partial text ranges, formatted titles, and optional title art. The system should also support both creator ratings and community ratings.
 
+The default authoring posture should be safe and fast: quick-composer submissions save as drafts by default, while a separate publish action allows immediate release when desired. Drafts are never public. Published content is public by default, but creators/admins can hide it. Reading mode should be chosen per piece rather than by content type, and title art should take precedence whenever the creator chooses to show it while the text title remains the fallback.
+
 ## What Makes This Different
 
 - It is optimized for literary reading rather than blog chronology.
@@ -54,6 +56,9 @@ The product should support content as structured documents rather than only raw 
 - Page break support.
 - Title art / cover image support.
 - Ratings by creators and logged-in users.
+- Draft-first quick capture with separate publish control.
+- Hidden-published visibility support.
+- Per-piece default reader mode selection.
 - Multi-author-ready data model and role model.
 
 ### Explicitly deferred
