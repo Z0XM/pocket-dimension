@@ -12,7 +12,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "typecheck": "bun run check",
-    "test": "bun test src/lib/visibility.test.ts"
+    "test": "bun test src/lib/visibility.test.ts src/lib/server/drafts.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/playwrite-us-modern": "^5.2.7",
@@ -22,6 +22,7 @@
     "@pocket-dimension/db": "workspace:*",
     "@tailwindcss/vite": "^4.3.0",
     "better-auth": "^1.4.10",
+    "drizzle-orm": "^0.45.1",
     "gray-matter": "^4.0.3",
     "marked": "^17.0.1",
     "svelte": "^5.48.2",

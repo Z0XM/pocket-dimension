@@ -1,5 +1,6 @@
 <script lang="ts">
   import FilterSort from "$components/FilterSort.svelte";
+  import QuickComposer from "$components/QuickComposer.svelte";
   import RhymeSelector from "$components/RhymeSelector.svelte";
   import type { RhymesWorkspaceAccess } from "$lib/server/membership";
   import type { Rhyme } from "$lib/rhymes";
@@ -32,5 +33,10 @@
     </div>
   </div>
 
-  <RhymeSelector {rhymes} useFiltered={true} {initialSlug} />
+  <div class="flex min-h-0 flex-1 flex-col">
+    <div class="min-h-0 flex-1">
+      <RhymeSelector {rhymes} useFiltered={true} {initialSlug} />
+    </div>
+    <QuickComposer canCreate={creatorWorkspace?.canCreate ?? false} />
+  </div>
 </div>
