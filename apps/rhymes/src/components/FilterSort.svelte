@@ -190,9 +190,9 @@
       });
     } else if (currentSort === "best") {
       result.sort((a, b) => {
-        const ratingA = a.frontmatter.rating ?? 0;
-        const ratingB = b.frontmatter.rating ?? 0;
-        return ratingB - ratingA; // Descending (best first)
+        const ratingA = a.readerAverageRating ?? a.creatorRating ?? a.frontmatter.rating ?? 0;
+        const ratingB = b.readerAverageRating ?? b.creatorRating ?? b.frontmatter.rating ?? 0;
+        return ratingB - ratingA;
       });
     }
 

@@ -10,4 +10,9 @@
   <meta name="description" content="Browse, filter, and read poems, articles, songs, and diaries inline." />
 </svelte:head>
 
-<RhymesShell rhymes={data.rhymes} />
+<RhymesShell
+  rhymes={data.rhymes}
+  creatorWorkspace={data.creatorWorkspace}
+  creatorPieces={data.creatorPieces}
+  user={data.user}
+/>

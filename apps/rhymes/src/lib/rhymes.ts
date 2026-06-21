@@ -1,8 +1,12 @@
 import matter from "gray-matter";
+import type { SourceMode, TitleRichStyle } from "./document";
+import { filterPublicRhymes } from "./visibility";
 
 export type ContentType = "poem" | "article" | "song" | "diary";
 export type ContentVisibility = "public" | "hidden" | "draft";
 export type ReaderMode = "continuous" | "paged";
+export type PieceSource = "markdown" | "database";
+export type { SourceMode, TitleRichStyle };
 
 export interface RhymeFrontmatter {
   title?: string;
@@ -29,6 +33,17 @@ export interface Rhyme {
   defaultReaderMode: ReaderMode;
   summary: string;
   frontmatter: RhymeFrontmatter;
+  source?: PieceSource;
+  pieceId?: string;
+  sourceMode?: SourceMode;
+  bodyHtml?: string;
+  creatorRating?: number | null;
+  readerAverageRating?: number | null;
+  readerRatingCount?: number;
+  titleArtUrl?: string | null;
+  displayTitleMode?: "text" | "art";
+  titleRichJson?: TitleRichStyle | null;
+  titleStyle?: string;
 }
 
 const PAGE_BREAK_REGEX = /\n---\s*\n/g;
@@ -47,7 +62,7 @@ function parseOrder(frontmatter: RhymeFrontmatter): number | undefined {
   return Number.isNaN(numericOrder) ? undefined : numericOrder;
 }
 
-function slugify(value: string): string {
+export function slugify(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -55,7 +70,7 @@ function slugify(value: string): string {
     .replace(/-{2,}/g, "-");
 }
 
-function deriveSlug(title: string, order: number | undefined, path: string): string {
+export function deriveSlug(title: string, order: number | undefined, path: string): string {
   const baseSlug = slugify(title) || slugify(path.split("/").pop()?.replace(/\.md$/i, "") || path) || "piece";
 
   if (order !== undefined) {
@@ -118,9 +133,17 @@ function deriveSummary(content: string): string {
   );
 }
 
-export function parseRhymes(rawRhymeModules: Record<string, string>): Rhyme[] {
-  return Object.keys(rawRhymeModules)
-    .map((path) => {
+function sortRhymes(rhymes: Rhyme[]): Rhyme[] {
+  return [...rhymes].sort((a, b) => {
+    const orderA = a.frontmatter.order ?? 0;
+    const orderB = b.frontmatter.order ?? 0;
+    return orderB - orderA;
+  });
+}
+
+export function parseAllRhymes(rawRhymeModules: Record<string, string>): Rhyme[] {
+  return sortRhymes(
+    Object.keys(rawRhymeModules).map((path) => {
       const rawDocument = rawRhymeModules[path];
       const parsed = matter(rawDocument);
       const content = parsed.content.trim();
@@ -145,10 +168,10 @@ export function parseRhymes(rawRhymeModules: Record<string, string>): Rhyme[] {
         },
       } satisfies Rhyme;
     })
-    .filter((rhyme) => rhyme.visibility !== "draft" && rhyme.visibility !== "hidden")
-    .sort((a, b) => {
-      const orderA = a.frontmatter.order ?? 0;
-      const orderB = b.frontmatter.order ?? 0;
-      return orderB - orderA;
-    });
+  );
+}
+
+/** Parse markdown modules and return only pieces visible to public readers. */
+export function parseRhymes(rawRhymeModules: Record<string, string>): Rhyme[] {
+  return filterPublicRhymes(parseAllRhymes(rawRhymeModules));
 }

@@ -1,14 +1,31 @@
 <script lang="ts">
   import FilterSort from "$components/FilterSort.svelte";
+  import QuickComposer from "$components/QuickComposer.svelte";
+  import ExpandedEditor from "$components/ExpandedEditor.svelte";
   import RhymeSelector from "$components/RhymeSelector.svelte";
+  import type { RhymesWorkspaceAccess } from "$lib/server/membership";
   import type { Rhyme } from "$lib/rhymes";
+
+  interface CreatorPieceSummary {
+    id: string;
+    slug: string;
+    title: string;
+    status: string;
+    visibility: string;
+    updatedAt: string;
+  }
 
   interface Props {
     rhymes: Rhyme[];
     initialSlug?: string;
+    creatorWorkspace?: RhymesWorkspaceAccess;
+    creatorPieces?: CreatorPieceSummary[];
+    user?: { id: string; email?: string | null; username?: string | null; emailVerified?: boolean } | null;
   }
 
-  const { rhymes, initialSlug }: Props = $props();
+  const { rhymes, initialSlug, creatorWorkspace, creatorPieces = [], user = null }: Props = $props();
+
+  let editorOpen = $state(false);
 </script>
 
 <div class="flex flex-col h-screen overflow-hidden">
@@ -18,11 +35,42 @@
         <span class="font-medium text-2xl shrink-0 whitespace-nowrap md:text-4xl font-heading text-theme-peach-1"> rhymes </span>
       </a>
       <p class="mt-2 max-w-xl text-xs md:text-sm text-theme-peach-3">Browse, filter, and read without leaving the page.</p>
+      {#if creatorWorkspace?.canAdmin}
+        <a href="/admin/people" class="mt-2 inline-block text-xs text-theme-peach-2 underline">Manage rhymes people</a>
+      {/if}
     </div>
-    <div class="flex justify-end pt-1">
+    <div class="flex items-start justify-end gap-3 pt-1">
+      {#if user}
+        <div class="border border-theme-peach-2/40 bg-theme-pink-3/80 px-3 py-2 text-right text-xs text-theme-peach-2">
+          <p>{user.email ?? user.username}</p>
+          {#if !user.emailVerified}
+            <a href="/check-email" class="text-theme-red-2 underline">Verify email</a>
+          {/if}
+        </div>
+      {:else}
+        <a href="/login" class="border border-theme-peach-2 px-3 py-2 text-xs text-theme-peach-1">Sign in</a>
+      {/if}
+      {#if creatorWorkspace?.canCreate}
+        <div class="border border-theme-peach-2/40 bg-theme-pink-3/80 px-3 py-2 text-right" aria-label="Creator workspace">
+          <p class="text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-3">Creator workspace</p>
+          <p class="mt-1 text-xs text-theme-peach-1">Signed in as {creatorWorkspace.role}</p>
+        </div>
+      {/if}
       <FilterSort {rhymes} />
     </div>
   </div>
 
-  <RhymeSelector {rhymes} useFiltered={true} {initialSlug} />
+  <div class="flex min-h-0 flex-1 flex-col">
+    <div class="min-h-0 flex-1">
+      <RhymeSelector {rhymes} useFiltered={true} {initialSlug} {user} />
+    </div>
+    <QuickComposer canCreate={creatorWorkspace?.canCreate ?? false} onOpenEditor={() => (editorOpen = true)} />
+  </div>
+
+  <ExpandedEditor
+    open={editorOpen}
+    canCreate={creatorWorkspace?.canCreate ?? false}
+    {creatorPieces}
+    onClose={() => (editorOpen = false)}
+  />
 </div>

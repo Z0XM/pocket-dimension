@@ -9,6 +9,7 @@ export default defineConfig({
     "./src/schema/howwasyourday.ts",
     "./src/schema/chhanchhan.ts",
     "./src/schema/meviayou.ts",
+    "./src/schema/rhymes.ts",
   ],
   dialect: "postgresql",
   dbCredentials: {

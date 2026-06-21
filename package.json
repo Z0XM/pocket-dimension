@@ -26,6 +26,8 @@
     "dev:app:pocket": "./scripts/turbo-no-prefix.sh run dev --filter=@pocket-dimension/pocket",
     "db:generate": "./scripts/turbo-no-prefix.sh run db:generate --filter=@pocket-dimension/db --",
     "db:migrate": "./scripts/turbo-no-prefix.sh run db:migrate --filter=@pocket-dimension/db",
+    "db:import:rhymes": "cd apps/rhymes && bun run import:markdown",
+    "db:import:rhymes:dry-run": "cd apps/rhymes && bun run import:markdown:dry-run",
     "db:studio": "./scripts/turbo-no-prefix.sh run db:studio --filter=@pocket-dimension/db",
     "lint": "./scripts/turbo-no-prefix.sh run lint",
     "format": "prettier --write .",
