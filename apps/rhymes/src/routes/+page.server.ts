@@ -1,8 +1,8 @@
-import { loadPublicRhymes } from "$lib/loadRhymes";
+import { loadPublicCatalog } from "$lib/server/catalog";
 import type { PageServerLoad } from "./$types";
 
-export const load: PageServerLoad = () => {
+export const load: PageServerLoad = async () => {
   return {
-    rhymes: loadPublicRhymes(),
+    rhymes: await loadPublicCatalog(),
   };
 };

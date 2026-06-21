@@ -169,6 +169,13 @@
       "when": 1781020000000,
       "tag": "0023_rhymes_pieces",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1781100000000,
+      "tag": "0024_rhymes_platform",
+      "breakpoints": true
     }
   ]
 }

@@ -1,9 +1,12 @@
 import matter from "gray-matter";
+import type { SourceMode, TitleRichStyle } from "./document";
 import { filterPublicRhymes } from "./visibility";
 
 export type ContentType = "poem" | "article" | "song" | "diary";
 export type ContentVisibility = "public" | "hidden" | "draft";
 export type ReaderMode = "continuous" | "paged";
+export type PieceSource = "markdown" | "database";
+export type { SourceMode, TitleRichStyle };
 
 export interface RhymeFrontmatter {
   title?: string;
@@ -30,6 +33,17 @@ export interface Rhyme {
   defaultReaderMode: ReaderMode;
   summary: string;
   frontmatter: RhymeFrontmatter;
+  source?: PieceSource;
+  pieceId?: string;
+  sourceMode?: SourceMode;
+  bodyHtml?: string;
+  creatorRating?: number | null;
+  readerAverageRating?: number | null;
+  readerRatingCount?: number;
+  titleArtUrl?: string | null;
+  displayTitleMode?: "text" | "art";
+  titleRichJson?: TitleRichStyle | null;
+  titleStyle?: string;
 }
 
 const PAGE_BREAK_REGEX = /\n---\s*\n/g;

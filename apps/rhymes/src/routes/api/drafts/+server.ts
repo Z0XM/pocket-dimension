@@ -1,12 +1,12 @@
 import { json, error } from "@sveltejs/kit";
 import { requireRhymesCreator } from "$lib/server/authz";
-import { createDraftPiece, normalizeContentType } from "$lib/server/drafts";
+import { createDraftPiece, normalizeContentType } from "$lib/server/pieces";
 import type { RequestHandler } from "./$types";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
-  const user = requireRhymesCreator(locals);
+  const user = await requireRhymesCreator(locals);
 
-  let payload: { body?: unknown; contentType?: unknown };
+  let payload: { body?: unknown; contentType?: unknown; sourceMode?: unknown };
 
   try {
     payload = await request.json();
@@ -22,10 +22,16 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     const draft = await createDraftPiece(user.id, {
       body: payload.body,
       contentType: typeof payload.contentType === "string" ? normalizeContentType(payload.contentType) : undefined,
+      sourceMode: typeof payload.sourceMode === "string" ? (payload.sourceMode as "plain" | "markdown" | "html") : undefined,
     });
 
     return json({
-      ...draft,
+      id: draft.id,
+      slug: draft.slug,
+      title: draft.titleText,
+      status: draft.status,
+      visibility: draft.visibility,
+      contentType: draft.contentType,
       message: "Draft saved",
     });
   } catch (createError) {

@@ -7,9 +7,10 @@
     rhymes: Rhyme[];
     useFiltered?: boolean;
     initialSlug?: string;
+    user?: { id: string } | null;
   }
 
-  let { rhymes: initialRhymes, useFiltered = false, initialSlug }: Props = $props();
+  let { rhymes: initialRhymes, useFiltered = false, initialSlug, user = null }: Props = $props();
 
   // Use filtered rhymes from store if useFiltered is true, otherwise use initial rhymes
   let rhymes = $state<Rhyme[]>([]);
@@ -214,6 +215,10 @@
   let selectedPageIndex = $state(0);
   let titleContainer: HTMLDivElement | null = $state(null);
   let contentArea: HTMLDivElement | null = $state(null);
+  let readerRating = $state<number | "">("");
+  let ratingMessage = $state<string | null>(null);
+  let communityAverage = $state<number | null>(null);
+  let communityCount = $state(0);
 
   $effect(() => {
     if (typeof window === "undefined") return;
@@ -367,11 +372,63 @@
   const processedContent = $derived.by(() => {
     if (!selectedRhyme) return "";
 
+    if (selectedRhyme.bodyHtml) {
+      if (pageMode === "paged" && selectedRhyme.pages[selectedPageIndex]) {
+        return marked.parse(selectedRhyme.pages[selectedPageIndex]) as string;
+      }
+      return selectedRhyme.bodyHtml;
+    }
+
     const activeContent =
       pageMode === "paged" && selectedRhyme.pages[selectedPageIndex] ? selectedRhyme.pages[selectedPageIndex] : selectedRhyme.content;
 
     return marked.parse(activeContent) as string;
   });
+
+  $effect(() => {
+    if (!selectedRhyme?.pieceId || !user?.id) {
+      readerRating = "";
+      communityAverage = selectedRhyme?.readerAverageRating ?? null;
+      communityCount = selectedRhyme?.readerRatingCount ?? 0;
+      return;
+    }
+
+    communityAverage = selectedRhyme.readerAverageRating ?? null;
+    communityCount = selectedRhyme.readerRatingCount ?? 0;
+
+    void (async () => {
+      const response = await fetch(`/api/pieces/${selectedRhyme.pieceId}/rating`);
+      if (!response.ok) return;
+      const data = (await response.json()) as {
+        rating: number | null;
+        readerAverageRating: number | null;
+        readerRatingCount: number;
+      };
+      readerRating = data.rating ?? "";
+      communityAverage = data.readerAverageRating;
+      communityCount = data.readerRatingCount;
+    })();
+  });
+
+  async function submitReaderRating() {
+    if (!selectedRhyme?.pieceId || !user?.id || readerRating === "") return;
+
+    const response = await fetch(`/api/pieces/${selectedRhyme.pieceId}/rating`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rating: Number(readerRating) }),
+    });
+
+    if (!response.ok) {
+      ratingMessage = "Could not save rating";
+      return;
+    }
+
+    const data = (await response.json()) as { readerAverageRating: number | null; readerRatingCount: number };
+    communityAverage = data.readerAverageRating;
+    communityCount = data.readerRatingCount;
+    ratingMessage = "Rating saved";
+  }
 
   $effect(() => {
     if (typeof window === "undefined" || isHydratingFromUrl || displayedRhymes.length === 0) return;
@@ -596,7 +653,11 @@
             </div>
 
             <h1 class="mt-4 font-heading text-2xl text-theme-peach-1 md:text-4xl">
-              {selectedRhyme.frontmatter.title}
+              {#if selectedRhyme.displayTitleMode === "art" && selectedRhyme.titleArtUrl}
+                <img src={selectedRhyme.titleArtUrl} alt={selectedRhyme.frontmatter.title} class="max-h-40 object-contain" />
+              {:else}
+                <span style={selectedRhyme.titleStyle}>{selectedRhyme.frontmatter.title}</span>
+              {/if}
             </h1>
             <p class="mt-3 max-w-2xl text-sm leading-6 text-theme-peach-3">
               {selectedRhyme.summary}
@@ -605,7 +666,16 @@
 
           <div class="flex flex-col gap-3 text-sm text-theme-peach-2 lg:items-end">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="font-heading text-theme-peach-1">{selectedRhyme.frontmatter.rating}/10</span>
+              {#if selectedRhyme.creatorRating != null}
+                <span class="font-heading text-theme-peach-1">Creator: {selectedRhyme.creatorRating}/10</span>
+              {:else if selectedRhyme.frontmatter.rating}
+                <span class="font-heading text-theme-peach-1">{selectedRhyme.frontmatter.rating}/10</span>
+              {/if}
+              {#if communityAverage != null}
+                <span>Community: {communityAverage}/10 ({communityCount})</span>
+              {:else if selectedRhyme.readerAverageRating != null}
+                <span>Community: {selectedRhyme.readerAverageRating}/10 ({selectedRhyme.readerRatingCount ?? 0})</span>
+              {/if}
               {#if selectedRhyme.frontmatter.thought_on}
                 <span>{selectedRhyme.frontmatter.thought_on?.replaceAll("/", "-")}</span>
               {/if}
@@ -613,6 +683,31 @@
                 <span>{selectedRhyme.pages.length} pages</span>
               {/if}
             </div>
+
+            {#if user && selectedRhyme.pieceId}
+              <div class="flex flex-wrap items-center gap-2">
+                <label class="text-xs text-theme-peach-3">
+                  Your rating
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    bind:value={readerRating}
+                    class="ml-2 w-16 border border-theme-red-2/40 bg-theme-pink-3 px-2 py-1 text-xs text-theme-peach-1"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onclick={() => void submitReaderRating()}
+                  class="border border-theme-red-2/40 px-3 py-1 text-xs text-theme-peach-1"
+                >
+                  Rate
+                </button>
+                {#if ratingMessage}
+                  <span class="text-xs text-theme-peach-3">{ratingMessage}</span>
+                {/if}
+              </div>
+            {/if}
 
             {#if hasMultiplePages}
               <div class="flex flex-wrap items-center gap-2">
