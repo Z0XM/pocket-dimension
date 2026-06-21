@@ -9,15 +9,16 @@ This architecture is intentionally provisional. It captures the current best-fit
 ## 2. Current-state summary
 
 - Current public app lives in `apps/rhymes/`.
-- Current content source of truth is repo-committed markdown in `apps/rhymes/src/assets/rhymes/`.
-- Current app has no auth, no CRUD API, and no admin UX.
+- Current public shell now runs on SvelteKit with Bun/Vite and preserves the current two-pane inline reader UX.
+- Current content source of truth is still repo-committed markdown in `apps/rhymes/src/assets/rhymes/`.
+- Current app still has no auth, no CRUD API, and no admin UX.
 - Current platform already provides reusable auth roles, session handling, and database conventions in other apps.
 
 ## 3. Recommended platform direction
 
 ### 3.1 Application framework
 
-Preferred direction: migrate the rhymes app to an auth-friendly full-stack application pattern aligned with the monorepo's SvelteKit apps.
+Current direction: `rhymes` now uses a SvelteKit application shell aligned with the monorepo's Bun/SvelteKit apps, replacing the earlier Astro runtime.
 
 Reasoning:
 - faster reuse of existing session and route-protection patterns
@@ -25,7 +26,7 @@ Reasoning:
 - easier server-side content APIs and file uploads
 - more natural fit for live drafts, ratings, and permissions
 
-Astro can technically be extended, but for this scope SvelteKit is the lower-friction long-term architecture inside this monorepo.
+The framework migration is complete for the public reader shell; the next architectural milestone is auth/database integration on top of this SvelteKit baseline.
 
 ### 3.2 Source of truth
 
@@ -216,4 +217,4 @@ Minimum server capabilities:
 
 ## 12. Implementation readiness
 
-The current planning set is ready to be translated into epics/stories for implementation.
+The public-reader foundation is already underway on the SvelteKit baseline. The next major implementation target is Epic 2 Story 2.1: authenticated creator access and rhymes workspace gating.

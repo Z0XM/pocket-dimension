@@ -36,6 +36,7 @@
 - Support piece-level edit access in addition to project-level roles.
 
 ### Technical direction
+- The current public `rhymes` shell is now implemented in SvelteKit and should stay aligned with the monorepo's Bun + SvelteKit conventions.
 - Favor reuse of the monorepo auth/database patterns already used by other apps.
 - Treat the current markdown-in-repo implementation as migration input, not the long-term source of truth.
 - Prefer database-backed content and metadata; use object storage/CDN only for assets such as cover art and future images.
