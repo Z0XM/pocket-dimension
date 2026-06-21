@@ -41,7 +41,7 @@ development_status:
   1-2-deliver-the-new-public-reader-shell-with-persistent-reading-canvas: review
   1-3-add-inline-discovery-with-search-filters-and-piece-switching: review
   1-4-render-page-aware-and-continuous-reading-per-content-piece: review
-  1-5-respect-public-visibility-rules-for-published-and-hidden-content: backlog
+  1-5-respect-public-visibility-rules-for-published-and-hidden-content: ready-for-dev
   epic-1-retrospective: optional
 
   epic-2: in-progress
@@ -53,22 +53,22 @@ development_status:
   epic-2-retrospective: optional
 
   epic-3: backlog
-  3-1-support-plain-text-markdown-and-html-editing-modes: backlog
-  3-2-add-rich-inline-body-styling-controls: backlog
-  3-3-add-title-styling-and-title-art-display-rules: backlog
-  3-4-author-and-manage-explicit-page-breaks: backlog
-  3-5-configure-default-reader-mode-per-content-piece: backlog
+  3-1-support-plain-text-markdown-and-html-editing-modes: ready-for-dev
+  3-2-add-rich-inline-body-styling-controls: ready-for-dev
+  3-3-add-title-styling-and-title-art-display-rules: ready-for-dev
+  3-4-author-and-manage-explicit-page-breaks: ready-for-dev
+  3-5-configure-default-reader-mode-per-content-piece: ready-for-dev
   epic-3-retrospective: optional
 
   epic-4: backlog
-  4-1-capture-and-display-creator-ratings: backlog
-  4-2-allow-any-logged-in-user-to-rate-and-update-ratings: backlog
-  4-3-surface-aggregate-reader-ratings-in-reader-and-discovery-flows: backlog
+  4-1-capture-and-display-creator-ratings: ready-for-dev
+  4-2-allow-any-logged-in-user-to-rate-and-update-ratings: ready-for-dev
+  4-3-surface-aggregate-reader-ratings-in-reader-and-discovery-flows: ready-for-dev
   epic-4-retrospective: optional
 
   epic-5: backlog
-  5-1-introduce-rhymes-specific-memberships-and-workspace-roles: backlog
-  5-2-manage-rhymes-roles-from-an-admin-people-surface: backlog
-  5-3-grant-piece-level-edit-access: backlog
-  5-4-preserve-revision-history-and-audit-metadata: backlog
+  5-1-introduce-rhymes-specific-memberships-and-workspace-roles: ready-for-dev
+  5-2-manage-rhymes-roles-from-an-admin-people-surface: ready-for-dev
+  5-3-grant-piece-level-edit-access: ready-for-dev
+  5-4-preserve-revision-history-and-audit-metadata: ready-for-dev
   epic-5-retrospective: optional
