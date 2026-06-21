@@ -20,7 +20,7 @@
     initialSlug?: string;
     creatorWorkspace?: RhymesWorkspaceAccess;
     creatorPieces?: CreatorPieceSummary[];
-    user?: { id: string } | null;
+    user?: { id: string; email?: string | null; username?: string | null; emailVerified?: boolean } | null;
   }
 
   const { rhymes, initialSlug, creatorWorkspace, creatorPieces = [], user = null }: Props = $props();
@@ -40,6 +40,16 @@
       {/if}
     </div>
     <div class="flex items-start justify-end gap-3 pt-1">
+      {#if user}
+        <div class="border border-theme-peach-2/40 bg-theme-pink-3/80 px-3 py-2 text-right text-xs text-theme-peach-2">
+          <p>{user.email ?? user.username}</p>
+          {#if !user.emailVerified}
+            <a href="/check-email" class="text-theme-red-2 underline">Verify email</a>
+          {/if}
+        </div>
+      {:else}
+        <a href="/login" class="border border-theme-peach-2 px-3 py-2 text-xs text-theme-peach-1">Sign in</a>
+      {/if}
       {#if creatorWorkspace?.canCreate}
         <div class="border border-theme-peach-2/40 bg-theme-pink-3/80 px-3 py-2 text-right" aria-label="Creator workspace">
           <p class="text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-3">Creator workspace</p>

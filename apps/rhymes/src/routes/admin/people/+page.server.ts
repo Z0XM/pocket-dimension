@@ -6,7 +6,7 @@ export const load: PageServerLoad = async ({ locals }) => {
   const workspace = await resolveRhymesWorkspaceAccess(locals.user);
   if (!workspace.canAdmin) {
     if (!locals.user) {
-      throw redirect(307, "/");
+      throw redirect(307, `/login?redirect=${encodeURIComponent("/admin/people")}`);
     }
     throw error(403, "Rhymes admin access required");
   }

@@ -2,6 +2,7 @@ import { json, error } from "@sveltejs/kit";
 import { requirePieceEditor } from "$lib/server/authz";
 import { getPieceById, publishPiece, updatePiece } from "$lib/server/pieces";
 import { listPieceEvents } from "$lib/server/events";
+import type { BodyDocument } from "$lib/document";
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ locals, params }) => {
@@ -25,6 +26,10 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
     const piece = await updatePiece(params.id, user.id, {
       titleText: typeof payload.titleText === "string" ? payload.titleText : undefined,
       bodyPlain: typeof payload.bodyPlain === "string" ? payload.bodyPlain : undefined,
+      bodyDocument:
+        payload.bodyDocument && typeof payload.bodyDocument === "object"
+          ? (payload.bodyDocument as BodyDocument)
+          : undefined,
       contentType: typeof payload.contentType === "string" ? (payload.contentType as "poem") : undefined,
       sourceMode: typeof payload.sourceMode === "string" ? (payload.sourceMode as "plain") : undefined,
       defaultReaderMode:

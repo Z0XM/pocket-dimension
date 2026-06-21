@@ -12,11 +12,12 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "typecheck": "bun run check",
-    "test": "bun test src/lib/visibility.test.ts src/lib/server/drafts.test.ts scripts/import-markdown.test.ts",
+    "test": "bun test src/lib/visibility.test.ts src/lib/document.test.ts src/lib/server/drafts.test.ts src/lib/server/pieces.test.ts src/lib/server/storage.test.ts src/lib/server/revision-store.test.ts src/lib/server/api-payloads.test.ts scripts/import-markdown.test.ts",
     "import:markdown": "bun run scripts/import-markdown.ts",
     "import:markdown:dry-run": "bun run scripts/import-markdown.ts --dry-run"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1073.0",
     "@fontsource-variable/playwrite-us-modern": "^5.2.7",
     "@fontsource/playwrite-de-grund-guides": "^5.2.6",
     "@fontsource/playwrite-us-modern-guides": "^5.2.6",

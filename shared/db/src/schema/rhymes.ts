@@ -135,6 +135,23 @@ export const rhymesPieceEvents = rhymesSchema.table(
   (table) => [index("rhymes_piece_events_piece_id_idx").on(table.pieceId)]
 );
 
+export const rhymesPieceRevisions = rhymesSchema.table(
+  "piece_revisions",
+  {
+    id,
+    createdAt: timestamps.createdAt,
+    pieceId: uuid("piece_id")
+      .notNull()
+      .references(() => rhymesPieces.id, { onDelete: "cascade" }),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    snapshotJson: jsonb("snapshot_json").notNull(),
+    label: text("label"),
+  },
+  (table) => [index("rhymes_piece_revisions_piece_id_idx").on(table.pieceId)]
+);
+
 export const rhymesPiecesRelations = relations(rhymesPieces, ({ one, many }) => ({
   author: one(auth.user, {
     fields: [rhymesPieces.authorId],

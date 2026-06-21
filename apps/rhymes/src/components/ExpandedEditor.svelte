@@ -1,6 +1,8 @@
 <script lang="ts">
+  import RichBodyEditor from "$components/RichBodyEditor.svelte";
   import type { ContentType, ReaderMode } from "$lib/rhymes";
-  import type { SourceMode, TitleRichStyle } from "$lib/document";
+  import type { BodyDocument, SourceMode, TitleRichStyle } from "$lib/document";
+  import { plainTextToDocument } from "$lib/document";
 
   interface CreatorPieceSummary {
     id: string;
@@ -9,6 +11,26 @@
     status: string;
     visibility: string;
     updatedAt: string;
+  }
+
+  interface PermissionRow {
+    userId: string;
+    email: string;
+    name: string | null;
+    username: string | null;
+  }
+
+  interface RevisionRow {
+    id: string;
+    createdAt: string;
+    label: string | null;
+  }
+
+  interface UserSearchResult {
+    id: string;
+    email: string;
+    name: string | null;
+    username: string | null;
   }
 
   interface Props {
@@ -23,6 +45,7 @@
   let selectedPieceId = $state<string | null>(null);
   let titleText = $state("");
   let bodyPlain = $state("");
+  let bodyDocument = $state<BodyDocument>({ type: "doc", content: [] });
   let contentType = $state<ContentType>("poem");
   let sourceMode = $state<SourceMode>("plain");
   let defaultReaderMode = $state<ReaderMode>("continuous");
@@ -32,7 +55,10 @@
   let titleBackground = $state("");
   let titleFontFamily = $state("var(--font-heading)");
   let titleFontSize = $state("1.5rem");
-  let shareUserId = $state("");
+  let shareQuery = $state("");
+  let shareResults = $state<UserSearchResult[]>([]);
+  let permissions = $state<PermissionRow[]>([]);
+  let revisions = $state<RevisionRow[]>([]);
   let statusMessage = $state<string | null>(null);
   let errorMessage = $state<string | null>(null);
   let isSaving = $state(false);
@@ -50,6 +76,10 @@
     const piece = data.piece;
     titleText = String(piece.titleText ?? "");
     bodyPlain = String(piece.bodyPlain ?? "");
+    bodyDocument =
+      piece.bodyDocument && typeof piece.bodyDocument === "object"
+        ? (piece.bodyDocument as BodyDocument)
+        : plainTextToDocument(bodyPlain);
     contentType = (piece.contentType as ContentType) ?? "poem";
     sourceMode = (piece.sourceMode as SourceMode) ?? "plain";
     defaultReaderMode = (piece.defaultReaderMode as ReaderMode) ?? "continuous";
@@ -62,27 +92,53 @@
     titleFontFamily = titleRich?.fontFamily ?? "var(--font-heading)";
     titleFontSize = titleRich?.fontSize ?? "1.5rem";
 
+    await Promise.all([loadHistory(pieceId), loadPermissions(pieceId), loadRevisions(pieceId)]);
+  }
+
+  async function loadHistory(pieceId: string) {
     const historyResponse = await fetch(`/api/pieces/${pieceId}?action=history`, { method: "POST" });
-    if (historyResponse.ok) {
-      const historyData = (await historyResponse.json()) as {
-        events: Array<{ action: string; createdAt: string | Date }>;
-      };
-      history = historyData.events.map((event) => ({
-        action: event.action,
-        createdAt: new Date(event.createdAt).toLocaleString(),
-      }));
-    }
+    if (!historyResponse.ok) return;
+    const historyData = (await historyResponse.json()) as {
+      events: Array<{ action: string; createdAt: string | Date }>;
+    };
+    history = historyData.events.map((event) => ({
+      action: event.action,
+      createdAt: new Date(event.createdAt).toLocaleString(),
+    }));
+  }
+
+  async function loadPermissions(pieceId: string) {
+    const response = await fetch(`/api/pieces/${pieceId}/permissions`);
+    if (!response.ok) return;
+    const data = (await response.json()) as { permissions: PermissionRow[] };
+    permissions = data.permissions;
+  }
+
+  async function loadRevisions(pieceId: string) {
+    const response = await fetch(`/api/pieces/${pieceId}/revisions`);
+    if (!response.ok) return;
+    const data = (await response.json()) as { revisions: Array<{ id: string; createdAt: string | Date; label: string | null }> };
+    revisions = data.revisions.map((revision) => ({
+      id: revision.id,
+      label: revision.label,
+      createdAt: new Date(revision.createdAt).toLocaleString(),
+    }));
   }
 
   function resetEditor() {
     selectedPieceId = null;
     titleText = "";
     bodyPlain = "";
+    bodyDocument = { type: "doc", content: [] };
     contentType = "poem";
     sourceMode = "plain";
     defaultReaderMode = "continuous";
     creatorRating = "";
     displayTitleMode = "text";
+    shareQuery = "";
+    shareResults = [];
+    permissions = [];
+    revisions = [];
     history = [];
     statusMessage = null;
     errorMessage = null;
@@ -93,24 +149,31 @@
     isSaving = true;
     errorMessage = null;
 
+    const payload: Record<string, unknown> = {
+      titleText,
+      contentType,
+      sourceMode,
+      defaultReaderMode,
+      creatorRating: creatorRating === "" ? null : Number(creatorRating),
+      displayTitleMode,
+      titleRichJson: {
+        color: titleColor,
+        backgroundColor: titleBackground || undefined,
+        fontFamily: titleFontFamily,
+        fontSize: titleFontSize,
+      },
+    };
+
+    if (sourceMode === "plain") {
+      payload.bodyDocument = bodyDocument;
+    } else {
+      payload.bodyPlain = bodyPlain;
+    }
+
     const response = await fetch(`/api/pieces/${selectedPieceId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        titleText,
-        bodyPlain,
-        contentType,
-        sourceMode,
-        defaultReaderMode,
-        creatorRating: creatorRating === "" ? null : Number(creatorRating),
-        displayTitleMode,
-        titleRichJson: {
-          color: titleColor,
-          backgroundColor: titleBackground || undefined,
-          fontFamily: titleFontFamily,
-          fontSize: titleFontSize,
-        },
-      }),
+      body: JSON.stringify(payload),
     });
 
     isSaving = false;
@@ -177,19 +240,64 @@
     await loadPiece(selectedPieceId);
   }
 
-  async function grantEditAccess() {
-    if (!selectedPieceId || !shareUserId.trim()) return;
+  async function searchUsers() {
+    const query = shareQuery.trim();
+    if (query.length < 2) {
+      shareResults = [];
+      return;
+    }
+
+    const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+    if (!response.ok) return;
+    const data = (await response.json()) as { users: UserSearchResult[] };
+    shareResults = data.users;
+  }
+
+  async function grantEditAccess(userId: string) {
+    if (!selectedPieceId) return;
     const response = await fetch(`/api/pieces/${selectedPieceId}/permissions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: shareUserId.trim() }),
+      body: JSON.stringify({ userId }),
     });
     if (!response.ok) {
       errorMessage = "Could not grant edit access";
       return;
     }
     statusMessage = "Edit access granted";
-    shareUserId = "";
+    shareQuery = "";
+    shareResults = [];
+    await loadPermissions(selectedPieceId);
+  }
+
+  async function revokeEditAccess(userId: string) {
+    if (!selectedPieceId) return;
+    const response = await fetch(`/api/pieces/${selectedPieceId}/permissions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, action: "revoke" }),
+    });
+    if (!response.ok) {
+      errorMessage = "Could not revoke edit access";
+      return;
+    }
+    statusMessage = "Edit access revoked";
+    await loadPermissions(selectedPieceId);
+  }
+
+  async function restoreRevision(revisionId: string) {
+    if (!selectedPieceId) return;
+    const response = await fetch(`/api/pieces/${selectedPieceId}/revisions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ revisionId }),
+    });
+    if (!response.ok) {
+      errorMessage = "Could not restore revision";
+      return;
+    }
+    statusMessage = "Revision restored";
+    await loadPiece(selectedPieceId);
   }
 </script>
 
@@ -301,11 +409,19 @@
 
             <label class="block text-xs text-theme-peach-3">
               Body
-              <textarea bind:value={bodyPlain} rows="10" class="mt-1 w-full border border-theme-red-2/40 bg-theme-pink-3 px-3 py-2 text-sm text-theme-peach-1"></textarea>
+              {#if sourceMode === "plain"}
+                <div class="mt-1">
+                  <RichBodyEditor bodyDocument={bodyDocument} onchange={(next) => (bodyDocument = next)} />
+                </div>
+              {:else}
+                <textarea bind:value={bodyPlain} rows="10" class="mt-1 w-full border border-theme-red-2/40 bg-theme-pink-3 px-3 py-2 text-sm text-theme-peach-1"></textarea>
+              {/if}
             </label>
 
             <div class="flex flex-wrap gap-2">
-              <button type="button" class="border border-theme-peach-2 px-3 py-2 text-xs text-theme-peach-1" onclick={insertPageBreak}>Insert page break</button>
+              {#if sourceMode !== "plain"}
+                <button type="button" class="border border-theme-peach-2 px-3 py-2 text-xs text-theme-peach-1" onclick={insertPageBreak}>Insert page break</button>
+              {/if}
               <label class="border border-theme-red-2/40 px-3 py-2 text-xs text-theme-peach-1 cursor-pointer">
                 Upload title art
                 <input type="file" accept="image/*" class="hidden" onchange={uploadTitleArt} />
@@ -323,10 +439,54 @@
             <div class="border border-theme-red-2/30 p-3">
               <p class="text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-3">Piece-level edit access</p>
               <div class="mt-2 flex gap-2">
-                <input bind:value={shareUserId} placeholder="User ID" class="flex-1 border border-theme-red-2/40 bg-theme-pink-3 px-2 py-2 text-xs text-theme-peach-1" />
-                <button type="button" class="border border-theme-red-2/40 px-3 py-2 text-xs text-theme-peach-1" onclick={() => void grantEditAccess()}>Grant edit</button>
+                <input
+                  bind:value={shareQuery}
+                  placeholder="Search by email or name"
+                  class="flex-1 border border-theme-red-2/40 bg-theme-pink-3 px-2 py-2 text-xs text-theme-peach-1"
+                  oninput={() => void searchUsers()}
+                />
               </div>
+              {#if shareResults.length > 0}
+                <ul class="mt-2 space-y-1">
+                  {#each shareResults as user}
+                    <li class="flex items-center justify-between gap-2 text-xs text-theme-peach-2">
+                      <span>{user.name ?? user.username ?? user.email}</span>
+                      <button type="button" class="border border-theme-red-2/40 px-2 py-1 text-[0.625rem]" onclick={() => void grantEditAccess(user.id)}>
+                        Grant
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+              {#if permissions.length > 0}
+                <ul class="mt-3 space-y-1 text-xs text-theme-peach-3">
+                  {#each permissions as permission}
+                    <li class="flex items-center justify-between gap-2">
+                      <span>{permission.name ?? permission.username ?? permission.email}</span>
+                      <button type="button" class="border border-theme-red-2/40 px-2 py-1 text-[0.625rem]" onclick={() => void revokeEditAccess(permission.userId)}>
+                        Revoke
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
             </div>
+
+            {#if revisions.length > 0}
+              <div class="border border-theme-red-2/30 p-3">
+                <p class="text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-3">Revisions</p>
+                <ul class="mt-2 space-y-1 text-xs text-theme-peach-3">
+                  {#each revisions as revision}
+                    <li class="flex items-center justify-between gap-2">
+                      <span>{revision.createdAt}{revision.label ? ` · ${revision.label}` : ""}</span>
+                      <button type="button" class="border border-theme-red-2/40 px-2 py-1 text-[0.625rem]" onclick={() => void restoreRevision(revision.id)}>
+                        Restore
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
 
             {#if history.length > 0}
               <div class="border border-theme-red-2/30 p-3">

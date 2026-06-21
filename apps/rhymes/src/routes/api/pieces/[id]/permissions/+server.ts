@@ -1,7 +1,15 @@
 import { json, error } from "@sveltejs/kit";
-import { grantPieceEditAccess, requirePieceEditor, revokePieceEditAccess } from "$lib/server/authz";
+import { db, schema } from "@pocket-dimension/db";
+import { eq } from "drizzle-orm";
+import { grantPieceEditAccess, listPiecePermissions, requirePieceEditor, revokePieceEditAccess } from "$lib/server/authz";
 import { logPieceEvent } from "$lib/server/events";
 import type { RequestHandler } from "./$types";
+
+export const GET: RequestHandler = async ({ locals, params }) => {
+  await requirePieceEditor(locals, params.id);
+  const permissions = await listPiecePermissions(params.id);
+  return json({ permissions });
+};
 
 export const POST: RequestHandler = async ({ locals, params, request }) => {
   const user = await requirePieceEditor(locals, params.id);
@@ -15,6 +23,11 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 
   if (typeof payload.userId !== "string") {
     throw error(400, "userId is required");
+  }
+
+  const [targetUser] = await db.select().from(schema.user).where(eq(schema.user.id, payload.userId)).limit(1);
+  if (!targetUser) {
+    throw error(404, "User not found");
   }
 
   if (payload.action === "revoke") {

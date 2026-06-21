@@ -1,10 +1,11 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { ContentType, ReaderMode } from "$lib/rhymes";
+import { plainTextToDocument, documentToHtml, documentToPlainTextWithBreaks, splitDocumentPages } from "$lib/document";
 import type { BodyDocument, SourceMode, TitleRichStyle } from "$lib/document";
-import { plainTextToDocument, splitDocumentPages } from "$lib/document";
 import { renderSourceToHtml } from "$lib/server/sanitize";
 import { logPieceEvent } from "$lib/server/events";
+import { createPieceRevision } from "$lib/server/revision-store";
 
 const CONTENT_TYPES: ContentType[] = ["poem", "article", "song", "diary"];
 const SOURCE_MODES: SourceMode[] = ["plain", "markdown", "html"];
@@ -18,6 +19,7 @@ export interface CreateDraftInput {
 export interface UpdatePieceInput {
   titleText?: string;
   bodyPlain?: string;
+  bodyDocument?: BodyDocument;
   contentType?: ContentType;
   sourceMode?: SourceMode;
   defaultReaderMode?: ReaderMode;
@@ -92,10 +94,14 @@ export function normalizeCreatorRating(value: number | null | undefined): number
   return value;
 }
 
-async function buildRenderPayload(bodyPlain: string, sourceMode: SourceMode) {
-  const bodyDocument = plainTextToDocument(bodyPlain);
-  const bodyRenderHtml = await renderSourceToHtml(bodyPlain, sourceMode);
-  return { bodyDocument, bodyRenderHtml };
+async function buildRenderPayload(bodyPlain: string, sourceMode: SourceMode, bodyDocument?: BodyDocument) {
+  const document = bodyDocument ?? plainTextToDocument(bodyPlain);
+  const normalizedPlain = bodyDocument ? documentToPlainTextWithBreaks(document) : bodyPlain;
+  const bodyRenderHtml =
+    sourceMode === "plain" && bodyDocument
+      ? documentToHtml(document)
+      : await renderSourceToHtml(normalizedPlain, sourceMode);
+  return { bodyDocument: document, bodyPlain: normalizedPlain, bodyRenderHtml };
 }
 
 export async function createDraftPiece(userId: string, input: CreateDraftInput) {
@@ -187,11 +193,28 @@ export async function getPieceBySlug(slug: string) {
 }
 
 export async function listCreatorPieces(userId: string) {
-  return db
+  return listEditablePieces(userId);
+}
+
+export async function listEditablePieces(userId: string) {
+  const authored = await db
     .select()
     .from(schema.rhymesPieces)
     .where(eq(schema.rhymesPieces.authorId, userId))
     .orderBy(desc(schema.rhymesPieces.updatedAt));
+
+  const shared = await db
+    .select({ piece: schema.rhymesPieces })
+    .from(schema.rhymesPiecePermissions)
+    .innerJoin(schema.rhymesPieces, eq(schema.rhymesPiecePermissions.pieceId, schema.rhymesPieces.id))
+    .where(eq(schema.rhymesPiecePermissions.userId, userId))
+    .orderBy(desc(schema.rhymesPieces.updatedAt));
+
+  const byId = new Map<string, DbPiece>();
+  for (const piece of authored) byId.set(piece.id, piece);
+  for (const { piece } of shared) byId.set(piece.id, piece);
+
+  return Array.from(byId.values()).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }
 
 export async function listPublicDbPieces() {
@@ -209,6 +232,12 @@ export async function updatePiece(pieceId: string, userId: string, input: Update
   const piece = await getPieceById(pieceId);
   if (!piece) throw new Error("Piece not found");
 
+  const hasContentChange =
+    input.bodyPlain !== undefined || input.bodyDocument !== undefined || input.sourceMode !== undefined;
+  if (hasContentChange || input.titleText !== undefined || input.titleRichJson !== undefined) {
+    await createPieceRevision(piece, userId);
+  }
+
   const updates: Partial<typeof schema.rhymesPieces.$inferInsert> = {
     updatedById: userId,
   };
@@ -221,7 +250,17 @@ export async function updatePiece(pieceId: string, userId: string, input: Update
   if (input.displayTitleMode !== undefined) updates.displayTitleMode = input.displayTitleMode;
   if (input.titleArtAssetId !== undefined) updates.titleArtAssetId = input.titleArtAssetId;
 
-  if (input.bodyPlain !== undefined) {
+  if (input.bodyDocument !== undefined) {
+    const sourceMode = input.sourceMode ? normalizeSourceMode(input.sourceMode) : piece.sourceMode;
+    const renderPayload = await buildRenderPayload(piece.bodyPlain, sourceMode, input.bodyDocument);
+    updates.bodyPlain = renderPayload.bodyPlain;
+    updates.sourceMode = sourceMode;
+    updates.bodyDocument = renderPayload.bodyDocument;
+    updates.bodyRenderHtml = renderPayload.bodyRenderHtml;
+    if (!input.titleText) {
+      updates.titleText = deriveDraftTitle(renderPayload.bodyPlain);
+    }
+  } else if (input.bodyPlain !== undefined) {
     const bodyPlain = normalizeDraftBody(input.bodyPlain);
     if (!bodyPlain) throw new Error("Body cannot be empty");
     const sourceMode = input.sourceMode ? normalizeSourceMode(input.sourceMode) : piece.sourceMode;
@@ -235,7 +274,7 @@ export async function updatePiece(pieceId: string, userId: string, input: Update
     }
   } else if (input.sourceMode !== undefined) {
     const sourceMode = normalizeSourceMode(input.sourceMode);
-    const renderPayload = await buildRenderPayload(piece.bodyPlain, sourceMode);
+    const renderPayload = await buildRenderPayload(piece.bodyPlain, sourceMode, piece.bodyDocument as BodyDocument | undefined);
     updates.sourceMode = sourceMode;
     updates.bodyDocument = renderPayload.bodyDocument;
     updates.bodyRenderHtml = renderPayload.bodyRenderHtml;

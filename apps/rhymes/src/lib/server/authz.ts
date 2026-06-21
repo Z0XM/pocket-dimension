@@ -97,3 +97,16 @@ export async function revokePieceEditAccess(pieceId: string, userId: string) {
     .delete(schema.rhymesPiecePermissions)
     .where(and(eq(schema.rhymesPiecePermissions.pieceId, pieceId), eq(schema.rhymesPiecePermissions.userId, userId)));
 }
+
+export async function listPiecePermissions(pieceId: string) {
+  return db
+    .select({
+      userId: schema.rhymesPiecePermissions.userId,
+      email: schema.user.email,
+      name: schema.user.name,
+      username: schema.user.username,
+    })
+    .from(schema.rhymesPiecePermissions)
+    .innerJoin(schema.user, eq(schema.rhymesPiecePermissions.userId, schema.user.id))
+    .where(eq(schema.rhymesPiecePermissions.pieceId, pieceId));
+}

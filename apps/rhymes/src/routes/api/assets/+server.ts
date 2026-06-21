@@ -1,11 +1,13 @@
 import { json, error } from "@sveltejs/kit";
 import { db, schema } from "@pocket-dimension/db";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { requirePieceEditor } from "$lib/server/authz";
 import { updatePiece } from "$lib/server/pieces";
 import { logPieceEvent } from "$lib/server/events";
+import { getAssetPublicUrl, uploadTitleArt } from "$lib/server/storage";
 import type { RequestHandler } from "./$types";
+
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 export const POST: RequestHandler = async ({ locals, request }) => {
   const formData = await request.formData();
@@ -16,14 +18,20 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     throw error(400, "pieceId and file are required");
   }
 
-  const user = await requirePieceEditor(locals, pieceId);
-  const uploadsDir = path.join(process.cwd(), "static", "uploads", "rhymes");
-  await mkdir(uploadsDir, { recursive: true });
+  if (!ALLOWED_MIME_TYPES.has(file.type)) {
+    throw error(400, "Only PNG, JPEG, WebP, and GIF images are supported");
+  }
 
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw error(400, "Image must be 5MB or smaller");
+  }
+
+  const user = await requirePieceEditor(locals, pieceId);
   const storageKey = `${pieceId}-${crypto.randomUUID()}-${file.name}`;
-  const destination = path.join(uploadsDir, storageKey);
   const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(destination, buffer);
+  const mimeType = file.type || "application/octet-stream";
+
+  await uploadTitleArt(storageKey, buffer, mimeType);
 
   const [asset] = await db
     .insert(schema.rhymesAssets)
@@ -31,7 +39,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       pieceId,
       kind: "title_art",
       storageKey,
-      mimeType: file.type || "application/octet-stream",
+      mimeType,
       createdById: user.id,
       updatedById: user.id,
     })
@@ -47,6 +55,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   return json({
     asset,
     piece,
-    url: `/uploads/rhymes/${storageKey}`,
+    url: getAssetPublicUrl(storageKey),
   });
 };

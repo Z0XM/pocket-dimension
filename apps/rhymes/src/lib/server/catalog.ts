@@ -3,6 +3,7 @@ import { parseRhymes } from "$lib/rhymes";
 import type { TitleRichStyle } from "$lib/document";
 import { renderTitleStyle } from "$lib/document";
 import { listPublicDbPieces, pieceToPages, type DbPiece } from "$lib/server/pieces";
+import { getAssetPublicUrl } from "$lib/server/storage";
 
 function loadRawRhymeModules(): Record<string, string> {
   return import.meta.glob("../assets/rhymes/*.md", {
@@ -71,7 +72,7 @@ export async function loadPublicCatalog(): Promise<Rhyme[]> {
   const useMarkdownCatalog = process.env.RHYMES_USE_MARKDOWN_CATALOG !== "false";
   const dbRows = await listPublicDbPieces();
   const dbRhymes = dbRows.map(({ piece, titleArtStorageKey }) =>
-    dbPieceToRhyme(piece, titleArtStorageKey ? `/uploads/rhymes/${titleArtStorageKey}` : null)
+    dbPieceToRhyme(piece, titleArtStorageKey ? getAssetPublicUrl(titleArtStorageKey) : null)
   );
 
   if (!useMarkdownCatalog) {
