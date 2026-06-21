@@ -62,7 +62,7 @@ function parseOrder(frontmatter: RhymeFrontmatter): number | undefined {
   return Number.isNaN(numericOrder) ? undefined : numericOrder;
 }
 
-function slugify(value: string): string {
+export function slugify(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -70,7 +70,7 @@ function slugify(value: string): string {
     .replace(/-{2,}/g, "-");
 }
 
-function deriveSlug(title: string, order: number | undefined, path: string): string {
+export function deriveSlug(title: string, order: number | undefined, path: string): string {
   const baseSlug = slugify(title) || slugify(path.split("/").pop()?.replace(/\.md$/i, "") || path) || "piece";
 
   if (order !== undefined) {

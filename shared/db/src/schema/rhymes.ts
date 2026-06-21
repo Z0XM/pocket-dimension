@@ -33,6 +33,7 @@ export const rhymesPieces = rhymesSchema.table(
     titleRichJson: jsonb("title_rich_json"),
     displayTitleMode: rhymesDisplayTitleMode("display_title_mode").default("text").notNull(),
     titleArtAssetId: uuid("title_art_asset_id"),
+    legacyMetadata: jsonb("legacy_metadata"),
     defaultReaderMode: rhymesReaderMode("default_reader_mode").default("continuous").notNull(),
     creatorRating: integer("creator_rating"),
     readerAverageRating: numeric("reader_average_rating", { precision: 4, scale: 2 }),

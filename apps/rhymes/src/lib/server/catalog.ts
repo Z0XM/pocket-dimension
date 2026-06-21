@@ -26,6 +26,11 @@ export function dbPieceToRhyme(piece: DbPiece, titleArtUrl: string | null = null
   const pages = pieceToPages(piece);
   const content = pages.join("\n\n---\n\n") || piece.bodyPlain;
   const publishedOrder = piece.publishedAt ? Math.floor(piece.publishedAt.getTime() / 1000) : 0;
+  const legacy =
+    piece.legacyMetadata && typeof piece.legacyMetadata === "object"
+      ? (piece.legacyMetadata as Record<string, unknown>)
+      : null;
+  const legacyOrder = typeof legacy?.order === "number" ? legacy.order : undefined;
 
   return {
     id: `db:${piece.id}`,
@@ -49,25 +54,35 @@ export function dbPieceToRhyme(piece: DbPiece, titleArtUrl: string | null = null
     titleStyle: renderTitleStyle((piece.titleRichJson as TitleRichStyle | null) ?? null),
     frontmatter: {
       title: piece.titleText,
-      order: publishedOrder,
+      order: legacyOrder ?? publishedOrder,
       rating: piece.creatorRating ?? (piece.readerAverageRating ? Number(piece.readerAverageRating) : undefined),
       content_type: piece.contentType,
       visibility: piece.status === "draft" ? "draft" : piece.visibility,
       reader_mode: piece.defaultReaderMode,
-      status: piece.status === "published" ? "Published" : "Draft",
+      status: typeof legacy?.status === "string" ? legacy.status : piece.status === "published" ? "Published" : "Draft",
+      thought_on: typeof legacy?.thought_on === "string" ? legacy.thought_on : undefined,
+      phase: typeof legacy?.phase === "string" ? legacy.phase : undefined,
+      tags: Array.isArray(legacy?.tags) ? (legacy.tags as string[]) : undefined,
     },
   };
 }
 
 export async function loadPublicCatalog(): Promise<Rhyme[]> {
-  const markdownRhymes = parseRhymes(loadRawRhymeModules());
+  const useMarkdownCatalog = process.env.RHYMES_USE_MARKDOWN_CATALOG !== "false";
   const dbRows = await listPublicDbPieces();
-
   const dbRhymes = dbRows.map(({ piece, titleArtStorageKey }) =>
     dbPieceToRhyme(piece, titleArtStorageKey ? `/uploads/rhymes/${titleArtStorageKey}` : null)
   );
 
-  return [...dbRhymes, ...markdownRhymes].sort((a, b) => {
+  if (!useMarkdownCatalog) {
+    return dbRhymes.sort((a, b) => (b.frontmatter.order ?? 0) - (a.frontmatter.order ?? 0));
+  }
+
+  const markdownRhymes = parseRhymes(loadRawRhymeModules());
+  const dbSlugs = new Set(dbRhymes.map((rhyme) => rhyme.slug));
+  const markdownOnly = markdownRhymes.filter((rhyme) => !dbSlugs.has(rhyme.slug));
+
+  return [...dbRhymes, ...markdownOnly].sort((a, b) => {
     const orderA = a.frontmatter.order ?? 0;
     const orderB = b.frontmatter.order ?? 0;
     return orderB - orderA;
