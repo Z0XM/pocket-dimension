@@ -12,6 +12,7 @@
     sort: SortOption;
     statuses: string[];
     tags: string[];
+    contentTypes: string[];
   };
 
   // Get filter state from URL
@@ -21,6 +22,7 @@
         sort: "best",
         statuses: [],
         tags: [],
+        contentTypes: [],
       };
     }
 
@@ -29,6 +31,7 @@
       const sort = params.get("sort");
       const statusesParam = params.get("statuses");
       const tagsParam = params.get("tags");
+      const contentTypesParam = params.get("types");
 
       const result = {
         sort: sort === "best" || sort === "most-recent" ? (sort as SortOption) : "best",
@@ -44,6 +47,12 @@
               .map((t) => decodeURIComponent(t))
               .filter((t) => t.length > 0)
           : [],
+        contentTypes: contentTypesParam
+          ? contentTypesParam
+              .split(",")
+              .map((type) => decodeURIComponent(type))
+              .filter((type) => type.length > 0)
+          : [],
       };
 
       return result;
@@ -52,6 +61,7 @@
         sort: "best",
         statuses: [],
         tags: [],
+        contentTypes: [],
       };
     }
   }
@@ -83,6 +93,12 @@
       url.searchParams.set("tags", filters.tags.map((t) => encodeURIComponent(t)).join(","));
     }
 
+    if (filters.contentTypes.length === 0) {
+      url.searchParams.delete("types");
+    } else {
+      url.searchParams.set("types", filters.contentTypes.map((type) => encodeURIComponent(type)).join(","));
+    }
+
     window.history.pushState({}, "", url);
   }
 
@@ -90,7 +106,9 @@
   let filterState = $state<FilterState>(getFiltersFromUrl());
 
   // Track filter state changes to ensure reactivity
-  const filterKey = $derived(`${filterState.sort}-${filterState.statuses.join(",")}-${filterState.tags.join(",")}`);
+  const filterKey = $derived(
+    `${filterState.sort}-${filterState.statuses.join(",")}-${filterState.tags.join(",")}-${filterState.contentTypes.join(",")}`
+  );
 
   let isOpen = $state(false);
 
@@ -117,6 +135,14 @@
     return Array.from(tagSet).sort();
   });
 
+  const allContentTypes = $derived.by(() => {
+    const contentTypeSet = new Set<string>();
+    rhymes.forEach((rhyme) => {
+      contentTypeSet.add(rhyme.contentType);
+    });
+    return Array.from(contentTypeSet).sort();
+  });
+
   // Apply filters and sorting
   // Use filterKey to ensure recalculation when filter state changes
   const filteredAndSortedRhymes = $derived.by(() => {
@@ -124,6 +150,7 @@
     void filterKey;
     const currentStatuses = filterState.statuses;
     const currentTags = filterState.tags;
+    const currentContentTypes = filterState.contentTypes;
     const currentSort = filterState.sort;
 
     let result = [...rhymes];
@@ -132,6 +159,7 @@
     result = result.filter((rhyme) => {
       let passesStatusFilter = true;
       let passesTagFilter = true;
+      let passesContentTypeFilter = true;
 
       // Status filter: must match at least one selected status (if any statuses are selected)
       if (currentStatuses.length > 0) {
@@ -145,8 +173,12 @@
         passesTagFilter = currentTags.some((tag) => tags.includes(tag));
       }
 
+      if (currentContentTypes.length > 0) {
+        passesContentTypeFilter = currentContentTypes.includes(rhyme.contentType);
+      }
+
       // Both filters must pass (AND logic)
-      return passesStatusFilter && passesTagFilter;
+      return passesStatusFilter && passesTagFilter && passesContentTypeFilter;
     });
 
     // Apply sorting
@@ -214,9 +246,18 @@
     // URL will be updated by the effect
   }
 
+  function toggleContentType(contentType: string) {
+    if (filterState.contentTypes.includes(contentType)) {
+      filterState.contentTypes = filterState.contentTypes.filter((type) => type !== contentType);
+    } else {
+      filterState.contentTypes = [...filterState.contentTypes, contentType];
+    }
+  }
+
   function clearFilters() {
     filterState.statuses = [];
     filterState.tags = [];
+    filterState.contentTypes = [];
     filterState.sort = "best";
     // URL will be updated by the effect
   }
@@ -234,6 +275,7 @@
     filterState.sort = newFilters.sort;
     filterState.statuses = newFilters.statuses;
     filterState.tags = newFilters.tags;
+    filterState.contentTypes = newFilters.contentTypes;
   }
 
   // Set up popstate listener
@@ -245,7 +287,12 @@
     };
   });
 
-  const hasActiveFilters = $derived(filterState.statuses.length > 0 || filterState.tags.length > 0 || filterState.sort !== "best");
+  const hasActiveFilters = $derived(
+    filterState.statuses.length > 0 ||
+      filterState.tags.length > 0 ||
+      filterState.contentTypes.length > 0 ||
+      filterState.sort !== "best"
+  );
 </script>
 
 <div class="relative">
@@ -321,6 +368,24 @@
               <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={filterState.tags.includes(tag)} onchange={() => toggleTag(tag)} class="accent-theme-red-1" />
                 <span class="text-xs text-theme-peach-1">{tag}</span>
+              </label>
+            {/each}
+          </div>
+        </div>
+
+        <!-- Content Type Filter -->
+        <div>
+          <h3 class="text-sm font-heading text-theme-peach-1 mb-2">Content Type</h3>
+          <div class="flex flex-col gap-2 max-h-32 overflow-y-auto">
+            {#each allContentTypes as contentType}
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filterState.contentTypes.includes(contentType)}
+                  onchange={() => toggleContentType(contentType)}
+                  class="accent-theme-red-1"
+                />
+                <span class="text-xs text-theme-peach-1 capitalize">{contentType}</span>
               </label>
             {/each}
           </div>

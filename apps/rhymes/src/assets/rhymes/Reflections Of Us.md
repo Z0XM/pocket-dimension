@@ -6,6 +6,7 @@ phase: "10/10 Poet"
 status: "Instagram"
 order: 147
 tags: ["Feel Good", "Article"]
+reader_mode: "paged"
 ---
 
 ## Phase 1
