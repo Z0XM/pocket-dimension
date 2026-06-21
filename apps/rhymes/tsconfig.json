@@ -9,7 +9,7 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "moduleResolution": "bundler",
-    "types": ["bun"]
-  }
+    "moduleResolution": "bundler"
+  },
+  "exclude": ["vite.config.ts"]
 }

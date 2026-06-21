@@ -10,4 +10,4 @@
   <meta name="description" content={data.description} />
 </svelte:head>
 
-<RhymesShell rhymes={data.rhymes} initialSlug={data.initialSlug} />
+<RhymesShell rhymes={data.rhymes} initialSlug={data.initialSlug} creatorWorkspace={data.creatorWorkspace} />

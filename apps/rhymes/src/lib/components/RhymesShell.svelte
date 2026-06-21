@@ -1,14 +1,16 @@
 <script lang="ts">
   import FilterSort from "$components/FilterSort.svelte";
   import RhymeSelector from "$components/RhymeSelector.svelte";
+  import type { RhymesWorkspaceAccess } from "$lib/server/membership";
   import type { Rhyme } from "$lib/rhymes";
 
   interface Props {
     rhymes: Rhyme[];
     initialSlug?: string;
+    creatorWorkspace?: RhymesWorkspaceAccess;
   }
 
-  const { rhymes, initialSlug }: Props = $props();
+  const { rhymes, initialSlug, creatorWorkspace }: Props = $props();
 </script>
 
 <div class="flex flex-col h-screen overflow-hidden">
@@ -19,7 +21,13 @@
       </a>
       <p class="mt-2 max-w-xl text-xs md:text-sm text-theme-peach-3">Browse, filter, and read without leaving the page.</p>
     </div>
-    <div class="flex justify-end pt-1">
+    <div class="flex items-start justify-end gap-3 pt-1">
+      {#if creatorWorkspace?.canCreate}
+        <div class="border border-theme-peach-2/40 bg-theme-pink-3/80 px-3 py-2 text-right" aria-label="Creator workspace">
+          <p class="text-[0.625rem] font-heading uppercase tracking-[0.18em] text-theme-peach-3">Creator workspace</p>
+          <p class="mt-1 text-xs text-theme-peach-1">Signed in as {creatorWorkspace.role}</p>
+        </div>
+      {/if}
       <FilterSort {rhymes} />
     </div>
   </div>

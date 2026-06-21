@@ -1,17 +1,16 @@
 import { error } from "@sveltejs/kit";
-import { loadRhymes } from "$lib/loadRhymes";
+import { findPublicRhymeBySlug, loadPublicRhymes } from "$lib/loadRhymes";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = ({ params }) => {
-  const rhymes = loadRhymes();
-  const selectedRhyme = rhymes.find((rhyme) => rhyme.slug === params.slug);
+  const selectedRhyme = findPublicRhymeBySlug(params.slug);
 
   if (!selectedRhyme) {
     throw error(404, "Rhyme not found");
   }
 
   return {
-    rhymes,
+    rhymes: loadPublicRhymes(),
     initialSlug: selectedRhyme.slug,
     title: selectedRhyme.frontmatter.title ?? "rhymes",
     description: selectedRhyme.summary || "Browse and read rhymes inline.",

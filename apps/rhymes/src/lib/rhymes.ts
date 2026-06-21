@@ -1,4 +1,5 @@
 import matter from "gray-matter";
+import { filterPublicRhymes } from "./visibility";
 
 export type ContentType = "poem" | "article" | "song" | "diary";
 export type ContentVisibility = "public" | "hidden" | "draft";
@@ -118,9 +119,17 @@ function deriveSummary(content: string): string {
   );
 }
 
-export function parseRhymes(rawRhymeModules: Record<string, string>): Rhyme[] {
-  return Object.keys(rawRhymeModules)
-    .map((path) => {
+function sortRhymes(rhymes: Rhyme[]): Rhyme[] {
+  return [...rhymes].sort((a, b) => {
+    const orderA = a.frontmatter.order ?? 0;
+    const orderB = b.frontmatter.order ?? 0;
+    return orderB - orderA;
+  });
+}
+
+export function parseAllRhymes(rawRhymeModules: Record<string, string>): Rhyme[] {
+  return sortRhymes(
+    Object.keys(rawRhymeModules).map((path) => {
       const rawDocument = rawRhymeModules[path];
       const parsed = matter(rawDocument);
       const content = parsed.content.trim();
@@ -145,10 +154,10 @@ export function parseRhymes(rawRhymeModules: Record<string, string>): Rhyme[] {
         },
       } satisfies Rhyme;
     })
-    .filter((rhyme) => rhyme.visibility !== "draft" && rhyme.visibility !== "hidden")
-    .sort((a, b) => {
-      const orderA = a.frontmatter.order ?? 0;
-      const orderB = b.frontmatter.order ?? 0;
-      return orderB - orderA;
-    });
+  );
+}
+
+/** Parse markdown modules and return only pieces visible to public readers. */
+export function parseRhymes(rawRhymeModules: Record<string, string>): Rhyme[] {
+  return filterPublicRhymes(parseAllRhymes(rawRhymeModules));
 }
