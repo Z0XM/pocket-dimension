@@ -1,5 +1,6 @@
 import { json, error } from "@sveltejs/kit";
 import { db, schema } from "@pocket-dimension/db";
+import { TITLE_ART_ENABLED } from "$lib/features";
 import { requirePieceEditor } from "$lib/server/authz";
 import { updatePiece } from "$lib/server/pieces";
 import { logPieceEvent } from "$lib/server/events";
@@ -10,6 +11,10 @@ const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 export const POST: RequestHandler = async ({ locals, request }) => {
+  if (!TITLE_ART_ENABLED) {
+    throw error(503, "Title art uploads are disabled");
+  }
+
   const formData = await request.formData();
   const pieceId = formData.get("pieceId");
   const file = formData.get("file");

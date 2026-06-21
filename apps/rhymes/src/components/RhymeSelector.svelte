@@ -2,6 +2,7 @@
   import { marked } from "marked";
   import type { ContentType, ReaderMode } from "../lib/rhymes";
   import { filteredRhymes, type Rhyme } from "../stores/filterStore";
+  import { TITLE_ART_ENABLED } from "$lib/features";
 
   interface Props {
     rhymes: Rhyme[];
@@ -653,7 +654,7 @@
             </div>
 
             <h1 class="mt-4 font-heading text-2xl text-theme-peach-1 md:text-4xl">
-              {#if selectedRhyme.displayTitleMode === "art" && selectedRhyme.titleArtUrl}
+              {#if TITLE_ART_ENABLED && selectedRhyme.displayTitleMode === "art" && selectedRhyme.titleArtUrl}
                 <img src={selectedRhyme.titleArtUrl} alt={selectedRhyme.frontmatter.title} class="max-h-40 object-contain" />
               {:else}
                 <span style={selectedRhyme.titleStyle}>{selectedRhyme.frontmatter.title}</span>

@@ -5,6 +5,7 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "static", "uploads", "rhymes");
 
 function assetDriver(): "local" | "s3" {
+  // Local disk is kept for development only; title art uploads are gated by TITLE_ART_ENABLED.
   return process.env.RHYMES_ASSET_DRIVER === "s3" ? "s3" : "local";
 }
 

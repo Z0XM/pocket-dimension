@@ -3,6 +3,7 @@
   import type { ContentType, ReaderMode } from "$lib/rhymes";
   import type { BodyDocument, SourceMode, TitleRichStyle } from "$lib/document";
   import { plainTextToDocument } from "$lib/document";
+  import { TITLE_ART_ENABLED } from "$lib/features";
 
   interface CreatorPieceSummary {
     id: string;
@@ -84,7 +85,7 @@
     sourceMode = (piece.sourceMode as SourceMode) ?? "plain";
     defaultReaderMode = (piece.defaultReaderMode as ReaderMode) ?? "continuous";
     creatorRating = typeof piece.creatorRating === "number" ? piece.creatorRating : "";
-    displayTitleMode = piece.displayTitleMode === "art" ? "art" : "text";
+    displayTitleMode = TITLE_ART_ENABLED && piece.displayTitleMode === "art" ? "art" : "text";
 
     const titleRich = piece.titleRichJson as TitleRichStyle | null;
     titleColor = titleRich?.color ?? "#f7f4ee";
@@ -373,7 +374,9 @@
                 Display title mode
                 <select bind:value={displayTitleMode} class="mt-1 w-full border border-theme-red-2/40 bg-theme-pink-3 px-2 py-2 text-sm text-theme-peach-1">
                   <option value="text">Styled text</option>
-                  <option value="art">Title art</option>
+                  {#if TITLE_ART_ENABLED}
+                    <option value="art">Title art</option>
+                  {/if}
                 </select>
               </label>
             </div>
@@ -422,10 +425,12 @@
               {#if sourceMode !== "plain"}
                 <button type="button" class="border border-theme-peach-2 px-3 py-2 text-xs text-theme-peach-1" onclick={insertPageBreak}>Insert page break</button>
               {/if}
-              <label class="border border-theme-red-2/40 px-3 py-2 text-xs text-theme-peach-1 cursor-pointer">
-                Upload title art
-                <input type="file" accept="image/*" class="hidden" onchange={uploadTitleArt} />
-              </label>
+              {#if TITLE_ART_ENABLED}
+                <label class="border border-theme-red-2/40 px-3 py-2 text-xs text-theme-peach-1 cursor-pointer">
+                  Upload title art
+                  <input type="file" accept="image/*" class="hidden" onchange={uploadTitleArt} />
+                </label>
+              {/if}
             </div>
 
             <div class="flex flex-wrap gap-2">

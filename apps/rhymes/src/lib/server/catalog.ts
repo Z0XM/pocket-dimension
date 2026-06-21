@@ -4,6 +4,7 @@ import type { TitleRichStyle } from "$lib/document";
 import { renderTitleStyle } from "$lib/document";
 import { listPublicDbPieces, pieceToPages, type DbPiece } from "$lib/server/pieces";
 import { getAssetPublicUrl } from "$lib/server/storage";
+import { TITLE_ART_ENABLED } from "$lib/features";
 
 function loadRawRhymeModules(): Record<string, string> {
   return import.meta.glob("../assets/rhymes/*.md", {
@@ -49,8 +50,8 @@ export function dbPieceToRhyme(piece: DbPiece, titleArtUrl: string | null = null
     creatorRating: piece.creatorRating,
     readerAverageRating: piece.readerAverageRating ? Number(piece.readerAverageRating) : null,
     readerRatingCount: piece.readerRatingCount,
-    titleArtUrl,
-    displayTitleMode: piece.displayTitleMode,
+    titleArtUrl: TITLE_ART_ENABLED ? titleArtUrl : null,
+    displayTitleMode: TITLE_ART_ENABLED ? piece.displayTitleMode : "text",
     titleRichJson: (piece.titleRichJson as TitleRichStyle | null) ?? null,
     titleStyle: renderTitleStyle((piece.titleRichJson as TitleRichStyle | null) ?? null),
     frontmatter: {
@@ -72,7 +73,10 @@ export async function loadPublicCatalog(): Promise<Rhyme[]> {
   const useMarkdownCatalog = process.env.RHYMES_USE_MARKDOWN_CATALOG !== "false";
   const dbRows = await listPublicDbPieces();
   const dbRhymes = dbRows.map(({ piece, titleArtStorageKey }) =>
-    dbPieceToRhyme(piece, titleArtStorageKey ? getAssetPublicUrl(titleArtStorageKey) : null)
+    dbPieceToRhyme(
+      piece,
+      TITLE_ART_ENABLED && titleArtStorageKey ? getAssetPublicUrl(titleArtStorageKey) : null
+    )
   );
 
   if (!useMarkdownCatalog) {

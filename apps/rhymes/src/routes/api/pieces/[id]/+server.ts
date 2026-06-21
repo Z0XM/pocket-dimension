@@ -1,5 +1,6 @@
 import { json, error } from "@sveltejs/kit";
 import { requirePieceEditor } from "$lib/server/authz";
+import { TITLE_ART_ENABLED } from "$lib/features";
 import { getPieceById, publishPiece, updatePiece } from "$lib/server/pieces";
 import { listPieceEvents } from "$lib/server/events";
 import type { BodyDocument } from "$lib/document";
@@ -49,9 +50,12 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
             ? (payload.titleRichJson as import("$lib/document").TitleRichStyle)
             : undefined,
       displayTitleMode:
-        payload.displayTitleMode === "text" || payload.displayTitleMode === "art" ? payload.displayTitleMode : undefined,
-      titleArtAssetId:
-        payload.titleArtAssetId === null
+        payload.displayTitleMode === "text" || (TITLE_ART_ENABLED && payload.displayTitleMode === "art")
+          ? payload.displayTitleMode
+          : undefined,
+      titleArtAssetId: !TITLE_ART_ENABLED
+        ? undefined
+        : payload.titleArtAssetId === null
           ? null
           : typeof payload.titleArtAssetId === "string"
             ? payload.titleArtAssetId
