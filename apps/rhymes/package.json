@@ -13,8 +13,8 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "typecheck": "bun run check",
     "test": "bun test src/lib/visibility.test.ts src/lib/server/drafts.test.ts scripts/import-markdown.test.ts",
-    "import:markdown": "bun run --cwd ../.. build:shared:db && bun run scripts/import-markdown.ts",
-    "import:markdown:dry-run": "bun run --cwd ../.. build:shared:db && bun run scripts/import-markdown.ts --dry-run"
+    "import:markdown": "bun run scripts/import-markdown.ts",
+    "import:markdown:dry-run": "bun run scripts/import-markdown.ts --dry-run"
   },
   "dependencies": {
     "@fontsource-variable/playwrite-us-modern": "^5.2.7",
