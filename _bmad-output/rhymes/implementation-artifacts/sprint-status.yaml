@@ -44,12 +44,12 @@ development_status:
   1-5-respect-public-visibility-rules-for-published-and-hidden-content: backlog
   epic-1-retrospective: optional
 
-  epic-2: backlog
+  epic-2: in-progress
   2-1-add-authenticated-creator-access-and-rhymes-workspace-gating: ready-for-dev
-  2-2-support-draft-first-quick-composer-creation: backlog
-  2-3-expose-direct-publish-action-beside-save: backlog
-  2-4-provide-expanded-editor-for-structured-piece-management: backlog
-  2-5-manage-hidden-published-visibility-without-reverting-to-draft: backlog
+  2-2-support-draft-first-quick-composer-creation: ready-for-dev
+  2-3-expose-direct-publish-action-beside-save: ready-for-dev
+  2-4-provide-expanded-editor-for-structured-piece-management: ready-for-dev
+  2-5-manage-hidden-published-visibility-without-reverting-to-draft: ready-for-dev
   epic-2-retrospective: optional
 
   epic-3: backlog
