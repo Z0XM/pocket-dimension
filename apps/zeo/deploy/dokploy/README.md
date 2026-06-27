@@ -87,17 +87,31 @@ RESEND_API_KEY=...
 
 ## 5. Deploy zeo (Railpack)
 
+Same pattern as **watchlist** — inline build command, monorepo root.
+
 1. Dokploy → **Applications** → **Create**
 2. **Source:** Git → `pocket-dimension`, branch `main`
 3. **Build type:** **Railpack**
 4. **Root directory:** `/` (monorepo root)
 5. **Port:** `3008`
 
-Railpack env:
+Railpack env (copy from `apps/zeo/.env.example`):
 
 ```env
-RAILPACK_BUILD_CMD=./apps/zeo/scripts/deploy-build.sh
+RAILPACK_BUILD_CMD=bun install --frozen-lockfile && bun build:app:zeo
 RAILPACK_START_CMD=cd apps/zeo && bun run start
+```
+
+If install fails with `lockfile is frozen`, add:
+
+```env
+RAILPACK_INSTALL_CMD=bun install
+```
+
+Run migrations separately after deploy (Dokploy Terminal on zeo container):
+
+```bash
+cd /app/shared/db && bunx --bun drizzle-kit migrate
 ```
 
 Domain: **`zeo.z0xm.com`** with HTTPS (Cloudflare SSL: Full strict if proxied).
