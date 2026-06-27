@@ -1,4 +1,4 @@
-import { RoomServiceClient } from "livekit-server-sdk";
+import { RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import { env } from "./env";
 
 function liveKitHttpHost() {
@@ -29,4 +29,16 @@ export async function countLiveKitParticipants(livekitRoomName: string) {
 
 export async function listLiveKitParticipants(livekitRoomName: string) {
   return getClient().listParticipants(livekitRoomName);
+}
+
+export async function stopActiveScreenShares(livekitRoomName: string) {
+  const participants = await listLiveKitParticipants(livekitRoomName);
+
+  for (const participant of participants) {
+    for (const track of participant.tracks ?? []) {
+      if (track.source === TrackSource.SCREEN_SHARE && track.sid) {
+        await getClient().mutePublishedTrack(livekitRoomName, participant.identity, track.sid, true);
+      }
+    }
+  }
 }

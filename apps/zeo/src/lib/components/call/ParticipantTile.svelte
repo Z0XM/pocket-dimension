@@ -10,9 +10,10 @@
     tileColor: string;
     isGuest?: boolean;
     isLocal?: boolean;
+    compact?: boolean;
   };
 
-  const { participant, displayName, isActiveSpeaker = false, tileColor, isGuest = false, isLocal = false }: Props = $props();
+  const { participant, displayName, isActiveSpeaker = false, tileColor, isGuest = false, isLocal = false, compact = false }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
   let hasVideo = $derived(isCameraEnabled(participant));
@@ -47,9 +48,9 @@
 </script>
 
 <div
-  class="relative aspect-video overflow-hidden rounded-lg bg-secondary ring-2 ring-transparent transition-shadow {isActiveSpeaker
-    ? 'ring-primary shadow-[0_0_0_1px_var(--primary)]'
-    : ''}"
+  class="relative overflow-hidden rounded-lg bg-secondary ring-2 ring-transparent transition-shadow {compact
+    ? 'aspect-video'
+    : 'aspect-video'} {isActiveSpeaker ? 'ring-primary shadow-[0_0_0_1px_var(--primary)]' : ''}"
   aria-label="{displayName}{isLocal ? ' (you)' : ''}{isGuest ? ', guest' : ''}"
 >
   {#if hasVideo}

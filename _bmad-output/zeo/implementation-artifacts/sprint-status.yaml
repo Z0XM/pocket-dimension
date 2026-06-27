@@ -60,10 +60,10 @@ development_status:
   4-5-reconnection-and-error-states: done
   epic-4-retrospective: optional
 
-  epic-5: backlog
-  5-1-start-and-stop-screen-share: backlog
-  5-2-single-sharer-policy-and-dominant-layout: backlog
-  5-3-call-snapshot: backlog
+  epic-5: done
+  5-1-start-and-stop-screen-share: done
+  5-2-single-sharer-policy-and-dominant-layout: done
+  5-3-call-snapshot: done
   epic-5-retrospective: optional
 
   epic-6: backlog

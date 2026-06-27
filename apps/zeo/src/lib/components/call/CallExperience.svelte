@@ -1,12 +1,14 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { onDestroy, onMount } from "svelte";
-  import type { Room } from "livekit-client";
+  import { RoomEvent, Track, type LocalTrackPublication, type Room } from "livekit-client";
   import type { CallPhase, PermissionState } from "$lib/livekit/types";
   import { startMediaPreview, stopMediaPreview, syncPreviewTracks } from "$lib/livekit/media-preview";
   import { createCallRoom, wasParticipantRemoved, wasRoomDeleted, type ConnectionPhase } from "$lib/livekit/room-client";
+  import { findScreenShareParticipant, isScreenShareActive } from "$lib/livekit/screen-share";
+  import { captureCallSnapshot } from "$lib/snapshot";
   import PreCallLobby from "$lib/components/call/PreCallLobby.svelte";
-  import VideoGrid from "$lib/components/call/VideoGrid.svelte";
+  import CallStage from "$lib/components/call/CallStage.svelte";
   import ControlBar from "$lib/components/call/ControlBar.svelte";
   import ConnectionBanner from "$lib/components/call/ConnectionBanner.svelte";
 
@@ -53,14 +55,38 @@
   let livekitRoom = $state<Room | null>(null);
   let activeSpeakerIdentity = $state<string | null>(null);
   let connectionGen = $state(0);
+  let mediaRevision = $state(0);
   let localDisplayName = $state("");
   let callSession: ReturnType<typeof createCallRoom> | null = null;
+  let stageEl = $state<HTMLElement | null>(null);
+  let intentionalScreenShareStop = false;
+  let snapshotting = $state(false);
+  let snapshotFlash = $state(false);
+  let toastMessage = $state<string | null>(null);
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  let screenShareListenerCleanup: (() => void) | undefined;
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
 
   const userDisplayName = $derived(user?.username ?? user?.email ?? null);
   const isGuest = $derived(!user);
   const canJoinLobby = $derived(!isEnded && !isFull && (user !== null || guestName.trim().length > 0) && previewReady && phase === "lobby");
+  const screenSharing = $derived.by(() => {
+    mediaRevision;
+    return livekitRoom ? isScreenShareActive(livekitRoom.localParticipant) : false;
+  });
+
+  function showToast(message: string) {
+    toastMessage = message;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toastMessage = null;
+    }, 3500);
+  }
+
+  function bumpMediaRevision() {
+    mediaRevision += 1;
+  }
 
   async function refreshRoomMeta() {
     const res = await fetch(`/api/rooms/${slug}`);
@@ -88,6 +114,8 @@
   }
 
   async function teardownCall(disconnectLiveKit: boolean) {
+    screenShareListenerCleanup?.();
+    screenShareListenerCleanup = undefined;
     if (disconnectLiveKit && callSession) {
       await callSession.disconnect();
     }
@@ -95,6 +123,26 @@
     livekitRoom = null;
     stopMediaPreview(previewStream);
     previewStream = null;
+  }
+
+  function attachScreenShareListener(room: Room, gen: number) {
+    screenShareListenerCleanup?.();
+
+    const onLocalTrackUnpublished = (publication: LocalTrackPublication) => {
+      if (gen !== connectionGen) return;
+      bumpMediaRevision();
+      if (publication.source !== Track.Source.ScreenShare) return;
+      if (intentionalScreenShareStop) {
+        intentionalScreenShareStop = false;
+        return;
+      }
+      showToast("Your screen share was stopped");
+    };
+
+    room.on(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
+    screenShareListenerCleanup = () => {
+      room.off(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
+    };
   }
 
   function bindConnectionHandlers(gen: number) {
@@ -112,6 +160,7 @@
       },
       onParticipantsChange: () => {
         if (gen !== connectionGen) return;
+        bumpMediaRevision();
         livekitRoom = callSession?.room ?? null;
       },
       onDisconnect: (reason?: import("livekit-client").DisconnectReason) => {
@@ -179,6 +228,7 @@
         camEnabled: camEnabled && permissionState === "granted",
       });
 
+      attachScreenShareListener(callSession.room, gen);
       setPhase("in_call");
       await refreshRoomMeta();
     } catch (err) {
@@ -238,6 +288,52 @@
     }
   }
 
+  async function toggleScreenShare() {
+    if (!livekitRoom) return;
+    const local = livekitRoom.localParticipant;
+
+    if (isScreenShareActive(local)) {
+      intentionalScreenShareStop = true;
+      await local.setScreenShareEnabled(false);
+      bumpMediaRevision();
+      return;
+    }
+
+    const otherSharer = findScreenShareParticipant(livekitRoom, local.identity);
+    if (otherSharer) {
+      const res = await fetch(`/api/rooms/${slug}/screen-share/stop-active`, { method: "POST" });
+      if (!res.ok) {
+        showToast("Could not take over screen share");
+        return;
+      }
+    }
+
+    try {
+      await local.setScreenShareEnabled(true);
+      bumpMediaRevision();
+    } catch {
+      showToast("Could not start screen share");
+    }
+  }
+
+  async function takeSnapshot() {
+    if (!stageEl || snapshotting) return;
+    snapshotting = true;
+    snapshotFlash = true;
+
+    try {
+      await captureCallSnapshot({ slug, stageRoot: stageEl });
+      showToast("Snapshot saved");
+    } catch {
+      showToast("Could not capture snapshot");
+    } finally {
+      snapshotting = false;
+      setTimeout(() => {
+        snapshotFlash = false;
+      }, 200);
+    }
+  }
+
   onMount(() => {
     if (!browser) return;
     onPhaseChange?.(phase);
@@ -248,6 +344,7 @@
 
   onDestroy(() => {
     if (refreshTimer) clearInterval(refreshTimer);
+    if (toastTimer) clearTimeout(toastTimer);
     teardownCall(true);
   });
 </script>
@@ -256,16 +353,33 @@
   <div class="fixed inset-0 z-50 flex flex-col bg-background">
     <ConnectionBanner {phase} {disconnectMessage} onRejoin={phase === "disconnected" && !isEnded ? rejoinCall : undefined} />
 
+    {#if toastMessage}
+      <div
+        class="pointer-events-none fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-lg border border-border bg-card/95 px-4 py-2 text-sm text-foreground shadow-lg backdrop-blur-sm"
+        role="status"
+      >
+        {toastMessage}
+      </div>
+    {/if}
+
+    {#if snapshotFlash}
+      <div class="pointer-events-none fixed inset-0 z-[55] bg-white/25" aria-hidden="true"></div>
+    {/if}
+
     {#if livekitRoom && (phase === "in_call" || phase === "reconnecting")}
       <div class="relative min-h-0 flex-1">
-        <VideoGrid room={livekitRoom} {activeSpeakerIdentity} {localDisplayName} />
+        <CallStage room={livekitRoom} {activeSpeakerIdentity} {localDisplayName} {mediaRevision} bind:stageRef={stageEl} />
       </div>
       <ControlBar
         {isHost}
         {micEnabled}
         {camEnabled}
+        {screenSharing}
+        {snapshotting}
         onToggleMic={toggleMic}
         onToggleCam={toggleCam}
+        onToggleScreenShare={toggleScreenShare}
+        onSnapshot={takeSnapshot}
         onLeave={leaveCall}
         onEndRoom={isHost ? endRoom : undefined}
         {ending}
