@@ -18,6 +18,22 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
 });
 
-export const env = validateEnv("zeo", envSchema, Bun.env);
+export type ZeoEnv = z.infer<typeof envSchema>;
+
+let _env: ZeoEnv | null = null;
+
+function getEnv(): ZeoEnv {
+  if (!_env) {
+    _env = validateEnv("zeo", envSchema, Bun.env);
+  }
+  return _env;
+}
+
+/** Validated at first access (runtime), not at SvelteKit build time. */
+export const env = new Proxy({} as ZeoEnv, {
+  get(_, prop: string) {
+    return getEnv()[prop as keyof ZeoEnv];
+  },
+});
 
 export const TOKEN_TTL_SECONDS = 4 * 60 * 60;
