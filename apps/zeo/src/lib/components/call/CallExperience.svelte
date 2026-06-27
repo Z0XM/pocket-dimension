@@ -205,7 +205,7 @@
 
     localDisplayName = payload.displayName ?? guestName.trim();
 
-    return payload as { token: string; wsUrl: string };
+    return payload as { token: string; wsUrl: string; iceServers?: RTCIceServer[] };
   }
 
   async function joinCall() {
@@ -216,7 +216,7 @@
       stopMediaPreview(previewStream);
       previewStream = null;
 
-      const { token, wsUrl } = await requestToken();
+      const { token, wsUrl, iceServers } = await requestToken();
       connectionGen += 1;
       const gen = connectionGen;
 
@@ -226,6 +226,7 @@
       await callSession.connect(wsUrl, token, {
         micEnabled: micEnabled && permissionState !== "denied",
         camEnabled: camEnabled && permissionState === "granted",
+        iceServers,
       });
 
       attachScreenShareListener(callSession.room, gen);

@@ -66,10 +66,10 @@ development_status:
   5-3-call-snapshot: done
   epic-5-retrospective: optional
 
-  epic-6: backlog
-  6-1-caddy-reverse-proxy-configuration: backlog
-  6-2-turn-configuration-and-firewall-guide: backlog
-  6-3-production-env-and-runbook: backlog
+  epic-6: done
+  6-1-caddy-reverse-proxy-configuration: done
+  6-2-turn-configuration-and-firewall-guide: done
+  6-3-production-env-and-runbook: done
   epic-6-retrospective: optional
 
   epic-7: backlog

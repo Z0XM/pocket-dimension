@@ -31,9 +31,9 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   room.on(RoomEvent.LocalTrackPublished, () => handlers.onParticipantsChange());
   room.on(RoomEvent.LocalTrackUnpublished, () => handlers.onParticipantsChange());
 
-  async function connect(wsUrl: string, token: string, options: { micEnabled: boolean; camEnabled: boolean }) {
+  async function connect(wsUrl: string, token: string, options: { micEnabled: boolean; camEnabled: boolean; iceServers?: RTCIceServer[] }) {
     handlers.onPhaseChange("connecting");
-    await room.connect(wsUrl, token);
+    await room.connect(wsUrl, token, options.iceServers?.length ? { rtcConfig: { iceServers: options.iceServers } } : undefined);
     await room.localParticipant.setMicrophoneEnabled(options.micEnabled);
     await room.localParticipant.setCameraEnabled(options.camEnabled);
     handlers.onPhaseChange("connected");

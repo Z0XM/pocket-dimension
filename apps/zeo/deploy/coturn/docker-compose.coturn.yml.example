@@ -1,0 +1,15 @@
+# Optional coturn sidecar — use only if LiveKit embedded TURN is disabled.
+# Most zeo deployments should use LiveKit built-in TURN (see livekit.prod.yaml.example).
+#
+# If you run coturn instead:
+#   1. Set turn.enabled: false in livekit.prod.yaml
+#   2. Configure zeo app LIVEKIT_TURN_* env vars (see env/production.env.example)
+#   3. docker compose -f docker-compose.coturn.yml.example up -d
+
+services:
+  coturn:
+    image: coturn/coturn:4.6.2
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./turnserver.conf.example:/etc/coturn/turnserver.conf:ro

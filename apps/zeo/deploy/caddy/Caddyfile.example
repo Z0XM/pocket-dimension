@@ -1,0 +1,31 @@
+# Copy to /etc/caddy/Caddyfile (or include from there).
+# Caddy obtains Let's Encrypt certificates automatically when:
+#   - DNS A/AAAA records point zeo.z0xm.com and zeo-livekit.z0xm.com to this VPS
+#   - Ports 80 and 443 are reachable from the internet
+#
+# Reload after edits: sudo systemctl reload caddy
+
+{
+	# Optional: use a real email for ACME expiry notices
+	# email ops@z0xm.com
+}
+
+# zeo SvelteKit app (Bun adapter on localhost:3008)
+zeo.z0xm.com {
+	encode gzip zstd
+
+	reverse_proxy localhost:3008
+}
+
+# LiveKit signal + WebSocket (proxied to localhost:7880)
+# Caddy upgrades WebSocket connections automatically.
+zeo-livekit.z0xm.com {
+	encode gzip
+
+	reverse_proxy localhost:7880 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

@@ -3,7 +3,7 @@ import { displayNameForUser, requireUser } from "$lib/server/authz";
 import { GUEST_TOKEN_RATE_LIMIT, GUEST_TOKEN_RATE_WINDOW_MS, MAX_PARTICIPANTS_PER_ROOM, ROOM_EMPTY_GRACE_SECONDS } from "$lib/server/constants";
 import { generateGuestIdentity, sanitizeGuestDisplayName } from "$lib/server/identity";
 import { readJsonBody } from "$lib/server/http";
-import { mintRoomJoinToken, publicLiveKitWsUrl } from "$lib/server/livekit-token";
+import { mintRoomJoinToken, publicLiveKitWsUrl, clientIceServers } from "$lib/server/livekit-token";
 import { checkRateLimit, clientIpFromRequest } from "$lib/server/rate-limit";
 import { isParticipantBlocked } from "$lib/server/session-blocks";
 import { findRoomBySlug, isRoomFull, resolveParticipantCount } from "$lib/server/rooms";
@@ -67,9 +67,12 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
     name,
   });
 
+  const iceServers = clientIceServers();
+
   return json({
     token,
     wsUrl: publicLiveKitWsUrl(),
+    ...(iceServers ? { iceServers } : {}),
     roomName: room.livekitRoomName,
     identity,
     displayName: name,
