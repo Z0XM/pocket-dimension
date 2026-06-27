@@ -179,11 +179,8 @@ livekit:
 Redeploy the stack, then verify:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" https://zeo-livekit.z0xm.com/rtc/v1/validate   # 401, not 404
-curl --http1.1 -sI \
-  -H "Connection: Upgrade" -H "Upgrade: websocket" \
-  -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
-  https://zeo-livekit.z0xm.com/rtc/v1 | head -3                        # 401 or 101, not 404
+curl -s -o /dev/null -w "%{http_code}\n" https://zeo-livekit.z0xm.com/rtc/v1/validate   # 400 without token (endpoint exists; was 404 on v1.9.0)
+curl -s https://zeo-livekit.z0xm.com/rtc/v1/validate?access_token=invalid              # body: invalid authorization token, HTTP 401
 ```
 
 Also edit **`livekit.yaml`** in Dokploy → Files:
@@ -289,7 +286,7 @@ After LiveKit is up, confirm zeo has matching `LIVEKIT_API_KEY` / `LIVEKIT_API_S
 
 | Symptom | Fix |
 |---------|-----|
-| `/rtc/v1` WebSocket fails, `/rtc/validate` works | Template server is **v1.9.0**; upgrade to **v1.9.12+** (§6.2). Confirm `PUBLIC_LIVEKIT_URL=wss://zeo-livekit.z0xm.com` (no port) |
+| `/rtc/v1` WebSocket fails, `/rtc/validate` works | Template server is **v1.9.0**; upgrade to **v1.9.12+** (§6.2). Bare `curl …/rtc/v1/validate` → **400** is OK; **404** means still on old server. `PUBLIC_LIVEKIT_URL=wss://zeo-livekit.z0xm.com` (no port) |
 | `https://zeo-livekit…` → 404 but `:7880` → OK | Add `livekit` to `dokploy-network`; redeploy (§6.3) |
 | HTTPS self-signed / LE fails | TURN/signal domains must be **DNS only** (grey cloud); redeploy after Domains change |
 | TURN fails on mobile | `turn.domain` = `zeo-livekit-turn.z0xm.com` in `livekit.yaml`, not sslip.io |
