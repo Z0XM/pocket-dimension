@@ -1,0 +1,5 @@
+export const MAX_CONCURRENT_ROOMS = 2;
+export const MAX_PARTICIPANTS_PER_ROOM = 6;
+export const ROOM_EMPTY_GRACE_SECONDS = 60;
+export const GUEST_TOKEN_RATE_LIMIT = 20;
+export const GUEST_TOKEN_RATE_WINDOW_MS = 60 * 60 * 1000;

@@ -1,6 +1,9 @@
 import { json, error } from "@sveltejs/kit";
 import { WebhookReceiver } from "livekit-server-sdk";
+import { ROOM_EMPTY_GRACE_SECONDS } from "$lib/server/constants";
 import { env } from "$lib/server/env";
+import { getLiveParticipantCount } from "$lib/server/room-occupancy";
+import { scheduleRoomEmptyGrace } from "$lib/server/room-grace";
 import { findRoomByLiveKitName, recordParticipantJoined, recordParticipantLeft } from "$lib/server/rooms";
 import type { RequestHandler } from "./$types";
 
@@ -32,7 +35,7 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   const identity = event.participant?.identity;
-  if (!identity) {
+  if (!identity && event.event !== "room_finished") {
     return json({ ok: true, skipped: "no_participant" });
   }
 
@@ -40,12 +43,21 @@ export const POST: RequestHandler = async ({ request }) => {
     case "participant_joined":
       await recordParticipantJoined({
         roomId: room.id,
-        identity,
+        identity: identity!,
         displayName: event.participant?.name,
       });
       break;
     case "participant_left":
-      await recordParticipantLeft({ roomId: room.id, identity });
+      await recordParticipantLeft({ roomId: room.id, identity: identity! });
+      if (getLiveParticipantCount(room.id) === 0 && room.status !== "ended") {
+        scheduleRoomEmptyGrace(room.id, ROOM_EMPTY_GRACE_SECONDS);
+      }
+      break;
+    case "room_finished":
+      if (room.status !== "ended") {
+        const { endRoom } = await import("$lib/server/rooms");
+        await endRoom(room, { skipLiveKit: true });
+      }
       break;
     default:
       break;

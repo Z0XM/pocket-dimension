@@ -43,13 +43,13 @@ development_status:
   2-3-livekit-webhook-handler: done
   epic-2-retrospective: optional
 
-  epic-3: backlog
-  3-1-create-room-api-and-home-ui-contributor-admin-only: backlog
-  3-2-enforce-two-concurrent-room-limit: backlog
-  3-3-enforce-six-participant-limit-on-join: backlog
-  3-4-end-room-and-cleanup: backlog
-  3-5-host-remove-participant: backlog
-  3-6-guest-join-without-login: backlog
+  epic-3: done
+  3-1-create-room-api-and-home-ui-contributor-admin-only: done
+  3-2-enforce-two-concurrent-room-limit: done
+  3-3-enforce-six-participant-limit-on-join: done
+  3-4-end-room-and-cleanup: done
+  3-5-host-remove-participant: done
+  3-6-guest-join-without-login: done
   epic-3-retrospective: optional
 
   epic-4: backlog
