@@ -2,6 +2,8 @@
 
 Production on **Dokploy**: use **[`docker-compose.dokploy.yml`](./docker-compose.dokploy.yml)** and **[`livekit.dokploy.yaml.example`](./livekit.dokploy.yaml.example)** — full steps in **[`../dokploy/README.md`](../dokploy/README.md)**.
 
+**Railpack does not apply to LiveKit** — use Compose with the official `livekit/livekit-server` image and `network_mode: host`.
+
 ## Dokploy (recommended)
 
 1. Create a **Compose** project in Dokploy.

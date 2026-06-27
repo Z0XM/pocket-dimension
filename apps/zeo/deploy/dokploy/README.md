@@ -12,9 +12,9 @@ Cloudflare DNS
   zeo-livekit.z0xm.com  → DNS only → VPS → LiveKit (host network :7880 WSS via Traefik)
 
 Dokploy (Hostinger VPS)
-  Application: zeo           (Dockerfile build)
+  Application: zeo           (Railpack — same as other Pocket Dimension apps)
   Application: auth-service  (existing — required)
-  Compose: livekit           (host network)
+  Compose: livekit           (official Docker image, host network — not Railpack)
   Database: PostgreSQL 18    (Dokploy service or external)
 ```
 
@@ -95,18 +95,32 @@ DATABASE_URL=postgresql://...
 RESEND_API_KEY=...
 ```
 
-## 5. Deploy zeo (Dokploy Application)
+## 5. Deploy zeo (Dokploy Application — Railpack)
+
+Use **Railpack** like your other Pocket Dimension apps (`auth-service`, `chhan-chhan`, etc.). No custom Dockerfile required.
 
 ### 5.1 Create application
 
 1. Dokploy → **Applications** → **Create**
 2. **Source:** Git → `pocket-dimension` repo, branch `main` (or your deploy branch)
-3. **Build type:** Dockerfile
-4. **Dockerfile path:** `apps/zeo/Dockerfile`
-5. **Build context / root directory:** `/` (repository root)
-6. **Port:** `3008`
+3. **Build type:** **Railpack**
+4. **Root directory / build context:** `/` (monorepo root)
+5. **Port:** `3008`
 
-### 5.2 Domain (Traefik)
+### 5.2 Railpack commands
+
+Set in Dokploy **Environment** (or copy from `apps/zeo/.env.example`):
+
+```env
+RAILPACK_BUILD_CMD=./apps/zeo/scripts/deploy-build.sh
+RAILPACK_START_CMD=cd apps/zeo && bun run start
+```
+
+The build script installs workspace deps, builds shared packages + zeo, and runs `db:migrate` when `DATABASE_URL` is set at build time.
+
+**Alternative:** Dockerfile at `apps/zeo/Dockerfile` (repo root context) if you prefer a fixed image build.
+
+### 5.3 Domain (Traefik)
 
 1. **Domains** → Add `zeo.z0xm.com`
 2. Enable HTTPS (Let's Encrypt via Dokploy Traefik)
@@ -158,7 +172,11 @@ curl -sf https://zeo.z0xm.com/health
 # {"status":"ok","app":"zeo"}
 ```
 
-## 6. Deploy LiveKit (Dokploy Compose)
+## 6. Deploy LiveKit (Dokploy Compose — not Railpack)
+
+**LiveKit cannot use Railpack.** It is not Bun/Node source in this repo — it is the upstream [`livekit/livekit-server`](https://hub.docker.com/r/livekit/livekit-server) binary and it needs **host network** for WebRTC UDP ports (50000–60000) and TURN.
+
+Deploy LiveKit as a **Dokploy Compose** project using the official image (no custom Dockerfile):
 
 ### 6.1 Prepare config
 
@@ -231,7 +249,7 @@ Ensure zeo env `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` match `livekit.prod.yaml
 | WebSocket failed | Dokploy domain on LiveKit port 7880; Traefik WebSocket enabled |
 | Webhook / wrong participant count | Keys match between `livekit.prod.yaml` and zeo env; webhook URL is public HTTPS |
 | Auth redirect loop | `BETTER_AUTH_TRUSTED_ORIGINS`, `BETTER_AUTH_COOKIE_DOMAIN=.z0xm.com`, HTTPS on `ORIGIN` |
-| Build fails | Build context = repo root; Dockerfile = `apps/zeo/Dockerfile`; check Dokploy build logs |
+| Build fails | Railpack: root = repo root, `RAILPACK_BUILD_CMD=./apps/zeo/scripts/deploy-build.sh`; check build logs |
 | `uuidv7()` migration error | PostgreSQL must be **18+** |
 | zeo can't reach LiveKit API | Set `LIVEKIT_URL=https://zeo-livekit.z0xm.com` (public URL) |
 
@@ -239,7 +257,8 @@ Ensure zeo env `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` match `livekit.prod.yaml
 
 | File | Purpose |
 |------|---------|
-| [../../Dockerfile](../../Dockerfile) | zeo production image |
+| [../../scripts/deploy-build.sh](../../scripts/deploy-build.sh) | Railpack build script |
+| [../../Dockerfile](../../Dockerfile) | Optional zeo Dockerfile (Railpack alternative) |
 | [cloudflare-dns.md](./cloudflare-dns.md) | DNS proxy rules |
 | [../livekit/docker-compose.dokploy.yml](../livekit/docker-compose.dokploy.yml) | LiveKit Compose for Dokploy |
 | [../livekit/livekit.dokploy.yaml.example](../livekit/livekit.dokploy.yaml.example) | LiveKit config template |
