@@ -1,0 +1,27 @@
+# Append to the Dokploy LiveKit template compose after deploy if HTTPS returns 404.
+# Traefik only routes containers on `dokploy-network` (see Dokploy issue #3435).
+#
+# Dokploy → Compose (LiveKit) → edit docker-compose.yml → add networks block below
+# to `livekit` and `ingress` (ingress only if you use WHIP). Then **Redeploy**.
+#
+# Domains tab must still have:
+#   livekit  → zeo-livekit.z0xm.com      port 7880  HTTPS Let's Encrypt
+#   livekit  → zeo-livekit-turn.z0xm.com port 5349  HTTPS Let's Encrypt
+#   ingress  → (optional WHIP host)      port 8080
+
+networks:
+  dokploy-network:
+    external: true
+
+services:
+  livekit:
+    networks:
+      - dokploy-network
+    labels:
+      - traefik.docker.network=dokploy-network
+
+  ingress:
+    networks:
+      - dokploy-network
+    labels:
+      - traefik.docker.network=dokploy-network

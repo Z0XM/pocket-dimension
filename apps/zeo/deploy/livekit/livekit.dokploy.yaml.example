@@ -21,7 +21,8 @@ room:
 
 turn:
   enabled: true
-  domain: zeo-livekit.z0xm.com
+  # Must match the TURN domain in Dokploy (not the signal/WSS domain).
+  domain: zeo-livekit-turn.z0xm.com
   tls_port: 5349
   udp_port: 3478
   external_tls: true
