@@ -21,7 +21,10 @@ ufw allow 443/tcp comment 'HTTPS (zeo app + LiveKit WSS via Traefik/Caddy)'
 # LiveKit ICE TCP (direct, not proxied)
 ufw allow 7881/tcp comment 'LiveKit ICE TCP'
 
-# LiveKit WebRTC media UDP range (must match livekit.prod.yaml rtc.port_range_*)
+# LiveKit WebRTC media UDP (Dokploy template uses UDPMux on 7882)
+ufw allow 7882/udp comment 'LiveKit WebRTC media (Dokploy template)'
+
+# Legacy custom compose / port-range config (optional — comment out if using template only)
 ufw allow 50000:60000/udp comment 'LiveKit WebRTC media'
 
 # LiveKit embedded TURN

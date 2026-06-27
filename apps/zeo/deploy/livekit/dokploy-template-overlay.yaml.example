@@ -1,0 +1,14 @@
+# Append to the Dokploy LiveKit template's `livekit.yaml` mount after deploy.
+# Dokploy → Compose (LiveKit template) → Files → livekit.yaml
+#
+# Docs: https://docs.dokploy.com/docs/templates/livekit
+# zeo runbook: ../dokploy/README.md
+
+room:
+  max_participants: 12
+  empty_timeout: 300
+
+webhook:
+  urls:
+    - https://zeo.z0xm.com/api/webhooks/livekit
+  api_key: API_KEY_FROM_TEMPLATE_ENV
