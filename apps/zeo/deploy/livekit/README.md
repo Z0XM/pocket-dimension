@@ -4,16 +4,21 @@ Self-hosted LiveKit SFU for local development and production.
 
 ## Dokploy (recommended)
 
-Production on **Dokploy**: use **[`docker-compose.dokploy.yml`](./docker-compose.dokploy.yml)** and **[`livekit.dokploy.yaml.example`](./livekit.dokploy.yaml.example)** — full steps in **[`../dokploy/README.md`](../dokploy/README.md)**.
+Use the official **[Dokploy LiveKit template](https://docs.dokploy.com/docs/templates/livekit)** — full zeo integration steps in **[`../dokploy/README.md`](../dokploy/README.md)**.
 
-**Railpack does not apply to LiveKit** — use Compose with the official `livekit/livekit-server` image and `network_mode: host`.
+Quick summary:
 
-1. Create a **Compose** project in Dokploy.
-2. Paste or mount `docker-compose.dokploy.yml`.
-3. Copy `livekit.dokploy.yaml.example` → `livekit.prod.yaml` and set `keys`, `webhook`, and `turn.domain`.
-4. Attach Traefik domain **`zeo-livekit.z0xm.com`** → container port **7880**.
-5. Cloudflare: **`zeo-livekit` DNS only** (grey cloud).
-6. Hostinger firewall: UDP **50000–60000**, **3478**, **5349**.
+1. Dokploy → **Templates** → **LiveKit** → Deploy
+2. Set main domain **`zeo-livekit.z0xm.com`**, turn domain **`zeo-livekit-turn.z0xm.com`**
+3. Copy template **`API_KEY`** / **`API_SECRET`** into zeo env
+4. Edit template **`livekit.yaml`** — append [dokploy-template-overlay.yaml.example](./dokploy-template-overlay.yaml.example) (webhook + room limits)
+5. Cloudflare: both LiveKit subdomains **DNS only** (grey cloud)
+
+**Railpack does not apply to LiveKit.** The Dokploy template deploys the official `livekit/livekit-server` image with Redis.
+
+### Alternative: custom compose
+
+If you are not using the Dokploy template, see [`docker-compose.dokploy.yml`](./docker-compose.dokploy.yml) and [`livekit.dokploy.yaml.example`](./livekit.dokploy.yaml.example) (host network, port range 50000–60000).
 
 ## Local development
 
@@ -43,59 +48,43 @@ curl -sI http://127.0.0.1:7880 | head -1
 |------|---------|
 | `docker-compose.yml` | Dev: official image with `--dev` flag |
 | `livekit.yaml` | Dev ports, room limits, dev keys, webhook URL |
-| `docker-compose.dokploy.yml` | Dokploy Compose (host network) |
-| `livekit.dokploy.yaml.example` | Dokploy/production config template |
+| `dokploy-template-overlay.yaml.example` | Webhook + room limits for Dokploy template |
+| `docker-compose.dokploy.yml` | Alternative custom Dokploy compose (host network) |
+| `livekit.dokploy.yaml.example` | Alternative custom production config |
 | `docker-compose.prod.yml.example` | Legacy VPS compose (no `--dev`) |
 | `livekit.prod.yaml.example` | Legacy VPS production config |
 
-`livekit.yaml` sets `room.max_participants: 12` at the SFU layer. The zeo app enforces **6 participants per room** and **2 concurrent rooms** in application logic.
+`room.max_participants: 12` at the SFU layer. The zeo app enforces **6 participants per room** and **2 concurrent rooms** in application logic.
 
-## Ports (Hostinger / VPS firewall)
+## Ports
 
-Open these in **ufw** and Hostinger panel (full script: [../firewall/ufw-rules.example.sh](../firewall/ufw-rules.example.sh)):
+### Dokploy template (default)
 
 | Port | Protocol | Service |
 |------|----------|---------|
-| 443 | TCP | HTTPS (Traefik/Caddy → app + LiveKit WSS) |
-| 7880 | TCP | LiveKit signal (dev; production proxied via 443) |
+| 443 | TCP | HTTPS (Traefik → WSS + TURN TLS) |
+| 7880 | TCP | LiveKit signal (internal; proxied via 443) |
 | 7881 | TCP | LiveKit ICE TCP |
-| 50000–60000 | UDP | WebRTC media (RTC port range) |
-| 3478 | UDP/TCP | TURN (LiveKit embedded or coturn) |
+| 7882 | UDP | WebRTC media (template UDPMux) |
+| 3478 | UDP/TCP | TURN UDP |
 | 5349 | TCP | TURN TLS |
-| 49152–65535 | UDP | TURN relay range |
+
+### Legacy / custom compose (port range)
+
+| Port | Protocol | Service |
+|------|----------|---------|
+| 50000–60000 | UDP | WebRTC media |
+| 49152–65535 | UDP | TURN relay |
+
+Full firewall script: [../firewall/ufw-rules.example.sh](../firewall/ufw-rules.example.sh)
 
 ## TURN
 
-### LiveKit embedded TURN (recommended)
-
-Enable in `livekit.prod.yaml.example` / `livekit.dokploy.yaml.example`:
-
-```yaml
-turn:
-  enabled: true
-  domain: zeo-livekit.z0xm.com
-  tls_port: 5349
-  udp_port: 3478
-  external_tls: true
-```
-
-Requirements:
-
-- TLS certificate for `zeo-livekit.z0xm.com` (Traefik/Caddy handles this)
-- Firewall ports 3478, 5349, 49152–65535 open
-- Clients receive TURN credentials automatically via LiveKit signaling
-
-### External coturn (optional)
-
-If embedded TURN is disabled, use [../coturn/](../coturn/) and configure `LIVEKIT_TURN_*` in zeo env.
+The Dokploy template enables embedded TURN with `turn.domain` on the **turn subdomain** (`zeo-livekit-turn.z0xm.com`). Clients receive TURN credentials automatically during the WebSocket join — no extra zeo env needed.
 
 ## Legacy (Caddy + systemd VPS)
 
-If you are **not** using Dokploy, see [`../README.legacy-caddy-systemd.md`](../README.legacy-caddy-systemd.md).
-
-- Copy `livekit.prod.yaml.example` → `livekit.prod.yaml`; generate keys with `livekit-server generate-keys`.
-- Set webhook URL to `https://zeo.z0xm.com/api/webhooks/livekit`.
-- Use Caddy ([../caddy/](../caddy/)) to terminate TLS for app and LiveKit subdomains.
+See [`../README.legacy-caddy-systemd.md`](../README.legacy-caddy-systemd.md).
 
 ## Connect from zeo app
 
@@ -108,5 +97,3 @@ curl -X POST http://localhost:3008/api/rooms/{slug}/token \
 ```
 
 Response: `{ "token": "...", "wsUrl": "wss://zeo-livekit.z0xm.com", "iceServers": [...] }`
-
-Use `livekit-client` in the browser with that token.
