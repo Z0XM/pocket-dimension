@@ -1,0 +1,16 @@
+# Dokploy Compose project for LiveKit on Hostinger.
+#
+# In Dokploy: Create → Compose → paste this file (or point to repo path).
+# Mount livekit.prod.yaml as a volume or bake into the project directory.
+#
+# IMPORTANT: network_mode: host is required for WebRTC UDP port ranges.
+# Enable "Host network" / privileged mode if Dokploy prompts for it.
+
+services:
+  livekit:
+    image: livekit/livekit-server:v1.9.4
+    command: --config /etc/livekit.yaml
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./livekit.prod.yaml:/etc/livekit.yaml:ro

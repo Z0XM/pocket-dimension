@@ -1,4 +1,8 @@
-# Caddy reverse proxy (zeo production)
+# Caddy reverse proxy (legacy)
+
+**Dokploy deployments use Traefik**, not Caddy. Follow **[`../dokploy/README.md`](../dokploy/README.md)**.
+
+These files remain for a **bare-metal / systemd** VPS without Dokploy. Full runbook: [`../README.legacy-caddy-systemd.md`](../README.legacy-caddy-systemd.md).
 
 Terminates HTTPS for the zeo app and LiveKit WebSocket endpoint on Hostinger KVM 2.
 
@@ -62,7 +66,7 @@ Set in `/etc/zeo/env` (see `../env/production.env.example`):
 ```env
 ORIGIN=https://zeo.z0xm.com
 PUBLIC_LIVEKIT_URL=wss://zeo-livekit.z0xm.com
-LIVEKIT_URL=wss://zeo-livekit.z0xm.com
+LIVEKIT_URL=https://zeo-livekit.z0xm.com
 BETTER_AUTH_TRUSTED_ORIGINS=https://zeo.z0xm.com,https://auth.z0xm.com
 ```
 

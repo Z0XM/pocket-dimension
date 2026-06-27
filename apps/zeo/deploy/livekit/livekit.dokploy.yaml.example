@@ -1,0 +1,39 @@
+# LiveKit config for Dokploy + Cloudflare production.
+# Copy to livekit.prod.yaml in your Dokploy Compose project directory.
+#
+# Generate keys: docker run --rm livekit/livekit-server:v1.9.4 livekit-server generate-keys
+
+port: 7880
+bind_addresses:
+  - ""
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+  # Uncomment if auto-detection fails — use your Hostinger VPS public IPv4:
+  # node_ip: YOUR_VPS_PUBLIC_IP
+
+room:
+  max_participants: 12
+  empty_timeout: 300
+
+turn:
+  enabled: true
+  domain: zeo-livekit.z0xm.com
+  tls_port: 5349
+  udp_port: 3478
+  external_tls: true
+
+keys:
+  API_KEY_PLACEHOLDER: API_SECRET_PLACEHOLDER
+
+webhook:
+  # Public URL — LiveKit (host network) reaches zeo through Traefik
+  urls:
+    - https://zeo.z0xm.com/api/webhooks/livekit
+  api_key: API_KEY_PLACEHOLDER
+
+logging:
+  level: info
