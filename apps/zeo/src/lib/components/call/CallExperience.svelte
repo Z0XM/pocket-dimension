@@ -1,9 +1,11 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { onDestroy, onMount } from "svelte";
-  import { RoomEvent, Track, type LocalTrackPublication, type Room } from "livekit-client";
+  import { RoomEvent, Track, type ConnectionQuality, type LocalTrackPublication, type Room } from "livekit-client";
   import type { CallPhase, PermissionState } from "$lib/livekit/types";
-  import { startMediaPreview, stopMediaPreview, syncPreviewTracks } from "$lib/livekit/media-preview";
+  import { startMediaPreview, stopMediaPreview, syncPreviewTracks, restartMediaPreview } from "$lib/livekit/media-preview";
+  import { listMediaDevices, type MediaDeviceLists } from "$lib/livekit/devices";
+  import { qualityLabel, type QualityLabel } from "$lib/livekit/connection-quality";
   import { createCallRoom, wasParticipantRemoved, wasRoomDeleted, type ConnectionPhase } from "$lib/livekit/room-client";
   import { findScreenShareParticipant, isScreenShareActive } from "$lib/livekit/screen-share";
   import { captureCallSnapshot } from "$lib/snapshot";
@@ -11,6 +13,11 @@
   import CallStage from "$lib/components/call/CallStage.svelte";
   import ControlBar from "$lib/components/call/ControlBar.svelte";
   import ConnectionBanner from "$lib/components/call/ConnectionBanner.svelte";
+  import ChatPanel from "$lib/components/call/ChatPanel.svelte";
+  import WaitingRoomView from "$lib/components/call/WaitingRoomView.svelte";
+  import HostWaitingPanel from "$lib/components/call/HostWaitingPanel.svelte";
+  import ConnectionQualityBadge from "$lib/components/call/ConnectionQualityBadge.svelte";
+  import DevicePicker from "$lib/components/call/DevicePicker.svelte";
 
   type Props = {
     slug: string;
@@ -22,11 +29,23 @@
     initialParticipantCount: number;
     initialIsFull: boolean;
     initialIsEnded: boolean;
+    initialWaitingRoomEnabled?: boolean;
     onPhaseChange?: (phase: CallPhase) => void;
   };
 
-  const { slug, roomTitle, hostName, maxParticipants, isHost, user, initialParticipantCount, initialIsFull, initialIsEnded, onPhaseChange }: Props =
-    $props();
+  const {
+    slug,
+    roomTitle,
+    hostName,
+    maxParticipants,
+    isHost,
+    user,
+    initialParticipantCount,
+    initialIsFull,
+    initialIsEnded,
+    initialWaitingRoomEnabled = false,
+    onPhaseChange,
+  }: Props = $props();
 
   const guestStorageKey = `zeo-guest:${slug}`;
 
@@ -51,6 +70,20 @@
   let permissionState = $state<PermissionState>("prompt");
   let previewStream = $state<MediaStream | null>(null);
   let previewReady = $state(false);
+  let mediaDevices = $state<MediaDeviceLists>({ audioInputs: [], videoInputs: [] });
+  let audioDeviceId = $state("");
+  let videoDeviceId = $state("");
+  let showInCallDevices = $state(false);
+
+  let waitingRoomEnabled = $state(initialWaitingRoomEnabled);
+  let waitingIdentity = $state<string | null>(null);
+  let pendingWaiting = $state<Array<{ identity: string; displayName: string; requestedAt: string }>>([]);
+  let waitingHostLoading = $state(false);
+  let waitingPollTimer: ReturnType<typeof setInterval> | undefined;
+  let hostWaitingTimer: ReturnType<typeof setInterval> | undefined;
+
+  let chatOpen = $state(false);
+  let localConnectionQuality = $state<QualityLabel>("unknown");
 
   let livekitRoom = $state<Room | null>(null);
   let activeSpeakerIdentity = $state<string | null>(null);
@@ -95,21 +128,73 @@
     participantCount = payload.participantCount;
     isFull = payload.isFull;
     isEnded = payload.isEnded;
+    waitingRoomEnabled = payload.waitingRoomEnabled ?? waitingRoomEnabled;
     if (payload.isEnded && phase !== "ended") {
       setPhase("ended");
       await teardownCall(false);
     }
   }
 
+  async function loadMediaDevices() {
+    mediaDevices = await listMediaDevices();
+    if (!audioDeviceId && mediaDevices.audioInputs[0]) {
+      audioDeviceId = mediaDevices.audioInputs[0].deviceId;
+    }
+    if (!videoDeviceId && mediaDevices.videoInputs[0]) {
+      videoDeviceId = mediaDevices.videoInputs[0].deviceId;
+    }
+  }
+
   async function setupPreview() {
-    const result = await startMediaPreview({ audio: true, video: true });
+    const result = await startMediaPreview({
+      audio: true,
+      video: true,
+      audioDeviceId: audioDeviceId || undefined,
+      videoDeviceId: videoDeviceId || undefined,
+    });
     permissionState = result.permission;
     previewStream = result.stream;
     previewReady = true;
 
+    if (result.permission === "granted") {
+      await loadMediaDevices();
+    }
+
     if (result.permission === "denied") {
       micEnabled = false;
       camEnabled = false;
+    }
+  }
+
+  async function changeAudioDevice(deviceId: string) {
+    audioDeviceId = deviceId;
+    if (phase === "lobby" || phase === "waiting_admission") {
+      const result = await restartMediaPreview(previewStream, {
+        audio: micEnabled,
+        video: camEnabled,
+        audioDeviceId: deviceId,
+        videoDeviceId: videoDeviceId || undefined,
+      });
+      previewStream = result.stream;
+      permissionState = result.permission;
+    } else if (livekitRoom) {
+      await livekitRoom.switchActiveDevice("audioinput", deviceId);
+    }
+  }
+
+  async function changeVideoDevice(deviceId: string) {
+    videoDeviceId = deviceId;
+    if (phase === "lobby" || phase === "waiting_admission") {
+      const result = await restartMediaPreview(previewStream, {
+        audio: micEnabled,
+        video: camEnabled,
+        audioDeviceId: audioDeviceId || undefined,
+        videoDeviceId: deviceId,
+      });
+      previewStream = result.stream;
+      permissionState = result.permission;
+    } else if (livekitRoom) {
+      await livekitRoom.switchActiveDevice("videoinput", deviceId);
     }
   }
 
@@ -163,6 +248,12 @@
         bumpMediaRevision();
         livekitRoom = callSession?.room ?? null;
       },
+      onConnectionQuality: (quality: ConnectionQuality, identity: string) => {
+        if (gen !== connectionGen) return;
+        if (identity === livekitRoom?.localParticipant.identity) {
+          localConnectionQuality = qualityLabel(quality);
+        }
+      },
       onDisconnect: (reason?: import("livekit-client").DisconnectReason) => {
         if (gen !== connectionGen) return;
         if (wasRoomDeleted(reason) || isEnded) {
@@ -205,7 +296,124 @@
 
     localDisplayName = payload.displayName ?? guestName.trim();
 
-    return payload as { token: string; wsUrl: string; iceServers?: RTCIceServer[] };
+    if (payload.status === "waiting") {
+      waitingIdentity = payload.identity ?? waitingIdentity;
+      return payload as { status: "waiting"; identity: string; displayName: string };
+    }
+
+    return payload as {
+      status: "ready";
+      token: string;
+      wsUrl: string;
+      iceServers?: RTCIceServer[];
+      identity?: string;
+      displayName?: string;
+    };
+  }
+
+  async function connectWithToken(payload: { token: string; wsUrl: string; iceServers?: RTCIceServer[] }) {
+    connectionGen += 1;
+    const gen = connectionGen;
+
+    callSession = createCallRoom(bindConnectionHandlers(gen));
+    livekitRoom = callSession.room;
+
+    await callSession.connect(payload.wsUrl, payload.token, {
+      micEnabled: micEnabled && permissionState !== "denied",
+      camEnabled: camEnabled && permissionState === "granted",
+      iceServers: payload.iceServers,
+      audioDeviceId: audioDeviceId || undefined,
+      videoDeviceId: videoDeviceId || undefined,
+    });
+
+    attachScreenShareListener(callSession.room, gen);
+    localConnectionQuality = qualityLabel(callSession.room.localParticipant.connectionQuality);
+    if (permissionState === "granted") await loadMediaDevices();
+    stopHostWaitingPoll();
+    setPhase("in_call");
+    await refreshRoomMeta();
+  }
+
+  async function pollWaitingAdmission() {
+    const identity = waitingIdentity ?? user?.id ?? sessionStorage.getItem(guestStorageKey);
+    if (!identity) return;
+
+    const res = await fetch(`/api/rooms/${slug}/waiting?identity=${encodeURIComponent(identity)}`);
+    if (!res.ok) return;
+    const payload = await res.json();
+
+    if (payload.status === "admitted") {
+      stopWaitingPoll();
+      joining = true;
+      try {
+        stopMediaPreview(previewStream);
+        previewStream = null;
+        const tokenPayload = await requestToken();
+        if (tokenPayload.status === "ready") {
+          await connectWithToken(tokenPayload);
+        }
+      } catch (err) {
+        errorMessage = err instanceof Error ? err.message : "Could not join room";
+        setPhase("lobby");
+        await setupPreview();
+      } finally {
+        joining = false;
+      }
+    } else if (payload.status === "denied") {
+      stopWaitingPoll();
+      errorMessage = "The host declined your request to join";
+      setPhase("lobby");
+    }
+  }
+
+  function stopWaitingPoll() {
+    if (waitingPollTimer) clearInterval(waitingPollTimer);
+    waitingPollTimer = undefined;
+  }
+
+  function startWaitingPoll() {
+    stopWaitingPoll();
+    waitingPollTimer = setInterval(pollWaitingAdmission, 2500);
+    pollWaitingAdmission();
+  }
+
+  async function refreshHostWaitingList() {
+    if (!isHost || !waitingRoomEnabled) return;
+    waitingHostLoading = true;
+    try {
+      const res = await fetch(`/api/rooms/${slug}/waiting`);
+      if (!res.ok) return;
+      const payload = await res.json();
+      pendingWaiting = payload.pending ?? [];
+    } finally {
+      waitingHostLoading = false;
+    }
+  }
+
+  async function resolveWaitingAction(identity: string, action: "admit" | "deny") {
+    const res = await fetch(`/api/rooms/${slug}/waiting?action=${action}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identity }),
+    });
+    if (!res.ok) {
+      showToast(`Could not ${action} guest`);
+      return;
+    }
+    await refreshHostWaitingList();
+  }
+
+  function startHostWaitingPoll() {
+    if (hostWaitingTimer) clearInterval(hostWaitingTimer);
+    if (isHost && waitingRoomEnabled) {
+      refreshHostWaitingList();
+      hostWaitingTimer = setInterval(refreshHostWaitingList, 3000);
+    }
+  }
+
+  function stopHostWaitingPoll() {
+    if (hostWaitingTimer) clearInterval(hostWaitingTimer);
+    hostWaitingTimer = undefined;
   }
 
   async function joinCall() {
@@ -213,25 +421,19 @@
     joining = true;
 
     try {
+      const tokenPayload = await requestToken();
+
+      if (tokenPayload.status === "waiting") {
+        waitingIdentity = tokenPayload.identity;
+        setPhase("waiting_admission");
+        startWaitingPoll();
+        return;
+      }
+
       stopMediaPreview(previewStream);
       previewStream = null;
 
-      const { token, wsUrl, iceServers } = await requestToken();
-      connectionGen += 1;
-      const gen = connectionGen;
-
-      callSession = createCallRoom(bindConnectionHandlers(gen));
-      livekitRoom = callSession.room;
-
-      await callSession.connect(wsUrl, token, {
-        micEnabled: micEnabled && permissionState !== "denied",
-        camEnabled: camEnabled && permissionState === "granted",
-        iceServers,
-      });
-
-      attachScreenShareListener(callSession.room, gen);
-      setPhase("in_call");
-      await refreshRoomMeta();
+      await connectWithToken(tokenPayload);
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : "Could not join room";
       await setupPreview();
@@ -240,12 +442,22 @@
     }
   }
 
+  function leaveWaitingRoom() {
+    stopWaitingPoll();
+    waitingIdentity = null;
+    setPhase("lobby");
+  }
+
   async function leaveCall() {
     connectionGen += 1;
+    chatOpen = false;
+    showInCallDevices = false;
+    stopHostWaitingPoll();
     await teardownCall(true);
     setPhase("lobby");
     await setupPreview();
     await refreshRoomMeta();
+    startHostWaitingPoll();
   }
 
   async function rejoinCall() {
@@ -273,7 +485,7 @@
 
   function toggleMic() {
     micEnabled = !micEnabled;
-    if (phase === "lobby") {
+    if (phase === "lobby" || phase === "waiting_admission") {
       syncPreviewTracks(previewStream, { audio: micEnabled, video: camEnabled });
     } else if (livekitRoom) {
       livekitRoom.localParticipant.setMicrophoneEnabled(micEnabled);
@@ -282,7 +494,7 @@
 
   function toggleCam() {
     camEnabled = !camEnabled;
-    if (phase === "lobby") {
+    if (phase === "lobby" || phase === "waiting_admission") {
       syncPreviewTracks(previewStream, { audio: micEnabled, video: camEnabled });
     } else if (livekitRoom) {
       livekitRoom.localParticipant.setCameraEnabled(camEnabled);
@@ -341,11 +553,14 @@
     setupPreview();
     refreshTimer = setInterval(refreshRoomMeta, 5000);
     refreshRoomMeta();
+    startHostWaitingPoll();
   });
 
   onDestroy(() => {
     if (refreshTimer) clearInterval(refreshTimer);
     if (toastTimer) clearTimeout(toastTimer);
+    stopWaitingPoll();
+    stopHostWaitingPoll();
     teardownCall(true);
   });
 </script>
@@ -368,6 +583,36 @@
     {/if}
 
     {#if livekitRoom && (phase === "in_call" || phase === "reconnecting")}
+      <div class="absolute left-4 top-4 z-20">
+        <ConnectionQualityBadge label={localConnectionQuality} />
+      </div>
+
+      <ChatPanel
+        {slug}
+        localIdentity={livekitRoom.localParticipant.identity}
+        guestIdentity={isGuest ? livekitRoom.localParticipant.identity : null}
+        open={chatOpen}
+        onClose={() => (chatOpen = false)}
+      />
+
+      {#if showInCallDevices}
+        <div class="absolute left-4 top-14 z-20 w-full max-w-md rounded-xl border border-border bg-card/95 p-4 shadow-lg backdrop-blur-sm">
+          <div class="mb-3 flex items-center justify-between">
+            <p class="text-sm font-medium text-foreground">Devices</p>
+            <button type="button" class="text-xs text-muted-foreground hover:text-foreground" onclick={() => (showInCallDevices = false)}>
+              Close
+            </button>
+          </div>
+          <DevicePicker
+            devices={mediaDevices}
+            {audioDeviceId}
+            {videoDeviceId}
+            onAudioDeviceChange={changeAudioDevice}
+            onVideoDeviceChange={changeVideoDevice}
+          />
+        </div>
+      {/if}
+
       <div class="relative min-h-0 flex-1">
         <CallStage room={livekitRoom} {activeSpeakerIdentity} {localDisplayName} {mediaRevision} bind:stageRef={stageEl} />
       </div>
@@ -377,10 +622,14 @@
         {camEnabled}
         {screenSharing}
         {snapshotting}
+        {chatOpen}
         onToggleMic={toggleMic}
         onToggleCam={toggleCam}
         onToggleScreenShare={toggleScreenShare}
         onSnapshot={takeSnapshot}
+        onToggleChat={() => (chatOpen = !chatOpen)}
+        onToggleDevices={() => (showInCallDevices = !showInCallDevices)}
+        devicesOpen={showInCallDevices}
         onLeave={leaveCall}
         onEndRoom={isHost ? endRoom : undefined}
         {ending}
@@ -391,6 +640,8 @@
   </div>
 {:else if phase === "ended" || isEnded}
   <ConnectionBanner phase="ended" />
+{:else if phase === "waiting_admission"}
+  <WaitingRoomView {hostName} onLeaveWaiting={leaveWaitingRoom} />
 {:else if isFull}
   <div class="rounded-xl border border-border bg-card/60 px-6 py-6">
     <p class="text-sm text-destructive">Room is full ({maxParticipants} of {maxParticipants} joined)</p>
@@ -412,15 +663,29 @@
     {camEnabled}
     {permissionState}
     {previewStream}
+    devices={mediaDevices}
+    {audioDeviceId}
+    {videoDeviceId}
     {joining}
     canJoin={canJoinLobby}
     onGuestNameChange={(v) => (guestName = v)}
     onToggleMic={toggleMic}
     onToggleCam={toggleCam}
+    onAudioDeviceChange={changeAudioDevice}
+    onVideoDeviceChange={changeVideoDevice}
     onJoin={joinCall}
   />
 
-  {#if isHost}
+  {#if isHost && waitingRoomEnabled}
+    <div class="mt-4">
+      <HostWaitingPanel
+        pending={pendingWaiting}
+        loading={waitingHostLoading}
+        onAdmit={(identity) => resolveWaitingAction(identity, "admit")}
+        onDeny={(identity) => resolveWaitingAction(identity, "deny")}
+      />
+    </div>
+  {:else if isHost}
     <p class="mt-4 text-xs text-muted-foreground">Host controls appear after you join the call.</p>
   {/if}
 {/if}

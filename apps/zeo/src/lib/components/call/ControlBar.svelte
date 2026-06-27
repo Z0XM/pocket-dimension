@@ -5,10 +5,14 @@
     camEnabled: boolean;
     screenSharing?: boolean;
     snapshotting?: boolean;
+    chatOpen?: boolean;
     onToggleMic: () => void;
     onToggleCam: () => void;
     onToggleScreenShare?: () => void;
     onSnapshot?: () => void;
+    onToggleChat?: () => void;
+    onToggleDevices?: () => void;
+    devicesOpen?: boolean;
     onLeave: () => void;
     onEndRoom?: () => void;
     ending?: boolean;
@@ -20,10 +24,14 @@
     camEnabled,
     screenSharing = false,
     snapshotting = false,
+    chatOpen = false,
     onToggleMic,
     onToggleCam,
     onToggleScreenShare,
     onSnapshot,
+    onToggleChat,
+    onToggleDevices,
+    devicesOpen = false,
     onLeave,
     onEndRoom,
     ending = false,
@@ -92,6 +100,32 @@
         onclick={onSnapshot}
       >
         {snapshotting ? "Saving…" : "Snapshot"}
+      </button>
+    {/if}
+    {#if onToggleChat}
+      <button
+        type="button"
+        class="rounded-full border px-4 py-2.5 text-sm font-medium focus-visible:ring-2 focus-visible:ring-primary {chatOpen
+          ? 'border-primary bg-primary/15 text-primary'
+          : 'border-border text-foreground hover:bg-secondary'}"
+        aria-label={chatOpen ? "Close chat" : "Open chat"}
+        aria-pressed={chatOpen}
+        onclick={onToggleChat}
+      >
+        Chat
+      </button>
+    {/if}
+    {#if onToggleDevices}
+      <button
+        type="button"
+        class="rounded-full border px-4 py-2.5 text-sm font-medium focus-visible:ring-2 focus-visible:ring-primary {devicesOpen
+          ? 'border-primary bg-primary/15 text-primary'
+          : 'border-border text-foreground hover:bg-secondary'}"
+        aria-label="Choose devices"
+        aria-pressed={devicesOpen}
+        onclick={onToggleDevices}
+      >
+        Devices
       </button>
     {/if}
     <button

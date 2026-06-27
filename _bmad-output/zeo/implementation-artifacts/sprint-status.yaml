@@ -72,11 +72,11 @@ development_status:
   6-3-production-env-and-runbook: done
   epic-6-retrospective: optional
 
-  epic-7: backlog
-  7-1-in-room-text-chat: backlog
-  7-2-device-picker: backlog
-  7-3-connection-quality-indicator: backlog
-  7-4-waiting-room: backlog
+  epic-7: done
+  7-1-in-room-text-chat: done
+  7-2-device-picker: done
+  7-3-connection-quality-indicator: done
+  7-4-waiting-room: done
   epic-7-retrospective: optional
 
   epic-8: backlog

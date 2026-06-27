@@ -7,6 +7,7 @@ import { mintRoomJoinToken, publicLiveKitWsUrl, clientIceServers } from "$lib/se
 import { checkRateLimit, clientIpFromRequest } from "$lib/server/rate-limit";
 import { isParticipantBlocked } from "$lib/server/session-blocks";
 import { findRoomBySlug, isRoomFull, resolveParticipantCount } from "$lib/server/rooms";
+import { isWaitingRoomAdmitted, requestWaitingRoomEntry } from "$lib/server/waiting-room";
 import { guestTokenSchema } from "$lib/validation/rooms";
 import type { RequestHandler } from "./$types";
 
@@ -56,6 +57,30 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
     throw error(403, "You were removed from this call");
   }
 
+  const isHost = locals.user?.id === room.hostUserId;
+
+  if (room.waitingRoomEnabled && !isHost) {
+    const admitted = await isWaitingRoomAdmitted(room, identity);
+    if (!admitted) {
+      const waiting = await requestWaitingRoomEntry({
+        roomId: room.id,
+        participantIdentity: identity,
+        displayName: name,
+      });
+
+      if (waiting.status === "denied") {
+        throw error(403, "The host declined your request to join");
+      }
+
+      return json({
+        status: "waiting",
+        identity,
+        displayName: name,
+        waitingStatus: waiting.status,
+      });
+    }
+  }
+
   const participantCount = await resolveParticipantCount(room);
   if (isRoomFull(participantCount)) {
     throw error(409, "Room is full");
@@ -70,6 +95,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
   const iceServers = clientIceServers();
 
   return json({
+    status: "ready",
     token,
     wsUrl: publicLiveKitWsUrl(),
     ...(iceServers ? { iceServers } : {}),

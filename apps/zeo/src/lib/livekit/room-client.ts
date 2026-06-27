@@ -1,4 +1,4 @@
-import { DisconnectReason, Room, RoomEvent, type LocalParticipant, type RemoteParticipant } from "livekit-client";
+import { DisconnectReason, Room, RoomEvent, type ConnectionQuality, type LocalParticipant, type RemoteParticipant } from "livekit-client";
 
 export type ConnectionPhase = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
 
@@ -7,6 +7,7 @@ export type CallRoomHandlers = {
   onActiveSpeaker: (identity: string | null) => void;
   onParticipantsChange: () => void;
   onDisconnect: (reason?: DisconnectReason) => void;
+  onConnectionQuality?: (quality: ConnectionQuality, identity: string) => void;
 };
 
 export function createCallRoom(handlers: CallRoomHandlers) {
@@ -30,12 +31,29 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   room.on(RoomEvent.TrackUnsubscribed, () => handlers.onParticipantsChange());
   room.on(RoomEvent.LocalTrackPublished, () => handlers.onParticipantsChange());
   room.on(RoomEvent.LocalTrackUnpublished, () => handlers.onParticipantsChange());
+  room.on(RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+    handlers.onConnectionQuality?.(quality, participant.identity);
+  });
 
-  async function connect(wsUrl: string, token: string, options: { micEnabled: boolean; camEnabled: boolean; iceServers?: RTCIceServer[] }) {
+  async function connect(
+    wsUrl: string,
+    token: string,
+    options: {
+      micEnabled: boolean;
+      camEnabled: boolean;
+      iceServers?: RTCIceServer[];
+      audioDeviceId?: string;
+      videoDeviceId?: string;
+    }
+  ) {
     handlers.onPhaseChange("connecting");
     await room.connect(wsUrl, token, options.iceServers?.length ? { rtcConfig: { iceServers: options.iceServers } } : undefined);
-    await room.localParticipant.setMicrophoneEnabled(options.micEnabled);
-    await room.localParticipant.setCameraEnabled(options.camEnabled);
+    await room.localParticipant.setMicrophoneEnabled(options.micEnabled, {
+      deviceId: options.audioDeviceId,
+    });
+    await room.localParticipant.setCameraEnabled(options.camEnabled, {
+      deviceId: options.videoDeviceId,
+    });
     handlers.onPhaseChange("connected");
     handlers.onParticipantsChange();
   }

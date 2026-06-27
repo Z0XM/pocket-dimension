@@ -22,6 +22,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
     slug: room.slug,
     displayName: room.displayName,
     status: room.status,
+    waitingRoomEnabled: room.waitingRoomEnabled,
     hostUserId: room.hostUserId,
     participantCount,
     maxParticipants: MAX_PARTICIPANTS_PER_ROOM,

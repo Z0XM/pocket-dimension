@@ -7,7 +7,9 @@
   const { data }: { data: PageData } = $props();
 
   let callPhase = $state<CallPhase>(data.isEnded ? "ended" : "lobby");
-  const showPageChrome = $derived(callPhase === "lobby" || callPhase === "ended" || callPhase === "disconnected");
+  const showPageChrome = $derived(
+    callPhase === "lobby" || callPhase === "waiting_admission" || callPhase === "ended" || callPhase === "disconnected"
+  );
 </script>
 
 <svelte:head>
@@ -35,6 +37,7 @@
   initialParticipantCount={data.participantCount}
   initialIsFull={data.isFull}
   initialIsEnded={data.isEnded}
+  initialWaitingRoomEnabled={data.room.waitingRoomEnabled}
 />
 
 {#if !data.user && !data.isEnded && showPageChrome}

@@ -24,6 +24,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       displayName: room.displayName,
       status: room.status,
       hostUserId: room.hostUserId,
+      waitingRoomEnabled: room.waitingRoomEnabled,
     },
     hostName: host?.username ?? host?.email?.split("@")[0] ?? "Host",
     participantCount,

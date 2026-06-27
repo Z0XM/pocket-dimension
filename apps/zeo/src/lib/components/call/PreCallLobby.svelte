@@ -2,6 +2,8 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
+  import DevicePicker from "$lib/components/call/DevicePicker.svelte";
+  import type { MediaDeviceLists } from "$lib/livekit/devices";
   import type { PermissionState } from "$lib/livekit/types";
   import { syncPreviewTracks } from "$lib/livekit/media-preview";
 
@@ -17,11 +19,16 @@
     camEnabled: boolean;
     permissionState: PermissionState;
     previewStream: MediaStream | null;
+    devices: MediaDeviceLists;
+    audioDeviceId: string;
+    videoDeviceId: string;
     joining: boolean;
     canJoin: boolean;
     onGuestNameChange: (value: string) => void;
     onToggleMic: () => void;
     onToggleCam: () => void;
+    onAudioDeviceChange: (deviceId: string) => void;
+    onVideoDeviceChange: (deviceId: string) => void;
     onJoin: () => void;
   };
 
@@ -37,11 +44,16 @@
     camEnabled,
     permissionState,
     previewStream,
+    devices,
+    audioDeviceId,
+    videoDeviceId,
     joining,
     canJoin,
     onGuestNameChange,
     onToggleMic,
     onToggleCam,
+    onAudioDeviceChange,
+    onVideoDeviceChange,
     onJoin,
   }: Props = $props();
 
@@ -95,6 +107,10 @@
       </p>
     {/if}
   </div>
+
+  {#if permissionState === "granted"}
+    <DevicePicker {devices} {audioDeviceId} {videoDeviceId} {onAudioDeviceChange} {onVideoDeviceChange} />
+  {/if}
 
   <div class="flex flex-wrap gap-2">
     <button

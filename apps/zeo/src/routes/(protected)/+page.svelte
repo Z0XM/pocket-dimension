@@ -10,6 +10,7 @@
 
   let roomName = $state("");
   let joinSlug = $state("");
+  let waitingRoomEnabled = $state(false);
   let creating = $state(false);
   let errorMessage = $state<string | null>(null);
 
@@ -22,7 +23,7 @@
       const res = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName: roomName.trim() }),
+        body: JSON.stringify({ displayName: roomName.trim(), waitingRoomEnabled }),
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -89,6 +90,10 @@
         <Label for="room-name">Room name</Label>
         <Input id="room-name" bind:value={roomName} placeholder="Team standup" maxlength={80} />
       </div>
+      <label class="flex items-center gap-2 text-sm text-foreground">
+        <input type="checkbox" bind:checked={waitingRoomEnabled} class="rounded border-border" />
+        Enable waiting room (host admits guests before they join)
+      </label>
       <Button disabled={creating || !roomName.trim()} onclick={createRoom}>
         {creating ? "Creating…" : "Create room"}
       </Button>

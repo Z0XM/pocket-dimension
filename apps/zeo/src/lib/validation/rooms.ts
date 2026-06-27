@@ -2,6 +2,19 @@ import { z } from "zod";
 
 export const createRoomSchema = z.object({
   displayName: z.string().trim().min(1, "Room name is required").max(80, "Room name is too long"),
+  waitingRoomEnabled: z.boolean().optional(),
+});
+
+export const chatMessageSchema = z.object({
+  body: z.string().trim().min(1, "Message is required").max(2000, "Message is too long"),
+  guestIdentity: z
+    .string()
+    .regex(/^guest_[0-9a-f-]{36}$/i, "Invalid guest identity")
+    .optional(),
+});
+
+export const waitingActionSchema = z.object({
+  identity: z.string().min(1, "Participant identity is required"),
 });
 
 export const guestTokenSchema = z.object({

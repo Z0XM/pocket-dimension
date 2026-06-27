@@ -1,4 +1,4 @@
-export type CallPhase = "lobby" | "connecting" | "in_call" | "reconnecting" | "disconnected" | "ended";
+export type CallPhase = "lobby" | "waiting_admission" | "connecting" | "in_call" | "reconnecting" | "disconnected" | "ended";
 
 export type PermissionState = "prompt" | "granted" | "denied" | "unavailable";
 

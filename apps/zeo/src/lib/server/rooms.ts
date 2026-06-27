@@ -32,7 +32,7 @@ export async function countActiveRooms() {
   return rows[0]?.count ?? 0;
 }
 
-export async function createRoom(options: { displayName: string; hostUserId: string }) {
+export async function createRoom(options: { displayName: string; hostUserId: string; waitingRoomEnabled?: boolean }) {
   const activeCount = await countActiveRooms();
   if (activeCount >= MAX_CONCURRENT_ROOMS) {
     return { error: "capacity" as const };
@@ -51,6 +51,7 @@ export async function createRoom(options: { displayName: string; hostUserId: str
           displayName: options.displayName,
           hostUserId: options.hostUserId,
           status: "waiting",
+          waitingRoomEnabled: options.waitingRoomEnabled ?? false,
           createdById: options.hostUserId,
           updatedById: options.hostUserId,
         })

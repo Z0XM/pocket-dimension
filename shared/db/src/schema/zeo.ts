@@ -7,6 +7,7 @@ export const zeoSchema = pgSchema("zeo");
 
 export const roomStatus = zeoSchema.enum("room_status", ["waiting", "active", "ended"]);
 export const sessionBlockReason = zeoSchema.enum("session_block_reason", ["removed"]);
+export const waitingEntryStatus = zeoSchema.enum("waiting_entry_status", ["pending", "admitted", "denied"]);
 
 export const rooms = zeoSchema.table(
   "rooms",
@@ -22,6 +23,7 @@ export const rooms = zeoSchema.table(
       .references(() => auth.user.id, { onDelete: "cascade" }),
     status: roomStatus("status").default("waiting").notNull(),
     maxParticipants: integer("max_participants").default(6).notNull(),
+    waitingRoomEnabled: boolean("waiting_room_enabled").default(false).notNull(),
     endedAt: timestamp("ended_at"),
   },
   (table) => [
@@ -75,5 +77,44 @@ export const roomSessionBlocks = zeoSchema.table(
   (table) => [
     unique("room_session_blocks_room_id_participant_identity_unique").on(table.roomId, table.participantIdentity),
     index("room_session_blocks_room_id_idx").on(table.roomId),
+  ]
+);
+
+export const chatMessages = zeoSchema.table(
+  "chat_messages",
+  {
+    id,
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "cascade" }),
+    senderIdentity: text("sender_identity").notNull(),
+    senderDisplayName: text("sender_display_name").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at")
+      .$default(() => sql`now()`)
+      .notNull(),
+  },
+  (table) => [index("chat_messages_room_id_idx").on(table.roomId), index("chat_messages_room_id_created_at_idx").on(table.roomId, table.createdAt)]
+);
+
+export const roomWaitingEntries = zeoSchema.table(
+  "room_waiting_entries",
+  {
+    id,
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "cascade" }),
+    participantIdentity: text("participant_identity").notNull(),
+    displayName: text("display_name").notNull(),
+    status: waitingEntryStatus("status").default("pending").notNull(),
+    requestedAt: timestamp("requested_at")
+      .$default(() => sql`now()`)
+      .notNull(),
+    resolvedAt: timestamp("resolved_at"),
+    resolvedById: uuid("resolved_by_id").references(() => auth.user.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    unique("room_waiting_entries_room_id_participant_identity_unique").on(table.roomId, table.participantIdentity),
+    index("room_waiting_entries_room_id_status_idx").on(table.roomId, table.status),
   ]
 );

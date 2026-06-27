@@ -17,11 +17,12 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 export const POST: RequestHandler = async ({ locals, request }) => {
   const user = requireContributorOrAdmin(locals);
-  const { displayName } = await readJsonBody(request, createRoomSchema);
+  const { displayName, waitingRoomEnabled } = await readJsonBody(request, createRoomSchema);
 
   const result = await createRoom({
     displayName,
     hostUserId: user.id,
+    waitingRoomEnabled,
   });
 
   if ("error" in result) {
@@ -34,6 +35,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
         slug: result.room.slug,
         displayName: result.room.displayName,
         status: result.room.status,
+        waitingRoomEnabled: result.room.waitingRoomEnabled,
       },
     },
     { status: 201 }
