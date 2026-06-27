@@ -1,4 +1,6 @@
 import { error } from "@sveltejs/kit";
+import { db, schema } from "@pocket-dimension/db";
+import { eq } from "drizzle-orm";
 import { findRoomBySlug, isRoomFull, MAX_PARTICIPANTS_PER_ROOM, resolveParticipantCount } from "$lib/server/rooms";
 import type { PageServerLoad } from "./$types";
 
@@ -10,6 +12,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     error(404, "Room not found");
   }
 
+  const host = await db.query.user.findFirst({
+    where: eq(schema.user.id, room.hostUserId),
+  });
+
   const participantCount = room.status === "ended" ? 0 : await resolveParticipantCount(room);
 
   return {
@@ -19,6 +25,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       status: room.status,
       hostUserId: room.hostUserId,
     },
+    hostName: host?.username ?? host?.email?.split("@")[0] ?? "Host",
     participantCount,
     maxParticipants: MAX_PARTICIPANTS_PER_ROOM,
     isFull: isRoomFull(participantCount),

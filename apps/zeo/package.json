@@ -38,6 +38,7 @@
     "bits-ui": "^2.14.4",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
+    "livekit-client": "^2.20.0",
     "livekit-server-sdk": "^2.15.5",
     "tailwind-merge": "^3.4.0",
     "tailwind-variants": "^3.2.2",

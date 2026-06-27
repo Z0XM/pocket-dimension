@@ -52,12 +52,12 @@ development_status:
   3-6-guest-join-without-login: done
   epic-3-retrospective: optional
 
-  epic-4: backlog
-  4-1-pre-call-lobby-with-device-preview: backlog
-  4-2-connect-to-livekit-and-render-participant-grid: backlog
-  4-3-mic-camera-and-leave-controls: backlog
-  4-4-active-speaker-indication: backlog
-  4-5-reconnection-and-error-states: backlog
+  epic-4: done
+  4-1-pre-call-lobby-with-device-preview: done
+  4-2-connect-to-livekit-and-render-participant-grid: done
+  4-3-mic-camera-and-leave-controls: done
+  4-4-active-speaker-indication: done
+  4-5-reconnection-and-error-states: done
   epic-4-retrospective: optional
 
   epic-5: backlog
