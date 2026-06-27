@@ -1,0 +1,15 @@
+# Used when building zeo: docker build -f apps/zeo/Dockerfile .
+node_modules
+**/.git
+**/.turbo
+**/.svelte-kit
+_bmad-output
+.agents
+apps/chhan-chhan
+apps/howwasyourday
+apps/markitdown
+apps/me-via-you
+apps/pocket
+apps/rhymes
+apps/watchlist
+apps/auth-service

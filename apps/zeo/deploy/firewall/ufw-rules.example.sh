@@ -14,9 +14,9 @@ ufw default allow outgoing
 # SSH (change if you use a non-default port)
 ufw allow 22/tcp comment 'SSH'
 
-# Caddy / HTTPS
+# Traefik / Dokploy / Caddy — HTTPS
 ufw allow 80/tcp comment 'HTTP (ACME + redirect)'
-ufw allow 443/tcp comment 'HTTPS (zeo app + LiveKit WSS via Caddy)'
+ufw allow 443/tcp comment 'HTTPS (zeo app + LiveKit WSS via Traefik/Caddy)'
 
 # LiveKit ICE TCP (direct, not proxied)
 ufw allow 7881/tcp comment 'LiveKit ICE TCP'
