@@ -1,0 +1,2 @@
+ALTER TABLE "zeo"."room_participants" ADD COLUMN "participant_identity" text NOT NULL;--> statement-breakpoint
+CREATE INDEX "room_participants_participant_identity_idx" ON "zeo"."room_participants" USING btree ("participant_identity");

@@ -1,0 +1,42 @@
+# Production LiveKit config — copy to livekit.prod.yaml and customize.
+# Generate keys: livekit-server generate-keys
+#
+# Run without --dev flag (see docker-compose.prod.yml.example).
+
+port: 7880
+bind_addresses:
+  - ""
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+  # Set to your VPS public IPv4 if auto-detection fails behind NAT:
+  # node_ip: 203.0.113.10
+
+room:
+  max_participants: 12
+  empty_timeout: 300
+
+# LiveKit embedded TURN — clients receive ephemeral credentials via signaling.
+# Requires TLS on zeo-livekit.z0xm.com (Caddy) and open UDP/TCP ports (see deploy README).
+turn:
+  enabled: true
+  domain: zeo-livekit.z0xm.com
+  tls_port: 5349
+  udp_port: 3478
+  # Relay ports (open in ufw — see ../firewall/ufw-rules.example.sh)
+  external_tls: true
+
+keys:
+  # Replace with output from `livekit-server generate-keys`
+  API_KEY_PLACEHOLDER: API_SECRET_PLACEHOLDER
+
+webhook:
+  urls:
+    - https://zeo.z0xm.com/api/webhooks/livekit
+  api_key: API_KEY_PLACEHOLDER
+
+logging:
+  level: info

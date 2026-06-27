@@ -1,0 +1,35 @@
+# systemd unit — copy to /etc/systemd/system/zeo.service
+#
+# Prerequisites:
+#   - bun installed at /usr/local/bin/bun (or adjust ExecStart)
+#   - repo built: cd /opt/pocket-dimension && bun run build:app:zeo
+#   - env file at /etc/zeo/env
+#
+# Enable:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now zeo
+
+[Unit]
+Description=zeo video calling app (SvelteKit + Bun)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zeo
+Group=zeo
+WorkingDirectory=/opt/pocket-dimension/apps/zeo
+EnvironmentFile=/etc/zeo/env
+ExecStart=/usr/local/bin/bun run start
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zeo
+
+# Hardening (optional — adjust if bun needs broader access)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

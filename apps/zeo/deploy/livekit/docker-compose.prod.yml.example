@@ -1,0 +1,15 @@
+# Production LiveKit — copy to docker-compose.prod.yml alongside livekit.prod.yaml
+#
+# Usage:
+#   cp livekit.prod.yaml.example livekit.prod.yaml   # edit keys + domain
+#   cp docker-compose.prod.yml.example docker-compose.prod.yml
+#   docker compose -f docker-compose.prod.yml up -d
+
+services:
+  livekit:
+    image: livekit/livekit-server:v1.9.4
+    command: --config /etc/livekit.yaml
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./livekit.prod.yaml:/etc/livekit.yaml:ro
