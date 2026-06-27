@@ -37,10 +37,10 @@ development_status:
   1-3-add-zeo-database-schema-and-migrations: done
   epic-1-retrospective: optional
 
-  epic-2: backlog
-  2-1-livekit-docker-compose-for-dev-and-production: backlog
-  2-2-server-side-livekit-token-mint-api: backlog
-  2-3-livekit-webhook-handler: backlog
+  epic-2: done
+  2-1-livekit-docker-compose-for-dev-and-production: done
+  2-2-server-side-livekit-token-mint-api: done
+  2-3-livekit-webhook-handler: done
   epic-2-retrospective: optional
 
   epic-3: backlog

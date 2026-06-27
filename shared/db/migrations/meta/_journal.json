@@ -169,6 +169,13 @@
       "when": 1782586002184,
       "tag": "0023_zeo_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1782589334290,
+      "tag": "0024_zeo_participant_identity",
+      "breakpoints": true
     }
   ]
 }

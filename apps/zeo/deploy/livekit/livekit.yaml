@@ -1,0 +1,21 @@
+port: 7880
+bind_addresses:
+  - ""
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+room:
+  # App enforces 6; SFU headroom for reconnects / subscribe-only tracks
+  max_participants: 12
+  empty_timeout: 300
+turn:
+  enabled: true
+keys:
+  devkey: secret
+webhook:
+  # Point at zeo app when running locally (see README for host.docker.internal)
+  urls:
+    - http://host.docker.internal:3008/api/webhooks/livekit
+  api_key: devkey

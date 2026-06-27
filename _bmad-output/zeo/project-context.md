@@ -1,9 +1,15 @@
 # zeo — Project Context (for AI agents)
 
 **Product:** Self-hosted group video calling (max 2 rooms × 6 participants)  
-**Monorepo path:** `apps/zeo` (to be created)  
+**Monorepo path:** `apps/zeo`  
 **Media:** LiveKit Server self-hosted on Hostinger KVM 2  
 **Auth:** `@pocket-dimension/auth` + auth-service  
+
+## Branding (2026-06-27)
+
+- **Icon:** multi-tile video grid SVG (`apps/zeo/static/icon.svg`)
+- **Theme:** dark UI; **off-white `#f5f5f0` primary** for actions/text
+- **Participant tiles:** distinct colors per user (`src/lib/participant-colors.ts`) — green, purple, yellow, red, blue, orange
 
 ## Production URLs
 

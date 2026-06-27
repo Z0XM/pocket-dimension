@@ -39,6 +39,7 @@ export const roomParticipants = zeoSchema.table(
     roomId: uuid("room_id")
       .notNull()
       .references(() => rooms.id, { onDelete: "cascade" }),
+    participantIdentity: text("participant_identity").notNull(),
     userId: uuid("user_id").references(() => auth.user.id, { onDelete: "set null" }),
     guestDisplayName: text("guest_display_name"),
     isGuest: boolean("is_guest").default(false).notNull(),
@@ -48,7 +49,11 @@ export const roomParticipants = zeoSchema.table(
     leftAt: timestamp("left_at"),
     removedById: uuid("removed_by_id").references(() => auth.user.id, { onDelete: "set null" }),
   },
-  (table) => [index("room_participants_room_id_idx").on(table.roomId), index("room_participants_user_id_idx").on(table.userId)]
+  (table) => [
+    index("room_participants_room_id_idx").on(table.roomId),
+    index("room_participants_user_id_idx").on(table.userId),
+    index("room_participants_participant_identity_idx").on(table.participantIdentity),
+  ]
 );
 
 export const roomSessionBlocks = zeoSchema.table(
