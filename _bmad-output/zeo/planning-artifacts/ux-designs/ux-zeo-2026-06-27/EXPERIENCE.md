@@ -18,17 +18,17 @@ sources:
 # Information Architecture
 
 ## Public / unauthenticated
-- `/login`, `/sign-up`, `/forgot-password`, `/verify-email`, `/check-email`
+- `/login`, `/sign-up`, `/forgot-password`, `/verify-email`, `/check-email` (optional for guests)
 - `/health`
+- `/room/[slug]` — join flow for guests (display name) or redirect to lobby if authenticated
 
 ## Authenticated
-- `/` — Home: create room, list joinable/active rooms (user's recent)
+- `/` — Home: create room (contributor/admin only), join by link, recent rooms
 - `/room/[slug]` — Pre-call lobby → active call (same route, state-driven)
 - `/room/[slug]/ended` — Post-call summary (optional MVP: redirect home with toast)
 
 ## Phase 2 additions
 - `/admin` — Operator dashboard
-- `/room/[slug]/guest` — Guest join with display name
 
 # Voice and Tone
 
@@ -40,11 +40,14 @@ sources:
 # Component Patterns
 
 ## Home — create or join
-- Primary CTA: **New room** (opens name prompt or inline field).
-- Secondary: paste/open join link field.
-- Show capacity indicator: "1 of 2 rooms in use" (when API exposes count).
+- **Contributor/admin:** Primary CTA **New room** + join link field
+- **User role:** Join link field only; no create CTA (or disabled with tooltip: "Only contributors can create rooms")
+- **Unauthenticated visitor on home:** Prompt to join via link or sign in
+- Show capacity indicator: "1 of 2 rooms in use" (when API exposes count)
 
 ## Pre-call lobby
+- **Guest path:** Display name field (required) before device preview
+- **Authenticated path:** Name from profile; optional edit display name for this call
 - Live preview of camera (or placeholder if off).
 - Mic/camera toggle before join.
 - Room title and host name when joining existing room.
@@ -121,10 +124,12 @@ sources:
 6. Priya shares screen; layout switches to dominant share.
 7. Priya **End room for all** → confirm → everyone to home.
 
-## Flow 2 — Marco joins at capacity edge (climax: admitted as 6th)
-1. Marco opens link; lobby shows "5 of 6 joined".
-2. Joins successfully as sixth participant.
-3. **Climax:** seventh would-be joiner sees capacity error (not Marco's view — host sees toast if webhook fires).
+## Flow 2 — Marco joins as a guest (climax: admitted as 6th)
+1. Marco opens Priya's link without logging in.
+2. Enters display name "Marco".
+3. Lobby shows "5 of 6 joined".
+4. Joins successfully as sixth participant with Guest badge.
+5. **Climax:** grid shows six tiles including Marco as guest.
 
 ## Flow 3 — Permission denied recovery
 1. User denies camera in browser.

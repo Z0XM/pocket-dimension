@@ -12,7 +12,7 @@ sources:
 
 ## Executive Summary
 
-**zeo** is a self-hosted group video calling product in the Pocket Dimension monorepo. Authenticated users create or join video rooms with up to six participants, share their screen, and manage in-call media controls. Media is routed through a self-hosted **LiveKit SFU** on the owner's Hostinger KVM 2 VPS.
+**zeo** is a self-hosted group video calling product in the Pocket Dimension monorepo. **Contributors and admins** create video rooms; **guests and authenticated users** join via link — no login required for guests. Up to six participants per room share video and screen; media routes through a self-hosted **LiveKit SFU** on Hostinger KVM 2.
 
 The product is intentionally capacity-limited: **two concurrent rooms** and **six participants per room**. These limits are enforced in the application layer before LiveKit tokens are issued, aligning software guardrails with hardware constraints (2 vCPU, 8 GB RAM).
 
@@ -39,17 +39,23 @@ Deployment documentation and defaults must allow the full stack (app + LiveKit +
 
 ## Users and Roles
 
-### Authenticated member
-- Signs in via shared Better Auth.
-- Can create a room (MVP) and join rooms they are invited to.
+### Contributor or admin (room creator / host)
+- Global Pocket Dimension role: `contributor` or `admin` on `auth.users.role`.
+- Can create rooms and is host of rooms they create.
 - Controls own mic, camera, and screen share.
-- Can leave a call at any time.
+- Can end the room for all and remove participants (MVP).
 
-### Room host
-- The user who created the room (MVP: creator = host).
-- Can end the room for all participants.
-- Can remove a participant from the room (MVP).
-- Phase 2: admit guests from waiting room, mute others.
+### Authenticated member (`user` role)
+- Can sign in and join existing rooms via link.
+- Cannot create new rooms.
+- Full in-call media controls for self.
+
+### Guest (unauthenticated)
+- Joins via room link without an account.
+- Enters a display name before joining.
+- Receives a scoped guest token; LiveKit identity `guest_<uuid>`.
+- Cannot create rooms.
+- Phase 2: optional waiting room admission by host.
 
 ### Operator / admin (Phase 3)
 - Views active rooms and system health.
@@ -59,21 +65,24 @@ Deployment documentation and defaults must allow the full stack (app + LiveKit +
 ## User Journeys
 
 ### UJ-1 — Priya starts a team sync
-Priya logs into zeo, clicks **New room**, enters "Design sync", and lands in a pre-call lobby. She allows camera and mic, confirms her devices work, then clicks **Join**. She copies the room link and sends it to five teammates. As each joins, their tile appears in the grid. Priya shares her Figma tab; others see her screen as the dominant tile. When done, she clicks **End room for all** and everyone disconnects. The room is marked closed in the database.
+Priya (contributor) logs into zeo, clicks **New room**, enters "Design sync", and lands in a pre-call lobby. She allows camera and mic, confirms her devices work, then clicks **Join**. She copies the room link and sends it to five teammates. As each joins, their tile appears in the grid. Priya shares her Figma tab; others see her screen as the dominant tile. When done, she clicks **End room for all** and everyone disconnects. The room is marked closed in the database.
 
-### UJ-2 — Marco joins an existing call
-Marco receives Priya's link, logs in, and opens the join page. The system shows room name, participant count (4/6), and a **Join** button. Marco completes the device check, joins, and is muted by default [ASSUMPTION: join muted optional — default unmuted per FR]. He toggles mute when his dog barks. He leaves without ending the room for others.
+### UJ-2 — Marco joins as a guest
+Marco receives Priya's link and opens it without logging in. He enters his name "Marco", allows mic when prompted, and clicks **Join**. He appears in the grid as a guest. He cannot create a room if he later visits the home page without signing in as contributor/admin.
 
-### UJ-3 — System at capacity
+### UJ-3 — Regular user cannot create a room
+Sam is logged in with role `user`. The home page shows join options but no **New room** button (or shows it disabled with explanation). An API attempt to create a room returns 403.
+
+### UJ-4 — System at capacity
 A third user tries to create a room while two are active. The API returns a clear error: "All rooms are in use. Try again later." No LiveKit token is issued.
 
 ## Release Phases
 
 | Phase | Focus |
 |-------|--------|
-| **MVP (Phase 1)** | Auth, create/join, 6-person video, screen share, host end/remove, capacity limits, LiveKit deploy |
-| **Phase 2** | Text chat, waiting room, device picker, connection quality, guest links |
-| **Phase 3** | Admin dashboard, scheduled rooms, recording (Egress), role-based room creation |
+| **MVP (Phase 1)** | Role-gated create, guest + auth join, 6-person video, screen share, host controls, capacity limits, LiveKit deploy |
+| **Phase 2** | Text chat, waiting room, device picker, connection quality |
+| **Phase 3** | Admin dashboard, scheduled rooms, recording (Egress) |
 
 ---
 
@@ -81,22 +90,31 @@ A third user tries to create a room while two are active. The API returns a clea
 
 ### Authentication and access
 
-#### FR-1 Authenticated access
-The product shall require a valid Better Auth session to create a room or join a room (MVP).
+#### FR-1 Access model
+The product shall allow **guest join without login** via room link (display name required) and **authenticated join** for users with a Better Auth session.
 
 #### FR-2 Session integration
-The product shall use the monorepo shared auth package and auth-service with identical `BETTER_AUTH_SECRET` and `PUBLIC_BASE_AUTH_URL` configuration.
+The product shall use the monorepo shared auth package and auth-service with identical `BETTER_AUTH_SECRET` and `PUBLIC_BASE_AUTH_URL` configuration for authenticated flows.
 
 #### FR-3 Sign-in and sign-up flows
-The product shall provide login, sign-up, forgot-password, and email-verification routes consistent with sibling SvelteKit apps.
+The product shall provide login, sign-up, forgot-password, and email-verification routes for users who choose to authenticate (optional for joining a call).
+
+#### FR-3a Room creation role gate
+Only users whose global role is **`contributor` or `admin`** shall be able to create rooms. Users with role **`user`** shall receive 403 on create attempts.
 
 ### Room lifecycle
 
 #### FR-4 Create room
-An authenticated user shall be able to create a new room with a display name; the system assigns a unique room slug or code.
+A user with role **contributor or admin** shall be able to create a new room with a display name; the system assigns a unique room slug or code.
 
 #### FR-5 Join room by link
-An authenticated user shall be able to join an active room via URL containing the room identifier.
+Any person with a valid room link shall be able to join an active room — either as an authenticated user or as a guest with a display name (no account).
+
+#### FR-5a Guest display name
+Guests shall provide a display name (1–50 chars, trimmed) before joining; profanity filter optional Phase 2.
+
+#### FR-5b Guest identity
+Guest participants shall use LiveKit identity `guest_<uuid>`; display name shown in UI only.
 
 #### FR-6 Room states
 The system shall track room states: `waiting` (created, no media yet), `active` (at least one participant connected to LiveKit), `ended` (closed).
@@ -130,10 +148,10 @@ Participant count shall reflect users currently connected to LiveKit, reconciled
 ### LiveKit integration
 
 #### FR-15 Token issuance
-The server shall mint short-lived LiveKit JWT tokens scoped to a specific room name and participant identity.
+The server shall mint short-lived LiveKit JWT tokens scoped to a specific room name and participant identity — for authenticated users (user id) or guests (guest uuid).
 
 #### FR-16 Participant identity
-Each token shall bind a stable participant identity (authenticated user id) and display name.
+Each token shall bind a stable participant identity (authenticated `user.id` or `guest_<uuid>`) and display name.
 
 #### FR-17 Room name mapping
 Each zeo room shall map to exactly one LiveKit room name; names must be unique and non-guessable (UUID-based).
@@ -200,6 +218,11 @@ The host shall be able to remove a participant from the room; removed users are 
 #### FR-35 Host transfer
 Deferred to Phase 2: automatic host transfer when host leaves.
 
+### Guest join (MVP)
+
+#### FR-40 Guest join without account
+Room links shall allow unauthenticated join: guest enters display name, passes device check, receives guest token, and enters the LiveKit room without creating an account.
+
 ### Phase 2 — Enhanced collaboration
 
 #### FR-36 In-room text chat
@@ -214,9 +237,6 @@ User can choose camera and microphone from available devices before and during a
 #### FR-39 Connection quality
 UI shows per-participant or self connection quality (excellent / good / poor).
 
-#### FR-40 Guest join links
-Host can generate a time-limited guest link that allows join without a full account [ASSUMPTION: guest identity is display-name only].
-
 ### Phase 3 — Administration and scheduling
 
 #### FR-41 Admin dashboard
@@ -228,8 +248,8 @@ User can schedule a room for a future time with a persistent link.
 #### FR-43 Recording
 Authorized host can start/stop room recording via LiveKit Egress; recordings stored per operator-configured storage.
 
-#### FR-44 Role-based room creation
-Configuration can restrict room creation to users with a specific role or allowlist.
+#### FR-44 Operator configuration
+Operator can adjust global limits and feature flags via admin dashboard (Phase 3).
 
 ---
 
@@ -264,6 +284,12 @@ In-call controls shall be keyboard-operable; tiles shall expose participant name
 
 #### NFR-10 Observability
 Structured logs for token issuance, capacity rejections, webhook events, and room state transitions.
+
+#### NFR-11 Production domains
+Production shall serve the app at **https://zeo.z0xm.com** and LiveKit WSS at **https://zeo-livekit.z0xm.com**.
+
+#### NFR-12 Guest abuse mitigation
+Guest token endpoint shall be rate-limited per IP (e.g. 20/hour) and require valid room slug; display names sanitized.
 
 ---
 
@@ -300,14 +326,19 @@ Structured logs for token issuance, capacity rejections, webhook events, and roo
 - Hostinger KVM 2 with root access, public IPv4, and ability to open UDP ports for WebRTC/TURN.
 - PostgreSQL 18 available (monorepo standard).
 - auth-service running for session validation.
-- Domain with DNS pointing to VPS for TLS certificates.
+- Domain with DNS: **zeo.z0xm.com**, **zeo-livekit.z0xm.com**
 - `[ASSUMPTION]` Users primarily connect from desktop/laptop browsers.
 - `[ASSUMPTION]` MVP join default: microphone unmuted, camera on if permission granted (configurable).
 
 ---
 
+## Resolved decisions (2026-06-27)
+
+1. **Room creation:** contributor or admin role only (global `auth.users.role`).
+2. **Guest join:** allowed in MVP without login; display name required.
+3. **Production URLs:** zeo.z0xm.com (app), zeo-livekit.z0xm.com (LiveKit).
+
 ## Open Questions
 
-1. Production domain/subdomain naming for zeo app vs LiveKit endpoint?
-2. Should removed participants be blocked from rejoining the same room session?
-3. Is recording a near-term requirement or firmly Phase 3?
+1. Should removed guests be blocked from rejoining the same room session?
+2. Is recording a near-term requirement or firmly Phase 3?

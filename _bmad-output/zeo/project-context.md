@@ -5,6 +5,11 @@
 **Media:** LiveKit Server self-hosted on Hostinger KVM 2  
 **Auth:** `@pocket-dimension/auth` + auth-service  
 
+## Production URLs
+
+- App: **https://zeo.z0xm.com**
+- LiveKit: **wss://zeo-livekit.z0xm.com**
+
 ## Key constraints
 
 - Do not exceed **2 concurrent rooms** or **6 participants per room** — enforce before LiveKit token mint.
@@ -12,6 +17,14 @@
 - **One active screen share** at a time.
 - Cap video at **720p**; prefer **480p** when 5–6 on camera.
 - Dev port: **3008**. PostgreSQL schema: **`zeo`**.
+
+## Access rules
+
+| Action | Who |
+|--------|-----|
+| Create room | `contributor` or `admin` only (`auth.users.role`) |
+| Join authenticated | Any logged-in user |
+| Join as guest | Anyone with room link + display name (no account) |
 
 ## Planning artifacts
 
@@ -26,6 +39,7 @@ All specs live under `_bmad-output/zeo/planning-artifacts/`:
 ## Monorepo patterns to follow
 
 - Copy auth route structure from `apps/watchlist` or `apps/chhan-chhan`
+- Read `session.user.role` for create-room authorization
 - Drizzle schema in `shared/db/src/schema/zeo/`
 - Built shared packages required before dev: `bun run build`
 - `.env` from `.env.example`; non-empty `RESEND_API_KEY` for auth-service
@@ -36,4 +50,4 @@ Epics 1 → 2 → 4 (slice) → 3 → 4–5 → 6 per `epics.md` suggested sprin
 
 ## Out of scope for MVP
 
-Guest links, chat, recording, admin dashboard, PSTN, breakout rooms.
+Waiting room, chat, recording, admin dashboard, PSTN, breakout rooms.

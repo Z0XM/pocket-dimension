@@ -127,16 +127,18 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 
 **Goal:** Users create and join rooms; hard limits enforced before media connect.
 
-### Story 3.1 — Create room API and home UI
+### Story 3.1 — Create room API and home UI (contributor/admin only)
 
-**As an** authenticated user,
+**As a** contributor or admin,
 **I want** to create a named room from the home page,
 **So that** I can start a call.
 
 **Acceptance criteria:**
-- [ ] `POST /api/rooms` creates room with unique slug and livekit_room_name
+- [ ] `POST /api/rooms` requires session with role `contributor` or `admin`; returns 403 for `user`
+- [ ] Creates room with unique slug and livekit_room_name
 - [ ] Host set to current user; status `waiting`
-- [ ] Home UI: **New room** flow with display name input
+- [ ] Home UI: **New room** visible only for contributor/admin
+- [ ] Home UI for `user` role: join-only, no create CTA (or disabled with explanation)
 - [ ] Redirect to `/room/[slug]` after create
 
 ### Story 3.2 — Enforce two concurrent room limit
@@ -184,6 +186,20 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 - [ ] Server calls LiveKit RemoveParticipant
 - [ ] Audit row records `removed_by_id`
 - [ ] Removed user sees disconnect message
+
+### Story 3.6 — Guest join without login
+
+**As a** guest without an account,
+**I want** to join a room via link with my display name,
+**So that** I can participate without signing up.
+
+**Acceptance criteria:**
+- [ ] `/room/[slug]` accessible without session; prompts for display name if unauthenticated
+- [ ] `POST /api/rooms/[slug]/token` accepts `{ guestName }` without session
+- [ ] Issues token with identity `guest_<uuid>` and sanitized display name
+- [ ] Rate limit guest token requests per IP (NFR-12)
+- [ ] Guest tiles show optional "Guest" badge
+- [ ] Guests cannot access create/end/remove APIs
 
 ---
 
@@ -290,7 +306,7 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 **So that** browsers allow media capture.
 
 **Acceptance criteria:**
-- [ ] Caddyfile template for app + LiveKit WSS subdomain
+- [ ] Caddyfile template for **zeo.z0xm.com** + **zeo-livekit.z0xm.com**
 - [ ] Let's Encrypt automatic certs documented
 - [ ] WebSocket upgrade works for LiveKit
 
@@ -318,7 +334,7 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 
 ---
 
-## Epic 7 (Phase 2): Chat, devices, and guests
+## Epic 7 (Phase 2): Chat, devices, and waiting room
 
 **Goal:** Enhanced collaboration without changing media architecture.
 
@@ -331,8 +347,8 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 ### Story 7.3 — Connection quality indicator
 - [ ] FR-39: quality badge on self tile or status bar
 
-### Story 7.4 — Waiting room and guest links
-- [ ] FR-37, FR-40: host admits guests; signed guest tokens
+### Story 7.4 — Waiting room
+- [ ] FR-37: host admits participants before LiveKit connect
 
 ---
 
@@ -349,8 +365,8 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 ### Story 8.3 — Recording via LiveKit Egress
 - [ ] FR-43: start/stop record, storage config
 
-### Story 8.4 — Role-based room creation
-- [ ] FR-44: restrict create to allowlist/role
+### Story 8.4 — Operator configuration
+- [ ] FR-44: adjust global limits and feature flags via admin dashboard
 
 ---
 
@@ -360,14 +376,14 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 |------|-------|---------|-------|
 | 1 | MVP | 1.1–1.3 | App scaffold + auth + DB |
 | 2 | MVP | 2.1–2.3 | LiveKit infra + tokens + webhooks |
-| 3 | MVP | 3.1–3.5 | Rooms + capacity + host controls |
+| 3 | MVP | 3.1–3.6 | Rooms + capacity + guest join + host controls |
 | 4 | MVP | 4.1–4.5 | Lobby + grid + controls |
 | 5 | MVP | 5.1–5.2 | Screen share |
 | 6 | MVP | 6.1–6.3 | Hostinger deploy |
-| 7 | Phase 2 | 7.1–7.4 | Chat, devices, guests |
+| 7 | Phase 2 | 7.1–7.4 | Chat, devices, waiting room |
 | 8 | Phase 3 | 8.1–8.4 | Admin, schedule, record |
 
-**MVP story count:** 20 implementable stories across Epics 1–6.
+**MVP story count:** 21 implementable stories across Epics 1–6.
 
 ## Suggested sprint order
 

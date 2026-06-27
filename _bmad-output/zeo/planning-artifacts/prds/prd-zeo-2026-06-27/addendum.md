@@ -11,8 +11,40 @@ Technical and implementation context that supports the PRD but does not belong i
 | Client SDK | `livekit-client` + `@livekit/components-core` or custom Svelte wrappers | Evaluate official Svelte examples |
 | TURN | LiveKit built-in TURN or coturn sidecar | Open UDP 3478, 5349, 49152–65535 |
 | Reverse proxy | Caddy recommended | Auto TLS, WebSocket upgrade for LiveKit |
-| Auth | `@pocket-dimension/auth` + auth-service | Same cookie/session caveats as other apps on localhost |
-| Database | Drizzle + PostgreSQL schema `zeo` | Rooms, participants audit, optional chat messages Phase 2 |
+| Auth | `@pocket-dimension/auth` + auth-service | Optional for join; required for create (contributor/admin) |
+| Database | Drizzle + PostgreSQL schema `zeo` | Rooms, participants audit, optional chat Phase 2 |
+
+## Role model (room creation)
+
+Uses global Better Auth user role from `auth.users.role`:
+
+| Role | Create room | Join room |
+|------|-------------|-----------|
+| `admin` | Yes | Yes (authenticated) |
+| `contributor` | Yes | Yes (authenticated) |
+| `user` | No (403) | Yes (authenticated) |
+| Guest (none) | No | Yes (display name + guest token) |
+
+Server check on `POST /api/rooms`:
+
+```typescript
+const role = session.user.role;
+if (role !== "contributor" && role !== "admin") {
+  throw error(403, "Only contributors and admins can create rooms");
+}
+```
+
+## Production domains
+
+| Service | URL |
+|---------|-----|
+| zeo app | **https://zeo.z0xm.com** |
+| LiveKit WSS | **wss://zeo-livekit.z0xm.com** |
+
+Env vars:
+
+- `PUBLIC_LIVEKIT_URL=wss://zeo-livekit.z0xm.com`
+- `ORIGIN=https://zeo.z0xm.com`
 
 ## Hostinger KVM 2 deployment topology
 
@@ -21,8 +53,8 @@ Internet
    │
    ▼
 Caddy (:443)
-   ├── zeo.example.com     → SvelteKit (Bun/Node adapter)
-   └── livekit.example.com → LiveKit (:7880 WS, :7881 TCP)
+   ├── zeo.z0xm.com          → SvelteKit (Bun/Node adapter)
+   └── zeo-livekit.z0xm.com  → LiveKit (:7880 WS, :7881 TCP)
 
 LiveKit ←→ coturn (optional, same host)
 PostgreSQL (local or managed)
@@ -36,6 +68,16 @@ auth-service (:5001)
 | zeo app | 3008 (internal), proxied 443 |
 | LiveKit | 7880 (WS), 7881 (TCP), 50000–60000 UDP (configurable range) |
 | TURN | 3478 UDP/TCP, 5349 TLS, 49152–65535 UDP relay |
+
+## Guest join security model (MVP)
+
+- Room link format: `https://zeo.z0xm.com/room/[slug]`
+- Guest flow: enter display name → `POST /api/rooms/[slug]/token` with `{ guestName }` (no session)
+- LiveKit identity: `guest_<uuid>` generated server-side; display name in token metadata
+- Rate limit: 20 guest token requests / hour / IP per room
+- Sanitize display name (length, strip HTML)
+- Guests cannot call create/end/remove APIs
+- Optional: mark guest tiles with subtle "Guest" badge in UI
 
 ## LiveKit resource tuning (KVM 2)
 
@@ -60,10 +102,3 @@ auth-service (:5001)
 | mediasoup | More engineering for signaling + UI |
 | Pure P2P mesh | Unreliable at 6 participants |
 | LiveKit Cloud | Adds cost; user wants self-host |
-
-## Phase 2 guest link security model (draft)
-
-- Host generates signed guest token (HMAC, 1-hour TTL, room-scoped)
-- Guest enters display name only; no persistent account
-- Guest tokens cannot create rooms or exceed participant cap
-- Rate limit guest token generation per host

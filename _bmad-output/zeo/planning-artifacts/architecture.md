@@ -104,7 +104,9 @@ PostgreSQL schema **`zeo`** via Drizzle in `@pocket-dimension/db`.
 |--------|------|-------|
 | id | uuid | PK |
 | room_id | uuid | FK |
-| user_id | uuid | FK |
+| user_id | uuid | FK; nullable for guests |
+| guest_display_name | text | nullable; set when user_id null |
+| is_guest | boolean | default false |
 | joined_at | timestamptz | |
 | left_at | timestamptz | nullable |
 | removed_by_id | uuid | nullable, host remove |
@@ -125,24 +127,26 @@ LiveKit is source of truth for *live* presence; this table is audit trail and lo
 
 ### 5.1 REST / form actions (SvelteKit)
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `POST /api/rooms` | POST | Create room; enforce global room cap |
-| `GET /api/rooms/[slug]` | GET | Room metadata + live participant count |
-| `POST /api/rooms/[slug]/token` | POST | Mint LiveKit JWT; enforce participant cap |
-| `POST /api/rooms/[slug]/end` | POST | Host ends room |
-| `POST /api/rooms/[slug]/remove` | POST | Host removes participant |
-| `POST /api/webhooks/livekit` | POST | LiveKit event webhook |
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `POST /api/rooms` | POST | contributor/admin session | Create room; enforce global room cap |
+| `GET /api/rooms/[slug]` | GET | public | Room metadata + live participant count |
+| `POST /api/rooms/[slug]/token` | POST | session **or** guest body | Mint LiveKit JWT; enforce participant cap |
+| `POST /api/rooms/[slug]/end` | POST | host session | Host ends room |
+| `POST /api/rooms/[slug]/remove` | POST | host session | Host removes participant |
+| `POST /api/webhooks/livekit` | POST | LiveKit signature | LiveKit event webhook |
 
 ### 5.2 Token mint flow
 
 ```
-1. Validate session
+1. If authenticated: validate session; identity = user.id, name = profile
+   If guest: require guestName in body; identity = guest_<uuid>, rate-limit by IP
 2. Load room by slug; reject if ended
-3. Count active rooms (status waiting|active) — reject create if ≥ 2
-4. Count LiveKit participants via webhook cache or LiveKit API — reject if ≥ 6
-5. Build AccessToken with roomName, identity, name, TTL 4h
-6. Return { token, wsUrl, roomName }
+3. (Create only) Verify role ∈ {contributor, admin}
+4. Count active rooms — reject create if ≥ 2
+5. Count LiveKit participants — reject if ≥ 6
+6. Build AccessToken with roomName, identity, name, TTL 4h
+7. Return { token, wsUrl, roomName }
 ```
 
 ### 5.3 Capacity counting strategy
@@ -173,7 +177,8 @@ turn:
 Environment variables in zeo app:
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
-- `LIVEKIT_URL` (public WSS URL)
+- `LIVEKIT_URL` → public `wss://zeo-livekit.z0xm.com`
+- `ORIGIN` → `https://zeo.z0xm.com`
 - `LIVEKIT_WEBHOOK_SECRET`
 
 ## 7. Deployment architecture
@@ -181,7 +186,7 @@ Environment variables in zeo app:
 ### 7.1 Docker Compose (VPS)
 
 Services:
-- `caddy` — TLS, routes to zeo + livekit
+- `caddy` — TLS for zeo.z0xm.com + zeo-livekit.z0xm.com
 - `livekit` — official image
 - `coturn` — optional if not using LiveKit embedded TURN
 - `zeo` — built SvelteKit container or systemd + bun
@@ -252,9 +257,9 @@ State machine for `/room/[slug]`:
 
 | Phase | Deliverables |
 |-------|--------------|
-| **1** | DB schema, app scaffold, LiveKit docker, token API, basic call UI, capacity limits, deploy docs |
-| **2** | Webhooks, chat table + UI, device picker, waiting room, guest tokens |
-| **3** | Admin routes, Egress recording, scheduled rooms, Redis counter |
+| **1** | DB schema, app scaffold, LiveKit docker, token API (auth + guest), role-gated create, basic call UI, capacity limits, deploy docs |
+| **2** | Webhooks, chat, device picker, waiting room |
+| **3** | Admin routes, Egress recording, scheduled rooms |
 
 ## 12. Risks and mitigations
 
@@ -265,7 +270,13 @@ State machine for `/room/[slug]`:
 | localhost auth cookies | Document; use HTTPS dev proxy or DB verify for local |
 | Safari screen share quirks | Test early; document browser requirements |
 
-## 13. Open technical questions
+## 13. Resolved decisions
+
+- Room creation: `contributor` | `admin` only (`auth.users.role`)
+- Guest join: MVP, no login, display name required
+- Production: zeo.z0xm.com, zeo-livekit.z0xm.com
+
+## 14. Open technical questions
 
 1. Bun vs Node adapter for production SvelteKit on VPS?
 2. Co-locate LiveKit on same VPS as zeo app or separate subdomain only?

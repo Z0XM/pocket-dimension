@@ -65,10 +65,17 @@
 
 | Gap | Recommendation |
 |-----|----------------|
-| Open Q: production domain names | Decide before Epic 6; use placeholder in dev |
-| Open Q: Bun vs Node adapter | Spike in Story 1.1; default Bun to match monorepo |
+| Guest rejoin after host remove | Decide before Story 3.6; default allow rejoin with new token |
 | Redis for participant count | Defer; LiveKit API on token mint OK for 12 max users |
 | pocket hub registration | Optional; add to Epic 6 or Phase 2 |
+
+### Resolved (2026-06-27)
+
+| Item | Decision |
+|------|----------|
+| Room creation | contributor/admin only |
+| Guest join | MVP, no login |
+| Production domains | zeo.z0xm.com, zeo-livekit.z0xm.com |
 
 ### Medium severity (before production deploy)
 
@@ -126,5 +133,6 @@ Optional before dev:
 - [ ] Third room creation blocked with clear UI message
 - [ ] Seventh join attempt blocked
 - [ ] HTTPS production deploy documented and verified
-- [ ] Auth required for create/join
+- [ ] Guest can join without login via room link + display name
+- [ ] User role cannot create rooms; contributor/admin can
 - [ ] Host can end room and remove participant

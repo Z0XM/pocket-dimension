@@ -4,7 +4,7 @@
 
 **zeo** is a self-hosted group video calling application within the Pocket Dimension monorepo. It enables small teams and trusted groups to start video meetings with screen sharing over the internet, running on the owner's Hostinger KVM 2 VPS with open-source media infrastructure (LiveKit).
 
-The product targets **low-volume, controlled usage**: at most **2 concurrent rooms**, each with up to **6 participants**. It is not a public Zoom competitor — it is a private, auth-gated conferencing tool for people who already belong to the Pocket Dimension ecosystem (or invited guests).
+The product targets **low-volume, controlled usage**: at most **2 concurrent rooms**, each with up to **6 participants**. It is not a public Zoom competitor — it is a controlled conferencing tool where **contributors and admins** create rooms, and **anyone with a link** can join as a guest without an account.
 
 ## The Problem
 
@@ -26,10 +26,11 @@ Users authenticate, create or join a room, and enter a call with standard contro
 ## Who This Serves
 
 ### Primary users
-- Authenticated Pocket Dimension users who need occasional group calls (friends, small teams, collaborators).
+- Pocket Dimension users with **`contributor` or `admin`** role who create and host rooms.
 
 ### Secondary users
-- **Guests** invited via room link (optional phase — may require logged-in host to create room first).
+- **Guests** who join via room link with a display name only — no account required.
+- Authenticated **`user`** role members who join existing rooms but cannot create new ones.
 
 ### Operator
 - The VPS owner who deploys LiveKit, monitors usage, and manages capacity limits.
@@ -52,7 +53,9 @@ Users authenticate, create or join a room, and enter a call with standard contro
 ## Scope
 
 ### In scope (MVP foundation)
-- Authenticated room create/join
+- Room create (contributor/admin only)
+- Guest join via link without login (display name)
+- Authenticated user join (any role)
 - Group video (up to 6 per room)
 - Audio mute/unmute, camera on/off
 - Screen sharing (one active sharer at a time)
@@ -65,7 +68,7 @@ Users authenticate, create or join a room, and enter a call with standard contro
 
 ### In scope (post-MVP phases)
 - Text chat in room
-- Waiting room / admit guest
+- Waiting room / host admit before entry
 - Device selector (choose mic/camera)
 - Connection quality indicator
 - Admin usage dashboard
@@ -82,10 +85,9 @@ Users authenticate, create or join a room, and enter a call with standard contro
 
 ## Vision
 
-zeo becomes the default "start a call" surface inside Pocket Dimension — lightweight, private, and sized honestly for the hardware it runs on. It starts as a focused 6-person room tool and can grow (recording, scheduling, guest links) without re-architecting the media layer.
+zeo becomes the default "start a call" surface inside Pocket Dimension — lightweight, private, and sized honestly for the hardware it runs on. It starts as a focused 6-person room tool and can grow (recording, scheduling, waiting room) without re-architecting the media layer.
 
-## Open Questions
+## Production URLs
 
-- Should all users be able to create rooms, or only a designated role?
-- Are guest join links (no account) required for MVP, or auth-only?
-- Preferred production domain/subdomain for zeo and LiveKit (e.g. `zeo.example.com`, `livekit.example.com`)?
+- App: **https://zeo.z0xm.com**
+- LiveKit: **https://zeo-livekit.z0xm.com**
