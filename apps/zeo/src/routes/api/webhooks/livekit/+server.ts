@@ -7,7 +7,9 @@ import { scheduleRoomEmptyGrace } from "$lib/server/room-grace";
 import { findRoomByLiveKitName, recordParticipantJoined, recordParticipantLeft } from "$lib/server/rooms";
 import type { RequestHandler } from "./$types";
 
-const receiver = new WebhookReceiver(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET);
+function getWebhookReceiver() {
+  return new WebhookReceiver(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET);
+}
 
 export const POST: RequestHandler = async ({ request }) => {
   const body = await request.text();
@@ -19,7 +21,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   let event;
   try {
-    event = await receiver.receive(body, authHeader);
+    event = await getWebhookReceiver().receive(body, authHeader);
   } catch {
     throw error(401, "Invalid LiveKit webhook signature");
   }
