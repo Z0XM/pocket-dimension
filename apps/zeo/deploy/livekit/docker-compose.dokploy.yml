@@ -1,4 +1,5 @@
-# Dokploy Compose project for LiveKit on Hostinger.
+# ALTERNATIVE to the Dokploy LiveKit template (https://docs.dokploy.com/docs/templates/livekit).
+# Prefer the official template unless you need host network + UDP port range 50000–60000.
 #
 # In Dokploy: Create → Compose → paste this file (or point to repo path).
 # Mount livekit.prod.yaml as a volume or bake into the project directory.
