@@ -90,14 +90,21 @@ RESEND_API_KEY=...
 1. Dokploy → **Applications** → **Create**
 2. **Source:** Git → `pocket-dimension`, branch `main`
 3. **Build type:** **Railpack**
-4. **Root directory:** `/` (monorepo root)
+4. **Root directory:** `/` (monorepo root — **not** `apps/zeo`)
 5. **Port:** `3008`
 
 Railpack env:
 
 ```env
-RAILPACK_BUILD_CMD=./apps/zeo/scripts/deploy-build.sh
-RAILPACK_START_CMD=cd apps/zeo && bun run start
+RAILPACK_CONFIG_FILE=apps/zeo/railpack.json
+```
+
+That config pins Bun **1.3.5**, runs `bun install` (without `--frozen-lockfile`), then builds zeo via `./apps/zeo/scripts/deploy-build.sh`.
+
+If install still fails with `lockfile is frozen`, add:
+
+```env
+RAILPACK_INSTALL_CMD=bun install
 ```
 
 Domain: **`zeo.z0xm.com`** with HTTPS (Cloudflare SSL: Full strict if proxied).
@@ -226,7 +233,7 @@ After LiveKit is up, confirm zeo has matching `LIVEKIT_API_KEY` / `LIVEKIT_API_S
 | WebSocket failed | Template domain on LiveKit service port 7880; Traefik WebSocket enabled |
 | Webhook / wrong participant count | `webhook` block in template `livekit.yaml`; keys match zeo env |
 | Auth redirect loop | `BETTER_AUTH_TRUSTED_ORIGINS`, `BETTER_AUTH_COOKIE_DOMAIN=.z0xm.com` |
-| Build fails | Railpack root = repo root; `RAILPACK_BUILD_CMD=./apps/zeo/scripts/deploy-build.sh` |
+| Build fails / frozen lockfile | Root = repo root (`/`). Set `RAILPACK_CONFIG_FILE=apps/zeo/railpack.json` or `RAILPACK_INSTALL_CMD=bun install` |
 | `uuidv7()` migration error | PostgreSQL must be **18+** |
 | Template deploy stuck | Large UDP port ranges can hang Docker — template uses single **7882/udp** by design |
 
@@ -234,7 +241,8 @@ After LiveKit is up, confirm zeo has matching `LIVEKIT_API_KEY` / `LIVEKIT_API_S
 
 | File | Purpose |
 |------|---------|
-| [../../scripts/deploy-build.sh](../../scripts/deploy-build.sh) | Railpack build script |
+| [../../scripts/deploy-build.sh](../../scripts/deploy-build.sh) | Build script (called from railpack.json) |
+| [../../railpack.json](../../railpack.json) | Railpack config (install + build + start) |
 | [cloudflare-dns.md](./cloudflare-dns.md) | DNS proxy rules |
 | [../livekit/dokploy-template-overlay.yaml.example](../livekit/dokploy-template-overlay.yaml.example) | Webhook + room limits for template `livekit.yaml` |
 | [../livekit/docker-compose.dokploy.yml](../livekit/docker-compose.dokploy.yml) | **Alternative** custom compose (not needed if using template) |

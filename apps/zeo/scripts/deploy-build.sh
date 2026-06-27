@@ -7,8 +7,8 @@ ROOT_DIR="$(cd "$APP_DIR/../.." && pwd)"
 
 cd "$ROOT_DIR"
 
-echo "Installing Bun workspace dependencies..."
-bun install --frozen-lockfile
+# Dependencies are installed by Railpack (see apps/zeo/railpack.json).
+# Do not use --frozen-lockfile here — partial monorepo checkouts fail frozen install.
 
 echo "Building shared packages and zeo..."
 bun build:shared:utils
