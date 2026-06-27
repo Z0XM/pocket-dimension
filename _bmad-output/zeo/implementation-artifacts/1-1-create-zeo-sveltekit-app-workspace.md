@@ -1,7 +1,7 @@
 # Story 1.1: Create zeo SvelteKit app workspace
 
 **Epic:** 1 — Platform scaffold and auth integration  
-**Status:** in-progress
+**Status:** done
 
 ## User story
 
@@ -11,10 +11,10 @@
 
 ## Acceptance criteria
 
-- [ ] Package `@pocket-dimension/zeo` exists with `dev`, `build`, `lint`, `typecheck` scripts
-- [ ] Root `package.json` includes `dev:app:zeo` and `build:app:zeo`
-- [ ] App runs on port **3008** locally
-- [ ] `GET /health` returns 200
+- [x] Package `@pocket-dimension/zeo` exists with `dev`, `build`, `lint`, `typecheck` scripts
+- [x] Root `package.json` includes `dev:app:zeo` and `build:app:zeo`
+- [x] App runs on port **3008** locally
+- [x] `GET /health` returns 200
 
 ## Implementation notes
 
