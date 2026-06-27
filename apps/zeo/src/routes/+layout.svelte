@@ -2,16 +2,18 @@
   import "../app.css";
   import "@fontsource-variable/inter";
   import "@fontsource/fira-mono";
+  import { onMount } from "svelte";
+  import { authClient } from "$lib/auth-client";
 
   const { children } = $props();
+
+  onMount(() => {
+    const session = authClient.useSession();
+    const unsubSession = session.subscribe(() => {});
+    return () => {
+      unsubSession();
+    };
+  });
 </script>
 
-<div class="relative min-h-screen overflow-hidden">
-  <div
-    class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(110,231,183,0.08),transparent_60%)]"
-  ></div>
-
-  <div class="relative mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-10 sm:px-6 lg:px-8">
-    {@render children()}
-  </div>
-</div>
+{@render children()}

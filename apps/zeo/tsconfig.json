@@ -11,5 +11,6 @@
     "strict": true,
     "moduleResolution": "bundler",
     "types": ["bun"]
-  }
+  },
+  "exclude": ["vite-kysely-compat.ts"]
 }

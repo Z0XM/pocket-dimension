@@ -281,6 +281,13 @@
       "dependencies": {
         "@fontsource-variable/inter": "^5.2.8",
         "@fontsource/fira-mono": "^5.2.7",
+        "@pocket-dimension/auth": "workspace:*",
+        "@pocket-dimension/db": "workspace:*",
+        "better-auth": "^1.4.10",
+        "bits-ui": "^2.14.4",
+        "clsx": "^2.1.1",
+        "tailwind-merge": "^3.4.0",
+        "tailwind-variants": "^3.2.2",
       },
       "devDependencies": {
         "@sveltejs/kit": "^2.49.1",
