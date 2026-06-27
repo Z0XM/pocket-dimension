@@ -159,17 +159,36 @@ Use the official **[Dokploy LiveKit template](https://docs.dokploy.com/docs/temp
    - **Turn domain (TURN TLS):** `zeo-livekit-turn.z0xm.com`
    - **WHIP domain:** only needed if you use ingress/recording — zeo calls do not require it
 3. Deploy. The template creates:
-   - `livekit` — LiveKit server (`livekit/livekit-server:v1.9.0`)
+   - `livekit` — LiveKit server (`livekit/livekit-server:v1.9.0` in the template — **upgrade to v1.9.12+**, see §6.2)
    - `redis` — required by the template
    - `egress` / `ingress` — optional for zeo; safe to leave running or remove from compose if you want a lighter stack
 
 The template auto-generates **`API_KEY`** and **`API_SECRET`**. Copy them from the Compose project's **Environment** tab into zeo env (`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`).
 
-### 6.2 Fix livekit.yaml (TURN domain + webhook)
+### 6.2 Upgrade LiveKit server + fix livekit.yaml
 
-After deploy, edit **`livekit.yaml`** in Dokploy → Files:
+**zeo uses `livekit-client` 2.20**, which connects to **`/rtc/v1`**. The Dokploy template ships **`livekit-server:v1.9.0`**, which only has **`/rtc`** (legacy). Symptom: browser console shows WebSocket failure on `/rtc/v1?access_token=…` while `https://zeo-livekit…/rtc/validate` returns 401.
 
-1. Set **`turn.domain`** to your TURN host — **`zeo-livekit-turn.z0xm.com`**, not the sslip.io hostname the template generated and not the signal domain (`zeo-livekit`).
+In your Compose file, bump the image:
+
+```yaml
+livekit:
+  image: livekit/livekit-server:v1.9.12   # was v1.9.0
+```
+
+Redeploy the stack, then verify:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://zeo-livekit.z0xm.com/rtc/v1/validate   # 401, not 404
+curl --http1.1 -sI \
+  -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  https://zeo-livekit.z0xm.com/rtc/v1 | head -3                        # 401 or 101, not 404
+```
+
+Also edit **`livekit.yaml`** in Dokploy → Files:
+
+1. Set **`turn.domain`** to **`zeo-livekit-turn.z0xm.com`**, not the sslip.io hostname the template generated.
 2. Append room limits and webhook from [../livekit/dokploy-template-overlay.yaml.example](../livekit/dokploy-template-overlay.yaml.example):
 
 ```yaml
@@ -186,6 +205,8 @@ webhook:
 3. Redeploy the LiveKit stack
 
 If you use ingress/WHIP, update `ingress.rtmp_base_url` and `ingress.whip_base_url` to your real domains too. zeo calls do not need ingress.
+
+**zeo env:** `PUBLIC_LIVEKIT_URL` must be **`wss://zeo-livekit.z0xm.com`** (no `:7880` port — port 7880 is plain HTTP only).
 
 ### 6.3 Fix Traefik 404 on HTTPS (dokploy-network)
 
@@ -268,6 +289,7 @@ After LiveKit is up, confirm zeo has matching `LIVEKIT_API_KEY` / `LIVEKIT_API_S
 
 | Symptom | Fix |
 |---------|-----|
+| `/rtc/v1` WebSocket fails, `/rtc/validate` works | Template server is **v1.9.0**; upgrade to **v1.9.12+** (§6.2). Confirm `PUBLIC_LIVEKIT_URL=wss://zeo-livekit.z0xm.com` (no port) |
 | `https://zeo-livekit…` → 404 but `:7880` → OK | Add `livekit` to `dokploy-network`; redeploy (§6.3) |
 | HTTPS self-signed / LE fails | TURN/signal domains must be **DNS only** (grey cloud); redeploy after Domains change |
 | TURN fails on mobile | `turn.domain` = `zeo-livekit-turn.z0xm.com` in `livekit.yaml`, not sslip.io |
