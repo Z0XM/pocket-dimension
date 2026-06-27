@@ -24,6 +24,8 @@ export const rooms = zeoSchema.table(
     status: roomStatus("status").default("waiting").notNull(),
     maxParticipants: integer("max_participants").default(6).notNull(),
     waitingRoomEnabled: boolean("waiting_room_enabled").default(false).notNull(),
+    scheduledStartAt: timestamp("scheduled_start_at"),
+    forceEndedById: uuid("force_ended_by_id").references(() => auth.user.id, { onDelete: "set null" }),
     endedAt: timestamp("ended_at"),
   },
   (table) => [
@@ -31,6 +33,7 @@ export const rooms = zeoSchema.table(
     unique("rooms_livekit_room_name_unique").on(table.livekitRoomName),
     index("rooms_host_user_id_idx").on(table.hostUserId),
     index("rooms_status_idx").on(table.status),
+    index("rooms_scheduled_start_at_idx").on(table.scheduledStartAt),
   ]
 );
 
@@ -118,3 +121,17 @@ export const roomWaitingEntries = zeoSchema.table(
     index("room_waiting_entries_room_id_status_idx").on(table.roomId, table.status),
   ]
 );
+
+export const operatorSettings = zeoSchema.table("operator_settings", {
+  id,
+  maxConcurrentRooms: integer("max_concurrent_rooms").default(2).notNull(),
+  maxParticipantsPerRoom: integer("max_participants_per_room").default(6).notNull(),
+  chatEnabled: boolean("chat_enabled").default(true).notNull(),
+  waitingRoomDefaultEnabled: boolean("waiting_room_default_enabled").default(false).notNull(),
+  scheduledRoomsEnabled: boolean("scheduled_rooms_enabled").default(true).notNull(),
+  updatedAt: timestamp("updated_at")
+    .$default(() => sql`now()`)
+    .$onUpdate(() => sql`now()`)
+    .notNull(),
+  updatedById: uuid("updated_by_id").references(() => auth.user.id, { onDelete: "set null" }),
+});

@@ -3,6 +3,15 @@ import { z } from "zod";
 export const createRoomSchema = z.object({
   displayName: z.string().trim().min(1, "Room name is required").max(80, "Room name is too long"),
   waitingRoomEnabled: z.boolean().optional(),
+  scheduledStartAt: z.string().datetime().optional(),
+});
+
+export const operatorSettingsSchema = z.object({
+  maxConcurrentRooms: z.number().int().min(1).max(20),
+  maxParticipantsPerRoom: z.number().int().min(2).max(50),
+  chatEnabled: z.boolean(),
+  waitingRoomDefaultEnabled: z.boolean(),
+  scheduledRoomsEnabled: z.boolean(),
 });
 
 export const chatMessageSchema = z.object({

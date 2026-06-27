@@ -38,6 +38,9 @@
   initialIsFull={data.isFull}
   initialIsEnded={data.isEnded}
   initialWaitingRoomEnabled={data.room.waitingRoomEnabled}
+  initialIsScheduledForFuture={data.isScheduledForFuture}
+  initialScheduledStartLabel={data.scheduledStartLabel}
+  initialIsJoinable={data.isJoinable}
 />
 
 {#if !data.user && !data.isEnded && showPageChrome}

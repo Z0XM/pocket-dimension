@@ -183,6 +183,13 @@
       "when": 1782590557611,
       "tag": "0025_demonic_captain_america",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1782590889244,
+      "tag": "0026_peaceful_scarlet_witch",
+      "breakpoints": true
     }
   ]
 }

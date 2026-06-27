@@ -30,6 +30,9 @@
     initialIsFull: boolean;
     initialIsEnded: boolean;
     initialWaitingRoomEnabled?: boolean;
+    initialIsScheduledForFuture?: boolean;
+    initialScheduledStartLabel?: string | null;
+    initialIsJoinable?: boolean;
     onPhaseChange?: (phase: CallPhase) => void;
   };
 
@@ -44,6 +47,9 @@
     initialIsFull,
     initialIsEnded,
     initialWaitingRoomEnabled = false,
+    initialIsScheduledForFuture = false,
+    initialScheduledStartLabel = null,
+    initialIsJoinable = true,
     onPhaseChange,
   }: Props = $props();
 
@@ -59,6 +65,9 @@
   let participantCount = $state(initialParticipantCount);
   let isFull = $state(initialIsFull);
   let isEnded = $state(initialIsEnded);
+  let isScheduledForFuture = $state(initialIsScheduledForFuture);
+  let scheduledStartLabel = $state<string | null>(initialScheduledStartLabel);
+  let isJoinable = $state(initialIsJoinable);
   let guestName = $state("");
   let errorMessage = $state<string | null>(null);
   let disconnectMessage = $state<string | null>(null);
@@ -103,7 +112,9 @@
 
   const userDisplayName = $derived(user?.username ?? user?.email ?? null);
   const isGuest = $derived(!user);
-  const canJoinLobby = $derived(!isEnded && !isFull && (user !== null || guestName.trim().length > 0) && previewReady && phase === "lobby");
+  const canJoinLobby = $derived(
+    !isEnded && isJoinable && !isFull && (user !== null || guestName.trim().length > 0) && previewReady && phase === "lobby"
+  );
   const screenSharing = $derived.by(() => {
     mediaRevision;
     return livekitRoom ? isScreenShareActive(livekitRoom.localParticipant) : false;
@@ -129,6 +140,9 @@
     isFull = payload.isFull;
     isEnded = payload.isEnded;
     waitingRoomEnabled = payload.waitingRoomEnabled ?? waitingRoomEnabled;
+    isScheduledForFuture = payload.isScheduledForFuture ?? isScheduledForFuture;
+    scheduledStartLabel = payload.scheduledStartLabel ?? scheduledStartLabel;
+    isJoinable = payload.isJoinable ?? isJoinable;
     if (payload.isEnded && phase !== "ended") {
       setPhase("ended");
       await teardownCall(false);
@@ -642,6 +656,12 @@
   <ConnectionBanner phase="ended" />
 {:else if phase === "waiting_admission"}
   <WaitingRoomView {hostName} onLeaveWaiting={leaveWaitingRoom} />
+{:else if isScheduledForFuture && scheduledStartLabel}
+  <div class="rounded-xl border border-border bg-card/60 px-6 py-6 space-y-2">
+    <h2 class="text-lg font-semibold text-foreground">Room not open yet</h2>
+    <p class="text-sm text-muted-foreground">This call opens at {scheduledStartLabel}.</p>
+    <p class="text-xs text-muted-foreground">Share this link now — participants can join when the room opens.</p>
+  </div>
 {:else if isFull}
   <div class="rounded-xl border border-border bg-card/60 px-6 py-6">
     <p class="text-sm text-destructive">Room is full ({maxParticipants} of {maxParticipants} joined)</p>

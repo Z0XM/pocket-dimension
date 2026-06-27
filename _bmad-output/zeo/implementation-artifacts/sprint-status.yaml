@@ -79,8 +79,8 @@ development_status:
   7-4-waiting-room: done
   epic-7-retrospective: optional
 
-  epic-8: backlog
-  8-1-admin-dashboard: backlog
-  8-2-scheduled-rooms: backlog
-  8-3-operator-configuration: backlog
+  epic-8: done
+  8-1-admin-dashboard: done
+  8-2-scheduled-rooms: done
+  8-3-operator-configuration: done
   epic-8-retrospective: optional

@@ -3,6 +3,7 @@ import { displayNameForUser } from "$lib/server/authz";
 import { listChatMessages, sendChatMessage } from "$lib/server/chat";
 import { readJsonBody } from "$lib/server/http";
 import { isParticipantBlocked } from "$lib/server/session-blocks";
+import { getOperatorSettings } from "$lib/server/operator-settings";
 import { findRoomBySlug } from "$lib/server/rooms";
 import { findWaitingEntry, isWaitingRoomAdmitted } from "$lib/server/waiting-room";
 import { chatMessageSchema } from "$lib/validation/rooms";
@@ -22,6 +23,9 @@ export const GET: RequestHandler = async ({ params, url }) => {
   const room = await findRoomBySlug(slug);
   if (!room) throw error(404, "Room not found");
   if (room.status === "ended") throw error(410, "This room has ended");
+
+  const settings = await getOperatorSettings();
+  if (!settings.chatEnabled) throw error(403, "Chat is disabled by the operator");
 
   const sinceParam = url.searchParams.get("since");
   const since = sinceParam ? new Date(sinceParam) : undefined;
@@ -49,6 +53,9 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
   const room = await findRoomBySlug(slug);
   if (!room) throw error(404, "Room not found");
   if (room.status === "ended") throw error(410, "This room has ended");
+
+  const settings = await getOperatorSettings();
+  if (!settings.chatEnabled) throw error(403, "Chat is disabled by the operator");
 
   const { body, guestIdentity } = await readJsonBody(request, chatMessageSchema);
 

@@ -1,12 +1,13 @@
 import { json, error } from "@sveltejs/kit";
 import { displayNameForUser, requireUser } from "$lib/server/authz";
-import { GUEST_TOKEN_RATE_LIMIT, GUEST_TOKEN_RATE_WINDOW_MS, MAX_PARTICIPANTS_PER_ROOM, ROOM_EMPTY_GRACE_SECONDS } from "$lib/server/constants";
+import { GUEST_TOKEN_RATE_LIMIT, GUEST_TOKEN_RATE_WINDOW_MS, ROOM_EMPTY_GRACE_SECONDS } from "$lib/server/constants";
 import { generateGuestIdentity, sanitizeGuestDisplayName } from "$lib/server/identity";
 import { readJsonBody } from "$lib/server/http";
 import { mintRoomJoinToken, publicLiveKitWsUrl, clientIceServers } from "$lib/server/livekit-token";
 import { checkRateLimit, clientIpFromRequest } from "$lib/server/rate-limit";
 import { isParticipantBlocked } from "$lib/server/session-blocks";
-import { findRoomBySlug, isRoomFull, resolveParticipantCount } from "$lib/server/rooms";
+import { findRoomBySlug, getRoomLimits, isRoomFullForRoom, resolveParticipantCount } from "$lib/server/rooms";
+import { formatScheduledStart, isRoomJoinable } from "$lib/server/room-schedule";
 import { isWaitingRoomAdmitted, requestWaitingRoomEntry } from "$lib/server/waiting-room";
 import { guestTokenSchema } from "$lib/validation/rooms";
 import type { RequestHandler } from "./$types";
@@ -24,6 +25,10 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 
   if (room.status === "ended") {
     throw error(410, "This room has ended");
+  }
+
+  if (!isRoomJoinable(room, { isHost: locals.user?.id === room.hostUserId })) {
+    throw error(403, room.scheduledStartAt ? `This room opens at ${formatScheduledStart(room.scheduledStartAt)}` : "This room is not open yet");
   }
 
   let identity: string;
@@ -82,10 +87,11 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
   }
 
   const participantCount = await resolveParticipantCount(room);
-  if (isRoomFull(participantCount)) {
+  if (await isRoomFullForRoom(participantCount)) {
     throw error(409, "Room is full");
   }
 
+  const limits = await getRoomLimits();
   const token = await mintRoomJoinToken({
     livekitRoomName: room.livekitRoomName,
     identity,
@@ -103,7 +109,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
     identity,
     displayName: name,
     participantCount,
-    maxParticipants: MAX_PARTICIPANTS_PER_ROOM,
+    maxParticipants: limits.maxParticipantsPerRoom,
     graceSeconds: ROOM_EMPTY_GRACE_SECONDS,
   });
 };

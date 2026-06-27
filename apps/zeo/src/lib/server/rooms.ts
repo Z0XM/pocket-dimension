@@ -1,8 +1,9 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import { MAX_CONCURRENT_ROOMS, MAX_PARTICIPANTS_PER_ROOM } from "./constants";
+import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { DEFAULT_MAX_PARTICIPANTS_PER_ROOM } from "./constants";
 import { generateRoomSlug } from "./identity";
 import { countLiveKitParticipants, deleteLiveKitRoom } from "./livekit-room";
+import { getOperatorSettings } from "./operator-settings";
 import {
   clearLiveParticipantCount,
   decrementLiveParticipantCount,
@@ -24,19 +25,50 @@ export async function findRoomByLiveKitName(livekitRoomName: string) {
   });
 }
 
-export async function countActiveRooms() {
+/** Rooms that consume the concurrent-room capacity (excludes future scheduled). */
+export async function countOccupyingRooms() {
+  const now = new Date();
   const rows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.rooms)
-    .where(inArray(schema.rooms.status, ["waiting", "active"]));
+    .where(
+      and(inArray(schema.rooms.status, ["waiting", "active"]), or(isNull(schema.rooms.scheduledStartAt), lte(schema.rooms.scheduledStartAt, now)))
+    );
   return rows[0]?.count ?? 0;
 }
 
-export async function createRoom(options: { displayName: string; hostUserId: string; waitingRoomEnabled?: boolean }) {
-  const activeCount = await countActiveRooms();
-  if (activeCount >= MAX_CONCURRENT_ROOMS) {
+/** @deprecated Prefer countOccupyingRooms */
+export async function countActiveRooms() {
+  return countOccupyingRooms();
+}
+
+export async function getRoomLimits() {
+  const settings = await getOperatorSettings();
+  return {
+    maxConcurrentRooms: settings.maxConcurrentRooms,
+    maxParticipantsPerRoom: settings.maxParticipantsPerRoom,
+  };
+}
+
+export async function createRoom(options: { displayName: string; hostUserId: string; waitingRoomEnabled?: boolean; scheduledStartAt?: Date }) {
+  const settings = await getOperatorSettings();
+
+  if (options.scheduledStartAt && !settings.scheduledRoomsEnabled) {
+    return { error: "scheduling_disabled" as const };
+  }
+
+  if (options.scheduledStartAt && options.scheduledStartAt.getTime() <= Date.now()) {
+    return { error: "invalid_schedule" as const };
+  }
+
+  const occupyingCount = await countOccupyingRooms();
+  const countsTowardCap = !options.scheduledStartAt || options.scheduledStartAt.getTime() <= Date.now();
+
+  if (countsTowardCap && occupyingCount >= settings.maxConcurrentRooms) {
     return { error: "capacity" as const };
   }
+
+  const waitingRoomEnabled = options.waitingRoomEnabled ?? settings.waitingRoomDefaultEnabled;
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const slug = generateRoomSlug();
@@ -51,7 +83,8 @@ export async function createRoom(options: { displayName: string; hostUserId: str
           displayName: options.displayName,
           hostUserId: options.hostUserId,
           status: "waiting",
-          waitingRoomEnabled: options.waitingRoomEnabled ?? false,
+          waitingRoomEnabled,
+          scheduledStartAt: options.scheduledStartAt ?? null,
           createdById: options.hostUserId,
           updatedById: options.hostUserId,
         })
@@ -94,7 +127,10 @@ export async function markRoomActive(roomId: string) {
     .where(and(eq(schema.rooms.id, roomId), eq(schema.rooms.status, "waiting")));
 }
 
-export async function endRoom(room: typeof schema.rooms.$inferSelect, options?: { skipLiveKit?: boolean }) {
+export async function endRoom(
+  room: typeof schema.rooms.$inferSelect,
+  options?: { skipLiveKit?: boolean; forceEndedById?: string; updatedById?: string }
+) {
   if (room.status === "ended") {
     return;
   }
@@ -107,6 +143,8 @@ export async function endRoom(room: typeof schema.rooms.$inferSelect, options?: 
       status: "ended",
       endedAt: new Date(),
       updatedAt: new Date(),
+      ...(options?.forceEndedById ? { forceEndedById: options.forceEndedById } : {}),
+      ...(options?.updatedById ? { updatedById: options.updatedById } : {}),
     })
     .where(eq(schema.rooms.id, room.id));
 
@@ -209,8 +247,11 @@ export async function countActiveParticipantsFromDb(roomId: string) {
   return rows.length;
 }
 
-export function isRoomFull(participantCount: number) {
-  return participantCount >= MAX_PARTICIPANTS_PER_ROOM;
+export function isRoomFull(participantCount: number, maxParticipants = DEFAULT_MAX_PARTICIPANTS_PER_ROOM) {
+  return participantCount >= maxParticipants;
 }
 
-export { MAX_CONCURRENT_ROOMS, MAX_PARTICIPANTS_PER_ROOM };
+export async function isRoomFullForRoom(participantCount: number) {
+  const { maxParticipantsPerRoom } = await getRoomLimits();
+  return isRoomFull(participantCount, maxParticipantsPerRoom);
+}

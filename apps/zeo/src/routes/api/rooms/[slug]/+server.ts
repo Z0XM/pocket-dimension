@@ -1,7 +1,8 @@
 import { json, error } from "@sveltejs/kit";
 import { db, schema } from "@pocket-dimension/db";
 import { inArray } from "drizzle-orm";
-import { findRoomBySlug, isRoomFull, listOpenParticipants, MAX_PARTICIPANTS_PER_ROOM, resolveParticipantCount } from "$lib/server/rooms";
+import { findRoomBySlug, getRoomLimits, isRoomFullForRoom, listOpenParticipants, resolveParticipantCount } from "$lib/server/rooms";
+import { formatScheduledStart, isRoomJoinable, isRoomScheduledForFuture } from "$lib/server/room-schedule";
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ locals, params }) => {
@@ -15,8 +16,10 @@ export const GET: RequestHandler = async ({ locals, params }) => {
     throw error(404, "Room not found");
   }
 
+  const limits = await getRoomLimits();
   const participantCount = room.status === "ended" ? 0 : await resolveParticipantCount(room);
   const isHost = locals.user?.id === room.hostUserId;
+  const scheduledForFuture = isRoomScheduledForFuture(room);
 
   const payload: Record<string, unknown> = {
     slug: room.slug,
@@ -25,10 +28,14 @@ export const GET: RequestHandler = async ({ locals, params }) => {
     waitingRoomEnabled: room.waitingRoomEnabled,
     hostUserId: room.hostUserId,
     participantCount,
-    maxParticipants: MAX_PARTICIPANTS_PER_ROOM,
-    isFull: isRoomFull(participantCount),
+    maxParticipants: limits.maxParticipantsPerRoom,
+    isFull: await isRoomFullForRoom(participantCount),
     isEnded: room.status === "ended",
     isHost,
+    isJoinable: isRoomJoinable(room, { isHost }),
+    scheduledStartAt: room.scheduledStartAt?.toISOString() ?? null,
+    isScheduledForFuture: scheduledForFuture,
+    scheduledStartLabel: room.scheduledStartAt ? formatScheduledStart(room.scheduledStartAt) : null,
   };
 
   if (isHost && room.status !== "ended") {

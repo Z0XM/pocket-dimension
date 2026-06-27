@@ -19,6 +19,18 @@ export function canCreateRoom(role: string) {
   return role === "contributor" || role === "admin";
 }
 
+export function isAdmin(role: string) {
+  return role === "admin";
+}
+
+export function requireAdmin(locals: App.Locals) {
+  const user = requireUser(locals);
+  if (!isAdmin(user.role)) {
+    throw error(403, "Admin access required");
+  }
+  return user;
+}
+
 export function displayNameForUser(user: NonNullable<App.Locals["user"]>) {
   return user.username?.trim() || user.email.split("@")[0] || user.email;
 }

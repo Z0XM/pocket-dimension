@@ -10,7 +10,9 @@
 
   let roomName = $state("");
   let joinSlug = $state("");
-  let waitingRoomEnabled = $state(false);
+  let waitingRoomEnabled = $state(data.waitingRoomDefaultEnabled);
+  let scheduleMode = $state(false);
+  let scheduledStartAt = $state("");
   let creating = $state(false);
   let errorMessage = $state<string | null>(null);
 
@@ -20,10 +22,19 @@
     errorMessage = null;
     creating = true;
     try {
+      const body: Record<string, string | boolean> = {
+        displayName: roomName.trim(),
+        waitingRoomEnabled,
+      };
+
+      if (scheduleMode && scheduledStartAt) {
+        body.scheduledStartAt = new Date(scheduledStartAt).toISOString();
+      }
+
       const res = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName: roomName.trim(), waitingRoomEnabled }),
+        body: JSON.stringify(body),
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -74,6 +85,11 @@
     <p class="mt-1 text-xs text-muted-foreground">
       {data.roomStats.activeRoomCount} of {data.roomStats.maxConcurrentRooms} rooms in use
     </p>
+    {#if data.isAdmin}
+      <p class="mt-2 text-sm">
+        <a href="/admin" class="text-primary underline-offset-2 hover:underline">Open admin dashboard</a>
+      </p>
+    {/if}
   </div>
 
   {#if errorMessage}
@@ -94,10 +110,39 @@
         <input type="checkbox" bind:checked={waitingRoomEnabled} class="rounded border-border" />
         Enable waiting room (host admits guests before they join)
       </label>
-      <Button disabled={creating || !roomName.trim()} onclick={createRoom}>
-        {creating ? "Creating…" : "Create room"}
+      {#if data.scheduledRoomsEnabled}
+        <label class="flex items-center gap-2 text-sm text-foreground">
+          <input type="checkbox" bind:checked={scheduleMode} class="rounded border-border" />
+          Schedule for later (persistent link available immediately)
+        </label>
+        {#if scheduleMode}
+          <div class="space-y-2">
+            <Label for="scheduled-start">Start time</Label>
+            <Input id="scheduled-start" type="datetime-local" bind:value={scheduledStartAt} />
+          </div>
+        {/if}
+      {/if}
+      <Button disabled={creating || !roomName.trim() || (scheduleMode && !scheduledStartAt)} onclick={createRoom}>
+        {creating ? "Creating…" : scheduleMode ? "Schedule room" : "Create room"}
       </Button>
     </section>
+
+    {#if data.scheduledRooms.length > 0}
+      <section class="rounded-xl border border-border bg-card/60 px-6 py-6 space-y-3">
+        <h2 class="text-lg font-semibold text-foreground">Your scheduled rooms</h2>
+        <ul class="space-y-2">
+          {#each data.scheduledRooms as room (room.slug)}
+            <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+              <div>
+                <a href="/room/{room.slug}" class="font-medium text-primary hover:underline">{room.displayName}</a>
+                <p class="text-xs text-muted-foreground">{new Date(room.scheduledStartAt).toLocaleString()}</p>
+              </div>
+              <code class="text-xs text-muted-foreground">/room/{room.slug}</code>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
   {:else}
     <section class="rounded-xl border border-border bg-card/60 px-6 py-6">
       <h2 class="text-lg font-semibold text-foreground">Join a room</h2>
