@@ -15,7 +15,7 @@ Quick index:
 | PostgreSQL 18 + migrations | [dokploy/README.md §3](./dokploy/README.md#3-postgresql-18) |
 | auth-service on Dokploy | [dokploy/README.md §4](./dokploy/README.md#4-auth-service) |
 | zeo app (Railpack) | [dokploy/README.md §5](./dokploy/README.md#5-deploy-zeo-dokploy-application--railpack) |
-| LiveKit Compose (host network) | [dokploy/README.md §6](./dokploy/README.md#6-deploy-livekit-dokploy-compose) |
+| LiveKit Compose (host network) | [dokploy/README.md §6](./dokploy/README.md#6-deploy-livekit-dokploy-compose--not-railpack) |
 | Environment variables | [env/production.env.example](./env/production.env.example) |
 
 Build the image locally (optional):

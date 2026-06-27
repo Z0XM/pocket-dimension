@@ -126,7 +126,7 @@ The build script installs workspace deps, builds shared packages + zeo, and runs
 2. Enable HTTPS (Let's Encrypt via Dokploy Traefik)
 3. If Cloudflare is **proxied** on this hostname, set Cloudflare SSL to **Full (strict)**
 
-### 5.3 Environment variables
+### 5.4 Environment variables
 
 Set in Dokploy **Environment** tab (see [../env/production.env.example](../env/production.env.example)):
 
@@ -161,7 +161,7 @@ Notes:
 - `PUBLIC_LIVEKIT_URL` is what browsers use (`wss://`).
 - Do not rely on a `.env` file inside the container; Dokploy injects env at runtime.
 
-### 5.4 Deploy
+### 5.5 Deploy
 
 Click **Deploy**. First build runs `bun install`, builds shared packages, builds zeo, starts `bun ./build/index.js`.
 
