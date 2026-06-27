@@ -184,8 +184,10 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 **Acceptance criteria:**
 - [ ] Host can remove via people panel → confirm
 - [ ] Server calls LiveKit RemoveParticipant
+- [ ] Inserts row into `zeo.room_session_blocks` for participant identity
+- [ ] Token endpoint rejects blocked identity with "You were removed from this call"
 - [ ] Audit row records `removed_by_id`
-- [ ] Removed user sees disconnect message
+- [ ] Removed user sees disconnect message; rejoin attempt shows block message
 
 ### Story 3.6 — Guest join without login
 
@@ -293,6 +295,20 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 - [ ] Shared screen as dominant viewport; participants in filmstrip
 - [ ] Screen share button highlighted when self is sharing
 
+### Story 5.3 — Call snapshot
+
+**As a** participant,
+**I want** to capture a photo of the current call view,
+**So that** I can save a moment from the meeting.
+
+**Acceptance criteria:**
+- [ ] Snapshot button in control bar (camera/shutter icon)
+- [ ] Captures visible call layout (grid or screen-share-dominant) to PNG
+- [ ] Downloads as `zeo-{slug}-{timestamp}.png` to user's device
+- [ ] Brief visual feedback on capture (e.g. flash or toast "Snapshot saved")
+- [ ] Works with 1–6 participants and during active screen share
+- [ ] No server upload in MVP (FR-43a)
+
 ---
 
 ## Epic 6: Production deployment on Hostinger
@@ -352,9 +368,9 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 
 ---
 
-## Epic 8 (Phase 3): Admin, scheduling, recording
+## Epic 8 (Phase 3): Admin and scheduling
 
-**Goal:** Operator tools and advanced features.
+**Goal:** Operator tools.
 
 ### Story 8.1 — Admin dashboard
 - [ ] FR-41: list active rooms, force-end
@@ -362,10 +378,7 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 ### Story 8.2 — Scheduled rooms
 - [ ] FR-42: future start time, persistent link
 
-### Story 8.3 — Recording via LiveKit Egress
-- [ ] FR-43: start/stop record, storage config
-
-### Story 8.4 — Operator configuration
+### Story 8.3 — Operator configuration
 - [ ] FR-44: adjust global limits and feature flags via admin dashboard
 
 ---
@@ -378,12 +391,12 @@ UX-DR7: Dark minimal aesthetic per DESIGN.md tokens.
 | 2 | MVP | 2.1–2.3 | LiveKit infra + tokens + webhooks |
 | 3 | MVP | 3.1–3.6 | Rooms + capacity + guest join + host controls |
 | 4 | MVP | 4.1–4.5 | Lobby + grid + controls |
-| 5 | MVP | 5.1–5.2 | Screen share |
+| 5 | MVP | 5.1–5.3 | Screen share + call snapshot |
 | 6 | MVP | 6.1–6.3 | Hostinger deploy |
 | 7 | Phase 2 | 7.1–7.4 | Chat, devices, waiting room |
 | 8 | Phase 3 | 8.1–8.4 | Admin, schedule, record |
 
-**MVP story count:** 21 implementable stories across Epics 1–6.
+**MVP story count:** 22 implementable stories across Epics 1–6.
 
 ## Suggested sprint order
 

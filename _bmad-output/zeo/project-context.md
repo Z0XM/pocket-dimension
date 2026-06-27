@@ -23,31 +23,22 @@
 | Action | Who |
 |--------|-----|
 | Create room | `contributor` or `admin` only (`auth.users.role`) |
-| Join authenticated | Any logged-in user |
-| Join as guest | Anyone with room link + display name (no account) |
+| Join authenticated | Any logged-in user (unless session-blocked) |
+| Join as guest | Anyone with room link + display name (unless session-blocked) |
+| Host remove | Blocks rejoin for that room session until room ends |
+
+## Features in / out of scope
+
+| In MVP | Out of scope |
+|--------|----------------|
+| Group video, screen share | Video/audio **recording** |
+| **Call snapshot** (PNG download) | LiveKit Egress |
+| Session block after remove | |
 
 ## Planning artifacts
 
-All specs live under `_bmad-output/zeo/planning-artifacts/`:
-
-- `product-brief-zeo.md`
-- `prds/prd-zeo-2026-06-27/prd.md`
-- `architecture.md`
-- `epics.md`
-- `ux-designs/ux-zeo-2026-06-27/DESIGN.md` + `EXPERIENCE.md`
-
-## Monorepo patterns to follow
-
-- Copy auth route structure from `apps/watchlist` or `apps/chhan-chhan`
-- Read `session.user.role` for create-room authorization
-- Drizzle schema in `shared/db/src/schema/zeo/`
-- Built shared packages required before dev: `bun run build`
-- `.env` from `.env.example`; non-empty `RESEND_API_KEY` for auth-service
+All specs live under `_bmad-output/zeo/planning-artifacts/`.
 
 ## Implementation order
 
-Epics 1 → 2 → 4 (slice) → 3 → 4–5 → 6 per `epics.md` suggested sprint order.
-
-## Out of scope for MVP
-
-Waiting room, chat, recording, admin dashboard, PSTN, breakout rooms.
+Epics 1 → 2 → 4 (slice) → 3 → 4–5 → 6 per `epics.md`.

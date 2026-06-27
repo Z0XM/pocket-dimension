@@ -111,9 +111,22 @@ PostgreSQL schema **`zeo`** via Drizzle in `@pocket-dimension/db`.
 | left_at | timestamptz | nullable |
 | removed_by_id | uuid | nullable, host remove |
 
-LiveKit is source of truth for *live* presence; this table is audit trail and lobby count hint.
+### 4.3 `zeo.room_session_blocks`
 
-### 4.3 Phase 2: `zeo.chat_messages`
+Blocks rejoin after host remove until room ends.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| room_id | uuid | FK |
+| participant_identity | text | `user.id` or `guest_<uuid>` |
+| blocked_at | timestamptz | |
+| blocked_by_id | uuid | host user id |
+| reason | enum | `removed` (extensible) |
+
+Unique on `(room_id, participant_identity)` while room active. Cleared implicitly when room status → `ended` (rows may remain for audit).
+
+### 4.4 Phase 2: `zeo.chat_messages`
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -133,7 +146,7 @@ LiveKit is source of truth for *live* presence; this table is audit trail and lo
 | `GET /api/rooms/[slug]` | GET | public | Room metadata + live participant count |
 | `POST /api/rooms/[slug]/token` | POST | session **or** guest body | Mint LiveKit JWT; enforce participant cap |
 | `POST /api/rooms/[slug]/end` | POST | host session | Host ends room |
-| `POST /api/rooms/[slug]/remove` | POST | host session | Host removes participant |
+| `POST /api/rooms/[slug]/remove` | POST | host session | Host removes participant; adds session block |
 | `POST /api/webhooks/livekit` | POST | LiveKit signature | LiveKit event webhook |
 
 ### 5.2 Token mint flow
@@ -141,6 +154,7 @@ LiveKit is source of truth for *live* presence; this table is audit trail and lo
 ```
 1. If authenticated: validate session; identity = user.id, name = profile
    If guest: require guestName in body; identity = guest_<uuid>, rate-limit by IP
+   Reject if participant_identity on room_session_blocks for this room
 2. Load room by slug; reject if ended
 3. (Create only) Verify role ∈ {contributor, admin}
 4. Count active rooms — reject create if ≥ 2
@@ -223,6 +237,7 @@ apps/zeo/src/
     livekit/
       room-client.ts    # connect, disconnect, track handlers
       media-controls.ts # mic, cam, screen share
+    snapshot.ts       # canvas composite → PNG download
     server/
       livekit-token.ts  # server-only token mint
       capacity.ts       # limit checks
@@ -257,9 +272,9 @@ State machine for `/room/[slug]`:
 
 | Phase | Deliverables |
 |-------|--------------|
-| **1** | DB schema, app scaffold, LiveKit docker, token API (auth + guest), role-gated create, basic call UI, capacity limits, deploy docs |
+| **1** | DB schema, app scaffold, LiveKit docker, token API (auth + guest), role-gated create, call UI, snapshot, session blocks, capacity limits, deploy docs |
 | **2** | Webhooks, chat, device picker, waiting room |
-| **3** | Admin routes, Egress recording, scheduled rooms |
+| **3** | Admin routes, scheduled rooms |
 
 ## 12. Risks and mitigations
 
@@ -275,6 +290,16 @@ State machine for `/room/[slug]`:
 - Room creation: `contributor` | `admin` only (`auth.users.role`)
 - Guest join: MVP, no login, display name required
 - Production: zeo.z0xm.com, zeo-livekit.z0xm.com
+- Session block on host remove until room ends
+- Recording: out of scope; call snapshot (client PNG) in MVP
+
+## Call snapshot (technical)
+
+- **Trigger:** control bar camera icon or dedicated snapshot button
+- **Capture:** client-side canvas composite from LiveKit `<video>` elements + layout metadata (grid or screen-share-dominant)
+- **Output:** `zeo-{slug}-{ISO-timestamp}.png` via `URL.createObjectURL` + anchor download
+- **No server upload in MVP** — zero VPS storage/bandwidth cost
+- **Limitation:** black tiles if browser taints canvas on cross-origin video (use LiveKit attached elements same-origin); document Safari caveats
 
 ## 14. Open technical questions
 

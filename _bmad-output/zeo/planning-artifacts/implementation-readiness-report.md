@@ -52,10 +52,12 @@
 | FR-15–19 | Epic 2 |
 | FR-20–26, 31–33 | Epic 4 |
 | FR-27–30 | Epic 5 |
-| FR-36–44 | Epic 7–8 (Phase 2/3) |
+| FR-27–30, FR-43 | Epic 5 |
+| FR-36–39 | Epic 7 (Phase 2) |
+| FR-41–42, FR-44 | Epic 8 (Phase 3) |
 | NFR-1–10 | Epic 6 + cross-cutting stories |
 
-**Coverage:** All MVP FRs (1–35) map to at least one story with acceptance criteria.
+**Coverage:** All MVP FRs map to at least one story with acceptance criteria (including FR-43 snapshot, FR-34a session block).
 
 ---
 
@@ -65,7 +67,7 @@
 
 | Gap | Recommendation |
 |-----|----------------|
-| Guest rejoin after host remove | Decide before Story 3.6; default allow rejoin with new token |
+| Guest rejoin after host remove | **Blocked for session** — `room_session_blocks` table |
 | Redis for participant count | Defer; LiveKit API on token mint OK for 12 max users |
 | pocket hub registration | Optional; add to Epic 6 or Phase 2 |
 
@@ -76,6 +78,9 @@
 | Room creation | contributor/admin only |
 | Guest join | MVP, no login |
 | Production domains | zeo.z0xm.com, zeo-livekit.z0xm.com |
+| Recording | **Out of scope** |
+| Call snapshot | **MVP** — client-side PNG (Story 5.3) |
+| Session block on remove | Until room ends |
 
 ### Medium severity (before production deploy)
 
@@ -133,6 +138,6 @@ Optional before dev:
 - [ ] Third room creation blocked with clear UI message
 - [ ] Seventh join attempt blocked
 - [ ] HTTPS production deploy documented and verified
-- [ ] Guest can join without login via room link + display name
-- [ ] User role cannot create rooms; contributor/admin can
+- [ ] Host remove blocks rejoin for that room session
+- [ ] Call snapshot downloads PNG of current call view
 - [ ] Host can end room and remove participant

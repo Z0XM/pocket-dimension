@@ -69,6 +69,20 @@ auth-service (:5001)
 | LiveKit | 7880 (WS), 7881 (TCP), 50000–60000 UDP (configurable range) |
 | TURN | 3478 UDP/TCP, 5349 TLS, 49152–65535 UDP relay |
 
+## Guest abuse mitigation
+
+- Guest token endpoint shall be rate-limited per IP (e.g. 20/hour) and require valid room slug; display names sanitized.
+
+## Session block on remove
+
+When host removes a participant, insert into `zeo.room_session_blocks` keyed by `(room_id, participant_identity)`. Token mint checks this table; blocked users see: "You were removed from this call." Blocks expire when room status → `ended`.
+
+## Call snapshot (MVP)
+
+- Client-side only — no LiveKit Egress, no recording
+- Composite visible `<video>` elements to canvas → PNG blob → browser download
+- Optional Phase 2: upload snapshot to object storage with room audit trail
+
 ## Guest join security model (MVP)
 
 - Room link format: `https://zeo.z0xm.com/room/[slug]`

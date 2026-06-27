@@ -73,6 +73,7 @@ sources:
 | Mic | Toggle mute; icon reflects state; keyboard shortcut `M` |
 | Camera | Toggle video; keyboard `V` |
 | Share | Start/stop screen share; disabled if another sharer unless takeover flow |
+| Snapshot | Capture call view as PNG download |
 | People | Slide-over list: name, mute/video icons, host remove action |
 | Leave | Disconnect self only |
 | End room (host) | Confirm modal → disconnect all |

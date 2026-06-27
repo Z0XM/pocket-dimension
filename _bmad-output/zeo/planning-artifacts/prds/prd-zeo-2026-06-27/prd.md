@@ -80,9 +80,11 @@ A third user tries to create a room while two are active. The API returns a clea
 
 | Phase | Focus |
 |-------|--------|
-| **MVP (Phase 1)** | Role-gated create, guest + auth join, 6-person video, screen share, host controls, capacity limits, LiveKit deploy |
+| Phase | Focus |
+|-------|--------|
+| **MVP (Phase 1)** | Role-gated create, guest + auth join, session block on remove, 6-person video, screen share, **call snapshot**, host controls, capacity limits, LiveKit deploy |
 | **Phase 2** | Text chat, waiting room, device picker, connection quality |
-| **Phase 3** | Admin dashboard, scheduled rooms, recording (Egress) |
+| **Phase 3** | Admin dashboard, scheduled rooms |
 
 ---
 
@@ -213,7 +215,10 @@ The user shall explicitly confirm **Join call** from the lobby (no auto-join on 
 ### Host controls (MVP)
 
 #### FR-34 Remove participant
-The host shall be able to remove a participant from the room; removed users are disconnected and cannot rejoin without a new token if room still active.
+The host shall be able to remove a participant from the room; removed users are disconnected and **blocked from rejoining that room session** (until the room ends). Block applies to both guests and authenticated users.
+
+#### FR-34a Session block enforcement
+The token endpoint shall reject mint requests from identities on the room's session block list with a clear "You were removed from this call" message.
 
 #### FR-35 Host transfer
 Deferred to Phase 2: automatic host transfer when host leaves.
@@ -221,7 +226,18 @@ Deferred to Phase 2: automatic host transfer when host leaves.
 ### Guest join (MVP)
 
 #### FR-40 Guest join without account
-Room links shall allow unauthenticated join: guest enters display name, passes device check, receives guest token, and enters the LiveKit room without creating an account.
+Room links shall allow unauthenticated join: guest enters display name, passes device check, receives guest token, and enters the LiveKit room without creating an account — unless blocked for this session (FR-34a).
+
+### Call snapshot (MVP)
+
+#### FR-43 Call snapshot
+Any participant in an active call shall be able to capture a **snapshot** of the current call view (visible participant tiles and active screen share, if any) as a PNG image.
+
+#### FR-43a Snapshot delivery
+The snapshot shall download to the participant's device immediately (browser download). Server persistence is optional Phase 2.
+
+#### FR-43b Snapshot scope
+The snapshot reflects the capturing user's current on-screen call layout at the moment of capture; it is not a server-side composite of off-screen participants.
 
 ### Phase 2 — Enhanced collaboration
 
@@ -244,9 +260,6 @@ Operator can list active rooms, participant counts, and force-end a room.
 
 #### FR-42 Scheduled rooms
 User can schedule a room for a future time with a persistent link.
-
-#### FR-43 Recording
-Authorized host can start/stop room recording via LiveKit Egress; recordings stored per operator-configured storage.
 
 #### FR-44 Operator configuration
 Operator can adjust global limits and feature flags via admin dashboard (Phase 3).
@@ -318,6 +331,7 @@ Guest token endpoint shall be rate-limited per IP (e.g. 20/hour) and require val
 - Multi-region SFU
 - End-to-end encryption
 - AI transcription / summaries
+- Video/audio **recording** (LiveKit Egress or any continuous capture)
 
 ---
 
@@ -337,8 +351,9 @@ Guest token endpoint shall be rate-limited per IP (e.g. 20/hour) and require val
 1. **Room creation:** contributor or admin role only (global `auth.users.role`).
 2. **Guest join:** allowed in MVP without login; display name required.
 3. **Production URLs:** zeo.z0xm.com (app), zeo-livekit.z0xm.com (LiveKit).
+4. **Removed participants:** blocked from rejoining until room ends.
+5. **Recording:** out of scope; **call snapshot** (PNG) in MVP instead.
 
 ## Open Questions
 
-1. Should removed guests be blocked from rejoining the same room session?
-2. Is recording a near-term requirement or firmly Phase 3?
+None blocking MVP.

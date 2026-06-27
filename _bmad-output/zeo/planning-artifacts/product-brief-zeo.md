@@ -64,7 +64,8 @@ Users authenticate, create or join a room, and enter a call with standard contro
 - Self-hosted LiveKit on Hostinger KVM 2
 - Pre-call device check (mic/camera permission)
 - Leave/end room behavior with cleanup
-- Basic host controls (remove participant, end room for all)
+- Basic host controls (remove participant, end room for all; removed users blocked for session)
+- **Call snapshot** — capture current call view as PNG download
 
 ### In scope (post-MVP phases)
 - Text chat in room
@@ -73,19 +74,20 @@ Users authenticate, create or join a room, and enter a call with standard contro
 - Connection quality indicator
 - Admin usage dashboard
 - Scheduled rooms with calendar links
-- Recording via LiveKit Egress (optional, bandwidth-heavy)
+- Snapshot upload to server/storage (MVP is download-only)
 
 ### Explicitly deferred
 - Phone/PSTN dial-in
 - Breakout rooms
 - Whiteboard / collaborative docs
+- **Video/audio recording** (LiveKit Egress or continuous capture)
 - Multi-region SFU clustering
 - Native mobile apps (web responsive only initially)
 - End-to-end encryption (LiveKit supports it; defer until compliance need is clear)
 
 ## Vision
 
-zeo becomes the default "start a call" surface inside Pocket Dimension — lightweight, private, and sized honestly for the hardware it runs on. It starts as a focused 6-person room tool and can grow (recording, scheduling, waiting room) without re-architecting the media layer.
+zeo becomes the default "start a call" surface inside Pocket Dimension — lightweight, private, and sized honestly for the hardware it runs on. It starts as a focused 6-person room tool and can grow (scheduling, waiting room, server-stored snapshots) without re-architecting the media layer.
 
 ## Production URLs
 

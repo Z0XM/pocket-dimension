@@ -81,9 +81,13 @@ Design rule: the **video grid is the hero**; chrome stays darker and quieter tha
 - Active speaker: 2px `{colors.primary}` ring.
 
 ### Control bar
-- Icon buttons: mic, camera, screen share, participants, leave.
+- Icon buttons: mic, camera, screen share, snapshot, participants, leave.
 - Host-only: end room for all (separate from leave, requires confirm).
 - Screen share active: share button highlighted `{colors.primaryMuted}`.
+
+### Snapshot button
+- Circular shutter icon; same size as mic/camera.
+- On capture: brief white flash overlay (150ms) + toast "Snapshot saved".
 
 ### Pre-call lobby
 - Device preview, room name, participant count if joining existing room.
