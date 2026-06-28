@@ -22,7 +22,7 @@
   }
 </script>
 
-<div class={cn("flex items-center justify-between gap-4 py-2.5", disabled && "opacity-60")}>
+<div class={cn("flex items-center justify-between gap-3 py-2", disabled && "opacity-60")}>
   <Tooltip>
     <TooltipTrigger class="cursor-default text-left text-sm text-foreground">{label}</TooltipTrigger>
     <TooltipContent>{tooltip}</TooltipContent>
