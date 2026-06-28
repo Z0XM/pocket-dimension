@@ -18,6 +18,7 @@
   import HostWaitingPanel from "$lib/components/call/HostWaitingPanel.svelte";
   import ConnectionQualityBadge from "$lib/components/call/ConnectionQualityBadge.svelte";
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
+  import { readStored, STORAGE_KEYS, writeStored } from "$lib/browser-storage";
 
   type Props = {
     slug: string;
@@ -294,6 +295,7 @@
     const body: Record<string, string> = {};
     if (isGuest) {
       body.guestName = guestName.trim();
+      writeStored(STORAGE_KEYS.guestDisplayName, guestName);
       const stored = sessionStorage.getItem(guestStorageKey);
       if (stored) body.guestIdentity = stored;
     }
@@ -593,6 +595,12 @@
   onMount(() => {
     if (!browser) return;
     onPhaseChange?.(phase);
+    if (!user) {
+      const storedGuestName = readStored(STORAGE_KEYS.guestDisplayName);
+      if (storedGuestName) {
+        guestName = storedGuestName;
+      }
+    }
     setupPreview();
     refreshTimer = setInterval(refreshRoomMeta, 5000);
     refreshRoomMeta();
@@ -721,7 +729,10 @@
     {joining}
     canJoin={canJoinLobby}
     {updatingVisibility}
-    onGuestNameChange={(v) => (guestName = v)}
+    onGuestNameChange={(v) => {
+      guestName = v;
+      writeStored(STORAGE_KEYS.guestDisplayName, v);
+    }}
     onToggleMic={toggleMic}
     onToggleCam={toggleCam}
     onAudioDeviceChange={changeAudioDevice}

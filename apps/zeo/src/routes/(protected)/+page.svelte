@@ -9,6 +9,8 @@
   import { Separator } from "$lib/components/ui/separator";
   import type { PageData } from "./$types";
   import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
+  import { readStored, STORAGE_KEYS, writeStored } from "$lib/browser-storage";
 
   const { data }: { data: PageData } = $props();
 
@@ -22,6 +24,13 @@
   let errorMessage = $state<string | null>(null);
 
   const userCanCreate = $derived(data.roomStats.canCreate);
+
+  onMount(() => {
+    const storedRoomName = readStored(STORAGE_KEYS.lastRoomName);
+    if (storedRoomName) {
+      roomName = storedRoomName;
+    }
+  });
 
   async function createRoom() {
     errorMessage = null;
@@ -47,6 +56,7 @@
         errorMessage = payload.message ?? "Could not create room";
         return;
       }
+      writeStored(STORAGE_KEYS.lastRoomName, roomName);
       await goto(`/room/${payload.room.slug}`);
     } catch {
       errorMessage = "Could not create room";
