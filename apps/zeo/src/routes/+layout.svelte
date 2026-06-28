@@ -4,6 +4,7 @@
   import "@fontsource/fira-mono";
   import { onMount } from "svelte";
   import { authClient } from "$lib/auth-client";
+  import { TooltipProvider } from "$lib/components/ui/tooltip";
 
   const { children } = $props();
 
@@ -16,4 +17,6 @@
   });
 </script>
 
-{@render children()}
+<TooltipProvider delayDuration={300}>
+  {@render children()}
+</TooltipProvider>

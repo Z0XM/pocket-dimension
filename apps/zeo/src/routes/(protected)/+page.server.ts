@@ -40,6 +40,7 @@ export const load: PageServerLoad = async ({ locals }) => {
       displayName: room.displayName,
       hostName: hostNames.get(room.hostUserId) ?? "Host",
       status: room.status,
+      isPerpetual: room.isPerpetual,
     })),
   };
 };

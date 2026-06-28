@@ -4,6 +4,7 @@ export const createRoomSchema = z.object({
   displayName: z.string().trim().min(1, "Room name is required").max(80, "Room name is too long"),
   waitingRoomEnabled: z.boolean().optional(),
   isPublic: z.boolean().optional(),
+  isPerpetual: z.boolean().optional(),
   scheduledStartAt: z.string().datetime().optional(),
 });
 

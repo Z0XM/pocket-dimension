@@ -7,8 +7,10 @@ export async function listActiveRoomsForAdmin() {
   const now = new Date();
   const rows = await db.query.rooms.findMany({
     where: and(
-      inArray(schema.rooms.status, ["waiting", "active"]),
-      or(isNull(schema.rooms.scheduledStartAt), lte(schema.rooms.scheduledStartAt, now))
+      or(
+        and(inArray(schema.rooms.status, ["waiting", "active"]), or(isNull(schema.rooms.scheduledStartAt), lte(schema.rooms.scheduledStartAt, now))),
+        and(eq(schema.rooms.isPerpetual, true), eq(schema.rooms.status, "stale"))
+      )
     ),
     orderBy: [desc(schema.rooms.createdAt)],
   });

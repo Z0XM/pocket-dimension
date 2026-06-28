@@ -5,7 +5,7 @@ import { actionsByUser, id, timestamps } from "./common";
 
 export const zeoSchema = pgSchema("zeo");
 
-export const roomStatus = zeoSchema.enum("room_status", ["waiting", "active", "ended"]);
+export const roomStatus = zeoSchema.enum("room_status", ["waiting", "active", "stale", "ended"]);
 export const sessionBlockReason = zeoSchema.enum("session_block_reason", ["removed"]);
 export const waitingEntryStatus = zeoSchema.enum("waiting_entry_status", ["pending", "admitted", "denied"]);
 
@@ -25,6 +25,7 @@ export const rooms = zeoSchema.table(
     maxParticipants: integer("max_participants").default(6).notNull(),
     waitingRoomEnabled: boolean("waiting_room_enabled").default(false).notNull(),
     isPublic: boolean("is_public").default(false).notNull(),
+    isPerpetual: boolean("is_perpetual").default(false).notNull(),
     scheduledStartAt: timestamp("scheduled_start_at"),
     forceEndedById: uuid("force_ended_by_id").references(() => auth.user.id, { onDelete: "set null" }),
     endedAt: timestamp("ended_at"),

@@ -32,6 +32,7 @@
     initialIsEnded: boolean;
     initialWaitingRoomEnabled?: boolean;
     initialIsPublic?: boolean;
+    initialIsStale?: boolean;
     initialIsScheduledForFuture?: boolean;
     initialScheduledStartLabel?: string | null;
     initialIsJoinable?: boolean;
@@ -50,6 +51,7 @@
     initialIsEnded,
     initialWaitingRoomEnabled = false,
     initialIsPublic = false,
+    initialIsStale = false,
     initialIsScheduledForFuture = false,
     initialScheduledStartLabel = null,
     initialIsJoinable = true,
@@ -72,6 +74,7 @@
   let scheduledStartLabel = $state<string | null>(initialScheduledStartLabel);
   let isJoinable = $state(initialIsJoinable);
   let roomIsPublic = $state(initialIsPublic);
+  let isStale = $state(initialIsStale);
   let updatingVisibility = $state(false);
   let guestName = $state("");
   let errorMessage = $state<string | null>(null);
@@ -148,6 +151,9 @@
     isScheduledForFuture = payload.isScheduledForFuture ?? isScheduledForFuture;
     scheduledStartLabel = payload.scheduledStartLabel ?? scheduledStartLabel;
     isJoinable = payload.isJoinable ?? isJoinable;
+    if (payload.isPublic !== undefined) roomIsPublic = payload.isPublic;
+    if (payload.status === "stale") isStale = true;
+    if (payload.status === "active") isStale = false;
     if (payload.isEnded && phase !== "ended") {
       setPhase("ended");
       await teardownCall(false);
@@ -717,6 +723,7 @@
     {isGuest}
     {isHost}
     isPublic={roomIsPublic}
+    {isStale}
     {guestName}
     {userDisplayName}
     {micEnabled}

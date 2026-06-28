@@ -41,6 +41,7 @@
   maxParticipants={data.maxParticipants}
   isHost={data.isHost}
   initialIsPublic={data.room.isPublic}
+  initialIsStale={data.isStale}
   user={data.user}
   initialParticipantCount={data.participantCount}
   initialIsFull={data.isFull}

@@ -4,7 +4,7 @@ import { ROOM_EMPTY_GRACE_SECONDS } from "$lib/server/constants";
 import { env } from "$lib/server/env";
 import { getLiveParticipantCount } from "$lib/server/room-occupancy";
 import { scheduleRoomEmptyGrace } from "$lib/server/room-grace";
-import { findRoomByLiveKitName, recordParticipantJoined, recordParticipantLeft } from "$lib/server/rooms";
+import { findRoomByLiveKitName, markRoomStale, recordParticipantJoined, recordParticipantLeft } from "$lib/server/rooms";
 import type { RequestHandler } from "./$types";
 
 function getWebhookReceiver() {
@@ -57,8 +57,12 @@ export const POST: RequestHandler = async ({ request }) => {
       break;
     case "room_finished":
       if (room.status !== "ended") {
-        const { endRoom } = await import("$lib/server/rooms");
-        await endRoom(room, { skipLiveKit: true });
+        if (room.isPerpetual) {
+          await markRoomStale(room);
+        } else {
+          const { endRoom } = await import("$lib/server/rooms");
+          await endRoom(room, { skipLiveKit: true });
+        }
       }
       break;
     default:
