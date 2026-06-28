@@ -20,7 +20,7 @@ export async function listPublicRooms() {
   return db.query.rooms.findMany({
     where: and(
       eq(schema.rooms.isPublic, true),
-      inArray(schema.rooms.status, ["waiting", "active"]),
+      inArray(schema.rooms.status, ["waiting", "active", "stale"]),
       or(isNull(schema.rooms.scheduledStartAt), lte(schema.rooms.scheduledStartAt, now))
     ),
     orderBy: (table, { desc }) => [desc(table.updatedAt)],
@@ -76,6 +76,7 @@ export async function createRoom(options: {
   hostUserId: string;
   waitingRoomEnabled?: boolean;
   isPublic?: boolean;
+  isPerpetual?: boolean;
   scheduledStartAt?: Date;
 }) {
   const settings = await getOperatorSettings();
@@ -97,6 +98,11 @@ export async function createRoom(options: {
 
   const waitingRoomEnabled = options.waitingRoomEnabled ?? settings.waitingRoomDefaultEnabled;
   const isPublic = options.isPublic ?? false;
+  const isPerpetual = options.isPerpetual ?? false;
+
+  if (isPerpetual && options.scheduledStartAt) {
+    return { error: "invalid_perpetual_schedule" as const };
+  }
 
   for (let attempt = 0; attempt < 8; attempt++) {
     const slug = generateRoomSlug(attempt > 0 ? { suffix: randomInt(10, 99) } : undefined);
@@ -113,6 +119,7 @@ export async function createRoom(options: {
           status: "waiting",
           waitingRoomEnabled,
           isPublic,
+          isPerpetual,
           scheduledStartAt: options.scheduledStartAt ?? null,
           createdById: options.hostUserId,
           updatedById: options.hostUserId,
@@ -129,6 +136,10 @@ export async function createRoom(options: {
 }
 
 export async function resolveParticipantCount(room: typeof schema.rooms.$inferSelect) {
+  if (room.status === "ended" || room.status === "stale") {
+    return 0;
+  }
+
   const memoryCount = getLiveParticipantCount(room.id);
 
   try {
@@ -153,7 +164,25 @@ export async function markRoomActive(roomId: string) {
   await db
     .update(schema.rooms)
     .set({ status: "active", updatedAt: new Date() })
-    .where(and(eq(schema.rooms.id, roomId), eq(schema.rooms.status, "waiting")));
+    .where(and(eq(schema.rooms.id, roomId), inArray(schema.rooms.status, ["waiting", "stale"])));
+}
+
+export async function markRoomStale(room: typeof schema.rooms.$inferSelect) {
+  if (room.status === "ended" || room.status === "stale") {
+    return;
+  }
+
+  cancelRoomEmptyGrace(room.id);
+
+  await db.update(schema.rooms).set({ status: "stale", updatedAt: new Date() }).where(eq(schema.rooms.id, room.id));
+
+  clearLiveParticipantCount(room.id);
+
+  try {
+    await deleteLiveKitRoom(room.livekitRoomName);
+  } catch {
+    // LiveKit room may already be gone
+  }
 }
 
 export async function endRoom(
@@ -199,6 +228,10 @@ export async function endRoomById(roomId: string, options?: { reason?: string; s
   if (options?.reason === "empty") {
     const openCount = await resolveParticipantCount(room);
     if (openCount > 0) {
+      return room;
+    }
+    if (room.isPerpetual) {
+      await markRoomStale(room);
       return room;
     }
   }

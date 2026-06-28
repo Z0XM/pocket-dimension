@@ -1,9 +1,10 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "$lib/components/ui/card";
-  import { Checkbox } from "$lib/components/ui/checkbox";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
+  import { Separator } from "$lib/components/ui/separator";
+  import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
@@ -57,9 +58,9 @@
   <Button href="/" variant="link" class="h-auto p-0 text-sm">← Back to home</Button>
 </header>
 
-<main class="space-y-8">
+<main class="flex flex-col gap-5">
   <Card>
-    <CardHeader>
+    <CardHeader class="pb-3">
       <CardTitle>Active rooms</CardTitle>
       <CardDescription>Live calls consuming capacity right now.</CardDescription>
     </CardHeader>
@@ -89,7 +90,7 @@
                   <td class="py-3 pr-4">{room.participantCount}</td>
                   <td class="py-3 pr-4 capitalize">{room.status}</td>
                   <td class="py-3">
-                    <Button variant="secondary" disabled={forceEnding === room.slug} onclick={() => forceEnd(room.slug)}>
+                    <Button variant="secondary" size="sm" disabled={forceEnding === room.slug} onclick={() => forceEnd(room.slug)}>
                       {forceEnding === room.slug ? "Ending…" : "Force end"}
                     </Button>
                   </td>
@@ -103,8 +104,8 @@
   </Card>
 
   <Card>
-    <CardHeader>
-      <CardTitle>Upcoming scheduled rooms</CardTitle>
+    <CardHeader class="pb-3">
+      <CardTitle>Scheduled</CardTitle>
       <CardDescription>Pre-created links waiting for their start time.</CardDescription>
     </CardHeader>
     <CardContent class="pt-0">
@@ -113,7 +114,7 @@
       {:else}
         <ul class="space-y-2">
           {#each data.scheduledRooms as room (room.slug)}
-            <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
+            <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5">
               <div>
                 <a href="/room/{room.slug}" class="font-medium text-primary hover:underline">{room.displayName}</a>
                 <p class="text-xs text-muted-foreground">{new Date(room.scheduledStartAt).toLocaleString()}</p>
@@ -127,11 +128,11 @@
   </Card>
 
   <Card>
-    <CardHeader>
-      <CardTitle>Operator configuration</CardTitle>
-      <CardDescription>Global limits and feature flags (FR-44).</CardDescription>
+    <CardHeader class="pb-3">
+      <CardTitle>Configuration</CardTitle>
+      <CardDescription>Global limits and feature flags.</CardDescription>
     </CardHeader>
-    <CardContent class="space-y-4 pt-0">
+    <CardContent class="space-y-5 pt-0">
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="space-y-2">
           <Label for="max-rooms">Max concurrent rooms</Label>
@@ -143,19 +144,22 @@
         </div>
       </div>
 
-      <div class="space-y-3">
-        <label class="flex items-start gap-3 text-sm">
-          <Checkbox bind:checked={settings.chatEnabled} class="mt-0.5" />
-          <span>Enable in-room chat</span>
-        </label>
-        <label class="flex items-start gap-3 text-sm">
-          <Checkbox bind:checked={settings.waitingRoomDefaultEnabled} class="mt-0.5" />
-          <span>Waiting room enabled by default for new rooms</span>
-        </label>
-        <label class="flex items-start gap-3 text-sm">
-          <Checkbox bind:checked={settings.scheduledRoomsEnabled} class="mt-0.5" />
-          <span>Allow scheduled rooms</span>
-        </label>
+      <div class="rounded-lg border border-border px-4">
+        <SettingToggle id="chat-enabled" label="Chat" tooltip="Allow in-room text chat during calls." bind:checked={settings.chatEnabled} />
+        <Separator />
+        <SettingToggle
+          id="waiting-default"
+          label="Require approval by default"
+          tooltip="New rooms start with the waiting room enabled."
+          bind:checked={settings.waitingRoomDefaultEnabled}
+        />
+        <Separator />
+        <SettingToggle
+          id="schedule-enabled"
+          label="Scheduling"
+          tooltip="Allow hosts to schedule rooms for a future start time."
+          bind:checked={settings.scheduledRoomsEnabled}
+        />
       </div>
 
       {#if settingsMessage}

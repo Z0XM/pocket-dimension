@@ -95,6 +95,7 @@ Use shadcn-svelte components consistently:
 - **Button** — primary actions (`Create room`, `Join call`), secondary actions (`Go to room`), outline/ghost for navigation (`Back`) and device toggles.
 - **Card** — all home, lobby, and admin form sections.
 - **Checkbox** — room options (waiting room, public room, schedule).
+- **Switch + SettingToggle** — compact labeled toggles with hover tooltips for room options.
 - **Badge** — room visibility (`Public` / `Private`) and live status (`Live` / `Open`).
 - **Input / Label** — all form fields.
 - **Separator** — divide major home-page sections.

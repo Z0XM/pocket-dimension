@@ -1,12 +1,14 @@
 <script lang="ts">
   import icon from "$lib/assets/icon.svg";
+  import VideoIcon from "@lucide/svelte/icons/video";
+  import LinkIcon from "@lucide/svelte/icons/link";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "$lib/components/ui/card";
-  import { Checkbox } from "$lib/components/ui/checkbox";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import { Separator } from "$lib/components/ui/separator";
+  import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import type { PageData } from "./$types";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
@@ -18,12 +20,20 @@
   let joinSlug = $state("");
   let waitingRoomEnabled = $state(data.waitingRoomDefaultEnabled);
   let isPublic = $state(false);
+  let isPerpetual = $state(false);
   let scheduleMode = $state(false);
   let scheduledStartAt = $state("");
   let creating = $state(false);
   let errorMessage = $state<string | null>(null);
 
   const userCanCreate = $derived(data.roomStats.canCreate);
+
+  $effect(() => {
+    if (isPerpetual && scheduleMode) {
+      scheduleMode = false;
+      scheduledStartAt = "";
+    }
+  });
 
   onMount(() => {
     const storedRoomName = readStored(STORAGE_KEYS.lastRoomName);
@@ -40,6 +50,7 @@
         displayName: roomName.trim(),
         waitingRoomEnabled,
         isPublic,
+        isPerpetual,
       };
 
       if (scheduleMode && scheduledStartAt) {
@@ -76,39 +87,42 @@
     }
     goto(`/room/${slug}`);
   }
+
+  function roomStatusLabel(status: string) {
+    if (status === "active") return "Live";
+    if (status === "stale") return "Idle";
+    return "Open";
+  }
 </script>
 
 <svelte:head>
   <title>zeo — video calls</title>
 </svelte:head>
 
-<header class="mb-12 space-y-4">
+<header class="mb-10 space-y-3">
   <div class="flex items-center gap-3">
     <img src={icon} alt="" class="size-10 rounded-xl" width="40" height="40" />
     <p class="font-mono text-xs uppercase tracking-[0.35em] text-muted-foreground">Pocket Dimension</p>
   </div>
-
-  <div class="space-y-2">
+  <div class="space-y-1">
     <h1 class="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">zeo</h1>
-    <p class="max-w-xl text-base text-muted-foreground">Self-hosted group video calls with screen sharing.</p>
+    <p class="max-w-xl text-muted-foreground">Self-hosted group video calls with screen sharing.</p>
   </div>
 </header>
 
-<main class="flex-1 space-y-6">
+<main class="flex flex-1 flex-col gap-5">
   <Card>
-    <CardHeader>
+    <CardHeader class="pb-3">
       <CardDescription>Signed in as</CardDescription>
       <CardTitle class="text-base font-medium">{data.user?.email}</CardTitle>
     </CardHeader>
-    <CardContent class="space-y-2 pt-0">
+    <CardContent class="pt-0">
       <p class="text-xs text-muted-foreground">
         {data.roomStats.activeRoomCount} of {data.roomStats.maxConcurrentRooms} rooms in use
+        {#if data.isAdmin}
+          · <a href="/admin" class="text-primary underline-offset-2 hover:underline">Admin</a>
+        {/if}
       </p>
-      {#if data.isAdmin}
-        <p class="text-sm">
-          <a href="/admin" class="text-primary underline-offset-2 hover:underline">Open admin dashboard</a>
-        </p>
-      {/if}
     </CardContent>
   </Card>
 
@@ -118,21 +132,21 @@
 
   {#if data.publicRooms.length > 0}
     <Card>
-      <CardHeader>
+      <CardHeader class="pb-3">
         <CardTitle>Public rooms</CardTitle>
-        <CardDescription>Join an open call without a room code.</CardDescription>
+        <CardDescription>Join without a room code.</CardDescription>
       </CardHeader>
       <CardContent class="pt-0">
         <div class="grid gap-2 sm:grid-cols-2">
           {#each data.publicRooms as room (room.slug)}
             <a
               href="/room/{room.slug}"
-              class="group flex flex-col gap-1 rounded-lg border border-border bg-secondary/40 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-secondary/70"
+              class="group flex flex-col gap-1.5 rounded-lg border border-border bg-secondary/30 px-4 py-3 transition-colors hover:border-accent/40 hover:bg-secondary/60"
             >
               <div class="flex items-start justify-between gap-2">
-                <span class="font-medium text-foreground group-hover:text-primary">{room.displayName}</span>
+                <span class="font-medium text-foreground group-hover:text-accent">{room.displayName}</span>
                 <Badge variant={room.status === "active" ? "default" : "secondary"}>
-                  {room.status === "active" ? "Live" : "Open"}
+                  {roomStatusLabel(room.status)}
                 </Badge>
               </div>
               <p class="text-xs text-muted-foreground">Host: {room.hostName}</p>
@@ -146,40 +160,58 @@
 
   {#if userCanCreate}
     <Card>
-      <CardHeader>
+      <CardHeader class="pb-3">
         <CardTitle>New room</CardTitle>
-        <CardDescription>Start a call and share the room code with your group.</CardDescription>
+        <CardDescription>Create a call and share the room code.</CardDescription>
       </CardHeader>
-      <CardContent class="space-y-4 pt-0">
+      <CardContent class="space-y-5 pt-0">
         <div class="space-y-2">
           <Label for="room-name">Room name</Label>
-          <Input id="room-name" bind:value={roomName} placeholder="Team standup" maxlength={80} />
+          <div class="relative">
+            <VideoIcon class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input id="room-name" bind:value={roomName} class="pl-9" placeholder="Team standup" maxlength={80} />
+          </div>
         </div>
 
-        <div class="space-y-3">
-          <label class="flex items-start gap-3 text-sm text-foreground">
-            <Checkbox bind:checked={waitingRoomEnabled} class="mt-0.5" />
-            <span>Enable waiting room (host admits guests before they join)</span>
-          </label>
-
-          <label class="flex items-start gap-3 text-sm text-foreground">
-            <Checkbox bind:checked={isPublic} class="mt-0.5" />
-            <span>Make room public (visible on the home page for anyone to join)</span>
-          </label>
-
+        <div class="rounded-lg border border-border px-4">
+          <SettingToggle
+            id="waiting-room"
+            label="Require approval"
+            tooltip="Guests wait in a lobby until the host lets them in."
+            bind:checked={waitingRoomEnabled}
+          />
+          <Separator />
+          <SettingToggle
+            id="public-room"
+            label="Public"
+            tooltip="Show this room on the home page so anyone can join without a code."
+            bind:checked={isPublic}
+          />
+          <Separator />
+          <SettingToggle
+            id="perpetual-room"
+            label="Always open"
+            tooltip="Keep the room until you or an admin closes it. When empty, it goes idle and can be rejoined later."
+            bind:checked={isPerpetual}
+          />
           {#if data.scheduledRoomsEnabled}
-            <label class="flex items-start gap-3 text-sm text-foreground">
-              <Checkbox bind:checked={scheduleMode} class="mt-0.5" />
-              <span>Schedule for later (persistent link available immediately)</span>
-            </label>
-            {#if scheduleMode}
-              <div class="space-y-2 pl-7">
-                <Label for="scheduled-start">Start time</Label>
-                <Input id="scheduled-start" type="datetime-local" bind:value={scheduledStartAt} />
-              </div>
-            {/if}
+            <Separator />
+            <SettingToggle
+              id="schedule-room"
+              label="Schedule"
+              tooltip="Create a persistent link now that opens at a chosen time."
+              bind:checked={scheduleMode}
+              disabled={isPerpetual}
+            />
           {/if}
         </div>
+
+        {#if scheduleMode && !isPerpetual}
+          <div class="space-y-2">
+            <Label for="scheduled-start">Opens at</Label>
+            <Input id="scheduled-start" type="datetime-local" bind:value={scheduledStartAt} />
+          </div>
+        {/if}
 
         <Button disabled={creating || !roomName.trim() || (scheduleMode && !scheduledStartAt)} onclick={createRoom}>
           {creating ? "Creating…" : scheduleMode ? "Schedule room" : "Create room"}
@@ -189,46 +221,43 @@
 
     {#if data.scheduledRooms.length > 0}
       <Card>
-        <CardHeader>
-          <CardTitle>Your scheduled rooms</CardTitle>
+        <CardHeader class="pb-3">
+          <CardTitle>Scheduled</CardTitle>
         </CardHeader>
-        <CardContent class="pt-0">
-          <ul class="space-y-2">
-            {#each data.scheduledRooms as room (room.slug)}
-              <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                <div>
-                  <a href="/room/{room.slug}" class="font-medium text-primary hover:underline">{room.displayName}</a>
-                  <p class="text-xs text-muted-foreground">{new Date(room.scheduledStartAt).toLocaleString()}</p>
-                </div>
-                <code class="font-mono text-xs text-muted-foreground">{room.slug}</code>
-              </li>
-            {/each}
-          </ul>
+        <CardContent class="space-y-2 pt-0">
+          {#each data.scheduledRooms as room (room.slug)}
+            <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-sm">
+              <div>
+                <a href="/room/{room.slug}" class="font-medium text-primary hover:underline">{room.displayName}</a>
+                <p class="text-xs text-muted-foreground">{new Date(room.scheduledStartAt).toLocaleString()}</p>
+              </div>
+              <code class="font-mono text-xs text-muted-foreground">{room.slug}</code>
+            </div>
+          {/each}
         </CardContent>
       </Card>
     {/if}
   {:else}
     <Card>
-      <CardHeader>
+      <CardHeader class="pb-3">
         <CardTitle>Join a room</CardTitle>
-        <CardDescription>
-          Room creation is limited to contributors and admins. Browse public rooms above or paste a room code to join a private call.
-        </CardDescription>
+        <CardDescription>Browse public rooms above or enter a room code below.</CardDescription>
       </CardHeader>
     </Card>
   {/if}
 
-  <Separator />
-
   <Card>
-    <CardHeader>
+    <CardHeader class="pb-3">
       <CardTitle>Join with code</CardTitle>
-      <CardDescription>Paste a room code like <code class="font-mono text-xs">calm-river</code> or a full room link.</CardDescription>
+      <CardDescription>Use a code like <code class="font-mono text-xs">calm-river</code> or paste a full link.</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4 pt-0">
       <div class="space-y-2">
-        <Label for="join-slug">Room code or link</Label>
-        <Input id="join-slug" bind:value={joinSlug} placeholder="calm-river or /room/calm-river" />
+        <Label for="join-slug">Room code</Label>
+        <div class="relative">
+          <LinkIcon class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input id="join-slug" bind:value={joinSlug} class="pl-9" placeholder="calm-river" />
+        </div>
       </div>
       <Button variant="secondary" onclick={joinRoom}>Go to room</Button>
     </CardContent>

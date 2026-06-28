@@ -17,13 +17,14 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 export const POST: RequestHandler = async ({ locals, request }) => {
   const user = requireContributorOrAdmin(locals);
-  const { displayName, waitingRoomEnabled, isPublic, scheduledStartAt } = await readJsonBody(request, createRoomSchema);
+  const { displayName, waitingRoomEnabled, isPublic, isPerpetual, scheduledStartAt } = await readJsonBody(request, createRoomSchema);
 
   const result = await createRoom({
     displayName,
     hostUserId: user.id,
     waitingRoomEnabled,
     isPublic,
+    isPerpetual,
     scheduledStartAt: scheduledStartAt ? new Date(scheduledStartAt) : undefined,
   });
 
@@ -37,6 +38,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     if (result.error === "invalid_schedule") {
       throw error(400, "Scheduled start time must be in the future");
     }
+    if (result.error === "invalid_perpetual_schedule") {
+      throw error(400, "Perpetual rooms cannot be scheduled for later");
+    }
   }
 
   return json(
@@ -47,6 +51,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
         status: result.room.status,
         waitingRoomEnabled: result.room.waitingRoomEnabled,
         isPublic: result.room.isPublic,
+        isPerpetual: result.room.isPerpetual,
         scheduledStartAt: result.room.scheduledStartAt?.toISOString() ?? null,
       },
     },

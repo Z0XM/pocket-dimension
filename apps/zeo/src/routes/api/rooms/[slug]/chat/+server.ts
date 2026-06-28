@@ -23,6 +23,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
   const room = await findRoomBySlug(slug);
   if (!room) throw error(404, "Room not found");
   if (room.status === "ended") throw error(410, "This room has ended");
+  if (room.status === "stale") throw error(409, "This room is idle. Join the call to start chatting.");
 
   const settings = await getOperatorSettings();
   if (!settings.chatEnabled) throw error(403, "Chat is disabled by the operator");
@@ -53,6 +54,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
   const room = await findRoomBySlug(slug);
   if (!room) throw error(404, "Room not found");
   if (room.status === "ended") throw error(410, "This room has ended");
+  if (room.status === "stale") throw error(409, "This room is idle. Join the call to start chatting.");
 
   const settings = await getOperatorSettings();
   if (!settings.chatEnabled) throw error(403, "Chat is disabled by the operator");
