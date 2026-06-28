@@ -165,7 +165,7 @@
         <CardDescription>Create a call and share the room code.</CardDescription>
       </CardHeader>
       <CardContent class="space-y-5 pt-0">
-        <div class="space-y-2">
+        <div class="w-full max-w-xs space-y-2 sm:max-w-sm">
           <Label for="room-name">Room name</Label>
           <div class="relative">
             <VideoIcon class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -173,7 +173,7 @@
           </div>
         </div>
 
-        <div class="rounded-lg border border-border px-4">
+        <div class="w-full max-w-xs rounded-lg border border-border px-3 sm:max-w-sm">
           <SettingToggle
             id="waiting-room"
             label="Require approval"
@@ -207,7 +207,7 @@
         </div>
 
         {#if scheduleMode && !isPerpetual}
-          <div class="space-y-2">
+          <div class="w-full max-w-xs space-y-2 sm:max-w-sm">
             <Label for="scheduled-start">Opens at</Label>
             <Input id="scheduled-start" type="datetime-local" bind:value={scheduledStartAt} />
           </div>

@@ -6,6 +6,7 @@
   import { startMediaPreview, stopMediaPreview, syncPreviewTracks, restartMediaPreview } from "$lib/livekit/media-preview";
   import { listMediaDevices, type MediaDeviceLists } from "$lib/livekit/devices";
   import { qualityLabel, type QualityLabel } from "$lib/livekit/connection-quality";
+  import { readConnectionRttMs } from "$lib/livekit/connection-stats";
   import { createCallRoom, wasParticipantRemoved, wasRoomDeleted, type ConnectionPhase } from "$lib/livekit/room-client";
   import { findScreenShareParticipant, isScreenShareActive } from "$lib/livekit/screen-share";
   import { captureCallSnapshot } from "$lib/snapshot";
@@ -101,6 +102,7 @@
 
   let chatOpen = $state(false);
   let localConnectionQuality = $state<QualityLabel>("unknown");
+  let localPingMs = $state<number | null>(null);
 
   let livekitRoom = $state<Room | null>(null);
   let activeSpeakerIdentity = $state<string | null>(null);
@@ -117,6 +119,7 @@
   let screenShareListenerCleanup: (() => void) | undefined;
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
+  let pingPollTimer: ReturnType<typeof setInterval> | undefined;
 
   const userDisplayName = $derived(user?.username ?? user?.email ?? null);
   const isGuest = $derived(!user);
@@ -223,7 +226,33 @@
     }
   }
 
+  async function refreshConnectionStats(room: Room | null = livekitRoom) {
+    if (!room || room.state !== "connected") {
+      localPingMs = null;
+      return;
+    }
+
+    localPingMs = await readConnectionRttMs(room);
+  }
+
+  function startPingPoll() {
+    stopPingPoll();
+    void refreshConnectionStats();
+    pingPollTimer = setInterval(() => {
+      void refreshConnectionStats();
+    }, 2000);
+  }
+
+  function stopPingPoll() {
+    if (pingPollTimer) {
+      clearInterval(pingPollTimer);
+      pingPollTimer = undefined;
+    }
+    localPingMs = null;
+  }
+
   async function teardownCall(disconnectLiveKit: boolean) {
+    stopPingPoll();
     screenShareListenerCleanup?.();
     screenShareListenerCleanup = undefined;
     if (disconnectLiveKit && callSession) {
@@ -277,6 +306,7 @@
         if (gen !== connectionGen) return;
         if (identity === livekitRoom?.localParticipant.identity) {
           localConnectionQuality = qualityLabel(quality);
+          void refreshConnectionStats(livekitRoom);
         }
       },
       onDisconnect: (reason?: import("livekit-client").DisconnectReason) => {
@@ -354,6 +384,7 @@
 
     attachScreenShareListener(callSession.room, gen);
     localConnectionQuality = qualityLabel(callSession.room.localParticipant.connectionQuality);
+    startPingPoll();
     if (permissionState === "granted") await loadMediaDevices();
     stopHostWaitingPoll();
     setPhase("in_call");
@@ -641,7 +672,7 @@
 
     {#if livekitRoom && (phase === "in_call" || phase === "reconnecting")}
       <div class="absolute left-4 top-4 z-20">
-        <ConnectionQualityBadge label={localConnectionQuality} />
+        <ConnectionQualityBadge label={localConnectionQuality} pingMs={localPingMs} />
       </div>
 
       <ChatPanel

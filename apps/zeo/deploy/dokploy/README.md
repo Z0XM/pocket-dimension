@@ -49,13 +49,15 @@ The Dokploy LiveKit template exposes **7882/udp** for WebRTC (UDPMux), not a 500
 
 1. Dokploy → **Databases** → Create → PostgreSQL **18**
 2. Note internal hostname and credentials
-3. Run migrations once:
+3. Run migrations once (or restart the app — `bun run start` runs migrations automatically when `DATABASE_URL` is set):
 
 **Dokploy Terminal** (zeo app container):
 
 ```bash
 cd /app/shared/db && bunx --bun drizzle-kit migrate
 ```
+
+Or restart the zeo application — startup runs pending migrations when `DATABASE_URL` is available.
 
 Or from your machine:
 
@@ -108,7 +110,7 @@ If install fails with `lockfile is frozen`, add:
 RAILPACK_INSTALL_CMD=bun install
 ```
 
-Run migrations separately after deploy (Dokploy Terminal on zeo container):
+Run migrations separately after deploy if the app was not restarted (otherwise startup handles this automatically):
 
 ```bash
 cd /app/shared/db && bunx --bun drizzle-kit migrate
