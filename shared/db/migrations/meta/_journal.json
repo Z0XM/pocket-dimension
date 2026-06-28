@@ -190,6 +190,13 @@
       "when": 1782590889244,
       "tag": "0026_peaceful_scarlet_witch",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1782591200000,
+      "tag": "0027_zeo_public_rooms",
+      "breakpoints": true
     }
   ]
 }

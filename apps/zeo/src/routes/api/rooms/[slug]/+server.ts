@@ -1,8 +1,17 @@
 import { json, error } from "@sveltejs/kit";
 import { db, schema } from "@pocket-dimension/db";
 import { inArray } from "drizzle-orm";
-import { findRoomBySlug, getRoomLimits, isRoomFullForRoom, listOpenParticipants, resolveParticipantCount } from "$lib/server/rooms";
+import {
+  findRoomBySlug,
+  getRoomLimits,
+  isRoomFullForRoom,
+  listOpenParticipants,
+  resolveParticipantCount,
+  updateRoomVisibility,
+} from "$lib/server/rooms";
 import { formatScheduledStart, isRoomJoinable, isRoomScheduledForFuture } from "$lib/server/room-schedule";
+import { readJsonBody } from "$lib/server/http";
+import { updateRoomSchema } from "$lib/validation/rooms";
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ locals, params }) => {
@@ -26,6 +35,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
     displayName: room.displayName,
     status: room.status,
     waitingRoomEnabled: room.waitingRoomEnabled,
+    isPublic: room.isPublic,
     hostUserId: room.hostUserId,
     participantCount,
     maxParticipants: limits.maxParticipantsPerRoom,
@@ -57,4 +67,33 @@ export const GET: RequestHandler = async ({ locals, params }) => {
   }
 
   return json(payload);
+};
+
+export const PATCH: RequestHandler = async ({ locals, params, request }) => {
+  const slug = params.slug;
+  if (!slug) {
+    throw error(400, "Room slug is required");
+  }
+
+  const room = await findRoomBySlug(slug);
+  if (!room) {
+    throw error(404, "Room not found");
+  }
+
+  if (room.status === "ended") {
+    throw error(409, "This room has ended");
+  }
+
+  const user = locals.user;
+  if (!user || user.id !== room.hostUserId) {
+    throw error(403, "Only the room host can update room settings");
+  }
+
+  const { isPublic } = await readJsonBody(request, updateRoomSchema);
+  const updated = await updateRoomVisibility(room.id, isPublic, user.id);
+
+  return json({
+    slug: updated!.slug,
+    isPublic: updated!.isPublic,
+  });
 };
