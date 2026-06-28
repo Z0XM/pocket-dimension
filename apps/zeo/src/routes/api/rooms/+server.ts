@@ -17,12 +17,13 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 export const POST: RequestHandler = async ({ locals, request }) => {
   const user = requireContributorOrAdmin(locals);
-  const { displayName, waitingRoomEnabled, scheduledStartAt } = await readJsonBody(request, createRoomSchema);
+  const { displayName, waitingRoomEnabled, isPublic, scheduledStartAt } = await readJsonBody(request, createRoomSchema);
 
   const result = await createRoom({
     displayName,
     hostUserId: user.id,
     waitingRoomEnabled,
+    isPublic,
     scheduledStartAt: scheduledStartAt ? new Date(scheduledStartAt) : undefined,
   });
 
@@ -45,6 +46,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
         displayName: result.room.displayName,
         status: result.room.status,
         waitingRoomEnabled: result.room.waitingRoomEnabled,
+        isPublic: result.room.isPublic,
         scheduledStartAt: result.room.scheduledStartAt?.toISOString() ?? null,
       },
     },

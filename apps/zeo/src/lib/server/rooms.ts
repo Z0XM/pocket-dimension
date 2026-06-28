@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { db, schema } from "@pocket-dimension/db";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { DEFAULT_MAX_PARTICIPANTS_PER_ROOM } from "./constants";
@@ -12,6 +13,26 @@ import {
   setLiveParticipantCount,
 } from "./room-occupancy";
 import { cancelRoomEmptyGrace } from "./room-grace";
+
+export async function listPublicRooms() {
+  const now = new Date();
+
+  return db.query.rooms.findMany({
+    where: and(
+      eq(schema.rooms.isPublic, true),
+      inArray(schema.rooms.status, ["waiting", "active"]),
+      or(isNull(schema.rooms.scheduledStartAt), lte(schema.rooms.scheduledStartAt, now))
+    ),
+    orderBy: (table, { desc }) => [desc(table.updatedAt)],
+    limit: 20,
+  });
+}
+
+export async function updateRoomVisibility(roomId: string, isPublic: boolean, updatedById: string) {
+  const [room] = await db.update(schema.rooms).set({ isPublic, updatedAt: new Date(), updatedById }).where(eq(schema.rooms.id, roomId)).returning();
+
+  return room ?? null;
+}
 
 export async function findRoomBySlug(slug: string) {
   return db.query.rooms.findFirst({
@@ -50,7 +71,13 @@ export async function getRoomLimits() {
   };
 }
 
-export async function createRoom(options: { displayName: string; hostUserId: string; waitingRoomEnabled?: boolean; scheduledStartAt?: Date }) {
+export async function createRoom(options: {
+  displayName: string;
+  hostUserId: string;
+  waitingRoomEnabled?: boolean;
+  isPublic?: boolean;
+  scheduledStartAt?: Date;
+}) {
   const settings = await getOperatorSettings();
 
   if (options.scheduledStartAt && !settings.scheduledRoomsEnabled) {
@@ -69,9 +96,10 @@ export async function createRoom(options: { displayName: string; hostUserId: str
   }
 
   const waitingRoomEnabled = options.waitingRoomEnabled ?? settings.waitingRoomDefaultEnabled;
+  const isPublic = options.isPublic ?? false;
 
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const slug = generateRoomSlug();
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const slug = generateRoomSlug(attempt > 0 ? { suffix: randomInt(10, 99) } : undefined);
     const livekitRoomName = crypto.randomUUID();
 
     try {
@@ -84,6 +112,7 @@ export async function createRoom(options: { displayName: string; hostUserId: str
           hostUserId: options.hostUserId,
           status: "waiting",
           waitingRoomEnabled,
+          isPublic,
           scheduledStartAt: options.scheduledStartAt ?? null,
           createdById: options.hostUserId,
           updatedById: options.hostUserId,

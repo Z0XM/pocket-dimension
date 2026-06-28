@@ -18,6 +18,7 @@
   import HostWaitingPanel from "$lib/components/call/HostWaitingPanel.svelte";
   import ConnectionQualityBadge from "$lib/components/call/ConnectionQualityBadge.svelte";
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
+  import { readStored, STORAGE_KEYS, writeStored } from "$lib/browser-storage";
 
   type Props = {
     slug: string;
@@ -30,6 +31,7 @@
     initialIsFull: boolean;
     initialIsEnded: boolean;
     initialWaitingRoomEnabled?: boolean;
+    initialIsPublic?: boolean;
     initialIsScheduledForFuture?: boolean;
     initialScheduledStartLabel?: string | null;
     initialIsJoinable?: boolean;
@@ -47,6 +49,7 @@
     initialIsFull,
     initialIsEnded,
     initialWaitingRoomEnabled = false,
+    initialIsPublic = false,
     initialIsScheduledForFuture = false,
     initialScheduledStartLabel = null,
     initialIsJoinable = true,
@@ -68,6 +71,8 @@
   let isScheduledForFuture = $state(initialIsScheduledForFuture);
   let scheduledStartLabel = $state<string | null>(initialScheduledStartLabel);
   let isJoinable = $state(initialIsJoinable);
+  let roomIsPublic = $state(initialIsPublic);
+  let updatingVisibility = $state(false);
   let guestName = $state("");
   let errorMessage = $state<string | null>(null);
   let disconnectMessage = $state<string | null>(null);
@@ -290,6 +295,7 @@
     const body: Record<string, string> = {};
     if (isGuest) {
       body.guestName = guestName.trim();
+      writeStored(STORAGE_KEYS.guestDisplayName, guestName);
       const stored = sessionStorage.getItem(guestStorageKey);
       if (stored) body.guestIdentity = stored;
     }
@@ -430,6 +436,31 @@
     hostWaitingTimer = undefined;
   }
 
+  async function updateRoomVisibility(nextIsPublic: boolean) {
+    if (!isHost || nextIsPublic === roomIsPublic) return;
+
+    updatingVisibility = true;
+    errorMessage = null;
+
+    try {
+      const res = await fetch(`/api/rooms/${slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic: nextIsPublic }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        errorMessage = payload.message ?? "Could not update room visibility";
+        return;
+      }
+      roomIsPublic = payload.isPublic;
+    } catch {
+      errorMessage = "Could not update room visibility";
+    } finally {
+      updatingVisibility = false;
+    }
+  }
+
   async function joinCall() {
     errorMessage = null;
     joining = true;
@@ -564,6 +595,12 @@
   onMount(() => {
     if (!browser) return;
     onPhaseChange?.(phase);
+    if (!user) {
+      const storedGuestName = readStored(STORAGE_KEYS.guestDisplayName);
+      if (storedGuestName) {
+        guestName = storedGuestName;
+      }
+    }
     setupPreview();
     refreshTimer = setInterval(refreshRoomMeta, 5000);
     refreshRoomMeta();
@@ -672,11 +709,14 @@
   {/if}
 
   <PreCallLobby
+    {slug}
     {roomTitle}
     {hostName}
     {participantCount}
     {maxParticipants}
     {isGuest}
+    {isHost}
+    isPublic={roomIsPublic}
     {guestName}
     {userDisplayName}
     {micEnabled}
@@ -688,11 +728,16 @@
     {videoDeviceId}
     {joining}
     canJoin={canJoinLobby}
-    onGuestNameChange={(v) => (guestName = v)}
+    {updatingVisibility}
+    onGuestNameChange={(v) => {
+      guestName = v;
+      writeStored(STORAGE_KEYS.guestDisplayName, v);
+    }}
     onToggleMic={toggleMic}
     onToggleCam={toggleCam}
     onAudioDeviceChange={changeAudioDevice}
     onVideoDeviceChange={changeVideoDevice}
+    onPublicChange={isHost ? updateRoomVisibility : undefined}
     onJoin={joinCall}
   />
 

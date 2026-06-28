@@ -24,6 +24,7 @@ export const rooms = zeoSchema.table(
     status: roomStatus("status").default("waiting").notNull(),
     maxParticipants: integer("max_participants").default(6).notNull(),
     waitingRoomEnabled: boolean("waiting_room_enabled").default(false).notNull(),
+    isPublic: boolean("is_public").default(false).notNull(),
     scheduledStartAt: timestamp("scheduled_start_at"),
     forceEndedById: uuid("force_ended_by_id").references(() => auth.user.id, { onDelete: "set null" }),
     endedAt: timestamp("ended_at"),
@@ -33,6 +34,7 @@ export const rooms = zeoSchema.table(
     unique("rooms_livekit_room_name_unique").on(table.livekitRoomName),
     index("rooms_host_user_id_idx").on(table.hostUserId),
     index("rooms_status_idx").on(table.status),
+    index("rooms_is_public_status_idx").on(table.isPublic, table.status),
     index("rooms_scheduled_start_at_idx").on(table.scheduledStartAt),
   ]
 );
