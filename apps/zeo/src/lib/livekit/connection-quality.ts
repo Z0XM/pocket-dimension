@@ -15,17 +15,38 @@ export function qualityLabel(quality: ConnectionQuality): QualityLabel {
   }
 }
 
-export function qualityTitle(label: QualityLabel) {
+export function qualityDisplayLabel(label: QualityLabel) {
   switch (label) {
     case "excellent":
-      return "Excellent connection";
+      return "Excellent";
     case "good":
-      return "Good connection";
+      return "Good";
     case "poor":
-      return "Poor connection";
+      return "Poor";
     default:
-      return "Connection quality unknown";
+      return "Unknown";
   }
+}
+
+export function qualityTitle(label: QualityLabel, pingMs?: number | null) {
+  const base = (() => {
+    switch (label) {
+      case "excellent":
+        return "Excellent connection";
+      case "good":
+        return "Good connection";
+      case "poor":
+        return "Poor connection";
+      default:
+        return "Connection quality unknown";
+    }
+  })();
+
+  if (pingMs != null && pingMs > 0) {
+    return `${base} · ${pingMs} ms ping`;
+  }
+
+  return base;
 }
 
 export function qualityClass(label: QualityLabel) {
