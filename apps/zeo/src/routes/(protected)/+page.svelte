@@ -108,21 +108,6 @@
 </header>
 
 <main class="flex flex-1 flex-col gap-5">
-  <Card>
-    <CardHeader class="pb-3">
-      <CardDescription>Signed in as</CardDescription>
-      <CardTitle class="text-base font-medium">{data.user?.email}</CardTitle>
-    </CardHeader>
-    <CardContent class="pt-0">
-      <p class="text-xs text-muted-foreground">
-        {data.roomStats.activeRoomCount} of {data.roomStats.maxConcurrentRooms} rooms in use
-        {#if data.isAdmin}
-          · <a href="/admin" class="text-primary underline-offset-2 hover:underline">Admin</a>
-        {/if}
-      </p>
-    </CardContent>
-  </Card>
-
   {#if errorMessage}
     <div class="auth-error">{errorMessage}</div>
   {/if}
