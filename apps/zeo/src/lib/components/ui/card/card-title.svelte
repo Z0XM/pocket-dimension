@@ -5,6 +5,11 @@
   let { ref = $bindable(null), class: className, children, ...restProps }: WithElementRef<HTMLAttributes<HTMLDivElement>> = $props();
 </script>
 
-<div bind:this={ref} data-slot="card-title" class={cn("text-lg font-semibold leading-none tracking-tight", className)} {...restProps}>
+<div
+  bind:this={ref}
+  data-slot="card-title"
+  class={cn("text-lg font-semibold leading-none tracking-tight text-participant-green", className)}
+  {...restProps}
+>
   {@render children?.()}
 </div>

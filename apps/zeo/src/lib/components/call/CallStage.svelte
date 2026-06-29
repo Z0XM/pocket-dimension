@@ -7,12 +7,13 @@
   type Props = {
     room: Room;
     activeSpeakerIdentity: string | null;
+    audioLevels: Record<string, number>;
     localDisplayName: string;
     mediaRevision?: number;
     stageRef?: HTMLElement | null;
   };
 
-  let { room, activeSpeakerIdentity, localDisplayName, mediaRevision = 0, stageRef = $bindable(null) }: Props = $props();
+  let { room, activeSpeakerIdentity, audioLevels, localDisplayName, mediaRevision = 0, stageRef = $bindable(null) }: Props = $props();
 
   let stageEl = $state<HTMLElement | null>(null);
 
@@ -28,8 +29,8 @@
 
 <div bind:this={stageEl} class="size-full">
   {#if screenSharer}
-    <ScreenShareLayout {room} {activeSpeakerIdentity} {localDisplayName} />
+    <ScreenShareLayout {room} {activeSpeakerIdentity} {audioLevels} {localDisplayName} />
   {:else}
-    <VideoGrid {room} {activeSpeakerIdentity} {localDisplayName} />
+    <VideoGrid {room} {activeSpeakerIdentity} {audioLevels} {localDisplayName} />
   {/if}
 </div>

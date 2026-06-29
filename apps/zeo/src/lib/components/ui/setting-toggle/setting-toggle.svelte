@@ -10,25 +10,34 @@
     tooltip: string;
     checked?: boolean;
     disabled?: boolean;
+    class?: string;
     onCheckedChange?: (checked: boolean) => void;
     children?: Snippet;
   };
 
-  let { id, label, tooltip, checked = $bindable(false), disabled = false, onCheckedChange, children }: Props = $props();
+  let { id, label, tooltip, checked = $bindable(false), disabled = false, class: className, onCheckedChange, children }: Props = $props();
 
   function handleChange(value: boolean) {
     checked = value;
     onCheckedChange?.(value);
   }
+
+  function toggleRow() {
+    if (disabled) return;
+    handleChange(!checked);
+  }
 </script>
 
-<div class={cn("flex items-center justify-between gap-3 py-2", disabled && "opacity-60")}>
+<div
+  class={cn("flex items-center justify-between gap-3 py-2", disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer", className)}
+  onclick={toggleRow}
+>
   <Tooltip>
-    <TooltipTrigger class="cursor-default text-left text-sm text-foreground">{label}</TooltipTrigger>
+    <TooltipTrigger class="cursor-pointer text-left text-sm text-foreground">{label}</TooltipTrigger>
     <TooltipContent>{tooltip}</TooltipContent>
   </Tooltip>
 
-  <div class="flex shrink-0 items-center gap-3">
+  <div class="flex shrink-0 items-center gap-3" onclick={(e) => e.stopPropagation()}>
     {@render children?.()}
     <Switch {id} {checked} {disabled} onCheckedChange={(value) => handleChange(Boolean(value))} aria-label={label} />
   </div>

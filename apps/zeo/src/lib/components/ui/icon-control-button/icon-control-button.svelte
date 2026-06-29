@@ -24,7 +24,7 @@
         variant === "destructive" && "border-destructive/40 bg-destructive text-white hover:bg-destructive/90",
         variant === "accent" && active && "border-accent bg-accent/15 text-accent",
         variant === "accent" && !active && "border-border bg-card text-foreground hover:bg-secondary",
-        variant === "default" && active && "border-primary bg-primary/10 text-foreground hover:bg-primary/15",
+        variant === "default" && active && "border-border bg-primary/10 text-foreground hover:bg-primary/15",
         variant === "default" && !active && "border-border bg-card text-foreground hover:bg-secondary"
       )}
       aria-label={label}

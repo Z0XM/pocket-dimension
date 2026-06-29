@@ -9,10 +9,11 @@
   type Props = {
     room: Room;
     activeSpeakerIdentity: string | null;
+    audioLevels: Record<string, number>;
     localDisplayName: string;
   };
 
-  const { room, activeSpeakerIdentity, localDisplayName }: Props = $props();
+  const { room, activeSpeakerIdentity, audioLevels, localDisplayName }: Props = $props();
 
   const sharer = $derived(findScreenShareParticipant(room));
   const sharerName = $derived(sharer ? displayNameForParticipant(sharer, room.localParticipant.identity, localDisplayName) : "");
@@ -37,6 +38,7 @@
             {participant}
             displayName={displayNameForParticipant(participant, room.localParticipant.identity, localDisplayName)}
             isActiveSpeaker={activeSpeakerIdentity === participant.identity}
+            audioLevel={audioLevels[participant.identity] ?? 0}
             tileColor={participantColorForIdentity(participant.identity)}
             isGuest={participant.identity.startsWith("guest_")}
             isLocal={participant.identity === room.localParticipant.identity}

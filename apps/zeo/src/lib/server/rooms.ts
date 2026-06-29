@@ -68,6 +68,7 @@ export async function getRoomLimits() {
   return {
     maxConcurrentRooms: settings.maxConcurrentRooms,
     maxParticipantsPerRoom: settings.maxParticipantsPerRoom,
+    chatEnabled: settings.chatEnabled,
   };
 }
 

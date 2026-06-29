@@ -10,7 +10,7 @@
 
   {#if data.user?.email}
     <div class="absolute top-10 right-4 z-20 sm:right-6 lg:right-8">
-      <UserMenu email={data.user.email} />
+      <UserMenu email={data.user.email} username={data.user.username} isAdmin={data.user.role === "admin"} />
     </div>
   {/if}
 
