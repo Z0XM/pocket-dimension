@@ -102,30 +102,12 @@
 <header class="mb-10 space-y-3">
   <div class="flex items-center gap-3">
     <img src={icon} alt="" class="size-10 rounded-xl" width="40" height="40" />
-    <p class="font-mono text-xs uppercase tracking-[0.35em] text-muted-foreground">Pocket Dimension</p>
+    <p class="font-mono text-xs uppercase tracking-[0.35em] text-muted-foreground">zeo</p>
   </div>
-  <div class="space-y-1">
-    <h1 class="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">zeo</h1>
-    <p class="max-w-xl text-muted-foreground">Self-hosted group video calls with screen sharing.</p>
-  </div>
+  <p class="max-w-xl text-muted-foreground">Self-hosted group video calls with screen sharing.</p>
 </header>
 
 <main class="flex flex-1 flex-col gap-5">
-  <Card>
-    <CardHeader class="pb-3">
-      <CardDescription>Signed in as</CardDescription>
-      <CardTitle class="text-base font-medium">{data.user?.email}</CardTitle>
-    </CardHeader>
-    <CardContent class="pt-0">
-      <p class="text-xs text-muted-foreground">
-        {data.roomStats.activeRoomCount} of {data.roomStats.maxConcurrentRooms} rooms in use
-        {#if data.isAdmin}
-          · <a href="/admin" class="text-primary underline-offset-2 hover:underline">Admin</a>
-        {/if}
-      </p>
-    </CardContent>
-  </Card>
-
   {#if errorMessage}
     <div class="auth-error">{errorMessage}</div>
   {/if}
