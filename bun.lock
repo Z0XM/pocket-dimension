@@ -285,7 +285,7 @@
         "@pocket-dimension/db": "workspace:*",
         "@pocket-dimension/utils": "workspace:*",
         "better-auth": "^1.4.10",
-        "bits-ui": "^2.14.4",
+        "bits-ui": "^2.16.3",
         "clsx": "^2.1.1",
         "drizzle-orm": "^0.45.2",
         "livekit-client": "^2.20.0",
@@ -295,7 +295,8 @@
         "zod": "^4.4.3",
       },
       "devDependencies": {
-        "@lucide/svelte": "^0.561.0",
+        "@internationalized/date": "^3.12.0",
+        "@lucide/svelte": "^1.22.0",
         "@sveltejs/kit": "^2.49.1",
         "@sveltejs/vite-plugin-svelte": "^6.2.1",
         "@tailwindcss/forms": "^0.5.10",
@@ -1772,7 +1773,7 @@
 
     "@pocket-dimension/watchlist/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
-    "@pocket-dimension/zeo/@lucide/svelte": ["@lucide/svelte@0.561.0", "", { "peerDependencies": { "svelte": "^5" } }, "sha512-vofKV2UFVrKE6I4ewKJ3dfCXSV6iP6nWVmiM83MLjsU91EeJcEg7LoWUABLp/aOTxj1HQNbJD1f3g3L0JQgH9A=="],
+    "@pocket-dimension/zeo/@lucide/svelte": ["@lucide/svelte@1.22.0", "", { "peerDependencies": { "svelte": "^5" } }, "sha512-eaNC3GGu9ma7mviB9vPL6OnawXqxdvRnoAQSq5l15mBlsuwD7kozZ7pzPXSlT6OwSl7hz4qTk+ZU3OEewwi5gQ=="],
 
     "@pocket-dimension/zeo/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 

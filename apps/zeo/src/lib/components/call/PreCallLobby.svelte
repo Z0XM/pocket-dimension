@@ -1,20 +1,15 @@
 <script lang="ts">
   import HashIcon from "@lucide/svelte/icons/hash";
-  import LinkIcon from "@lucide/svelte/icons/link";
-  import MicIcon from "@lucide/svelte/icons/mic";
-  import MicOffIcon from "@lucide/svelte/icons/mic-off";
-  import VideoIcon from "@lucide/svelte/icons/video";
-  import VideoOffIcon from "@lucide/svelte/icons/video-off";
-  import VideoIconRoom from "@lucide/svelte/icons/video";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "$lib/components/ui/card";
-  import { IconControlButton } from "$lib/components/ui/icon-control-button";
+  import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import { Separator } from "$lib/components/ui/separator";
   import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
+  import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
+  import type { MicGateProcessor } from "$lib/livekit/mic-gate-processor";
   import type { MediaDeviceLists } from "$lib/livekit/devices";
   import type { PermissionState } from "$lib/livekit/types";
   import { syncPreviewTracks } from "$lib/livekit/media-preview";
@@ -28,23 +23,31 @@
     isGuest: boolean;
     isHost: boolean;
     isPublic: boolean;
+    waitingRoomEnabled?: boolean;
     isStale?: boolean;
     guestName: string;
     userDisplayName?: string | null;
     micEnabled: boolean;
+    speakerEnabled: boolean;
     camEnabled: boolean;
     permissionState: PermissionState;
     previewStream: MediaStream | null;
     devices: MediaDeviceLists;
     audioDeviceId: string;
+    audioOutputDeviceId?: string;
     videoDeviceId: string;
+    showAudioOutput?: boolean;
     joining: boolean;
     canJoin: boolean;
+    micTestActive?: boolean;
+    micGateProcessor?: MicGateProcessor | null;
     updatingVisibility?: boolean;
     onGuestNameChange: (value: string) => void;
     onToggleMic: () => void;
+    onToggleSpeaker: () => void;
     onToggleCam: () => void;
     onAudioDeviceChange: (deviceId: string) => void;
+    onAudioOutputDeviceChange?: (deviceId: string) => void;
     onVideoDeviceChange: (deviceId: string) => void;
     onPublicChange?: (value: boolean) => void;
     onJoin: () => void;
@@ -59,29 +62,43 @@
     isGuest,
     isHost,
     isPublic,
+    waitingRoomEnabled = false,
     isStale = false,
     guestName,
     userDisplayName = null,
     micEnabled,
+    speakerEnabled,
     camEnabled,
     permissionState,
     previewStream,
     devices,
     audioDeviceId,
+    audioOutputDeviceId = "",
     videoDeviceId,
+    showAudioOutput = false,
     joining,
     canJoin,
+    micTestActive = $bindable(false),
+    micGateProcessor = null,
     updatingVisibility = false,
     onGuestNameChange,
     onToggleMic,
+    onToggleSpeaker,
     onToggleCam,
     onAudioDeviceChange,
+    onAudioOutputDeviceChange,
     onVideoDeviceChange,
     onPublicChange,
     onJoin,
   }: Props = $props();
 
   let previewEl = $state<HTMLVideoElement | null>(null);
+  let micPreviewControls = $state<MicPreviewControls | null>(null);
+
+  async function handleAudioOutputDeviceChange(deviceId: string) {
+    onAudioOutputDeviceChange?.(deviceId);
+    await micPreviewControls?.applyAudioOutputDevice(deviceId);
+  }
 
   $effect(() => {
     if (previewEl && previewStream) {
@@ -94,17 +111,10 @@
 <Card>
   <CardHeader class="space-y-3">
     <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="space-y-1">
-        <CardTitle>{roomTitle}</CardTitle>
-        <CardDescription>Host: {hostName}</CardDescription>
-        <CardDescription>{participantCount} of {maxParticipants} joined</CardDescription>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        {#if isStale}
-          <Badge variant="secondary">Idle</Badge>
-        {/if}
-        <Badge variant={isPublic ? "default" : "outline"}>{isPublic ? "Public" : "Private"}</Badge>
-      </div>
+      <CardTitle>Preview and Settings</CardTitle>
+      {#if isStale}
+        <Badge variant="secondary">Idle</Badge>
+      {/if}
     </div>
 
     {#if isStale}
@@ -114,83 +124,111 @@
     {/if}
   </CardHeader>
 
-  <CardContent class="space-y-5 pt-0">
-    <div class="rounded-lg border border-border bg-secondary/40 px-4 py-3">
-      <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        <HashIcon class="size-3.5" />
-        Room code
+  <CardContent class="space-y-5 pt-4">
+    <div class="rounded-lg border border-border bg-secondary/40 px-3 py-2">
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <p>
+          <span class="text-muted-foreground">Host</span>
+          <span class="ms-1.5 font-medium text-foreground">{hostName}</span>
+        </p>
+        <p>
+          <span class="text-muted-foreground">Joined</span>
+          <span class="ms-1.5 font-medium text-foreground">{participantCount}/{maxParticipants}</span>
+        </p>
+        <p class="flex items-center gap-1.5 font-mono font-medium text-foreground">
+          <HashIcon class="size-3 text-muted-foreground" aria-hidden="true" />
+          {slug}
+        </p>
       </div>
-      <p class="mt-1 font-mono text-lg text-foreground">{slug}</p>
-    </div>
 
-    {#if isHost && onPublicChange}
-      <div class="rounded-lg border border-border px-4">
+      {#if isHost && onPublicChange}
+        <Separator class="my-2" />
         <SettingToggle
           id="lobby-public"
+          class="py-0"
           label="Public"
           tooltip="Listed on the home page so anyone can join without a room code."
           checked={isPublic}
           disabled={updatingVisibility}
           onCheckedChange={onPublicChange}
         />
-      </div>
-    {/if}
+      {/if}
+    </div>
 
     {#if isGuest}
       <div class="space-y-2">
         <Label for="guest-name">Your name</Label>
         <Input id="guest-name" value={guestName} oninput={(e) => onGuestNameChange(e.currentTarget.value)} placeholder="Marco" maxlength={40} />
       </div>
-    {:else if userDisplayName}
-      <p class="text-sm text-muted-foreground">Joining as {userDisplayName}</p>
     {/if}
 
-    <div class="space-y-3">
-      <Label>Preview</Label>
-      <div class="relative aspect-video max-w-md overflow-hidden rounded-lg bg-secondary">
-        {#if camEnabled && previewStream && permissionState === "granted"}
-          <video bind:this={previewEl} class="size-full object-cover mirror" autoplay playsinline muted></video>
-        {:else}
-          <div class="flex size-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
-            {#if permissionState === "denied"}
-              Camera blocked — check browser site settings for this page.
-            {:else if !camEnabled}
-              Camera is off
-            {:else}
-              Allow camera access when prompted, or join with devices off.
-            {/if}
-          </div>
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+      <div class="min-w-0 flex-1 space-y-3">
+        <div class="relative aspect-video max-w-md overflow-hidden rounded-lg bg-secondary">
+          {#if camEnabled && previewStream && permissionState === "granted"}
+            <video bind:this={previewEl} class="size-full object-cover mirror" autoplay playsinline muted></video>
+          {:else}
+            <div class="flex size-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+              {#if permissionState === "denied"}
+                Camera blocked — check browser site settings for this page.
+              {:else if !camEnabled}
+                Camera is off
+              {:else}
+                Allow camera access when prompted, or join with devices off.
+              {/if}
+            </div>
+          {/if}
+        </div>
+
+        {#if permissionState === "denied"}
+          <p class="text-xs text-muted-foreground">You can still join without devices.</p>
         {/if}
       </div>
 
-      {#if permissionState === "denied"}
-        <p class="text-xs text-muted-foreground">You can still join without devices.</p>
+      <div class="flex min-w-0 w-full flex-col gap-2 sm:w-52 sm:shrink-0 lg:w-56">
+        <DevicePicker
+          layout="stack"
+          {devices}
+          {audioDeviceId}
+          {audioOutputDeviceId}
+          {videoDeviceId}
+          {showAudioOutput}
+          {micEnabled}
+          {speakerEnabled}
+          {camEnabled}
+          {onToggleMic}
+          {onToggleSpeaker}
+          {onToggleCam}
+          {onAudioDeviceChange}
+          onAudioOutputDeviceChange={handleAudioOutputDeviceChange}
+          {onVideoDeviceChange}
+          deviceSelectDisabled={permissionState !== "granted"}
+        />
+
+        <MicPreviewControls
+          bind:this={micPreviewControls}
+          layout="stack"
+          bind:micTestActive
+          {previewStream}
+          {micEnabled}
+          {speakerEnabled}
+          {audioOutputDeviceId}
+          {micGateProcessor}
+          permissionGranted={permissionState === "granted"}
+        />
+      </div>
+    </div>
+
+    <Button class="w-full sm:w-auto" disabled={joining || !canJoin || micTestActive} onclick={onJoin}>
+      {#if joining}
+        Joining…
+      {:else if isStale}
+        Join and wake room
+      {:else if waitingRoomEnabled}
+        Knock Knock →
+      {:else}
+        Enter →
       {/if}
-    </div>
-
-    {#if permissionState === "granted"}
-      <DevicePicker {devices} {audioDeviceId} {videoDeviceId} {onAudioDeviceChange} {onVideoDeviceChange} />
-    {/if}
-
-    <div class="flex gap-2">
-      <IconControlButton label={micEnabled ? "Mute microphone" : "Unmute microphone"} active={micEnabled} onclick={onToggleMic}>
-        {#if micEnabled}
-          <MicIcon class="size-4" />
-        {:else}
-          <MicOffIcon class="size-4" />
-        {/if}
-      </IconControlButton>
-      <IconControlButton label={camEnabled ? "Turn camera off" : "Turn camera on"} active={camEnabled} onclick={onToggleCam}>
-        {#if camEnabled}
-          <VideoIcon class="size-4" />
-        {:else}
-          <VideoOffIcon class="size-4" />
-        {/if}
-      </IconControlButton>
-    </div>
-
-    <Button class="w-full sm:w-auto" disabled={joining || !canJoin} onclick={onJoin}>
-      {joining ? "Joining…" : isStale ? "Join and wake room" : "Join call"}
     </Button>
   </CardContent>
 </Card>

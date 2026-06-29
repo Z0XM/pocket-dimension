@@ -1,16 +1,21 @@
-<svg width="512" height="512" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="zeo">
-  <defs>
-    <clipPath id="zeo-squircle">
-      <rect x="0" y="0" width="100" height="100" rx="22" ry="22" />
-    </clipPath>
-  </defs>
-  <g clip-path="url(#zeo-squircle)">
-    <rect width="100" height="100" fill="#000000" />
-    <rect x="3" y="3" width="55" height="42" fill="#22c55e" />
-    <rect x="61" y="3" width="36" height="48" fill="#8b5cf6" />
-    <rect x="3" y="48" width="26" height="14" fill="#eab308" />
-    <rect x="3" y="65" width="26" height="32" fill="#ef4444" />
-    <rect x="32" y="48" width="26" height="49" fill="#3b82f6" />
-    <rect x="61" y="54" width="36" height="43" fill="#ea580c" />
-  </g>
+<svg width="1000" height="1000" viewBox="0 0 1000 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_166_96)">
+<mask id="mask0_166_96" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M1000 650L1000 350C1000 156.7 843.3 0 650 0L350 0C156.7 0 0 156.7 0 350L0 650C0 843.3 156.7 1000 350 1000L650 1000C843.3 1000 1000 843.3 1000 650Z" fill="white"/>
+</mask>
+<g mask="url(#mask0_166_96)">
+<path d="M1000 1000L1000 0L0 0L0 1000L1000 1000Z" fill="#060B0F"/>
+<rect x="1025" y="-25" width="651.163" height="418.372" rx="25" transform="rotate(90 1025 -25)" fill="#751798"/>
+<rect x="567.559" y="-25" width="488.372" height="592.558" rx="25" transform="rotate(90 567.559 -25)" fill="#00B56D"/>
+<rect x="567.559" y="500.814" width="524.186" height="332.093" rx="25" transform="rotate(90 567.559 500.814)" fill="#004AAA"/>
+<rect x="196.396" y="676.627" width="348.372" height="221.395" rx="25" transform="rotate(90 196.396 676.627)" fill="#C80000"/>
+<rect x="196.396" y="502.443" width="138.372" height="221.395" rx="25" transform="rotate(90 196.396 502.443)" fill="#D9C000"/>
+<rect x="1025" y="663.605" width="353.256" height="418.372" rx="25" transform="rotate(90 1025 663.605)" fill="#B45D00"/>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_166_96">
+<rect width="1000" height="1000" fill="white" transform="matrix(0 1 -1 0 1000 0)"/>
+</clipPath>
+</defs>
 </svg>

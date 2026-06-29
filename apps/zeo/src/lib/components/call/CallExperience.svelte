@@ -1,13 +1,14 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { onDestroy, onMount } from "svelte";
-  import { RoomEvent, Track, type ConnectionQuality, type LocalTrackPublication, type Room } from "livekit-client";
+  import { RoomEvent, Track, type ConnectionQuality, type LocalTrackPublication, type Room, supportsAudioOutputSelection } from "livekit-client";
   import type { CallPhase, PermissionState } from "$lib/livekit/types";
   import { startMediaPreview, stopMediaPreview, syncPreviewTracks, restartMediaPreview } from "$lib/livekit/media-preview";
   import { listMediaDevices, type MediaDeviceLists } from "$lib/livekit/devices";
   import { qualityLabel, type QualityLabel } from "$lib/livekit/connection-quality";
   import { readConnectionRttMs } from "$lib/livekit/connection-stats";
-  import { createCallRoom, wasParticipantRemoved, wasRoomDeleted, type ConnectionPhase } from "$lib/livekit/room-client";
+  import { createCallRoom, setRoomSpeakerMuted, wasParticipantRemoved, wasRoomDeleted, type ConnectionPhase } from "$lib/livekit/room-client";
+  import { createMicGateProcessor, type MicGateProcessor } from "$lib/livekit/mic-gate-processor";
   import { findScreenShareParticipant, isScreenShareActive } from "$lib/livekit/screen-share";
   import { captureCallSnapshot } from "$lib/snapshot";
   import PreCallLobby from "$lib/components/call/PreCallLobby.svelte";
@@ -37,6 +38,7 @@
     initialIsScheduledForFuture?: boolean;
     initialScheduledStartLabel?: string | null;
     initialIsJoinable?: boolean;
+    chatEnabled?: boolean;
     onPhaseChange?: (phase: CallPhase) => void;
   };
 
@@ -56,6 +58,7 @@
     initialIsScheduledForFuture = false,
     initialScheduledStartLabel = null,
     initialIsJoinable = true,
+    chatEnabled = true,
     onPhaseChange,
   }: Props = $props();
 
@@ -84,14 +87,26 @@
   let ending = $state(false);
 
   let micEnabled = $state(true);
+  let speakerEnabled = $state(true);
   let camEnabled = $state(true);
   let permissionState = $state<PermissionState>("prompt");
   let previewStream = $state<MediaStream | null>(null);
   let previewReady = $state(false);
-  let mediaDevices = $state<MediaDeviceLists>({ audioInputs: [], videoInputs: [] });
+  let mediaDevices = $state<MediaDeviceLists>({ audioInputs: [], audioOutputs: [], videoInputs: [] });
   let audioDeviceId = $state("");
+  let audioOutputDeviceId = $state("");
   let videoDeviceId = $state("");
+  let micTestActive = $state(false);
   let showInCallDevices = $state(false);
+  let micGateProcessor = $state<MicGateProcessor | null>(null);
+
+  function readStoredPercent(key: string, fallback: number) {
+    const stored = readStored(key);
+    if (!stored) return fallback;
+    const parsed = Number.parseInt(stored, 10);
+    if (Number.isNaN(parsed)) return fallback;
+    return Math.min(100, Math.max(0, parsed));
+  }
 
   let waitingRoomEnabled = $state(initialWaitingRoomEnabled);
   let waitingIdentity = $state<string | null>(null);
@@ -106,6 +121,7 @@
 
   let livekitRoom = $state<Room | null>(null);
   let activeSpeakerIdentity = $state<string | null>(null);
+  let audioLevels = $state<Record<string, number>>({});
   let connectionGen = $state(0);
   let mediaRevision = $state(0);
   let localDisplayName = $state("");
@@ -126,6 +142,7 @@
   const canJoinLobby = $derived(
     !isEnded && isJoinable && !isFull && (user !== null || guestName.trim().length > 0) && previewReady && phase === "lobby"
   );
+  const showAudioOutputSelection = $derived(browser ? supportsAudioOutputSelection() && mediaDevices.audioOutputs.length > 0 : false);
   const screenSharing = $derived.by(() => {
     mediaRevision;
     return livekitRoom ? isScreenShareActive(livekitRoom.localParticipant) : false;
@@ -165,11 +182,29 @@
 
   async function loadMediaDevices() {
     mediaDevices = await listMediaDevices();
-    if (!audioDeviceId && mediaDevices.audioInputs[0]) {
+    if (micEnabled && audioDeviceId && !mediaDevices.audioInputs.some((device) => device.deviceId === audioDeviceId)) {
+      audioDeviceId = mediaDevices.audioInputs[0]?.deviceId ?? "";
+    }
+    if (camEnabled && videoDeviceId && !mediaDevices.videoInputs.some((device) => device.deviceId === videoDeviceId)) {
+      videoDeviceId = mediaDevices.videoInputs[0]?.deviceId ?? "";
+    }
+    if (micEnabled && !audioDeviceId && mediaDevices.audioInputs[0]) {
       audioDeviceId = mediaDevices.audioInputs[0].deviceId;
     }
-    if (!videoDeviceId && mediaDevices.videoInputs[0]) {
+    if (camEnabled && !videoDeviceId && mediaDevices.videoInputs[0]) {
       videoDeviceId = mediaDevices.videoInputs[0].deviceId;
+    }
+    if (showAudioOutputSelection) {
+      const storedOutput = readStored(STORAGE_KEYS.audioOutputDeviceId);
+      if (audioOutputDeviceId && !mediaDevices.audioOutputs.some((device) => device.deviceId === audioOutputDeviceId)) {
+        audioOutputDeviceId = mediaDevices.audioOutputs[0]?.deviceId ?? "";
+      }
+      if (!audioOutputDeviceId) {
+        audioOutputDeviceId =
+          storedOutput && mediaDevices.audioOutputs.some((device) => device.deviceId === storedOutput)
+            ? storedOutput
+            : (mediaDevices.audioOutputs[0]?.deviceId ?? "");
+      }
     }
   }
 
@@ -191,6 +226,8 @@
     if (result.permission === "denied") {
       micEnabled = false;
       camEnabled = false;
+      audioDeviceId = "";
+      videoDeviceId = "";
     }
   }
 
@@ -207,6 +244,31 @@
       permissionState = result.permission;
     } else if (livekitRoom) {
       await livekitRoom.switchActiveDevice("audioinput", deviceId);
+    }
+  }
+
+  function applyRoomSpeakerState(room: Room | null = livekitRoom) {
+    if (!room || room.state !== "connected") return;
+    setRoomSpeakerMuted(room, !speakerEnabled);
+  }
+
+  function micCaptureOptions() {
+    return {
+      deviceId: audioDeviceId || undefined,
+      processor: micGateProcessor ?? undefined,
+    };
+  }
+
+  async function changeAudioOutputDevice(deviceId: string) {
+    audioOutputDeviceId = deviceId;
+    writeStored(STORAGE_KEYS.audioOutputDeviceId, deviceId);
+
+    if (livekitRoom) {
+      try {
+        await livekitRoom.switchActiveDevice("audiooutput", deviceId || "default");
+      } catch {
+        // Output routing is unsupported or the device is unavailable.
+      }
     }
   }
 
@@ -260,6 +322,7 @@
     }
     callSession = null;
     livekitRoom = null;
+    audioLevels = {};
     stopMediaPreview(previewStream);
     previewStream = null;
   }
@@ -297,10 +360,15 @@
         if (gen !== connectionGen) return;
         activeSpeakerIdentity = identity;
       },
+      onAudioLevelsChange: (levels: Record<string, number>) => {
+        if (gen !== connectionGen) return;
+        audioLevels = levels;
+      },
       onParticipantsChange: () => {
         if (gen !== connectionGen) return;
         bumpMediaRevision();
         livekitRoom = callSession?.room ?? null;
+        applyRoomSpeakerState(livekitRoom);
       },
       onConnectionQuality: (quality: ConnectionQuality, identity: string) => {
         if (gen !== connectionGen) return;
@@ -380,10 +448,13 @@
       iceServers: payload.iceServers,
       audioDeviceId: audioDeviceId || undefined,
       videoDeviceId: videoDeviceId || undefined,
+      audioOutputDeviceId: audioOutputDeviceId || undefined,
+      micGateProcessor: micGateProcessor ?? undefined,
     });
 
     attachScreenShareListener(callSession.room, gen);
     localConnectionQuality = qualityLabel(callSession.room.localParticipant.connectionQuality);
+    applyRoomSpeakerState(callSession.room);
     startPingPoll();
     if (permissionState === "granted") await loadMediaDevices();
     stopHostWaitingPoll();
@@ -565,21 +636,67 @@
     }
   }
 
-  function toggleMic() {
+  function toggleSpeaker() {
+    speakerEnabled = !speakerEnabled;
+    applyRoomSpeakerState();
+  }
+
+  async function toggleMic() {
     micEnabled = !micEnabled;
+
+    if (!micEnabled) {
+      audioDeviceId = "";
+      micTestActive = false;
+      if (phase === "lobby" || phase === "waiting_admission") {
+        syncPreviewTracks(previewStream, { audio: false, video: camEnabled });
+      } else if (livekitRoom) {
+        await livekitRoom.localParticipant.setMicrophoneEnabled(false);
+      }
+      return;
+    }
+
+    const nextDeviceId = mediaDevices.audioInputs[0]?.deviceId;
+    if (nextDeviceId) {
+      await changeAudioDevice(nextDeviceId);
+      if (livekitRoom && phase !== "lobby" && phase !== "waiting_admission") {
+        await livekitRoom.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
+      }
+      return;
+    }
+
     if (phase === "lobby" || phase === "waiting_admission") {
-      syncPreviewTracks(previewStream, { audio: micEnabled, video: camEnabled });
+      syncPreviewTracks(previewStream, { audio: true, video: camEnabled });
     } else if (livekitRoom) {
-      livekitRoom.localParticipant.setMicrophoneEnabled(micEnabled);
+      await livekitRoom.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
     }
   }
 
-  function toggleCam() {
+  async function toggleCam() {
     camEnabled = !camEnabled;
+
+    if (!camEnabled) {
+      videoDeviceId = "";
+      if (phase === "lobby" || phase === "waiting_admission") {
+        syncPreviewTracks(previewStream, { audio: micEnabled, video: false });
+      } else if (livekitRoom) {
+        await livekitRoom.localParticipant.setCameraEnabled(false);
+      }
+      return;
+    }
+
+    const nextDeviceId = mediaDevices.videoInputs[0]?.deviceId;
+    if (nextDeviceId) {
+      await changeVideoDevice(nextDeviceId);
+      if (livekitRoom && phase !== "lobby" && phase !== "waiting_admission") {
+        await livekitRoom.localParticipant.setCameraEnabled(true);
+      }
+      return;
+    }
+
     if (phase === "lobby" || phase === "waiting_admission") {
-      syncPreviewTracks(previewStream, { audio: micEnabled, video: camEnabled });
+      syncPreviewTracks(previewStream, { audio: micEnabled, video: true });
     } else if (livekitRoom) {
-      livekitRoom.localParticipant.setCameraEnabled(camEnabled);
+      await livekitRoom.localParticipant.setCameraEnabled(true);
     }
   }
 
@@ -639,6 +756,10 @@
       }
     }
     setupPreview();
+    micGateProcessor = createMicGateProcessor({
+      volume: readStoredPercent(STORAGE_KEYS.micOutputVolume, 75) / 100,
+      cutoff: readStoredPercent(STORAGE_KEYS.micInputCutoff, 10) / 100,
+    });
     refreshTimer = setInterval(refreshRoomMeta, 5000);
     refreshRoomMeta();
     startHostWaitingPoll();
@@ -675,13 +796,15 @@
         <ConnectionQualityBadge label={localConnectionQuality} pingMs={localPingMs} />
       </div>
 
-      <ChatPanel
-        {slug}
-        localIdentity={livekitRoom.localParticipant.identity}
-        guestIdentity={isGuest ? livekitRoom.localParticipant.identity : null}
-        open={chatOpen}
-        onClose={() => (chatOpen = false)}
-      />
+      {#if chatEnabled}
+        <ChatPanel
+          {slug}
+          localIdentity={livekitRoom.localParticipant.identity}
+          guestIdentity={isGuest ? livekitRoom.localParticipant.identity : null}
+          open={chatOpen}
+          onClose={() => (chatOpen = false)}
+        />
+      {/if}
 
       {#if showInCallDevices}
         <div class="absolute left-4 top-14 z-20 w-full max-w-md rounded-xl border border-border bg-card/95 p-4 shadow-lg backdrop-blur-sm">
@@ -694,15 +817,21 @@
           <DevicePicker
             devices={mediaDevices}
             {audioDeviceId}
+            {audioOutputDeviceId}
             {videoDeviceId}
+            showAudioOutput={showAudioOutputSelection}
+            {micEnabled}
+            {speakerEnabled}
+            {camEnabled}
             onAudioDeviceChange={changeAudioDevice}
+            onAudioOutputDeviceChange={changeAudioOutputDevice}
             onVideoDeviceChange={changeVideoDevice}
           />
         </div>
       {/if}
 
       <div class="relative min-h-0 flex-1">
-        <CallStage room={livekitRoom} {activeSpeakerIdentity} {localDisplayName} {mediaRevision} bind:stageRef={stageEl} />
+        <CallStage room={livekitRoom} {activeSpeakerIdentity} {audioLevels} {localDisplayName} {mediaRevision} bind:stageRef={stageEl} />
       </div>
       <ControlBar
         {isHost}
@@ -715,7 +844,7 @@
         onToggleCam={toggleCam}
         onToggleScreenShare={toggleScreenShare}
         onSnapshot={takeSnapshot}
-        onToggleChat={() => (chatOpen = !chatOpen)}
+        onToggleChat={chatEnabled ? () => (chatOpen = !chatOpen) : undefined}
         onToggleDevices={() => (showInCallDevices = !showInCallDevices)}
         devicesOpen={showInCallDevices}
         onLeave={leaveCall}
@@ -754,26 +883,34 @@
     {isGuest}
     {isHost}
     isPublic={roomIsPublic}
+    {waitingRoomEnabled}
     {isStale}
     {guestName}
     {userDisplayName}
     {micEnabled}
+    {speakerEnabled}
     {camEnabled}
     {permissionState}
     {previewStream}
     devices={mediaDevices}
     {audioDeviceId}
+    {audioOutputDeviceId}
     {videoDeviceId}
+    showAudioOutput={showAudioOutputSelection}
     {joining}
     canJoin={canJoinLobby}
+    bind:micTestActive
+    {micGateProcessor}
     {updatingVisibility}
     onGuestNameChange={(v) => {
       guestName = v;
       writeStored(STORAGE_KEYS.guestDisplayName, v);
     }}
     onToggleMic={toggleMic}
+    onToggleSpeaker={toggleSpeaker}
     onToggleCam={toggleCam}
     onAudioDeviceChange={changeAudioDevice}
+    onAudioOutputDeviceChange={changeAudioOutputDevice}
     onVideoDeviceChange={changeVideoDevice}
     onPublicChange={isHost ? updateRoomVisibility : undefined}
     onJoin={joinCall}
@@ -788,7 +925,5 @@
         onDeny={(identity) => resolveWaitingAction(identity, "deny")}
       />
     </div>
-  {:else if isHost}
-    <p class="mt-4 text-xs text-muted-foreground">Host controls appear after you join the call.</p>
   {/if}
 {/if}

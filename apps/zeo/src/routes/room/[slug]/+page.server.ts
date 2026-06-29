@@ -35,6 +35,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     hostName: host?.username ?? host?.email?.split("@")[0] ?? "Host",
     participantCount,
     maxParticipants: limits.maxParticipantsPerRoom,
+    chatEnabled: limits.chatEnabled,
     isFull: await isRoomFullForRoom(participantCount),
     isEnded: room.status === "ended",
     isStale: room.status === "stale",
