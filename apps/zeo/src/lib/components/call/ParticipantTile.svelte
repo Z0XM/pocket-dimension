@@ -30,6 +30,15 @@
   let hasVideo = $derived(isCameraEnabled(participant));
   let micEnabled = $derived(isMicrophoneEnabled(participant));
 
+  const SPEAKING_THRESHOLD = 0.02;
+  const clampedLevel = $derived(Math.min(1, Math.max(0, audioLevel)));
+  const isSpeaking = $derived(micEnabled && clampedLevel > SPEAKING_THRESHOLD);
+  const speakingGlowStyle = $derived(
+    isSpeaking
+      ? `box-shadow: 0 0 ${6 + clampedLevel * 18}px ${clampedLevel * 2}px color-mix(in srgb, var(--participant-purple) ${Math.round(20 + clampedLevel * 50)}%, transparent);`
+      : undefined
+  );
+
   $effect(() => {
     const el = videoEl;
     if (!el) return;
@@ -60,30 +69,33 @@
 </script>
 
 <div
-  class="relative overflow-hidden rounded-lg bg-secondary ring-2 ring-transparent transition-shadow {compact
-    ? 'aspect-video'
-    : 'aspect-video'} {isActiveSpeaker
-    ? 'ring-participant-purple/70 shadow-[0_0_0_1px_color-mix(in_srgb,var(--participant-purple)_70%,transparent)]'
-    : ''}"
-  aria-label="{displayName}{isLocal ? ' (you)' : ''}{isGuest ? ', guest' : ''}"
+  class="rounded-lg transition-[box-shadow] duration-75 ease-out {compact ? 'aspect-video' : 'aspect-video'}"
+  style={speakingGlowStyle}
 >
-  {#if hasVideo}
-    <video bind:this={videoEl} class="size-full object-cover {isLocal ? '-scale-x-100' : ''}" autoplay playsinline muted={isLocal}></video>
-  {:else}
-    <div class="flex size-full items-center justify-center" style="background-color: {tileColor}">
-      <span class="text-3xl font-semibold text-primary-foreground/90">{initialsForName(displayName)}</span>
-    </div>
-  {/if}
-
-  <div class="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
-    <p class="truncate text-sm font-medium text-white">{displayName}{isLocal ? " (you)" : ""}</p>
-    {#if isGuest}
-      <span class="shrink-0 rounded bg-black/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/80">Guest</span>
-    {/if}
-    {#if !micEnabled}
-      <span class="ml-auto shrink-0 text-xs text-white/80" aria-label="Muted">Muted</span>
+  <div
+    class="relative size-full overflow-hidden rounded-lg bg-secondary ring-2 ring-transparent transition-shadow {isActiveSpeaker
+      ? 'ring-participant-purple/70 shadow-[0_0_0_1px_color-mix(in_srgb,var(--participant-purple)_70%,transparent)]'
+      : ''}"
+    aria-label="{displayName}{isLocal ? ' (you)' : ''}{isGuest ? ', guest' : ''}"
+  >
+    {#if hasVideo}
+      <video bind:this={videoEl} class="size-full object-cover {isLocal ? '-scale-x-100' : ''}" autoplay playsinline muted={isLocal}></video>
     {:else}
-      <AudioLevelIndicator class="ml-auto shrink-0" level={audioLevel} />
+      <div class="flex size-full items-center justify-center" style="background-color: {tileColor}">
+        <span class="text-3xl font-semibold text-primary-foreground/90">{initialsForName(displayName)}</span>
+      </div>
     {/if}
+
+    <div class="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
+      <p class="truncate text-sm font-medium text-white">{displayName}{isLocal ? " (you)" : ""}</p>
+      {#if isGuest}
+        <span class="shrink-0 rounded bg-black/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/80">Guest</span>
+      {/if}
+      {#if !micEnabled}
+        <span class="ml-auto shrink-0 text-xs text-white/80" aria-label="Muted">Muted</span>
+      {:else}
+        <AudioLevelIndicator class="ml-auto shrink-0" level={audioLevel} />
+      {/if}
+    </div>
   </div>
 </div>

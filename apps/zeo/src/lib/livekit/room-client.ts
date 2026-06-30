@@ -34,6 +34,20 @@ export function collectAudioLevels(room: Room): Record<string, number> {
   return levels;
 }
 
+const AUDIO_LEVEL_EPSILON = 0.005;
+
+function audioLevelsChanged(previous: Record<string, number>, next: Record<string, number>) {
+  const identities = new Set([...Object.keys(previous), ...Object.keys(next)]);
+
+  for (const identity of identities) {
+    if (Math.abs((previous[identity] ?? 0) - (next[identity] ?? 0)) > AUDIO_LEVEL_EPSILON) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function getLocalMicTrack(room: Room): LocalAudioTrack | undefined {
   const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
   if (!track || track.kind !== Track.Kind.Audio) return undefined;
@@ -80,15 +94,49 @@ export function createCallRoom(handlers: CallRoomHandlers) {
     dynacast: true,
   });
 
+  let audioLevelFrame: number | null = null;
+  let lastAudioLevels: Record<string, number> = {};
+
+  function stopAudioLevelPolling() {
+    if (audioLevelFrame !== null) {
+      cancelAnimationFrame(audioLevelFrame);
+      audioLevelFrame = null;
+    }
+    lastAudioLevels = {};
+  }
+
+  function publishAudioLevels(force = false) {
+    const levels = collectAudioLevels(room);
+    if (!force && !audioLevelsChanged(lastAudioLevels, levels)) {
+      return;
+    }
+
+    lastAudioLevels = levels;
+    handlers.onAudioLevelsChange?.(levels);
+  }
+
+  function startAudioLevelPolling() {
+    stopAudioLevelPolling();
+
+    const tick = () => {
+      publishAudioLevels();
+      audioLevelFrame = requestAnimationFrame(tick);
+    };
+
+    publishAudioLevels(true);
+    audioLevelFrame = requestAnimationFrame(tick);
+  }
+
   room.on(RoomEvent.Reconnecting, () => handlers.onPhaseChange("reconnecting"));
   room.on(RoomEvent.Reconnected, () => handlers.onPhaseChange("connected"));
   room.on(RoomEvent.Disconnected, (reason) => {
+    stopAudioLevelPolling();
     handlers.onPhaseChange("disconnected");
     handlers.onDisconnect(reason);
   });
   room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
     handlers.onActiveSpeaker(speakers[0]?.identity ?? null);
-    handlers.onAudioLevelsChange?.(collectAudioLevels(room));
+    publishAudioLevels(true);
   });
   room.on(RoomEvent.ParticipantConnected, () => handlers.onParticipantsChange());
   room.on(RoomEvent.ParticipantDisconnected, () => handlers.onParticipantsChange());
@@ -136,9 +184,11 @@ export function createCallRoom(handlers: CallRoomHandlers) {
     }
     handlers.onPhaseChange("connected");
     handlers.onParticipantsChange();
+    startAudioLevelPolling();
   }
 
   async function disconnect() {
+    stopAudioLevelPolling();
     if (room.state !== "disconnected") {
       await room.disconnect();
     }
