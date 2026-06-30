@@ -1,4 +1,6 @@
 <script lang="ts">
+  import LayoutGridIcon from "@lucide/svelte/icons/layout-grid";
+  import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
   import CameraIcon from "@lucide/svelte/icons/camera";
   import MessageSquareIcon from "@lucide/svelte/icons/message-square";
   import MicIcon from "@lucide/svelte/icons/mic";
@@ -21,6 +23,9 @@
     screenSharing?: boolean;
     snapshotting?: boolean;
     chatOpen?: boolean;
+    layoutEditMode?: boolean;
+    onToggleLayoutEdit?: () => void;
+    onResetLayout?: () => void;
     onToggleMic: () => void;
     onToggleSpeaker?: () => void;
     onToggleCam: () => void;
@@ -42,6 +47,9 @@
     screenSharing = false,
     snapshotting = false,
     chatOpen = false,
+    layoutEditMode = false,
+    onToggleLayoutEdit,
+    onResetLayout,
     onToggleMic,
     onToggleSpeaker,
     onToggleCam,
@@ -59,6 +67,7 @@
   const speakerLabel = $derived(speakerEnabled ? "Mute speakers" : "Unmute speakers");
   const camLabel = $derived(camEnabled ? "Turn camera off" : "Turn camera on");
   const shareLabel = $derived(screenSharing ? "Stop sharing screen" : "Share screen");
+  const layoutLabel = $derived(layoutEditMode ? "Done editing layout" : "Edit tile layout");
 </script>
 
 <svelte:window
@@ -71,6 +80,14 @@
     if (e.key === "v" || e.key === "V") {
       e.preventDefault();
       onToggleCam();
+    }
+    if ((e.key === "l" || e.key === "L") && onToggleLayoutEdit) {
+      e.preventDefault();
+      onToggleLayoutEdit();
+    }
+    if (e.key === "Escape" && layoutEditMode && onToggleLayoutEdit) {
+      e.preventDefault();
+      onToggleLayoutEdit();
     }
   }}
 />
@@ -126,6 +143,18 @@
     {#if onToggleDevices}
       <IconControlButton label="Choose devices" active={devicesOpen} onclick={onToggleDevices}>
         <Settings2Icon class="size-4 {devicesOpen ? 'text-participant-orange' : 'text-muted-foreground'}" />
+      </IconControlButton>
+    {/if}
+
+    {#if onToggleLayoutEdit}
+      <IconControlButton label={layoutLabel} active={layoutEditMode} onclick={onToggleLayoutEdit}>
+        <LayoutGridIcon class="size-4 {layoutEditMode ? 'text-participant-orange' : 'text-muted-foreground'}" />
+      </IconControlButton>
+    {/if}
+
+    {#if layoutEditMode && onResetLayout}
+      <IconControlButton label="Reset layout to default" onclick={onResetLayout}>
+        <RotateCcwIcon class="size-4 text-muted-foreground" />
       </IconControlButton>
     {/if}
 
