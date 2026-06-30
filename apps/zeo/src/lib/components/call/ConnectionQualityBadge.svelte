@@ -1,29 +1,30 @@
 <script lang="ts">
-  import { qualityClass, qualityDisplayLabel, qualityTitle, type QualityLabel } from "$lib/livekit/connection-quality";
+  import { qualityBarCount, qualitySignalClass, qualityTextClass, qualityTitle, type QualityLabel } from "$lib/livekit/connection-quality";
 
   type Props = {
     label: QualityLabel;
     pingMs?: number | null;
-    compact?: boolean;
   };
 
-  const { label, pingMs = null, compact = false }: Props = $props();
+  const { label, pingMs = null }: Props = $props();
 
   const title = $derived(qualityTitle(label, pingMs));
-  const displayLabel = $derived(qualityDisplayLabel(label));
+  const activeBars = $derived(qualityBarCount(label));
+  const signalClass = $derived(qualitySignalClass(label));
+  const textClass = $derived(qualityTextClass(label));
+
+  const barHeights = [3, 5, 7, 9];
+  const bars = [0, 1, 2, 3];
 </script>
 
-<span
-  class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium tracking-wide text-white {qualityClass(label)}"
-  {title}
-  aria-label={title}
->
-  {#if !compact}
-    <span class="size-1.5 rounded-full bg-white/90" aria-hidden="true"></span>
-  {/if}
-  <span class="uppercase">{displayLabel}</span>
+<span class="inline-flex items-end gap-1" {title} aria-label={title}>
+  <span class="inline-flex items-end gap-px" aria-hidden="true">
+    {#each bars as index (index)}
+      <span class="w-[3px] rounded-[1px] {index < activeBars ? signalClass : 'bg-border/70'}" style="height: {barHeights[index]}px"></span>
+    {/each}
+  </span>
+
   {#if pingMs != null && pingMs > 0}
-    <span class="font-normal text-white/85" aria-hidden="true">·</span>
-    <span class="font-mono text-[10px] font-normal text-white/90">{pingMs} ms</span>
+    <span class="font-mono text-[11px] leading-none tabular-nums {textClass}">{pingMs}</span>
   {/if}
 </span>

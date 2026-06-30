@@ -1,4 +1,5 @@
 <script lang="ts">
+  import XIcon from "@lucide/svelte/icons/x";
   import { onMount } from "svelte";
 
   export type ChatMessage = {
@@ -98,10 +99,19 @@
 </script>
 
 {#if open}
-  <aside class="absolute inset-y-0 right-0 z-30 flex w-full max-w-sm flex-col border-l border-border bg-card/95 shadow-xl backdrop-blur-sm">
+  <aside
+    class="absolute right-4 bottom-6 z-30 flex w-[min(100%,20rem)] max-h-[min(24rem,calc(100vh-2rem))] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-lg backdrop-blur-sm"
+  >
     <div class="flex items-center justify-between border-b border-border px-4 py-3">
       <h2 class="text-sm font-semibold text-foreground">Chat</h2>
-      <button type="button" class="text-sm text-muted-foreground hover:text-foreground" onclick={onClose}>Close</button>
+      <button
+        type="button"
+        class="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        aria-label="Close chat"
+        onclick={onClose}
+      >
+        <XIcon class="size-4" aria-hidden="true" />
+      </button>
     </div>
 
     <div bind:this={listEl} class="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">

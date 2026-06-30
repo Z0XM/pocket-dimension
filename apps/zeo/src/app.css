@@ -31,6 +31,10 @@
   --participant-red: #ef4444;
   --participant-blue: #3b82f6;
   --participant-orange: #ea580c;
+
+  --scrollbar-thumb: var(--participant-orange);
+  --scrollbar-track: var(--background);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--participant-orange) 75%, white);
 }
 
 @theme inline {
@@ -69,6 +73,8 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   }
 
   body {
@@ -77,6 +83,29 @@
 
   button {
     @apply cursor-pointer disabled:cursor-not-allowed;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border: 1px solid var(--scrollbar-track);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
   }
 }
 

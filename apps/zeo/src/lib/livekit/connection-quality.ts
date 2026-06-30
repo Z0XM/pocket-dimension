@@ -15,19 +15,6 @@ export function qualityLabel(quality: ConnectionQuality): QualityLabel {
   }
 }
 
-export function qualityDisplayLabel(label: QualityLabel) {
-  switch (label) {
-    case "excellent":
-      return "Excellent";
-    case "good":
-      return "Good";
-    case "poor":
-      return "Poor";
-    default:
-      return "Unknown";
-  }
-}
-
 export function qualityTitle(label: QualityLabel, pingMs?: number | null) {
   const base = (() => {
     switch (label) {
@@ -49,15 +36,41 @@ export function qualityTitle(label: QualityLabel, pingMs?: number | null) {
   return base;
 }
 
-export function qualityClass(label: QualityLabel) {
+export function qualityBarCount(label: QualityLabel) {
   switch (label) {
     case "excellent":
-      return "bg-emerald-500/90";
+      return 4;
     case "good":
-      return "bg-amber-500/90";
+      return 3;
     case "poor":
-      return "bg-red-500/90";
+      return 2;
     default:
-      return "bg-muted-foreground/70";
+      return 1;
+  }
+}
+
+export function qualitySignalClass(label: QualityLabel) {
+  switch (label) {
+    case "excellent":
+      return "bg-emerald-500";
+    case "good":
+      return "bg-amber-500";
+    case "poor":
+      return "bg-red-500";
+    default:
+      return "bg-muted-foreground";
+  }
+}
+
+export function qualityTextClass(label: QualityLabel) {
+  switch (label) {
+    case "excellent":
+      return "text-emerald-500";
+    case "good":
+      return "text-amber-500";
+    case "poor":
+      return "text-red-500";
+    default:
+      return "text-muted-foreground";
   }
 }

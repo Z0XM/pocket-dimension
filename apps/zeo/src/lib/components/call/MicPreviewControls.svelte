@@ -35,7 +35,50 @@
   let monitor = $state<PreviewAudioMonitor | null>(null);
 
   let faderTrackEl = $state<HTMLDivElement | null>(null);
+  let faderInnerEl = $state<HTMLDivElement | null>(null);
   let dragging = $state<"volume" | "cutoff" | null>(null);
+
+  function trackPositionFromClientX(clientX: number) {
+    const track = faderInnerEl ?? faderTrackEl;
+    if (!track) return 0;
+
+    const rect = track.getBoundingClientRect();
+    if (rect.width <= 0) return 0;
+
+    const ratio = (clientX - rect.left) / rect.width;
+    return Math.min(100, Math.max(0, ratio * 100));
+  }
+
+  function applyDragPosition(clientX: number) {
+    const position = trackPositionFromClientX(clientX);
+    if (dragging === "volume") {
+      setVolume(position);
+    } else if (dragging === "cutoff") {
+      setCutoff(position);
+    }
+  }
+
+  function stopDragging(pointerId?: number) {
+    if (!dragging) return;
+
+    dragging = null;
+    if (pointerId !== undefined) {
+      faderTrackEl?.releasePointerCapture(pointerId);
+    }
+    window.removeEventListener("pointermove", onWindowPointerMove);
+    window.removeEventListener("pointerup", onWindowPointerEnd);
+    window.removeEventListener("pointercancel", onWindowPointerEnd);
+  }
+
+  function onWindowPointerMove(event: PointerEvent) {
+    if (!dragging || !controlsEnabled) return;
+    event.preventDefault();
+    applyDragPosition(event.clientX);
+  }
+
+  function onWindowPointerEnd(event: PointerEvent) {
+    stopDragging(event.pointerId);
+  }
 
   function readStoredPercent(key: string, fallback: number) {
     const stored = readStored(key);
@@ -46,7 +89,7 @@
   }
 
   let micOutputVolume = $state(readStoredPercent(STORAGE_KEYS.micOutputVolume, 75));
-  let micInputCutoff = $state(readStoredPercent(STORAGE_KEYS.micInputCutoff, 10));
+  let micInputCutoff = $state(readStoredPercent(STORAGE_KEYS.micInputCutoff, 5));
   let micLevel = $state(0);
 
   const controlsEnabled = $derived(permissionGranted && micEnabled);
@@ -117,17 +160,8 @@
     writeStored(STORAGE_KEYS.micInputCutoff, String(micInputCutoff));
   }
 
-  function positionFromClientX(clientX: number) {
-    const track = faderTrackEl;
-    if (!track) return 0;
-
-    const rect = track.getBoundingClientRect();
-    const ratio = (clientX - rect.left) / rect.width;
-    return Math.min(100, Math.max(0, ratio * 100));
-  }
-
   function pickDragTarget(clientX: number): "volume" | "cutoff" {
-    const position = positionFromClientX(clientX);
+    const position = trackPositionFromClientX(clientX);
     const volumeDistance = Math.abs(position - micOutputVolume);
     const cutoffDistance = Math.abs(position - micInputCutoff);
     return volumeDistance <= cutoffDistance ? "volume" : "cutoff";
@@ -135,36 +169,24 @@
 
   function onFaderPointerDown(event: PointerEvent) {
     if (!controlsEnabled) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
 
     const track = faderTrackEl;
     if (!track) return;
 
+    event.preventDefault();
+
     dragging = pickDragTarget(event.clientX);
+    applyDragPosition(event.clientX);
+
     track.setPointerCapture(event.pointerId);
-
-    if (dragging === "volume") {
-      setVolume(positionFromClientX(event.clientX));
-    } else {
-      setCutoff(positionFromClientX(event.clientX));
-    }
+    window.addEventListener("pointermove", onWindowPointerMove, { passive: false });
+    window.addEventListener("pointerup", onWindowPointerEnd);
+    window.addEventListener("pointercancel", onWindowPointerEnd);
   }
 
-  function onFaderPointerMove(event: PointerEvent) {
-    if (!dragging || !controlsEnabled) return;
-
-    const position = positionFromClientX(event.clientX);
-    if (dragging === "volume") {
-      setVolume(position);
-    } else {
-      setCutoff(position);
-    }
-  }
-
-  function onFaderPointerUp(event: PointerEvent) {
-    if (!dragging) return;
-
-    dragging = null;
-    faderTrackEl?.releasePointerCapture(event.pointerId);
+  function onFaderLostPointerCapture() {
+    stopDragging();
   }
 
   function onFaderKeyDown(event: KeyboardEvent) {
@@ -214,6 +236,7 @@
     monitor = instance;
 
     return () => {
+      stopDragging();
       instance.destroy();
       monitor = null;
     };
@@ -231,7 +254,7 @@
       </Tooltip>
       <div
         bind:this={faderTrackEl}
-        class="volume-fader relative h-10 shrink-0 rounded-md border border-border bg-secondary/60 p-1.5 {layout === 'stack'
+        class="volume-fader relative h-10 shrink-0 touch-none rounded-md border border-border bg-secondary/60 p-1.5 select-none {layout === 'stack'
           ? 'min-w-0 flex-1'
           : 'w-24'} {controlsEnabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}"
         role="slider"
@@ -243,23 +266,21 @@
         tabindex={controlsEnabled ? 0 : -1}
         onkeydown={onFaderKeyDown}
         onpointerdown={onFaderPointerDown}
-        onpointermove={onFaderPointerMove}
-        onpointerup={onFaderPointerUp}
-        onpointercancel={onFaderPointerUp}
+        onlostpointercapture={onFaderLostPointerCapture}
       >
-        <div class="relative h-full w-full overflow-hidden rounded-sm bg-border/80">
+        <div bind:this={faderInnerEl} class="relative h-full w-full overflow-hidden rounded-sm bg-border/80">
           <div class="absolute inset-y-0 left-0 rounded-sm bg-muted/70" style="width: {micInputCutoff}%"></div>
           <div
-            class="absolute inset-y-0 rounded-sm bg-participant-orange/85 transition-[left,width] duration-75"
+            class="absolute inset-y-0 rounded-sm bg-participant-orange/85 {dragging ? '' : 'transition-[left,width] duration-75'}"
             style="left: {micInputCutoff}%; width: {Math.max(0, micOutputVolume - micInputCutoff)}%"
           ></div>
           <div
-            class="cutoff-handle absolute inset-y-0.5 w-0.5 rounded-full bg-foreground/70 shadow-sm transition-[left] duration-75"
+            class="cutoff-handle absolute inset-y-0.5 w-0.5 rounded-full bg-foreground/70 shadow-sm {dragging ? '' : 'transition-[left] duration-75'}"
             style="left: calc({micInputCutoff}% - 1px)"
             aria-hidden="true"
           ></div>
           <div
-            class="volume-handle absolute inset-y-0.5 w-1 rounded-full bg-primary shadow-sm transition-[left] duration-75"
+            class="volume-handle absolute inset-y-0.5 w-1 rounded-full bg-primary shadow-sm {dragging ? '' : 'transition-[left] duration-75'}"
             style="left: calc({micOutputVolume}% - 2px)"
             aria-hidden="true"
           ></div>
@@ -312,6 +333,12 @@
 {/if}
 
 <style>
+  .volume-fader {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
   .volume-fader:focus-visible {
     outline: 2px solid color-mix(in srgb, var(--participant-orange) 70%, transparent);
     outline-offset: 2px;

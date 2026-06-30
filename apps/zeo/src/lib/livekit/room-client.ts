@@ -1,4 +1,13 @@
-import { DisconnectReason, Room, RoomEvent, Track, type ConnectionQuality, type LocalParticipant, type RemoteParticipant } from "livekit-client";
+import {
+  DisconnectReason,
+  Room,
+  RoomEvent,
+  Track,
+  type ConnectionQuality,
+  type LocalAudioTrack,
+  type LocalParticipant,
+  type RemoteParticipant,
+} from "livekit-client";
 import type { MicGateProcessor } from "./mic-gate-processor";
 
 export type ConnectionPhase = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
@@ -10,6 +19,7 @@ export type CallRoomHandlers = {
   onParticipantsChange: () => void;
   onDisconnect: (reason?: DisconnectReason) => void;
   onConnectionQuality?: (quality: ConnectionQuality, identity: string) => void;
+  onMicGateFallback?: () => void;
 };
 
 export function collectAudioLevels(room: Room): Record<string, number> {
@@ -22,6 +32,46 @@ export function collectAudioLevels(room: Room): Record<string, number> {
   }
 
   return levels;
+}
+
+function getLocalMicTrack(room: Room): LocalAudioTrack | undefined {
+  const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
+  if (!track || track.kind !== Track.Kind.Audio) return undefined;
+  return track as LocalAudioTrack;
+}
+
+/** Attach after publish — LiveKit sets audioContext on the track only after createLocalTracks returns. */
+export async function attachMicGateProcessor(room: Room, processor: MicGateProcessor) {
+  const track = getLocalMicTrack(room);
+  if (!track) {
+    throw new Error("Local microphone track is unavailable");
+  }
+
+  await track.setProcessor(processor);
+}
+
+async function enableMicrophone(
+  room: Room,
+  enabled: boolean,
+  options: {
+    audioDeviceId?: string;
+    micGateProcessor?: MicGateProcessor;
+  },
+  onMicGateFallback?: () => void
+) {
+  await room.localParticipant.setMicrophoneEnabled(enabled, {
+    deviceId: options.audioDeviceId,
+  });
+
+  if (!enabled || !options.micGateProcessor) {
+    return;
+  }
+
+  try {
+    await attachMicGateProcessor(room, options.micGateProcessor);
+  } catch {
+    onMicGateFallback?.();
+  }
 }
 
 export function createCallRoom(handlers: CallRoomHandlers) {
@@ -65,10 +115,15 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   ) {
     handlers.onPhaseChange("connecting");
     await room.connect(wsUrl, token, options.iceServers?.length ? { rtcConfig: { iceServers: options.iceServers } } : undefined);
-    await room.localParticipant.setMicrophoneEnabled(options.micEnabled, {
-      deviceId: options.audioDeviceId,
-      processor: options.micGateProcessor,
-    });
+    await enableMicrophone(
+      room,
+      options.micEnabled,
+      {
+        audioDeviceId: options.audioDeviceId,
+        micGateProcessor: options.micGateProcessor,
+      },
+      handlers.onMicGateFallback
+    );
     await room.localParticipant.setCameraEnabled(options.camEnabled, {
       deviceId: options.videoDeviceId,
     });

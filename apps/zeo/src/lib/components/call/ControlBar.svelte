@@ -9,16 +9,20 @@
   import SquareIcon from "@lucide/svelte/icons/square";
   import VideoIcon from "@lucide/svelte/icons/video";
   import VideoOffIcon from "@lucide/svelte/icons/video-off";
+  import Volume2Icon from "@lucide/svelte/icons/volume-2";
+  import VolumeOffIcon from "@lucide/svelte/icons/volume-off";
   import { IconControlButton } from "$lib/components/ui/icon-control-button";
 
   type Props = {
     isHost: boolean;
     micEnabled: boolean;
+    speakerEnabled?: boolean;
     camEnabled: boolean;
     screenSharing?: boolean;
     snapshotting?: boolean;
     chatOpen?: boolean;
     onToggleMic: () => void;
+    onToggleSpeaker?: () => void;
     onToggleCam: () => void;
     onToggleScreenShare?: () => void;
     onSnapshot?: () => void;
@@ -33,11 +37,13 @@
   let {
     isHost,
     micEnabled,
+    speakerEnabled = true,
     camEnabled,
     screenSharing = false,
     snapshotting = false,
     chatOpen = false,
     onToggleMic,
+    onToggleSpeaker,
     onToggleCam,
     onToggleScreenShare,
     onSnapshot,
@@ -50,6 +56,7 @@
   }: Props = $props();
 
   const micLabel = $derived(micEnabled ? "Mute microphone" : "Unmute microphone");
+  const speakerLabel = $derived(speakerEnabled ? "Mute speakers" : "Unmute speakers");
   const camLabel = $derived(camEnabled ? "Turn camera off" : "Turn camera on");
   const shareLabel = $derived(screenSharing ? "Stop sharing screen" : "Share screen");
 </script>
@@ -74,41 +81,51 @@
   >
     <IconControlButton label={micLabel} active={micEnabled} onclick={onToggleMic}>
       {#if micEnabled}
-        <MicIcon class="size-4" />
+        <MicIcon class="size-4 text-participant-orange" />
       {:else}
-        <MicOffIcon class="size-4" />
+        <MicOffIcon class="size-4 text-muted-foreground" />
       {/if}
     </IconControlButton>
 
+    {#if onToggleSpeaker}
+      <IconControlButton label={speakerLabel} active={speakerEnabled} onclick={onToggleSpeaker}>
+        {#if speakerEnabled}
+          <Volume2Icon class="size-4 text-participant-orange" />
+        {:else}
+          <VolumeOffIcon class="size-4 text-muted-foreground" />
+        {/if}
+      </IconControlButton>
+    {/if}
+
     <IconControlButton label={camLabel} active={camEnabled} onclick={onToggleCam}>
       {#if camEnabled}
-        <VideoIcon class="size-4" />
+        <VideoIcon class="size-4 text-participant-orange" />
       {:else}
-        <VideoOffIcon class="size-4" />
+        <VideoOffIcon class="size-4 text-muted-foreground" />
       {/if}
     </IconControlButton>
 
     {#if onToggleScreenShare}
-      <IconControlButton label={shareLabel} active={screenSharing} variant="accent" onclick={onToggleScreenShare}>
-        <MonitorUpIcon class="size-4" />
+      <IconControlButton label={shareLabel} active={screenSharing} onclick={onToggleScreenShare}>
+        <MonitorUpIcon class="size-4 {screenSharing ? 'text-participant-orange' : 'text-muted-foreground'}" />
       </IconControlButton>
     {/if}
 
     {#if onSnapshot}
       <IconControlButton label={snapshotting ? "Saving snapshot…" : "Capture snapshot"} disabled={snapshotting} onclick={onSnapshot}>
-        <CameraIcon class="size-4" />
+        <CameraIcon class="size-4 text-participant-orange" />
       </IconControlButton>
     {/if}
 
     {#if onToggleChat}
-      <IconControlButton label={chatOpen ? "Close chat" : "Open chat"} active={chatOpen} variant="accent" onclick={onToggleChat}>
-        <MessageSquareIcon class="size-4" />
+      <IconControlButton label={chatOpen ? "Close chat" : "Open chat"} active={chatOpen} onclick={onToggleChat}>
+        <MessageSquareIcon class="size-4 {chatOpen ? 'text-participant-orange' : 'text-muted-foreground'}" />
       </IconControlButton>
     {/if}
 
     {#if onToggleDevices}
-      <IconControlButton label="Choose devices" active={devicesOpen} variant="accent" onclick={onToggleDevices}>
-        <Settings2Icon class="size-4" />
+      <IconControlButton label="Choose devices" active={devicesOpen} onclick={onToggleDevices}>
+        <Settings2Icon class="size-4 {devicesOpen ? 'text-participant-orange' : 'text-muted-foreground'}" />
       </IconControlButton>
     {/if}
 
