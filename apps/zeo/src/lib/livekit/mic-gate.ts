@@ -36,18 +36,18 @@ export function createMicGateController(audioContext: AudioContext): MicGateCont
 
   let source: MediaStreamAudioSourceNode | null = null;
   let volume = 0.75;
-  let cutoff = 0.1;
-  let gateOpen = false;
+  let cutoff = 0.05;
+  let gateOpen = true;
   let gateFrame = 0;
 
   volumeGain.gain.value = volume;
-  gateGain.gain.value = 0;
+  gateGain.gain.value = 1;
 
   function disconnectSource() {
     source?.disconnect();
     source = null;
-    gateOpen = false;
-    gateGain.gain.value = 0;
+    gateOpen = true;
+    gateGain.gain.value = 1;
   }
 
   function updateGate() {

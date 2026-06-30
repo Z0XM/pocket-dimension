@@ -7,7 +7,14 @@
   import { listMediaDevices, type MediaDeviceLists } from "$lib/livekit/devices";
   import { qualityLabel, type QualityLabel } from "$lib/livekit/connection-quality";
   import { readConnectionRttMs } from "$lib/livekit/connection-stats";
-  import { createCallRoom, setRoomSpeakerMuted, wasParticipantRemoved, wasRoomDeleted, type ConnectionPhase } from "$lib/livekit/room-client";
+  import {
+    createCallRoom,
+    attachMicGateProcessor,
+    setRoomSpeakerMuted,
+    wasParticipantRemoved,
+    wasRoomDeleted,
+    type ConnectionPhase,
+  } from "$lib/livekit/room-client";
   import { createMicGateProcessor, type MicGateProcessor } from "$lib/livekit/mic-gate-processor";
   import { findScreenShareParticipant, isScreenShareActive } from "$lib/livekit/screen-share";
   import { captureCallSnapshot } from "$lib/snapshot";
@@ -106,6 +113,21 @@
     const parsed = Number.parseInt(stored, 10);
     if (Number.isNaN(parsed)) return fallback;
     return Math.min(100, Math.max(0, parsed));
+  }
+
+  function createFreshMicGateProcessor() {
+    return createMicGateProcessor({
+      volume: readStoredPercent(STORAGE_KEYS.micOutputVolume, 75) / 100,
+      cutoff: readStoredPercent(STORAGE_KEYS.micInputCutoff, 5) / 100,
+    });
+  }
+
+  async function releasePreviewForJoin() {
+    micTestActive = false;
+    stopMediaPreview(previewStream);
+    previewStream = null;
+    micGateProcessor = createFreshMicGateProcessor();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }
 
   let waitingRoomEnabled = $state(initialWaitingRoomEnabled);
@@ -255,8 +277,21 @@
   function micCaptureOptions() {
     return {
       deviceId: audioDeviceId || undefined,
-      processor: micGateProcessor ?? undefined,
     };
+  }
+
+  async function enableLocalMicrophone() {
+    if (!livekitRoom) return;
+
+    await livekitRoom.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
+
+    if (!micGateProcessor) return;
+
+    try {
+      await attachMicGateProcessor(livekitRoom, micGateProcessor);
+    } catch {
+      showToast("Noise gate unavailable — using direct microphone input");
+    }
   }
 
   async function changeAudioOutputDevice(deviceId: string) {
@@ -392,6 +427,10 @@
         disconnectMessage = "Connection lost";
         setPhase("disconnected");
       },
+      onMicGateFallback: () => {
+        if (gen !== connectionGen) return;
+        showToast("Noise gate unavailable — using direct microphone input");
+      },
     };
   }
 
@@ -474,8 +513,7 @@
       stopWaitingPoll();
       joining = true;
       try {
-        stopMediaPreview(previewStream);
-        previewStream = null;
+        await releasePreviewForJoin();
         const tokenPayload = await requestToken();
         if (tokenPayload.status === "ready") {
           await connectWithToken(tokenPayload);
@@ -583,9 +621,7 @@
         return;
       }
 
-      stopMediaPreview(previewStream);
-      previewStream = null;
-
+      await releasePreviewForJoin();
       await connectWithToken(tokenPayload);
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : "Could not join room";
@@ -607,6 +643,7 @@
     showInCallDevices = false;
     stopHostWaitingPoll();
     await teardownCall(true);
+    micGateProcessor = createFreshMicGateProcessor();
     setPhase("lobby");
     await setupPreview();
     await refreshRoomMeta();
@@ -659,7 +696,7 @@
     if (nextDeviceId) {
       await changeAudioDevice(nextDeviceId);
       if (livekitRoom && phase !== "lobby" && phase !== "waiting_admission") {
-        await livekitRoom.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
+        await enableLocalMicrophone();
       }
       return;
     }
@@ -667,7 +704,7 @@
     if (phase === "lobby" || phase === "waiting_admission") {
       syncPreviewTracks(previewStream, { audio: true, video: camEnabled });
     } else if (livekitRoom) {
-      await livekitRoom.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
+      await enableLocalMicrophone();
     }
   }
 
@@ -756,10 +793,7 @@
       }
     }
     setupPreview();
-    micGateProcessor = createMicGateProcessor({
-      volume: readStoredPercent(STORAGE_KEYS.micOutputVolume, 75) / 100,
-      cutoff: readStoredPercent(STORAGE_KEYS.micInputCutoff, 10) / 100,
-    });
+    micGateProcessor = createFreshMicGateProcessor();
     refreshTimer = setInterval(refreshRoomMeta, 5000);
     refreshRoomMeta();
     startHostWaitingPoll();
@@ -823,6 +857,9 @@
             {micEnabled}
             {speakerEnabled}
             {camEnabled}
+            onToggleMic={toggleMic}
+            onToggleSpeaker={toggleSpeaker}
+            onToggleCam={toggleCam}
             onAudioDeviceChange={changeAudioDevice}
             onAudioOutputDeviceChange={changeAudioOutputDevice}
             onVideoDeviceChange={changeVideoDevice}
@@ -836,11 +873,13 @@
       <ControlBar
         {isHost}
         {micEnabled}
+        {speakerEnabled}
         {camEnabled}
         {screenSharing}
         {snapshotting}
         {chatOpen}
         onToggleMic={toggleMic}
+        onToggleSpeaker={toggleSpeaker}
         onToggleCam={toggleCam}
         onToggleScreenShare={toggleScreenShare}
         onSnapshot={takeSnapshot}
