@@ -1,6 +1,6 @@
 # Grid tile layout — feature plan
 
-**Status:** in progress (Phase 1 MVP)  
+**Status:** Phase 2 complete  
 **Epic:** 9 (proposed) — Personal in-call tile layout  
 **Updated:** 2026-06-30
 

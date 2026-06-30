@@ -10,10 +10,29 @@
     localDisplayName: string;
     layoutEditMode: boolean;
     tileLayout: CallTileLayout | null;
+    layoutResetToken?: number;
     onLayoutChange: (layout: CallTileLayout) => void;
   };
 
-  const { room, activeSpeakerIdentity, audioLevels, localDisplayName, layoutEditMode, tileLayout, onLayoutChange }: Props = $props();
+  const {
+    room,
+    activeSpeakerIdentity,
+    audioLevels,
+    localDisplayName,
+    layoutEditMode,
+    tileLayout,
+    layoutResetToken = 0,
+    onLayoutChange,
+  }: Props = $props();
 </script>
 
-<GridCanvas {room} {activeSpeakerIdentity} {audioLevels} {localDisplayName} editMode={layoutEditMode} {tileLayout} {onLayoutChange} />
+<GridCanvas
+  {room}
+  {activeSpeakerIdentity}
+  {audioLevels}
+  {localDisplayName}
+  editMode={layoutEditMode}
+  {tileLayout}
+  {layoutResetToken}
+  {onLayoutChange}
+/>

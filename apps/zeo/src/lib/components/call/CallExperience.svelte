@@ -29,7 +29,7 @@
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
   import { readStored, STORAGE_KEYS, writeStored } from "$lib/browser-storage";
   import type { CallTileLayout } from "$lib/call/grid/types";
-  import { readCallTileLayout, writeCallTileLayout } from "$lib/call/grid/layout-storage";
+  import { readCallTileLayout, writeCallTileLayout, clearCallTileLayout } from "$lib/call/grid/layout-storage";
 
   type Props = {
     slug: string;
@@ -148,6 +148,7 @@
   let audioLevels = $state<Record<string, number>>({});
   let layoutEditMode = $state(false);
   let tileLayout = $state<CallTileLayout | null>(null);
+  let layoutResetToken = $state(0);
   let connectionGen = $state(0);
   let mediaRevision = $state(0);
   let localDisplayName = $state("");
@@ -192,6 +193,13 @@
     if (layoutEditMode) {
       showToast("Drag tiles to rearrange. Saved on this device only.");
     }
+  }
+
+  function resetTileLayout() {
+    clearCallTileLayout(slug);
+    tileLayout = null;
+    layoutResetToken += 1;
+    showToast("Layout reset to default");
   }
 
   function bumpMediaRevision() {
@@ -896,6 +904,7 @@
           {mediaRevision}
           {layoutEditMode}
           {tileLayout}
+          {layoutResetToken}
           onLayoutChange={handleTileLayoutChange}
           bind:stageRef={stageEl}
         />
@@ -910,6 +919,7 @@
         {chatOpen}
         {layoutEditMode}
         onToggleLayoutEdit={toggleLayoutEdit}
+        onResetLayout={resetTileLayout}
         onToggleMic={toggleMic}
         onToggleSpeaker={toggleSpeaker}
         onToggleCam={toggleCam}

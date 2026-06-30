@@ -17,20 +17,31 @@ export async function captureCallSnapshot(options: { slug: string; stageRoot: HT
   ctx.fillStyle = "#0a0a0c";
   ctx.fillRect(0, 0, stageRect.width, stageRect.height);
 
-  const videos = stageRoot.querySelectorAll("video");
-  for (const video of videos) {
-    if (!(video instanceof HTMLVideoElement) || video.readyState < 2) continue;
+  const tiles = stageRoot.querySelectorAll(".grid-stack-item, [data-tile-id]");
+  const tileElements = tiles.length > 0 ? tiles : stageRoot.querySelectorAll("video");
 
-    const rect = video.getBoundingClientRect();
+  for (const tile of tileElements) {
+    const element = tile instanceof HTMLElement ? tile : tile.parentElement;
+    if (!element) continue;
+
+    const rect = element.getBoundingClientRect();
     const x = rect.left - stageRect.left;
     const y = rect.top - stageRect.top;
     if (rect.width <= 0 || rect.height <= 0) continue;
 
-    try {
-      ctx.drawImage(video, x, y, rect.width, rect.height);
-    } catch {
-      // Cross-origin or empty frame — skip tile
+    const video = element.querySelector("video");
+    if (video instanceof HTMLVideoElement && video.readyState >= 2) {
+      try {
+        ctx.drawImage(video, x, y, rect.width, rect.height);
+        continue;
+      } catch {
+        // Cross-origin or empty frame — fall through to placeholder
+      }
     }
+
+    const avatar = element.querySelector<HTMLElement>("[style*='background-color']");
+    ctx.fillStyle = avatar?.style.backgroundColor || "#1c1c22";
+    ctx.fillRect(x, y, rect.width, rect.height);
   }
 
   const blob = await new Promise<Blob>((resolve, reject) => {

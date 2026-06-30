@@ -7,7 +7,12 @@ export type TileGridEngine = {
   destroy: () => void;
 };
 
-export function createTileGridEngine(container: HTMLElement, metrics: GridMetrics, onLayoutSettled: () => void): TileGridEngine {
+export function createTileGridEngine(
+  container: HTMLElement,
+  metrics: GridMetrics,
+  getMetrics: () => GridMetrics,
+  onLayoutSettled: () => void
+): TileGridEngine {
   const grid = GridStack.init(
     {
       column: metrics.cols,
@@ -28,7 +33,7 @@ export function createTileGridEngine(container: HTMLElement, metrics: GridMetric
   grid.on("resizestop", (_event, element) => {
     const node = (element as GridItemHTMLElement).gridstackNode;
     if (node?.w && node?.h) {
-      const preset = nearestPreset(node.w, node.h);
+      const preset = nearestPreset(node.w, node.h, getMetrics());
       if (preset.w !== node.w || preset.h !== node.h) {
         grid.update(element, { w: preset.w, h: preset.h });
       }
@@ -82,4 +87,10 @@ export function registerGridWidgets(grid: GridStack, container: HTMLElement, lay
       grid.makeWidget(item, { id, x: rect.x, y: rect.y, w: rect.w, h: rect.h });
     }
   }
+}
+
+export function updateGridTile(grid: GridStack, container: HTMLElement, identity: string, rect: CallTileLayout["tiles"][string]) {
+  const element = container.querySelector<HTMLElement>(`[data-tile-id="${identity}"]`);
+  if (!element) return;
+  grid.update(element, { x: rect.x, y: rect.y, w: rect.w, h: rect.h });
 }

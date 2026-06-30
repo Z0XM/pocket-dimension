@@ -1,5 +1,5 @@
 import type { CallTileLayout, GridMetrics, TileRect } from "./types";
-import { isAllowedTileSize, presetForParticipantCount, TILE_SIZE_PRESETS, tileFits, type TileSizePreset } from "./tile-sizes";
+import { clampTileRect, isAllowedTileSize, presetForParticipantCount, TILE_SIZE_PRESETS, tileFits, type TileSizePreset } from "./tile-sizes";
 
 function overlaps(a: TileRect, b: TileRect) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -68,16 +68,22 @@ function defaultRectForIndex(index: number, count: number, preset: TileSizePrese
   return findFirstAvailable(preset, [], metrics) ?? centeredRect(preset, metrics);
 }
 
+export function createDefaultLayout(identities: string[], metrics: GridMetrics): CallTileLayout {
+  return mergeParticipantLayout(identities, null, metrics);
+}
+
 export function mergeParticipantLayout(identities: string[], saved: CallTileLayout | null, metrics: GridMetrics): CallTileLayout {
-  const preset = presetForParticipantCount(identities.length);
+  const preset = presetForParticipantCount(identities.length, metrics);
   const placed: TileRect[] = [];
   const tiles: Record<string, TileRect> = {};
 
   for (const identity of identities) {
     const savedTile = saved?.cols === metrics.cols ? saved.tiles[identity] : undefined;
-    if (savedTile && isAllowedTileSize(savedTile.w, savedTile.h) && fitsWithoutOverlap(savedTile, placed, metrics)) {
-      tiles[identity] = savedTile;
-      placed.push(savedTile);
+    const clamped = savedTile ? clampTileRect(savedTile, metrics) : undefined;
+
+    if (clamped && isAllowedTileSize(clamped.w, clamped.h, metrics) && fitsWithoutOverlap(clamped, placed, metrics)) {
+      tiles[identity] = clamped;
+      placed.push(clamped);
     }
   }
 
@@ -113,9 +119,8 @@ export function layoutFromGridNodes(
     if (!node.id) continue;
     if (node.x === undefined || node.y === undefined || node.w === undefined || node.h === undefined) continue;
 
-    const rect = { x: node.x, y: node.y, w: node.w, h: node.h };
-    if (!isAllowedTileSize(rect.w, rect.h)) continue;
-    if (!tileFits(rect, metrics.cols, metrics.rows)) continue;
+    const rect = clampTileRect({ x: node.x, y: node.y, w: node.w, h: node.h }, metrics);
+    if (!rect || !isAllowedTileSize(rect.w, rect.h, metrics)) continue;
 
     tiles[node.id] = rect;
   }
@@ -125,4 +130,8 @@ export function layoutFromGridNodes(
     cols: metrics.cols,
     tiles,
   };
+}
+
+export function clampParticipantLayout(layout: CallTileLayout, identities: string[], metrics: GridMetrics): CallTileLayout {
+  return mergeParticipantLayout(identities, layout, metrics);
 }

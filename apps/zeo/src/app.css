@@ -152,3 +152,12 @@
   overflow: hidden;
   background: transparent;
 }
+
+.zeo-grid-item-editable:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 80%, transparent);
+  outline-offset: 2px;
+}
+
+.zeo-grid-item-selected {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent);
+}

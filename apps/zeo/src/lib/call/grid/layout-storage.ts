@@ -34,6 +34,16 @@ export function writeCallTileLayout(roomSlug: string, layout: CallTileLayout) {
   }
 }
 
+export function clearCallTileLayout(roomSlug: string) {
+  if (!browser) return;
+
+  try {
+    localStorage.removeItem(layoutStorageKey(roomSlug));
+  } catch {
+    // Private browsing — ignore
+  }
+}
+
 export function sanitizeTileLayout(layout: CallTileLayout, cols: number, rows: number): CallTileLayout {
   const tiles: CallTileLayout["tiles"] = {};
 

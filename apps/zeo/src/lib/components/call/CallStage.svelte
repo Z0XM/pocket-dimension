@@ -13,6 +13,7 @@
     mediaRevision?: number;
     layoutEditMode?: boolean;
     tileLayout?: CallTileLayout | null;
+    layoutResetToken?: number;
     onLayoutChange?: (layout: CallTileLayout) => void;
     stageRef?: HTMLElement | null;
   };
@@ -25,6 +26,7 @@
     mediaRevision = 0,
     layoutEditMode = false,
     tileLayout = null,
+    layoutResetToken = 0,
     onLayoutChange = () => {},
     stageRef = $bindable(null),
   }: Props = $props();
@@ -45,6 +47,6 @@
   {#if screenSharer}
     <ScreenShareLayout {room} {activeSpeakerIdentity} {audioLevels} {localDisplayName} />
   {:else}
-    <VideoGrid {room} {activeSpeakerIdentity} {audioLevels} {localDisplayName} {layoutEditMode} {tileLayout} {onLayoutChange} />
+    <VideoGrid {room} {activeSpeakerIdentity} {audioLevels} {localDisplayName} {layoutEditMode} {tileLayout} {layoutResetToken} {onLayoutChange} />
   {/if}
 </div>
