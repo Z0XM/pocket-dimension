@@ -202,11 +202,11 @@ GridStack.init({
 - [ ] Participant join/leave handling
 
 ### Phase 2 — Polish
-- [ ] Window resize clamping
-- [ ] "Reset layout" action
-- [ ] Small-screen min preset (may use S only on narrow stages)
-- [ ] Snapshot compatibility verify
-- [ ] Keyboard a11y
+- [x] Window resize clamping
+- [x] "Reset layout" action
+- [x] Small-screen min preset (S only when cols ≤ 8 or cellSize < 48px)
+- [x] Snapshot compatibility (tile-aware capture with avatar fallback)
+- [x] Keyboard a11y (arrow move, +/- resize, Esc exit edit mode)
 
 ### Phase 3 — Future
 - [ ] Screen-share layout integration
