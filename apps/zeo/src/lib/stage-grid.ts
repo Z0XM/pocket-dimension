@@ -8,6 +8,21 @@ export type StageGridLayout = {
   height: number;
 };
 
+export function stageGridLayoutsEqual(a: StageGridLayout | null, b: StageGridLayout | null) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+
+  return (
+    a.cols === b.cols &&
+    a.rows === b.rows &&
+    a.cellSize === b.cellSize &&
+    a.offsetX === b.offsetX &&
+    a.offsetY === b.offsetY &&
+    a.width === b.width &&
+    a.height === b.height
+  );
+}
+
 export type ParticipantGridLayout = {
   slotCols: number;
   slotRows: number;
