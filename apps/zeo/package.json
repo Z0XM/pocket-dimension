@@ -40,7 +40,6 @@
     "bits-ui": "^2.16.3",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
-    "gridstack": "^12.6.0",
     "livekit-client": "^2.20.0",
     "livekit-server-sdk": "^2.15.5",
     "tailwind-merge": "^3.4.0",

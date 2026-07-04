@@ -13,8 +13,6 @@
     isGuest?: boolean;
     isLocal?: boolean;
     compact?: boolean;
-    fillContainer?: boolean;
-    layoutEditable?: boolean;
   };
 
   const {
@@ -26,8 +24,6 @@
     isGuest = false,
     isLocal = false,
     compact = false,
-    fillContainer = false,
-    layoutEditable = false,
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
@@ -72,11 +68,14 @@
   });
 </script>
 
-<div class="{fillContainer ? 'size-full min-h-0' : 'aspect-video'} rounded-lg transition-[box-shadow] duration-75 ease-out" style={speakingGlowStyle}>
+<div
+  class="rounded-lg transition-[box-shadow] duration-75 ease-out {compact ? 'aspect-video' : 'aspect-video'}"
+  style={speakingGlowStyle}
+>
   <div
     class="relative size-full overflow-hidden rounded-lg bg-secondary ring-2 ring-transparent transition-shadow {isActiveSpeaker
       ? 'ring-participant-purple/70 shadow-[0_0_0_1px_color-mix(in_srgb,var(--participant-purple)_70%,transparent)]'
-      : ''} {layoutEditable ? 'ring-border/80' : ''}"
+      : ''}"
     aria-label="{displayName}{isLocal ? ' (you)' : ''}{isGuest ? ', guest' : ''}"
   >
     {#if hasVideo}
