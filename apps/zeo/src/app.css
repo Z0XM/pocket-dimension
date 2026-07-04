@@ -130,34 +130,3 @@
     @apply mb-4 rounded-md border border-primary/35 bg-primary/10 p-4 text-sm text-foreground;
   }
 }
-
-.zeo-grid-lines {
-  background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--border) 35%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--border) 35%, transparent) 1px, transparent 1px);
-}
-
-.zeo-grid-lines-visible {
-  background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--border) 70%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--border) 70%, transparent) 1px, transparent 1px);
-}
-
-.zeo-tile-grid.grid-stack {
-  background: transparent;
-}
-
-.zeo-tile-grid .grid-stack-item-content {
-  inset: 0;
-  overflow: hidden;
-  background: transparent;
-}
-
-.zeo-grid-item-editable:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 80%, transparent);
-  outline-offset: 2px;
-}
-
-.zeo-grid-item-selected {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent);
-}
