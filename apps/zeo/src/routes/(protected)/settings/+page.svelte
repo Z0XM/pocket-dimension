@@ -5,7 +5,7 @@
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "$lib/components/ui/card";
   import TileColorPicker from "$lib/components/call/TileColorPicker.svelte";
   import { readStored, STORAGE_KEYS, writeStored } from "$lib/browser-storage";
-  import { isParticipantColor, PARTICIPANT_COLORS, type ParticipantColor } from "$lib/participant-colors";
+  import { PARTICIPANT_COLORS, resolveParticipantColor, type ParticipantColor } from "$lib/participant-colors";
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
@@ -15,8 +15,9 @@
   onMount(() => {
     if (!browser) return;
     const stored = readStored(STORAGE_KEYS.tileColor);
-    if (stored && isParticipantColor(stored)) {
-      tileColor = stored;
+    if (stored) {
+      const resolved = resolveParticipantColor(stored);
+      if (resolved) tileColor = resolved;
     }
   });
 

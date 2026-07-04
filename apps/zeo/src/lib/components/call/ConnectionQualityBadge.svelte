@@ -17,7 +17,7 @@
   const bars = [0, 1, 2, 3];
 </script>
 
-<span class="inline-flex items-end gap-1" {title} aria-label={title}>
+<span class="inline-flex items-center gap-1.5" {title} aria-label={title}>
   <span class="inline-flex items-end gap-px" aria-hidden="true">
     {#each bars as index (index)}
       <span class="w-[3px] rounded-[1px] {index < activeBars ? signalClass : 'bg-border/70'}" style="height: {barHeights[index]}px"></span>
@@ -25,6 +25,6 @@
   </span>
 
   {#if pingMs != null && pingMs > 0}
-    <span class="font-mono text-[11px] leading-none tabular-nums {textClass}">{pingMs}</span>
+    <span class="font-mono text-[10px] leading-none tabular-nums {textClass}">{pingMs}</span>
   {/if}
 </span>

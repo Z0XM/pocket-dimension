@@ -13,9 +13,20 @@
     localDisplayName: string;
     localMicEnabled?: boolean;
     localTileColor?: ParticipantColor | null;
+    hideParticipantVideos?: boolean;
+    disableSpeakingGlows?: boolean;
   };
 
-  const { room, activeSpeakerIdentity, audioLevels, localDisplayName, localMicEnabled, localTileColor }: Props = $props();
+  const {
+    room,
+    activeSpeakerIdentity,
+    audioLevels,
+    localDisplayName,
+    localMicEnabled,
+    localTileColor,
+    hideParticipantVideos = false,
+    disableSpeakingGlows = false,
+  }: Props = $props();
 
   const sharer = $derived(findScreenShareParticipant(room));
   const sharerName = $derived(sharer ? displayNameForParticipant(sharer, room.localParticipant.identity, localDisplayName) : "");
@@ -48,6 +59,8 @@
             isGuest={participant.identity.startsWith("guest_")}
             isLocal={participant.identity === room.localParticipant.identity}
             localMicEnabled={participant.identity === room.localParticipant.identity ? localMicEnabled : undefined}
+            hideVideos={hideParticipantVideos}
+            {disableSpeakingGlows}
             compact
           />
         </div>

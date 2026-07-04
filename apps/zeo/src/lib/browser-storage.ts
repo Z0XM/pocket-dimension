@@ -7,6 +7,8 @@ export const STORAGE_KEYS = {
   micInputCutoff: "zeo:mic-input-cutoff",
   audioOutputDeviceId: "zeo:audio-output-device-id",
   tileColor: "zeo:tile-color",
+  hideParticipantVideos: "zeo:hide-participant-videos",
+  disableSpeakingGlows: "zeo:disable-speaking-glows",
 } as const;
 
 export function readStored(key: string): string | null {
@@ -32,4 +34,15 @@ export function writeStored(key: string, value: string) {
   } catch {
     // Private browsing or storage quota — ignore
   }
+}
+
+export function readStoredFlag(key: string, defaultValue = false): boolean {
+  const stored = readStored(key);
+  if (stored === "true") return true;
+  if (stored === "false") return false;
+  return defaultValue;
+}
+
+export function writeStoredFlag(key: string, value: boolean) {
+  writeStored(key, value ? "true" : "false");
 }

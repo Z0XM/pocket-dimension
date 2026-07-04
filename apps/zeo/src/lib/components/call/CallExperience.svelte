@@ -17,7 +17,13 @@
     type ConnectionPhase,
   } from "$lib/livekit/room-client";
   import { createMicGateProcessor, type MicGateProcessor } from "$lib/livekit/mic-gate-processor";
-  import { findScreenShareParticipant, isScreenShareActive } from "$lib/livekit/screen-share";
+  import {
+    disableLocalScreenShare,
+    enableLocalScreenShare,
+    findScreenShareParticipant,
+    isScreenShareActive,
+    screenShareFailureMessage,
+  } from "$lib/livekit/screen-share";
   import { captureCallSnapshot } from "$lib/snapshot";
   import PreCallLobby from "$lib/components/call/PreCallLobby.svelte";
   import CallStage from "$lib/components/call/CallStage.svelte";
@@ -30,8 +36,10 @@
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
   import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
   import TileColorPicker from "$lib/components/call/TileColorPicker.svelte";
-  import { isParticipantColor, PARTICIPANT_COLORS, type ParticipantColor } from "$lib/participant-colors";
-  import { readStored, STORAGE_KEYS, writeStored } from "$lib/browser-storage";
+  import { Separator } from "$lib/components/ui/separator";
+  import { SettingToggle } from "$lib/components/ui/setting-toggle";
+  import { PARTICIPANT_COLORS, resolveParticipantColor, type ParticipantColor } from "$lib/participant-colors";
+  import { readStored, readStoredFlag, STORAGE_KEYS, writeStored, writeStoredFlag } from "$lib/browser-storage";
 
   type Props = {
     slug: string;
@@ -116,11 +124,16 @@
 
   function readInitialTileColor(): ParticipantColor {
     const stored = readStored(STORAGE_KEYS.tileColor);
-    if (stored && isParticipantColor(stored)) return stored;
+    if (stored) {
+      const resolved = resolveParticipantColor(stored);
+      if (resolved) return resolved;
+    }
     return PARTICIPANT_COLORS[0];
   }
 
   let tileColor = $state<ParticipantColor>(PARTICIPANT_COLORS[0]);
+  let hideParticipantVideos = $state(false);
+  let disableSpeakingGlows = $state(false);
 
   const inCallPhase = $derived(phase === "in_call" || phase === "reconnecting");
   const micMonitorStream = $derived(inCallPhase ? inCallMicTestStream : previewStream);
@@ -129,6 +142,16 @@
   function setTileColor(color: ParticipantColor) {
     tileColor = color;
     writeStored(STORAGE_KEYS.tileColor, color);
+  }
+
+  function setHideParticipantVideos(value: boolean) {
+    hideParticipantVideos = value;
+    writeStoredFlag(STORAGE_KEYS.hideParticipantVideos, value);
+  }
+
+  function setDisableSpeakingGlows(value: boolean) {
+    disableSpeakingGlows = value;
+    writeStoredFlag(STORAGE_KEYS.disableSpeakingGlows, value);
   }
 
   function readStoredPercent(key: string, fallback: number) {
@@ -173,6 +196,8 @@
   let localDisplayName = $state("");
   let callSession: ReturnType<typeof createCallRoom> | null = null;
   let stageEl = $state<HTMLElement | null>(null);
+  let controlBarEl = $state<HTMLElement | null>(null);
+  let controlBarReservePx = $state(0);
   let intentionalScreenShareStop = false;
   let snapshotting = $state(false);
   let snapshotFlash = $state(false);
@@ -192,6 +217,23 @@
   const screenSharing = $derived.by(() => {
     mediaRevision;
     return livekitRoom ? isScreenShareActive(livekitRoom.localParticipant) : false;
+  });
+
+  $effect(() => {
+    const el = controlBarEl;
+    if (!el) {
+      controlBarReservePx = 0;
+      return;
+    }
+
+    const sync = () => {
+      controlBarReservePx = el.offsetHeight;
+    };
+
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(el);
+    return () => observer.disconnect();
   });
 
   function showToast(message: string) {
@@ -868,7 +910,7 @@
 
     if (isScreenShareActive(local)) {
       intentionalScreenShareStop = true;
-      await local.setScreenShareEnabled(false);
+      await disableLocalScreenShare(local);
       bumpMediaRevision();
       return;
     }
@@ -883,10 +925,13 @@
     }
 
     try {
-      await local.setScreenShareEnabled(true);
+      await enableLocalScreenShare(local);
       bumpMediaRevision();
-    } catch {
-      showToast("Could not start screen share");
+    } catch (error) {
+      const message = screenShareFailureMessage(error);
+      if (!(error instanceof DOMException && error.name === "NotAllowedError")) {
+        showToast(message);
+      }
     }
   }
 
@@ -911,6 +956,8 @@
   onMount(() => {
     if (!browser) return;
     tileColor = readInitialTileColor();
+    hideParticipantVideos = readStoredFlag(STORAGE_KEYS.hideParticipantVideos);
+    disableSpeakingGlows = readStoredFlag(STORAGE_KEYS.disableSpeakingGlows);
     onPhaseChange?.(phase);
     if (!user) {
       const storedGuestName = readStored(STORAGE_KEYS.guestDisplayName);
@@ -952,10 +999,6 @@
     {/if}
 
     {#if livekitRoom && (phase === "in_call" || phase === "reconnecting")}
-      <div class="absolute left-4 top-4 z-20">
-        <ConnectionQualityBadge label={localConnectionQuality} pingMs={localPingMs} />
-      </div>
-
       {#if chatEnabled}
         <ChatPanel
           {slug}
@@ -969,8 +1012,8 @@
       {#if showInCallDevices}
         <div class="absolute left-4 top-14 z-20 w-full max-w-md rounded-xl border border-border bg-card/95 p-4 shadow-lg backdrop-blur-sm">
           <div class="mb-3 flex items-center justify-between">
-            <p class="text-sm font-medium text-foreground">Devices</p>
-            <button type="button" class="action-btn-ghost-destructive size-7" aria-label="Close devices" onclick={closeInCallDevicesPanel}>
+            <p class="text-sm font-medium text-foreground">Settings</p>
+            <button type="button" class="action-btn-ghost-destructive size-7" aria-label="Close settings" onclick={closeInCallDevicesPanel}>
               <XIcon class="size-4" aria-hidden="true" />
             </button>
           </div>
@@ -1005,6 +1048,23 @@
               permissionGranted={permissionState === "granted"}
             />
             <TileColorPicker compact value={tileColor} onChange={setTileColor} />
+            <div class="rounded-lg border border-border px-3">
+              <SettingToggle
+                id="hide-participant-videos"
+                label="Hide participant videos"
+                tooltip="Show colored initials instead of camera feeds for everyone in the grid."
+                checked={hideParticipantVideos}
+                onCheckedChange={setHideParticipantVideos}
+              />
+              <Separator />
+              <SettingToggle
+                id="disable-speaking-glows"
+                label="Hide speaking glows"
+                tooltip="Turn off the outer glow when someone speaks. The colored outline still appears."
+                checked={disableSpeakingGlows}
+                onCheckedChange={setDisableSpeakingGlows}
+              />
+            </div>
           </div>
         </div>
       {/if}
@@ -1018,10 +1078,17 @@
           {mediaRevision}
           localMicEnabled={micDisplayEnabled}
           localTileColor={tileColor}
+          {hideParticipantVideos}
+          {disableSpeakingGlows}
+          bottomInset={controlBarReservePx}
           bind:stageRef={stageEl}
         />
       </div>
+      <div class="pointer-events-none fixed bottom-6 right-4 z-[21]">
+        <ConnectionQualityBadge label={localConnectionQuality} pingMs={localPingMs} />
+      </div>
       <ControlBar
+        bind:barRef={controlBarEl}
         {isHost}
         micEnabled={micDisplayEnabled}
         micTesting={inCallPhase && micTestActive}

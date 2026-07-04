@@ -25,12 +25,12 @@
   --radius: 0.625rem;
 
   /* Participant tile palette (icon grid colors) */
-  --participant-green: #22c55e;
-  --participant-purple: #8b5cf6;
-  --participant-yellow: #eab308;
-  --participant-red: #ef4444;
-  --participant-blue: #3b82f6;
-  --participant-orange: #ea580c;
+  --participant-green: #16a34a;
+  --participant-purple: #7c3aed;
+  --participant-yellow: #ca8a04;
+  --participant-red: #dc2626;
+  --participant-blue: #2563eb;
+  --participant-orange: #c2410c;
 
   --scrollbar-thumb: var(--participant-orange);
   --scrollbar-track: var(--background);

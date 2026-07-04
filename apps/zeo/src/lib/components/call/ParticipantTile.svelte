@@ -13,7 +13,10 @@
     isGuest?: boolean;
     isLocal?: boolean;
     localMicEnabled?: boolean;
+    hideVideos?: boolean;
+    disableSpeakingGlows?: boolean;
     compact?: boolean;
+    fitContainer?: boolean;
   };
 
   const {
@@ -25,11 +28,15 @@
     isGuest = false,
     isLocal = false,
     localMicEnabled,
+    hideVideos = false,
+    disableSpeakingGlows = false,
     compact = false,
+    fitContainer = false,
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
   let hasVideo = $derived(isCameraEnabled(participant));
+  let showVideo = $derived(hasVideo && !hideVideos);
   let micEnabled = $derived(isLocal && localMicEnabled !== undefined ? localMicEnabled : isMicrophoneEnabled(participant));
 
   const SPEAKING_THRESHOLD = 0.02;
@@ -38,7 +45,7 @@
   const glowColor = (alpha: number) => `color-mix(in srgb, ${tileColor} ${alpha}%, transparent)`;
 
   const speakingGlowStyle = $derived.by(() => {
-    if (!isSpeaking) return undefined;
+    if (!isSpeaking || disableSpeakingGlows) return undefined;
 
     const innerBlur = 8 + clampedLevel * 14;
     const innerSpread = 2 + clampedLevel * 4;
@@ -52,6 +59,9 @@
 
   const speakingRingStyle = $derived.by(() => {
     if (isSpeaking) {
+      if (disableSpeakingGlows) {
+        return `outline: 2px solid ${glowColor(62)}; outline-offset: -2px;`;
+      }
       return `outline: 2px solid ${glowColor(62)}; outline-offset: -2px; box-shadow: 0 0 18px 5px ${glowColor(26)};`;
     }
     if (isActiveSpeaker) {
@@ -89,13 +99,13 @@
   });
 </script>
 
-<div class="rounded-lg transition-[box-shadow] duration-100 ease-out {compact ? 'aspect-video' : 'aspect-video'}" style={speakingGlowStyle}>
+<div class="rounded-lg transition-[box-shadow] duration-100 ease-out {fitContainer ? 'size-full' : 'aspect-video'}" style={speakingGlowStyle}>
   <div
     class="relative size-full overflow-hidden rounded-lg bg-secondary transition-[box-shadow,outline] duration-100 ease-out"
     style={speakingRingStyle}
     aria-label="{displayName}{isLocal ? ' (you)' : ''}{isGuest ? ', guest' : ''}"
   >
-    {#if hasVideo}
+    {#if showVideo}
       <video bind:this={videoEl} class="size-full object-cover {isLocal ? '-scale-x-100' : ''}" autoplay playsinline muted={isLocal}></video>
     {:else}
       <div class="flex size-full items-center justify-center" style="background-color: {tileColor}">

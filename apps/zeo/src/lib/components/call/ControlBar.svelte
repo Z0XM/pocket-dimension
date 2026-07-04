@@ -5,7 +5,7 @@
   import MicOffIcon from "@lucide/svelte/icons/mic-off";
   import MonitorUpIcon from "@lucide/svelte/icons/monitor-up";
   import PhoneOffIcon from "@lucide/svelte/icons/phone-off";
-  import Settings2Icon from "@lucide/svelte/icons/settings-2";
+  import SettingsIcon from "@lucide/svelte/icons/settings";
   import SquareIcon from "@lucide/svelte/icons/square";
   import VideoIcon from "@lucide/svelte/icons/video";
   import VideoOffIcon from "@lucide/svelte/icons/video-off";
@@ -33,6 +33,7 @@
     onLeave: () => void;
     onEndRoom?: () => void;
     ending?: boolean;
+    barRef?: HTMLElement | null;
   };
 
   let {
@@ -55,6 +56,7 @@
     onLeave,
     onEndRoom,
     ending = false,
+    barRef = $bindable(null),
   }: Props = $props();
 
   const micLabel = $derived(micTesting ? "Stop mic test and unmute" : micEnabled ? "Mute microphone" : "Unmute microphone");
@@ -77,7 +79,7 @@
   }}
 />
 
-<div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center p-4 pb-6" aria-live="polite">
+<div bind:this={barRef} class="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center p-4 pb-6" aria-live="polite">
   <div
     class="pointer-events-auto flex flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-border bg-card/95 px-3 py-2.5 shadow-lg backdrop-blur-sm"
   >
@@ -126,8 +128,8 @@
     {/if}
 
     {#if onToggleDevices}
-      <IconControlButton label="Choose devices" active={devicesOpen} onclick={onToggleDevices}>
-        <Settings2Icon class="size-4 {devicesOpen ? 'text-participant-orange' : 'text-muted-foreground'}" />
+      <IconControlButton label={devicesOpen ? "Close settings" : "Settings"} active={devicesOpen} onclick={onToggleDevices}>
+        <SettingsIcon class="size-4 {devicesOpen ? 'text-participant-orange' : 'text-muted-foreground'}" />
       </IconControlButton>
     {/if}
 
