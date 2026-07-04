@@ -7,12 +7,15 @@
     width: number;
     height: number;
     draggable?: boolean;
+    elevated?: boolean;
+    fullscreen?: boolean;
     onMoveStart?: (event: PointerEvent) => void;
     onMove?: (event: PointerEvent) => void;
     onMoveEnd?: (event: PointerEvent) => void;
     onResizeStart?: (size: { width: number; height: number }) => void;
     onResize?: (widthPx: number, heightPx: number) => void;
     onResizeEnd?: (widthPx: number, heightPx: number) => void;
+    actions?: Snippet;
     children: Snippet;
   };
 
@@ -22,21 +25,24 @@
     width,
     height,
     draggable = false,
+    elevated = false,
+    fullscreen = false,
     onMoveStart,
     onMove,
     onMoveEnd,
     onResizeStart,
     onResize,
     onResizeEnd,
+    actions,
     children,
   }: Props = $props();
 
-  function isResizeHandle(target: EventTarget | null) {
-    return target instanceof HTMLElement && Boolean(target.closest('[data-grid-tile-handle="resize"]'));
+  function isTileHandle(target: EventTarget | null) {
+    return target instanceof HTMLElement && Boolean(target.closest("[data-grid-tile-handle]"));
   }
 
   function startMove(event: PointerEvent) {
-    if (!draggable || isResizeHandle(event.target)) return;
+    if (!draggable || isTileHandle(event.target)) return;
 
     event.preventDefault();
 
@@ -101,7 +107,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="group absolute {draggable ? 'cursor-grab active:cursor-grabbing' : ''}"
+  class="group absolute {draggable ? 'cursor-grab active:cursor-grabbing' : ''} {elevated ? 'z-20' : 'z-10'} {fullscreen ? 'z-30' : ''}"
   style:left="{left}px"
   style:top="{top}px"
   style:width="{width}px"
@@ -109,6 +115,12 @@
   onpointerdown={startMove}
 >
   {@render children()}
+
+  {#if actions}
+    <div class="absolute right-1 top-1 z-20 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+      {@render actions()}
+    </div>
+  {/if}
 
   {#if onResize}
     <button

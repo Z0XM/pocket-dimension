@@ -40,6 +40,7 @@
   import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import { PARTICIPANT_COLORS, resolveParticipantColor, type ParticipantColor } from "$lib/participant-colors";
   import { readStored, readStoredFlag, STORAGE_KEYS, writeStored, writeStoredFlag } from "$lib/browser-storage";
+  import { buildStageTiles, pruneTileKeys } from "$lib/call/stage-tiles";
 
   type Props = {
     slug: string;
@@ -198,6 +199,10 @@
   let stageEl = $state<HTMLElement | null>(null);
   let controlBarEl = $state<HTMLElement | null>(null);
   let controlBarReservePx = $state(0);
+  let minimizedTileKeys = $state<string[]>([]);
+  let pinnedTileKeys = $state<string[]>([]);
+  let hiddenVideoTileKeys = $state<string[]>([]);
+  let fullscreenTileKey = $state<string | null>(null);
   let intentionalScreenShareStop = false;
   let snapshotting = $state(false);
   let snapshotFlash = $state(false);
@@ -218,6 +223,55 @@
     mediaRevision;
     return livekitRoom ? isScreenShareActive(livekitRoom.localParticipant) : false;
   });
+
+  const stageTiles = $derived.by(() => {
+    mediaRevision;
+    return livekitRoom ? buildStageTiles(livekitRoom) : [];
+  });
+
+  const minimizedTiles = $derived(stageTiles.filter((tile) => minimizedTileKeys.includes(tile.key)));
+
+  $effect(() => {
+    const validKeys = new Set(stageTiles.map((tile) => tile.key));
+    minimizedTileKeys = pruneTileKeys(minimizedTileKeys, validKeys);
+    pinnedTileKeys = pruneTileKeys(pinnedTileKeys, validKeys);
+    hiddenVideoTileKeys = pruneTileKeys(hiddenVideoTileKeys, validKeys);
+    if (fullscreenTileKey && !validKeys.has(fullscreenTileKey)) {
+      fullscreenTileKey = null;
+    }
+  });
+
+  function resetStageTileState() {
+    minimizedTileKeys = [];
+    pinnedTileKeys = [];
+    hiddenVideoTileKeys = [];
+    fullscreenTileKey = null;
+  }
+
+  function minimizeTile(key: string) {
+    if (!minimizedTileKeys.includes(key)) {
+      minimizedTileKeys = [...minimizedTileKeys, key];
+    }
+    if (fullscreenTileKey === key) {
+      fullscreenTileKey = null;
+    }
+  }
+
+  function restoreTile(key: string) {
+    minimizedTileKeys = minimizedTileKeys.filter((entry) => entry !== key);
+  }
+
+  function toggleTileHideVideo(key: string) {
+    hiddenVideoTileKeys = hiddenVideoTileKeys.includes(key) ? hiddenVideoTileKeys.filter((entry) => entry !== key) : [...hiddenVideoTileKeys, key];
+  }
+
+  function toggleTilePin(key: string) {
+    pinnedTileKeys = pinnedTileKeys.includes(key) ? pinnedTileKeys.filter((entry) => entry !== key) : [...pinnedTileKeys, key];
+  }
+
+  function toggleTileFullscreen(key: string) {
+    fullscreenTileKey = fullscreenTileKey === key ? null : key;
+  }
 
   $effect(() => {
     const el = controlBarEl;
@@ -514,6 +568,7 @@
     callSession = null;
     livekitRoom = null;
     audioLevels = {};
+    resetStageTileState();
     stopMediaPreview(previewStream);
     previewStream = null;
   }
@@ -1081,6 +1136,14 @@
           {hideParticipantVideos}
           {disableSpeakingGlows}
           bottomInset={controlBarReservePx}
+          {minimizedTileKeys}
+          {pinnedTileKeys}
+          {hiddenVideoTileKeys}
+          {fullscreenTileKey}
+          onMinimizeTile={minimizeTile}
+          onToggleHideVideo={toggleTileHideVideo}
+          onTogglePin={toggleTilePin}
+          onToggleTileFullscreen={toggleTileFullscreen}
           bind:stageRef={stageEl}
         />
       </div>
@@ -1108,6 +1171,13 @@
         onLeave={leaveCall}
         onEndRoom={isHost ? endRoom : undefined}
         {ending}
+        {minimizedTiles}
+        {hiddenVideoTileKeys}
+        {hideParticipantVideos}
+        localIdentity={livekitRoom.localParticipant.identity}
+        {localDisplayName}
+        localTileColor={tileColor}
+        onRestoreTile={restoreTile}
       />
     {:else if phase === "connecting"}
       <div class="flex flex-1 items-center justify-center text-muted-foreground">Connecting…</div>

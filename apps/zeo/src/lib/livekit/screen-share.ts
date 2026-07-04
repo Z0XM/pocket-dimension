@@ -19,6 +19,16 @@ export function findScreenShareParticipant(room: Room, excludeIdentity?: string)
   return null;
 }
 
+export const SCREEN_SHARE_TILE_PREFIX = "screen-share:";
+
+export function screenShareTileKey(participantIdentity: string) {
+  return `${SCREEN_SHARE_TILE_PREFIX}${participantIdentity}`;
+}
+
+export function isScreenShareTileKey(key: string) {
+  return key.startsWith(SCREEN_SHARE_TILE_PREFIX);
+}
+
 export function displayNameForParticipant(participant: LocalParticipant | RemoteParticipant, localIdentity: string, localDisplayName: string) {
   if (participant.identity === localIdentity) return localDisplayName;
   return participant.name || "Participant";
