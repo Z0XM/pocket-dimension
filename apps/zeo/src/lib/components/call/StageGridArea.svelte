@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { computeStageGrid, type StageGridLayout } from "$lib/stage-grid";
+  import { computeStageGrid, stageGridLayoutsEqual, type StageGridLayout } from "$lib/stage-grid";
 
   type Props = {
     bottomInset?: number;
@@ -21,7 +21,10 @@
     if (!el) return;
 
     const update = () => {
-      layout = computeStageGrid(el.clientWidth, el.clientHeight);
+      const next = computeStageGrid(el.clientWidth, el.clientHeight);
+      if (!stageGridLayoutsEqual(layout, next)) {
+        layout = next;
+      }
     };
 
     update();

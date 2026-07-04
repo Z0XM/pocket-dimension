@@ -32,5 +32,12 @@ export function buildStageTiles(room: Room): StageTileEntry[] {
 }
 
 export function pruneTileKeys(keys: string[], validKeys: Set<string>) {
-  return keys.filter((key) => validKeys.has(key));
+  if (keys.length === 0) return keys;
+
+  const pruned = keys.filter((key) => validKeys.has(key));
+  if (pruned.length === keys.length && pruned.every((key, index) => key === keys[index])) {
+    return keys;
+  }
+
+  return pruned;
 }
