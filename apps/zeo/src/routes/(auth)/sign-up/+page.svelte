@@ -111,7 +111,7 @@
 
     <p class="text-center text-sm text-muted-foreground">
       Already registered?
-      <a href={loginHref} class="text-primary underline-offset-2 hover:underline">Sign in</a>
+      <a href={loginHref} class="link-action">Sign in</a>
     </p>
   </div>
 </form>

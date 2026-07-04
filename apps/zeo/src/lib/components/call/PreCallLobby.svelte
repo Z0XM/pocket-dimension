@@ -9,6 +9,9 @@
   import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
   import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
+  import TileColorPicker from "$lib/components/call/TileColorPicker.svelte";
+  import type { ParticipantColor } from "$lib/participant-colors";
+  import { initialsForName } from "$lib/livekit/types";
   import type { MicGateProcessor } from "$lib/livekit/mic-gate-processor";
   import type { MediaDeviceLists } from "$lib/livekit/devices";
   import type { PermissionState } from "$lib/livekit/types";
@@ -41,6 +44,8 @@
     canJoin: boolean;
     micTestActive?: boolean;
     micGateProcessor?: MicGateProcessor | null;
+    tileColor: ParticipantColor;
+    onTileColorChange: (color: ParticipantColor) => void;
     updatingVisibility?: boolean;
     onGuestNameChange: (value: string) => void;
     onToggleMic: () => void;
@@ -80,6 +85,8 @@
     canJoin,
     micTestActive = $bindable(false),
     micGateProcessor = null,
+    tileColor,
+    onTileColorChange,
     updatingVisibility = false,
     onGuestNameChange,
     onToggleMic,
@@ -94,6 +101,8 @@
 
   let previewEl = $state<HTMLVideoElement | null>(null);
   let micPreviewControls = $state<MicPreviewControls | null>(null);
+
+  const previewDisplayName = $derived(userDisplayName?.trim() || guestName.trim() || "You");
 
   async function handleAudioOutputDeviceChange(deviceId: string) {
     onAudioOutputDeviceChange?.(deviceId);
@@ -167,15 +176,17 @@
         <div class="relative aspect-video max-w-md overflow-hidden rounded-lg bg-secondary">
           {#if camEnabled && previewStream && permissionState === "granted"}
             <video bind:this={previewEl} class="size-full object-cover mirror" autoplay playsinline muted></video>
+          {:else if permissionState === "denied"}
+            <div class="flex size-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+              Camera blocked — check browser site settings for this page.
+            </div>
+          {:else if !camEnabled}
+            <div class="flex size-full items-center justify-center" style="background-color: {tileColor}">
+              <span class="text-3xl font-semibold text-primary-foreground/90">{initialsForName(previewDisplayName)}</span>
+            </div>
           {:else}
             <div class="flex size-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
-              {#if permissionState === "denied"}
-                Camera blocked — check browser site settings for this page.
-              {:else if !camEnabled}
-                Camera is off
-              {:else}
-                Allow camera access when prompted, or join with devices off.
-              {/if}
+              Allow camera access when prompted, or join with devices off.
             </div>
           {/if}
         </div>
@@ -216,6 +227,8 @@
           {micGateProcessor}
           permissionGranted={permissionState === "granted"}
         />
+
+        <TileColorPicker compact value={tileColor} onChange={onTileColorChange} />
       </div>
     </div>
 

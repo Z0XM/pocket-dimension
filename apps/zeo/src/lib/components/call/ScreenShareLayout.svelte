@@ -2,7 +2,7 @@
   import type { Room } from "livekit-client";
   import { displayNameForParticipant, findScreenShareParticipant } from "$lib/livekit/screen-share";
   import { listRoomParticipants } from "$lib/livekit/room-client";
-  import { participantColorForIdentity } from "$lib/participant-colors";
+  import { tileColorForParticipant, type ParticipantColor } from "$lib/participant-colors";
   import ScreenShareVideo from "./ScreenShareVideo.svelte";
   import ParticipantTile from "./ParticipantTile.svelte";
 
@@ -11,9 +11,11 @@
     activeSpeakerIdentity: string | null;
     audioLevels: Record<string, number>;
     localDisplayName: string;
+    localMicEnabled?: boolean;
+    localTileColor?: ParticipantColor | null;
   };
 
-  const { room, activeSpeakerIdentity, audioLevels, localDisplayName }: Props = $props();
+  const { room, activeSpeakerIdentity, audioLevels, localDisplayName, localMicEnabled, localTileColor }: Props = $props();
 
   const sharer = $derived(findScreenShareParticipant(room));
   const sharerName = $derived(sharer ? displayNameForParticipant(sharer, room.localParticipant.identity, localDisplayName) : "");
@@ -39,9 +41,13 @@
             displayName={displayNameForParticipant(participant, room.localParticipant.identity, localDisplayName)}
             isActiveSpeaker={activeSpeakerIdentity === participant.identity}
             audioLevel={audioLevels[participant.identity] ?? 0}
-            tileColor={participantColorForIdentity(participant.identity)}
+            tileColor={tileColorForParticipant(participant.identity, {
+              localIdentity: room.localParticipant.identity,
+              preferredColor: localTileColor,
+            })}
             isGuest={participant.identity.startsWith("guest_")}
             isLocal={participant.identity === room.localParticipant.identity}
+            localMicEnabled={participant.identity === room.localParticipant.identity ? localMicEnabled : undefined}
             compact
           />
         </div>

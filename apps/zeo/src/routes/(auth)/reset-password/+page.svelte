@@ -97,7 +97,7 @@
       </div>
       <div class="flex w-full flex-col gap-3">
         <Button type="button" class="w-full" onclick={() => goto("/forgot-password")}>Request new link</Button>
-        <a href="/login" class="text-sm text-accent hover:underline">← Back to sign in</a>
+        <a href="/login" class="link-accent text-sm">← Back to sign in</a>
       </div>
     </div>
   </div>
@@ -139,7 +139,7 @@
       </Button>
 
       <p class="text-center text-sm text-muted-foreground">
-        <a href="/login" class="text-accent underline-offset-2 hover:underline">← Back to sign in</a>
+        <a href="/login" class="link-accent">← Back to sign in</a>
       </p>
     </div>
   </form>

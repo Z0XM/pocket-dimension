@@ -21,7 +21,7 @@
   <header class="mb-8">
     <a
       href="/"
-      class="group flex w-fit max-w-full items-center gap-3 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      class="group flex w-fit max-w-full items-center gap-3 rounded-lg px-2 py-1 -ml-2 transition-colors outline-none hover:bg-secondary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
       aria-label="Back to home"
     >
       <ChevronLeftIcon class="size-6 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" aria-hidden="true" />
@@ -56,7 +56,7 @@
 
 {#if !data.user && !data.isEnded && showPageChrome}
   <p class="mt-8 text-center text-sm text-muted-foreground">
-    <a href="/login?redirect=/room/{data.slug}" class="text-primary underline-offset-2 hover:underline"> Sign in </a>
+    <a href="/login?redirect=/room/{data.slug}" class="link-action"> Sign in </a>
     for a persistent identity (optional).
   </p>
 {/if}

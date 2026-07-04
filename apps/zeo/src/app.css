@@ -115,11 +115,39 @@
   }
 
   .auth-btn {
-    @apply rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50;
+    @apply rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-[color-mix(in_srgb,var(--primary)_88%,var(--participant-orange))] hover:shadow-md hover:shadow-participant-orange/20 active:scale-[0.98] active:shadow-xs disabled:pointer-events-none disabled:opacity-50;
   }
 
   .auth-btn-secondary {
-    @apply w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40;
+    @apply w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-secondary-foreground shadow-xs transition-all hover:bg-muted hover:shadow-sm hover:shadow-participant-orange/10 active:scale-[0.98] active:shadow-xs disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .action-btn-primary {
+    @apply rounded-md bg-primary font-medium text-primary-foreground shadow-xs transition-all hover:bg-[color-mix(in_srgb,var(--primary)_88%,var(--participant-orange))] hover:shadow-md hover:shadow-participant-orange/20 active:scale-[0.98] active:shadow-xs disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .action-btn-secondary {
+    @apply rounded-md border border-border font-medium text-foreground shadow-xs transition-all hover:bg-muted hover:shadow-sm hover:shadow-participant-orange/10 active:scale-[0.98] active:shadow-xs disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .action-btn-ghost {
+    @apply inline-flex items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-secondary hover:text-foreground active:scale-[0.98];
+  }
+
+  .action-btn-ghost-destructive {
+    @apply inline-flex items-center justify-center rounded-md text-destructive transition-all hover:bg-destructive/10 active:scale-[0.98];
+  }
+
+  .link-action {
+    @apply text-primary underline-offset-2 transition-colors hover:text-[color-mix(in_srgb,var(--primary)_75%,var(--participant-orange))] hover:underline;
+  }
+
+  .link-accent {
+    @apply text-accent underline-offset-2 transition-colors hover:text-[color-mix(in_srgb,var(--accent)_85%,white)] hover:underline;
+  }
+
+  .segment-btn {
+    @apply rounded-md px-1.5 py-0.5 font-medium transition-colors hover:text-foreground;
   }
 
   .auth-error {

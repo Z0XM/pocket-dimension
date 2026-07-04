@@ -131,7 +131,7 @@
       <div class="flex items-center gap-3 text-sm">
         <button
           type="button"
-          class="font-medium {loginBy === 'email' ? 'text-primary' : 'text-muted-foreground'}"
+          class="segment-btn {loginBy === 'email' ? 'text-primary' : 'text-muted-foreground'}"
           onclick={() => (loginBy = "email")}
         >
           Email
@@ -139,7 +139,7 @@
         <span class="text-muted-foreground">·</span>
         <button
           type="button"
-          class="font-medium {loginBy === 'username' ? 'text-primary' : 'text-muted-foreground'}"
+          class="segment-btn {loginBy === 'username' ? 'text-primary' : 'text-muted-foreground'}"
           onclick={() => (loginBy = "username")}
         >
           Username
@@ -155,7 +155,7 @@
     <div class="grid gap-2">
       <div class="flex items-center gap-2">
         <Label for="password-{id}">Password</Label>
-        <a href="/forgot-password" class="ms-auto text-sm text-accent underline-offset-2 hover:underline">Forgot password?</a>
+        <a href="/forgot-password" class="link-accent ms-auto text-sm">Forgot password?</a>
       </div>
       <Input id="password-{id}" type="password" bind:value={password} required disabled={loading} />
     </div>
@@ -170,7 +170,7 @@
 
     <p class="text-center text-sm text-muted-foreground">
       No account?
-      <a href={signUpHref} class="text-primary underline-offset-2 hover:underline">Sign up</a>
+      <a href={signUpHref} class="link-action">Sign up</a>
     </p>
   </div>
 </form>

@@ -16,6 +16,7 @@
   type Props = {
     isHost: boolean;
     micEnabled: boolean;
+    micTesting?: boolean;
     speakerEnabled?: boolean;
     camEnabled: boolean;
     screenSharing?: boolean;
@@ -37,6 +38,7 @@
   let {
     isHost,
     micEnabled,
+    micTesting = false,
     speakerEnabled = true,
     camEnabled,
     screenSharing = false,
@@ -55,7 +57,7 @@
     ending = false,
   }: Props = $props();
 
-  const micLabel = $derived(micEnabled ? "Mute microphone" : "Unmute microphone");
+  const micLabel = $derived(micTesting ? "Stop mic test and unmute" : micEnabled ? "Mute microphone" : "Unmute microphone");
   const speakerLabel = $derived(speakerEnabled ? "Mute speakers" : "Unmute speakers");
   const camLabel = $derived(camEnabled ? "Turn camera off" : "Turn camera on");
   const shareLabel = $derived(screenSharing ? "Stop sharing screen" : "Share screen");

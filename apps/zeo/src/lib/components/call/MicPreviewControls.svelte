@@ -19,6 +19,7 @@
     micGateProcessor?: MicGateProcessor | null;
     micTestActive?: boolean;
     layout?: "row" | "stack";
+    helpContext?: "lobby" | "incall";
   };
 
   let {
@@ -30,6 +31,7 @@
     micGateProcessor = null,
     micTestActive = $bindable(false),
     layout = "row",
+    helpContext = "lobby",
   }: Props = $props();
 
   let monitor = $state<PreviewAudioMonitor | null>(null);
@@ -324,7 +326,11 @@
 
     {#if micTestActive}
       <p class="text-[11px] leading-snug text-muted-foreground">
-        Mic test active — drag the bright handle for volume and the thin handle for noise cutoff, then stop the test to enter the room.
+        {#if helpContext === "incall"}
+          Mic test active — your mic is muted to the call and room audio is paused while you listen through your selected output.
+        {:else}
+          Mic test active — drag the bright handle for volume and the thin handle for noise cutoff, then stop the test to enter the room.
+        {/if}
       </p>
     {:else if !micEnabled}
       <p class="text-[11px] leading-snug text-muted-foreground">Turn on your microphone to adjust volume or run a mic test.</p>

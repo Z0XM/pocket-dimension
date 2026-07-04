@@ -95,7 +95,7 @@
         </button>
       {/if}
 
-      <a href="/login" class="text-sm text-accent hover:underline">← Back to sign in</a>
+      <a href="/login" class="link-accent text-sm">← Back to sign in</a>
     </div>
 
     <div class="mt-2 text-xs text-muted-foreground">

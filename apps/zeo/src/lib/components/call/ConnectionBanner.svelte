@@ -26,6 +26,6 @@
 {:else if phase === "ended"}
   <div class="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-background px-6 text-center" role="status">
     <p class="text-lg font-medium text-foreground">This room has ended</p>
-    <a href="/" class="text-sm text-primary underline-offset-2 hover:underline">Back to home</a>
+    <a href="/" class="link-action text-sm">Back to home</a>
   </div>
 {/if}

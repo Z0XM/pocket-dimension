@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button";
   type WaitingGuest = {
     identity: string;
     displayName: string;
@@ -34,20 +35,8 @@
             <p class="text-xs text-muted-foreground">Requested {new Date(guest.requestedAt).toLocaleTimeString()}</p>
           </div>
           <div class="flex gap-2">
-            <button
-              type="button"
-              class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-              onclick={() => onAdmit(guest.identity)}
-            >
-              Admit
-            </button>
-            <button
-              type="button"
-              class="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary"
-              onclick={() => onDeny(guest.identity)}
-            >
-              Deny
-            </button>
+            <Button size="sm" onclick={() => onAdmit(guest.identity)}>Admit</Button>
+            <Button size="sm" variant="secondary" onclick={() => onDeny(guest.identity)}>Deny</Button>
           </div>
         </li>
       {/each}

@@ -29,7 +29,11 @@
 </script>
 
 <div
-  class={cn("flex items-center justify-between gap-3 py-2", disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer", className)}
+  class={cn(
+    "flex items-center justify-between gap-3 rounded-md px-2 py-2 -mx-2 transition-colors",
+    disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-secondary/50",
+    className
+  )}
   onclick={toggleRow}
 >
   <Tooltip>

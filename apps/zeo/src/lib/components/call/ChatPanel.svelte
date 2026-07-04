@@ -1,6 +1,7 @@
 <script lang="ts">
   import XIcon from "@lucide/svelte/icons/x";
   import { onMount } from "svelte";
+  import { Button } from "$lib/components/ui/button";
 
   export type ChatMessage = {
     id: string;
@@ -104,12 +105,7 @@
   >
     <div class="flex items-center justify-between border-b border-border px-4 py-3">
       <h2 class="text-sm font-semibold text-foreground">Chat</h2>
-      <button
-        type="button"
-        class="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-        aria-label="Close chat"
-        onclick={onClose}
-      >
+      <button type="button" class="action-btn-ghost-destructive size-7" aria-label="Close chat" onclick={onClose}>
         <XIcon class="size-4" aria-hidden="true" />
       </button>
     </div>
@@ -148,13 +144,7 @@
           bind:value={draft}
           maxlength={2000}
         />
-        <button
-          type="submit"
-          class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          disabled={sending || !draft.trim()}
-        >
-          Send
-        </button>
+        <Button type="submit" disabled={sending || !draft.trim()}>Send</Button>
       </div>
     </form>
   </aside>

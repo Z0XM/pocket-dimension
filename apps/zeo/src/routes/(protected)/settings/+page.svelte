@@ -1,9 +1,29 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
+  import { onMount } from "svelte";
   import { Button } from "$lib/components/ui/button";
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "$lib/components/ui/card";
+  import TileColorPicker from "$lib/components/call/TileColorPicker.svelte";
+  import { readStored, STORAGE_KEYS, writeStored } from "$lib/browser-storage";
+  import { isParticipantColor, PARTICIPANT_COLORS, type ParticipantColor } from "$lib/participant-colors";
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
+
+  let tileColor = $state<ParticipantColor>(PARTICIPANT_COLORS[0]);
+
+  onMount(() => {
+    if (!browser) return;
+    const stored = readStored(STORAGE_KEYS.tileColor);
+    if (stored && isParticipantColor(stored)) {
+      tileColor = stored;
+    }
+  });
+
+  function setTileColor(color: ParticipantColor) {
+    tileColor = color;
+    writeStored(STORAGE_KEYS.tileColor, color);
+  }
 </script>
 
 <svelte:head>
@@ -25,6 +45,16 @@
       <p class="text-sm text-muted-foreground">
         {data.roomStats.activeRoomCount} of {data.roomStats.maxConcurrentRooms} rooms in use
       </p>
+    </CardContent>
+  </Card>
+
+  <Card>
+    <CardHeader class="pb-3">
+      <CardTitle>Call appearance</CardTitle>
+      <CardDescription>Choose the color shown on your tile when the camera is off.</CardDescription>
+    </CardHeader>
+    <CardContent class="pt-0">
+      <TileColorPicker value={tileColor} onChange={setTileColor} />
     </CardContent>
   </Card>
 

@@ -1,10 +1,11 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { onDestroy, onMount } from "svelte";
+  import XIcon from "@lucide/svelte/icons/x";
   import { RoomEvent, Track, type ConnectionQuality, type LocalTrackPublication, type Room, supportsAudioOutputSelection } from "livekit-client";
   import type { CallPhase, PermissionState } from "$lib/livekit/types";
   import { startMediaPreview, stopMediaPreview, syncPreviewTracks, restartMediaPreview } from "$lib/livekit/media-preview";
-  import { listMediaDevices, type MediaDeviceLists } from "$lib/livekit/devices";
+  import { buildMediaConstraints, listMediaDevices, type MediaDeviceLists } from "$lib/livekit/devices";
   import { qualityLabel, type QualityLabel } from "$lib/livekit/connection-quality";
   import { readConnectionRttMs } from "$lib/livekit/connection-stats";
   import {
@@ -27,6 +28,9 @@
   import HostWaitingPanel from "$lib/components/call/HostWaitingPanel.svelte";
   import ConnectionQualityBadge from "$lib/components/call/ConnectionQualityBadge.svelte";
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
+  import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
+  import TileColorPicker from "$lib/components/call/TileColorPicker.svelte";
+  import { isParticipantColor, PARTICIPANT_COLORS, type ParticipantColor } from "$lib/participant-colors";
   import { readStored, STORAGE_KEYS, writeStored } from "$lib/browser-storage";
 
   type Props = {
@@ -106,6 +110,26 @@
   let micTestActive = $state(false);
   let showInCallDevices = $state(false);
   let micGateProcessor = $state<MicGateProcessor | null>(null);
+  let inCallMicTestStream = $state<MediaStream | null>(null);
+  let inCallMicTestSyncGen = 0;
+  let inCallMicPreviewControls = $state<MicPreviewControls | null>(null);
+
+  function readInitialTileColor(): ParticipantColor {
+    const stored = readStored(STORAGE_KEYS.tileColor);
+    if (stored && isParticipantColor(stored)) return stored;
+    return PARTICIPANT_COLORS[0];
+  }
+
+  let tileColor = $state<ParticipantColor>(PARTICIPANT_COLORS[0]);
+
+  const inCallPhase = $derived(phase === "in_call" || phase === "reconnecting");
+  const micMonitorStream = $derived(inCallPhase ? inCallMicTestStream : previewStream);
+  const micDisplayEnabled = $derived(micEnabled && !(inCallPhase && micTestActive));
+
+  function setTileColor(color: ParticipantColor) {
+    tileColor = color;
+    writeStored(STORAGE_KEYS.tileColor, color);
+  }
 
   function readStoredPercent(key: string, fallback: number) {
     const stored = readStored(key);
@@ -253,6 +277,86 @@
     }
   }
 
+  function stopInCallMicTestStream() {
+    stopMediaPreview(inCallMicTestStream);
+    inCallMicTestStream = null;
+  }
+
+  async function createInCallMicTestStream() {
+    const constraints = await buildMediaConstraints({
+      audio: true,
+      video: false,
+      audioDeviceId: audioDeviceId || undefined,
+    });
+    return navigator.mediaDevices.getUserMedia(constraints);
+  }
+
+  async function startInCallMicTest() {
+    if (!livekitRoom || !micEnabled) return;
+
+    inCallMicTestSyncGen += 1;
+    const gen = inCallMicTestSyncGen;
+
+    setRoomSpeakerMuted(livekitRoom, true);
+    await livekitRoom.localParticipant.setMicrophoneEnabled(false);
+    if (gen !== inCallMicTestSyncGen) return;
+
+    try {
+      const stream = await createInCallMicTestStream();
+      if (gen !== inCallMicTestSyncGen) {
+        stopMediaPreview(stream);
+        return;
+      }
+
+      stopInCallMicTestStream();
+      inCallMicTestStream = stream;
+    } catch {
+      if (gen !== inCallMicTestSyncGen) return;
+      micTestActive = false;
+      applyRoomSpeakerState();
+      if (micEnabled) {
+        await enableLocalMicrophone();
+      }
+    }
+  }
+
+  async function stopInCallMicTest() {
+    inCallMicTestSyncGen += 1;
+    stopInCallMicTestStream();
+
+    if (!livekitRoom) return;
+
+    applyRoomSpeakerState();
+    if (micEnabled) {
+      await enableLocalMicrophone();
+    }
+  }
+
+  function closeInCallDevicesPanel() {
+    if (micTestActive) {
+      micTestActive = false;
+    }
+    showInCallDevices = false;
+  }
+
+  async function handleInCallAudioOutputDeviceChange(deviceId: string) {
+    await changeAudioOutputDevice(deviceId);
+    await inCallMicPreviewControls?.applyAudioOutputDevice(deviceId);
+  }
+
+  $effect(() => {
+    if (!inCallPhase) {
+      stopInCallMicTestStream();
+      return;
+    }
+
+    if (micTestActive && !inCallMicTestStream) {
+      void startInCallMicTest();
+    } else if (!micTestActive && inCallMicTestStream) {
+      void stopInCallMicTest();
+    }
+  });
+
   async function changeAudioDevice(deviceId: string) {
     audioDeviceId = deviceId;
     if (phase === "lobby" || phase === "waiting_admission") {
@@ -265,7 +369,17 @@
       previewStream = result.stream;
       permissionState = result.permission;
     } else if (livekitRoom) {
-      await livekitRoom.switchActiveDevice("audioinput", deviceId);
+      if (!micTestActive) {
+        await livekitRoom.switchActiveDevice("audioinput", deviceId);
+      }
+      if (micTestActive) {
+        stopInCallMicTestStream();
+        try {
+          inCallMicTestStream = await createInCallMicTestStream();
+        } catch {
+          micTestActive = false;
+        }
+      }
     }
   }
 
@@ -389,7 +503,10 @@
         if (connectionPhase === "connecting") setPhase("connecting");
         else if (connectionPhase === "connected") setPhase("in_call");
         else if (connectionPhase === "reconnecting") setPhase("reconnecting");
-        else if (connectionPhase === "disconnected" && phase !== "ended") setPhase("disconnected");
+        else if (connectionPhase === "disconnected" && phase !== "ended") {
+          micTestActive = false;
+          setPhase("disconnected");
+        }
       },
       onActiveSpeaker: (identity: string | null) => {
         if (gen !== connectionGen) return;
@@ -640,6 +757,9 @@
   async function leaveCall() {
     connectionGen += 1;
     chatOpen = false;
+    if (micTestActive) {
+      micTestActive = false;
+    }
     showInCallDevices = false;
     stopHostWaitingPoll();
     await teardownCall(true);
@@ -679,6 +799,11 @@
   }
 
   async function toggleMic() {
+    if (inCallPhase && micTestActive) {
+      micTestActive = false;
+      return;
+    }
+
     micEnabled = !micEnabled;
 
     if (!micEnabled) {
@@ -785,6 +910,7 @@
 
   onMount(() => {
     if (!browser) return;
+    tileColor = readInitialTileColor();
     onPhaseChange?.(phase);
     if (!user) {
       const storedGuestName = readStored(STORAGE_KEYS.guestDisplayName);
@@ -844,35 +970,61 @@
         <div class="absolute left-4 top-14 z-20 w-full max-w-md rounded-xl border border-border bg-card/95 p-4 shadow-lg backdrop-blur-sm">
           <div class="mb-3 flex items-center justify-between">
             <p class="text-sm font-medium text-foreground">Devices</p>
-            <button type="button" class="text-xs text-muted-foreground hover:text-foreground" onclick={() => (showInCallDevices = false)}>
-              Close
+            <button type="button" class="action-btn-ghost-destructive size-7" aria-label="Close devices" onclick={closeInCallDevicesPanel}>
+              <XIcon class="size-4" aria-hidden="true" />
             </button>
           </div>
-          <DevicePicker
-            devices={mediaDevices}
-            {audioDeviceId}
-            {audioOutputDeviceId}
-            {videoDeviceId}
-            showAudioOutput={showAudioOutputSelection}
-            {micEnabled}
-            {speakerEnabled}
-            {camEnabled}
-            onToggleMic={toggleMic}
-            onToggleSpeaker={toggleSpeaker}
-            onToggleCam={toggleCam}
-            onAudioDeviceChange={changeAudioDevice}
-            onAudioOutputDeviceChange={changeAudioOutputDevice}
-            onVideoDeviceChange={changeVideoDevice}
-          />
+          <div class="space-y-3">
+            <DevicePicker
+              layout="stack"
+              devices={mediaDevices}
+              {audioDeviceId}
+              {audioOutputDeviceId}
+              {videoDeviceId}
+              showAudioOutput={showAudioOutputSelection}
+              micEnabled={micDisplayEnabled}
+              {speakerEnabled}
+              {camEnabled}
+              onToggleMic={toggleMic}
+              onToggleSpeaker={toggleSpeaker}
+              onToggleCam={toggleCam}
+              onAudioDeviceChange={changeAudioDevice}
+              onAudioOutputDeviceChange={handleInCallAudioOutputDeviceChange}
+              onVideoDeviceChange={changeVideoDevice}
+            />
+            <MicPreviewControls
+              bind:this={inCallMicPreviewControls}
+              layout="stack"
+              helpContext="incall"
+              bind:micTestActive
+              previewStream={micMonitorStream}
+              {micEnabled}
+              {speakerEnabled}
+              {audioOutputDeviceId}
+              {micGateProcessor}
+              permissionGranted={permissionState === "granted"}
+            />
+            <TileColorPicker compact value={tileColor} onChange={setTileColor} />
+          </div>
         </div>
       {/if}
 
       <div class="relative min-h-0 flex-1">
-        <CallStage room={livekitRoom} {activeSpeakerIdentity} {audioLevels} {localDisplayName} {mediaRevision} bind:stageRef={stageEl} />
+        <CallStage
+          room={livekitRoom}
+          {activeSpeakerIdentity}
+          {audioLevels}
+          {localDisplayName}
+          {mediaRevision}
+          localMicEnabled={micDisplayEnabled}
+          localTileColor={tileColor}
+          bind:stageRef={stageEl}
+        />
       </div>
       <ControlBar
         {isHost}
-        {micEnabled}
+        micEnabled={micDisplayEnabled}
+        micTesting={inCallPhase && micTestActive}
         {speakerEnabled}
         {camEnabled}
         {screenSharing}
@@ -884,7 +1036,7 @@
         onToggleScreenShare={toggleScreenShare}
         onSnapshot={takeSnapshot}
         onToggleChat={chatEnabled ? () => (chatOpen = !chatOpen) : undefined}
-        onToggleDevices={() => (showInCallDevices = !showInCallDevices)}
+        onToggleDevices={() => (showInCallDevices ? closeInCallDevicesPanel() : (showInCallDevices = true))}
         devicesOpen={showInCallDevices}
         onLeave={leaveCall}
         onEndRoom={isHost ? endRoom : undefined}
@@ -940,6 +1092,8 @@
     canJoin={canJoinLobby}
     bind:micTestActive
     {micGateProcessor}
+    {tileColor}
+    onTileColorChange={setTileColor}
     {updatingVisibility}
     onGuestNameChange={(v) => {
       guestName = v;

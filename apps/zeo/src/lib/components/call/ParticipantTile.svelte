@@ -12,6 +12,7 @@
     tileColor: string;
     isGuest?: boolean;
     isLocal?: boolean;
+    localMicEnabled?: boolean;
     compact?: boolean;
   };
 
@@ -23,21 +24,41 @@
     tileColor,
     isGuest = false,
     isLocal = false,
+    localMicEnabled,
     compact = false,
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
   let hasVideo = $derived(isCameraEnabled(participant));
-  let micEnabled = $derived(isMicrophoneEnabled(participant));
+  let micEnabled = $derived(isLocal && localMicEnabled !== undefined ? localMicEnabled : isMicrophoneEnabled(participant));
 
   const SPEAKING_THRESHOLD = 0.02;
   const clampedLevel = $derived(Math.min(1, Math.max(0, audioLevel)));
   const isSpeaking = $derived(micEnabled && clampedLevel > SPEAKING_THRESHOLD);
-  const speakingGlowStyle = $derived(
-    isSpeaking
-      ? `box-shadow: 0 0 ${6 + clampedLevel * 18}px ${clampedLevel * 2}px color-mix(in srgb, var(--participant-purple) ${Math.round(20 + clampedLevel * 50)}%, transparent);`
-      : undefined
-  );
+  const glowColor = (alpha: number) => `color-mix(in srgb, ${tileColor} ${alpha}%, transparent)`;
+
+  const speakingGlowStyle = $derived.by(() => {
+    if (!isSpeaking) return undefined;
+
+    const innerBlur = 8 + clampedLevel * 14;
+    const innerSpread = 2 + clampedLevel * 4;
+    const innerAlpha = Math.round(20 + clampedLevel * 18);
+    const outerBlur = 28 + clampedLevel * 36;
+    const outerSpread = 5 + clampedLevel * 9;
+    const outerAlpha = Math.round(12 + clampedLevel * 12);
+
+    return `box-shadow: 0 0 ${innerBlur}px ${innerSpread}px ${glowColor(innerAlpha)}, 0 0 ${outerBlur}px ${outerSpread}px ${glowColor(outerAlpha)};`;
+  });
+
+  const speakingRingStyle = $derived.by(() => {
+    if (isSpeaking) {
+      return `outline: 2px solid ${glowColor(62)}; outline-offset: -2px; box-shadow: 0 0 18px 5px ${glowColor(26)};`;
+    }
+    if (isActiveSpeaker) {
+      return `outline: 2px solid ${glowColor(42)}; outline-offset: -2px;`;
+    }
+    return undefined;
+  });
 
   $effect(() => {
     const el = videoEl;
@@ -68,14 +89,10 @@
   });
 </script>
 
-<div
-  class="rounded-lg transition-[box-shadow] duration-75 ease-out {compact ? 'aspect-video' : 'aspect-video'}"
-  style={speakingGlowStyle}
->
+<div class="rounded-lg transition-[box-shadow] duration-100 ease-out {compact ? 'aspect-video' : 'aspect-video'}" style={speakingGlowStyle}>
   <div
-    class="relative size-full overflow-hidden rounded-lg bg-secondary ring-2 ring-transparent transition-shadow {isActiveSpeaker
-      ? 'ring-participant-purple/70 shadow-[0_0_0_1px_color-mix(in_srgb,var(--participant-purple)_70%,transparent)]'
-      : ''}"
+    class="relative size-full overflow-hidden rounded-lg bg-secondary transition-[box-shadow,outline] duration-100 ease-out"
+    style={speakingRingStyle}
     aria-label="{displayName}{isLocal ? ' (you)' : ''}{isGuest ? ', guest' : ''}"
   >
     {#if hasVideo}

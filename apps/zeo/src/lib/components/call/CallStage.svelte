@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { Room } from "livekit-client";
   import { findScreenShareParticipant } from "$lib/livekit/screen-share";
-  import VideoGrid from "./VideoGrid.svelte";
+  import type { ParticipantColor } from "$lib/participant-colors";
   import ScreenShareLayout from "./ScreenShareLayout.svelte";
+  import VideoGrid from "./VideoGrid.svelte";
 
   type Props = {
     room: Room;
@@ -10,10 +11,21 @@
     audioLevels: Record<string, number>;
     localDisplayName: string;
     mediaRevision?: number;
+    localMicEnabled?: boolean;
+    localTileColor?: ParticipantColor | null;
     stageRef?: HTMLElement | null;
   };
 
-  let { room, activeSpeakerIdentity, audioLevels, localDisplayName, mediaRevision = 0, stageRef = $bindable(null) }: Props = $props();
+  let {
+    room,
+    activeSpeakerIdentity,
+    audioLevels,
+    localDisplayName,
+    mediaRevision = 0,
+    localMicEnabled,
+    localTileColor,
+    stageRef = $bindable(null),
+  }: Props = $props();
 
   let stageEl = $state<HTMLElement | null>(null);
 
@@ -29,8 +41,8 @@
 
 <div bind:this={stageEl} class="size-full">
   {#if screenSharer}
-    <ScreenShareLayout {room} {activeSpeakerIdentity} {audioLevels} {localDisplayName} />
+    <ScreenShareLayout {room} {activeSpeakerIdentity} {audioLevels} {localDisplayName} {localMicEnabled} {localTileColor} />
   {:else}
-    <VideoGrid {room} {activeSpeakerIdentity} {audioLevels} {localDisplayName} />
+    <VideoGrid {room} {activeSpeakerIdentity} {audioLevels} {localDisplayName} {localMicEnabled} {localTileColor} />
   {/if}
 </div>

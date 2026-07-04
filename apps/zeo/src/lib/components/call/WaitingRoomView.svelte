@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button";
   type Props = {
     hostName: string;
     onLeaveWaiting: () => void;
@@ -15,11 +16,5 @@
       {hostName} has enabled the waiting room. You'll join when the host admits you.
     </p>
   </div>
-  <button
-    type="button"
-    class="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary"
-    onclick={onLeaveWaiting}
-  >
-    Leave waiting room
-  </button>
+  <Button variant="secondary" onclick={onLeaveWaiting}>Leave waiting room</Button>
 </section>

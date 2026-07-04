@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   micOutputVolume: "zeo:mic-output-volume",
   micInputCutoff: "zeo:mic-input-cutoff",
   audioOutputDeviceId: "zeo:audio-output-device-id",
+  tileColor: "zeo:tile-color",
 } as const;
 
 export function readStored(key: string): string | null {

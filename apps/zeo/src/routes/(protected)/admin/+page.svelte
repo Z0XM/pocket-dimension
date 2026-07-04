@@ -83,7 +83,7 @@
               {#each data.activeRooms as room (room.slug)}
                 <tr class="border-t border-border">
                   <td class="py-3 pr-4">
-                    <a href="/room/{room.slug}" class="font-medium text-primary hover:underline">{room.displayName}</a>
+                    <a href="/room/{room.slug}" class="link-action font-medium">{room.displayName}</a>
                     <p class="font-mono text-xs text-muted-foreground">{room.slug}</p>
                   </td>
                   <td class="py-3 pr-4">{room.hostName}</td>
@@ -116,7 +116,7 @@
           {#each data.scheduledRooms as room (room.slug)}
             <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5">
               <div>
-                <a href="/room/{room.slug}" class="font-medium text-primary hover:underline">{room.displayName}</a>
+                <a href="/room/{room.slug}" class="link-action font-medium">{room.displayName}</a>
                 <p class="text-xs text-muted-foreground">{new Date(room.scheduledStartAt).toLocaleString()}</p>
               </div>
               <span class="font-mono text-xs text-muted-foreground">{room.slug}</span>

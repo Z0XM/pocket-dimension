@@ -122,7 +122,7 @@
           {#each data.publicRooms as room (room.slug)}
             <a
               href="/room/{room.slug}"
-              class="group flex flex-col gap-1.5 rounded-lg border border-border bg-secondary/30 px-4 py-3 transition-colors hover:border-accent/40 hover:bg-secondary/60"
+              class="group flex flex-col gap-1.5 rounded-lg border border-border bg-secondary/30 px-4 py-3 transition-all hover:border-accent/40 hover:bg-secondary/60 hover:shadow-sm hover:shadow-accent/10"
             >
               <div class="flex items-start justify-between gap-2">
                 <span class="font-medium text-foreground group-hover:text-accent">{room.displayName}</span>
@@ -201,14 +201,14 @@
           </div>
         {/if}
 
-        <Button disabled={!userCanCreate || creating || !roomName.trim() || (scheduleMode && !scheduledStartAt)} onclick={createRoom}>
+        <Button class="group" disabled={!userCanCreate || creating || !roomName.trim() || (scheduleMode && !scheduledStartAt)} onclick={createRoom}>
           {#if creating}
             Creating…
           {:else if scheduleMode}
             Schedule room
           {:else}
             Create and Preview
-            <ArrowRightIcon class="text-participant-orange" />
+            <ArrowRightIcon class="text-participant-orange transition-transform duration-200 group-hover:translate-x-0.5" />
           {/if}
         </Button>
       </section>
@@ -227,9 +227,9 @@
             <Input id="join-slug" bind:value={joinSlug} class="pl-9" placeholder="calm-river" />
           </div>
         </div>
-        <Button variant="secondary" onclick={joinRoom}>
+        <Button variant="secondary" class="group" onclick={joinRoom}>
           Join and Preview
-          <ArrowRightIcon class="text-participant-orange" />
+          <ArrowRightIcon class="text-participant-orange transition-transform duration-200 group-hover:translate-x-0.5" />
         </Button>
       </section>
     </CardContent>
@@ -244,7 +244,7 @@
         {#each data.scheduledRooms as room (room.slug)}
           <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-sm">
             <div>
-              <a href="/room/{room.slug}" class="font-medium text-primary hover:underline">{room.displayName}</a>
+              <a href="/room/{room.slug}" class="link-action font-medium">{room.displayName}</a>
               <p class="text-xs text-muted-foreground">{new Date(room.scheduledStartAt).toLocaleString()}</p>
             </div>
             <code class="font-mono text-xs text-muted-foreground">{room.slug}</code>

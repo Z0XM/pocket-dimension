@@ -20,12 +20,15 @@
     <button
       type="button"
       class={cn(
-        "inline-flex size-10 items-center justify-center rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
-        variant === "destructive" && "border-destructive/40 bg-destructive text-white hover:bg-destructive/90",
-        variant === "accent" && active && "border-accent bg-accent/15 text-accent",
-        variant === "accent" && !active && "border-border bg-card text-foreground hover:bg-secondary",
-        variant === "default" && active && "border-border bg-primary/10 text-foreground hover:bg-primary/15",
-        variant === "default" && !active && "border-border bg-card text-foreground hover:bg-secondary"
+        "inline-flex size-10 items-center justify-center rounded-full border transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+        variant === "destructive" &&
+          "border-destructive/40 bg-destructive text-white hover:bg-destructive/90 hover:shadow-md hover:shadow-destructive/25 active:scale-95",
+        variant === "accent" && active && "border-accent bg-accent/15 text-accent hover:bg-accent/20 hover:shadow-sm active:scale-95",
+        variant === "accent" && !active && "border-border bg-card text-foreground hover:bg-secondary hover:shadow-sm active:scale-95",
+        variant === "default" &&
+          active &&
+          "border-border bg-primary/10 text-foreground hover:bg-primary/20 hover:shadow-sm hover:shadow-participant-orange/15 active:scale-95",
+        variant === "default" && !active && "border-border bg-card text-foreground hover:bg-secondary hover:shadow-sm active:scale-95"
       )}
       aria-label={label}
       aria-pressed={active}

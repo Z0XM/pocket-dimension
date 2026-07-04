@@ -63,7 +63,7 @@
 
       {#if isAdmin}
         <DropdownMenu.Item
-          class="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none select-none focus:bg-secondary"
+          class="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors select-none data-[highlighted]:bg-secondary data-[highlighted]:text-foreground"
           onSelect={goToAdmin}
         >
           <ShieldIcon class="size-4" />
@@ -72,7 +72,7 @@
       {/if}
 
       <DropdownMenu.Item
-        class="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive outline-none select-none focus:bg-destructive/10"
+        class="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive outline-none transition-colors select-none data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive"
         disabled={loggingOut}
         onSelect={() => void logout()}
       >
