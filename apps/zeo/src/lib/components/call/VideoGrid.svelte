@@ -376,7 +376,7 @@
   }
 </script>
 
-<div bind:this={gridRoot} class="relative size-full">
+<div bind:this={gridRoot} class="relative size-full {isManualGrid ? 'touch-none select-none' : ''}">
   {#if canRenderTiles}
     {#each stageTiles as tile, index (tile.key)}
       {#if !fullscreenTileKey || fullscreenTileKey === tile.key}

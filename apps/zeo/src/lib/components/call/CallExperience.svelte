@@ -1476,7 +1476,7 @@
       <div class="relative min-h-0 flex-1">
         {#if showInCallDevices}
           <div
-            class="absolute inset-x-0 top-0 z-30 max-h-[min(88dvh,100%)] overflow-y-auto rounded-b-xl border border-border bg-card/95 p-4 shadow-lg backdrop-blur-sm safe-top safe-x sm:inset-x-auto sm:left-4 sm:top-4 sm:max-h-none sm:w-full sm:max-w-md sm:rounded-xl"
+            class="absolute inset-x-0 top-0 z-40 max-h-[min(88dvh,100%)] overflow-y-auto rounded-b-xl border border-border bg-card/95 p-4 shadow-lg backdrop-blur-sm safe-top safe-x sm:inset-x-auto sm:left-4 sm:top-4 sm:max-h-none sm:w-full sm:max-w-md sm:rounded-xl"
           >
             <div class="mb-3 flex items-center justify-between">
               <p class="text-sm font-medium text-foreground">Settings</p>
@@ -1598,6 +1598,7 @@
           onToggleTileFullscreen={toggleTileFullscreen}
           onTogglePinTile={togglePinTile}
           {showGridSettings}
+          {showInCallDevices}
           onLayoutModeChange={setStageLayoutMode}
           onAutoLayoutPresetChange={setAutoLayoutPreset}
           onHideNonVideoTilesChange={setHideNonVideoTiles}
