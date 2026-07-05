@@ -14,6 +14,8 @@ export const STORAGE_KEYS = {
   autoLayoutPreset: "zeo:auto-layout-preset",
   galleryDensity: "zeo:gallery-density",
   sidebarSplitRatio: "zeo:sidebar-split-ratio",
+  gesturesEnabled: "zeo:gestures-enabled",
+  gestureOverlayVisible: "zeo:gesture-overlay-visible",
 } as const;
 
 export const SESSION_KEYS = {

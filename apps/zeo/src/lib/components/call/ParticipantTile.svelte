@@ -3,6 +3,8 @@
   import { initialsForName } from "$lib/livekit/types";
   import { isCameraEnabled, isMicrophoneEnabled } from "$lib/livekit/room-client";
   import AudioLevelIndicator from "./AudioLevelIndicator.svelte";
+  import HandGestureVideoOverlay from "./HandGestureVideoOverlay.svelte";
+  import type { DetectedGesture, HandLandmark } from "$lib/gestures/gesture-types";
 
   type Props = {
     participant: LocalParticipant | RemoteParticipant;
@@ -18,6 +20,10 @@
     mediaRevision?: number;
     compact?: boolean;
     fitContainer?: boolean;
+    trackingOverlayVisible?: boolean;
+    handLandmarks?: HandLandmark[] | null;
+    handGesture?: DetectedGesture;
+    handGestureHoldProgress?: number;
   };
 
   const {
@@ -34,6 +40,10 @@
     mediaRevision = 0,
     compact = false,
     fitContainer = false,
+    trackingOverlayVisible = false,
+    handLandmarks = null,
+    handGesture = "none",
+    handGestureHoldProgress = 0,
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
@@ -120,13 +130,22 @@
   >
     {#if showVideo}
       <video bind:this={videoEl} class="size-full object-cover {isLocal ? '-scale-x-100' : ''}" autoplay playsinline muted={isLocal}></video>
+      {#if isLocal && trackingOverlayVisible}
+        <HandGestureVideoOverlay
+          {handLandmarks}
+          gesture={handGesture}
+          holdProgress={handGestureHoldProgress}
+          visible={trackingOverlayVisible}
+          mirrored
+        />
+      {/if}
     {:else}
       <div class="flex size-full items-center justify-center" style="background-color: {tileColor}">
         <span class="text-3xl font-semibold text-primary-foreground/90">{initialsForName(displayName)}</span>
       </div>
     {/if}
 
-    <div class="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
+    <div class="absolute inset-x-0 bottom-0 z-[2] flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
       <p class="truncate text-sm font-medium text-white">{displayName}{isLocal ? " (you)" : ""}</p>
       {#if isGuest}
         <span class="shrink-0 rounded bg-black/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/80">Guest</span>
