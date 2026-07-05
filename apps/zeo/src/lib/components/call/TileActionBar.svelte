@@ -1,24 +1,34 @@
 <script lang="ts">
+  import EyeIcon from "@lucide/svelte/icons/eye";
+  import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import Maximize2Icon from "@lucide/svelte/icons/maximize-2";
   import Minimize2Icon from "@lucide/svelte/icons/minimize-2";
   import PinIcon from "@lucide/svelte/icons/pin";
-  import VideoIcon from "@lucide/svelte/icons/video";
-  import VideoOffIcon from "@lucide/svelte/icons/video-off";
 
   type Props = {
     videoHidden?: boolean;
-    pinned?: boolean;
     fullscreen?: boolean;
+    pinned?: boolean;
+    showPin?: boolean;
     onMinimize?: () => void;
     onToggleHideVideo?: () => void;
-    onTogglePin?: () => void;
     onToggleFullscreen?: () => void;
+    onTogglePin?: () => void;
   };
 
-  const { videoHidden = false, pinned = false, fullscreen = false, onMinimize, onToggleHideVideo, onTogglePin, onToggleFullscreen }: Props = $props();
+  const {
+    videoHidden = false,
+    fullscreen = false,
+    pinned = false,
+    showPin = false,
+    onMinimize,
+    onToggleHideVideo,
+    onToggleFullscreen,
+    onTogglePin,
+  }: Props = $props();
 
   const actionClass =
-    "inline-flex size-6 items-center justify-center rounded-sm text-white/90 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40";
+    "inline-flex size-8 items-center justify-center rounded-sm text-white/90 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 sm:size-6";
 </script>
 
 <div
@@ -26,6 +36,7 @@
   data-grid-tile-handle="action"
   role="toolbar"
   aria-label="Tile actions"
+  onpointerdown={(event) => event.stopPropagation()}
 >
   {#if onMinimize}
     <button type="button" class={actionClass} aria-label="Minimize tile" onclick={onMinimize}>
@@ -33,25 +44,25 @@
     </button>
   {/if}
 
-  {#if onToggleHideVideo}
-    <button type="button" class={actionClass} aria-label={videoHidden ? "Show video" : "Hide video"} onclick={onToggleHideVideo}>
-      {#if videoHidden}
-        <VideoIcon class="size-3.5" aria-hidden="true" />
-      {:else}
-        <VideoOffIcon class="size-3.5" aria-hidden="true" />
-      {/if}
-    </button>
-  {/if}
-
-  {#if onTogglePin}
+  {#if showPin && onTogglePin}
     <button
       type="button"
-      class="{actionClass} {pinned ? 'bg-white/15 text-white' : ''}"
-      aria-label={pinned ? "Unpin tile" : "Pin tile"}
+      class="{actionClass} {pinned ? 'bg-white/20 text-white' : ''}"
+      aria-label={pinned ? "Unpin spotlight" : "Pin spotlight"}
       aria-pressed={pinned}
       onclick={onTogglePin}
     >
       <PinIcon class="size-3.5" aria-hidden="true" />
+    </button>
+  {/if}
+
+  {#if onToggleHideVideo}
+    <button type="button" class={actionClass} aria-label={videoHidden ? "Show video" : "Hide video"} onclick={onToggleHideVideo}>
+      {#if videoHidden}
+        <EyeIcon class="size-3.5" aria-hidden="true" />
+      {:else}
+        <EyeOffIcon class="size-3.5" aria-hidden="true" />
+      {/if}
     </button>
   {/if}
 

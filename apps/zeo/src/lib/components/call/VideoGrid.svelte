@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { Room } from "livekit-client";
-  import { buildStageTiles, type StageTileEntry } from "$lib/call/stage-tiles";
+  import { buildStageTiles, filterStageTiles, type StageTileEntry } from "$lib/call/stage-tiles";
+  import { computeAutoLayoutFrames, type AutoLayoutPreset } from "$lib/call/auto-layout";
+  import { gridPlacementsKey, readStored, writeStored } from "$lib/browser-storage";
   import { displayNameForParticipant } from "$lib/livekit/screen-share";
   import { tileColorForParticipant, type ParticipantColor } from "$lib/participant-colors";
   import {
@@ -16,6 +18,7 @@
     tilePositionFromPlacement,
     type GridCellPlacement,
     type StageGridLayout,
+    type StageLayoutMode,
   } from "$lib/stage-grid";
   import GridTile from "./GridTile.svelte";
   import ParticipantTile from "./ParticipantTile.svelte";
@@ -29,18 +32,24 @@
     localDisplayName: string;
     mediaRevision?: number;
     gridLayout?: StageGridLayout | null;
+    layoutMode?: StageLayoutMode;
+    autoLayoutPreset?: AutoLayoutPreset;
     localMicEnabled?: boolean;
     localTileColor?: ParticipantColor | null;
     hideParticipantVideos?: boolean;
+    hideNonVideoTiles?: boolean;
     disableSpeakingGlows?: boolean;
+    slug?: string;
+    galleryDensity?: number;
+    sidebarSplitRatio?: number;
+    pinnedTileKey?: string | null;
     minimizedTileKeys?: string[];
-    pinnedTileKeys?: string[];
     hiddenVideoTileKeys?: string[];
     fullscreenTileKey?: string | null;
     onMinimizeTile?: (key: string) => void;
     onToggleHideVideo?: (key: string) => void;
-    onTogglePin?: (key: string) => void;
     onToggleTileFullscreen?: (key: string) => void;
+    onTogglePinTile?: (key: string) => void;
   };
 
   const {
@@ -50,37 +59,36 @@
     localDisplayName,
     mediaRevision = 0,
     gridLayout = null,
+    layoutMode = "grid",
+    autoLayoutPreset = "dynamic",
     localMicEnabled,
     localTileColor,
     hideParticipantVideos = false,
+    hideNonVideoTiles = false,
     disableSpeakingGlows = false,
+    slug = "",
+    galleryDensity = 5,
+    sidebarSplitRatio = 0.72,
+    pinnedTileKey = null,
     minimizedTileKeys = [],
-    pinnedTileKeys = [],
     hiddenVideoTileKeys = [],
     fullscreenTileKey = null,
     onMinimizeTile,
     onToggleHideVideo,
-    onTogglePin,
     onToggleTileFullscreen,
+    onTogglePinTile,
   }: Props = $props();
+
+  const isManualGrid = $derived(layoutMode === "grid");
 
   const gridTiles = $derived.by((): StageTileEntry[] => {
     mediaRevision;
-    return buildStageTiles(room);
+    return filterStageTiles(buildStageTiles(room), { hideNonVideo: hideNonVideoTiles });
   });
 
   const stageTiles = $derived.by(() => {
     const minimized = new Set(minimizedTileKeys);
-    const pinned = new Set(pinnedTileKeys);
-
-    return gridTiles
-      .filter((tile) => !minimized.has(tile.key))
-      .sort((a, b) => {
-        const aPinned = pinned.has(a.key);
-        const bPinned = pinned.has(b.key);
-        if (aPinned === bPinned) return 0;
-        return aPinned ? 1 : -1;
-      });
+    return gridTiles.filter((tile) => !minimized.has(tile.key));
   });
 
   const tileLayoutSignature = $derived(gridTiles.map((tile) => tile.key).join("|"));
@@ -100,8 +108,30 @@
   } | null>(null);
 
   const baseParticipantGrid = $derived.by(() => {
-    if (!gridLayout) return null;
+    if (!gridLayout || !isManualGrid) return null;
     return computeParticipantGrid(stageTiles.length, gridLayout);
+  });
+
+  const autoLayoutFrames = $derived.by(() => {
+    if (isManualGrid || !gridLayout) return null;
+    mediaRevision;
+    return computeAutoLayoutFrames(stageTiles, gridLayout, autoLayoutPreset, activeSpeakerIdentity, {
+      galleryDensity,
+      sidebarSplitRatio,
+      pinnedTileKey,
+    });
+  });
+
+  const canRenderTiles = $derived(Boolean(gridLayout && (isManualGrid ? baseParticipantGrid : autoLayoutFrames)));
+
+  $effect(() => {
+    if (!isManualGrid) {
+      isResizing = false;
+      previewSize = null;
+      dragState = null;
+      customTileSizes = {};
+      resetPlacements();
+    }
   });
 
   $effect(() => {
@@ -116,18 +146,43 @@
     }
   });
 
+  function readSavedPlacements() {
+    if (!slug) return null;
+
+    const raw = readStored(gridPlacementsKey(slug));
+    if (!raw) return null;
+
+    try {
+      return JSON.parse(raw) as Record<string, GridCellPlacement>;
+    } catch {
+      return null;
+    }
+  }
+
   function resetPlacements() {
     if (!baseParticipantGrid || !gridLayout) {
       tilePlacements = {};
       return;
     }
 
+    const saved = readSavedPlacements();
     const next: Record<string, GridCellPlacement> = {};
+
     for (const [index, tile] of stageTiles.entries()) {
-      next[tile.key] = placementFromTilePosition(tilePosition(baseParticipantGrid, index), gridLayout);
+      if (saved?.[tile.key]) {
+        next[tile.key] = saved[tile.key];
+      } else {
+        next[tile.key] = placementFromTilePosition(tilePosition(baseParticipantGrid, index), gridLayout);
+      }
     }
+
     tilePlacements = next;
   }
+
+  $effect(() => {
+    if (!isManualGrid || !slug || Object.keys(tilePlacements).length === 0) return;
+    writeStored(gridPlacementsKey(slug), JSON.stringify(tilePlacements));
+  });
 
   function defaultTileSize(key: string, index: number) {
     if (isResizing && previewSize?.key === key) {
@@ -159,9 +214,17 @@
       };
     }
 
+    if (!gridLayout) return null;
+
+    if (!isManualGrid) {
+      return autoLayoutFrames?.[key] ?? null;
+    }
+
+    if (!baseParticipantGrid) return null;
+
     const placement = getPlacement(key, index);
     const size = defaultTileSize(key, index);
-    if (!placement || !size || !gridLayout) return null;
+    if (!placement || !size) return null;
 
     return tilePositionFromPlacement(placement, size.width, size.height, gridLayout);
   }
@@ -173,10 +236,6 @@
 
   function tileVideoHidden(key: string) {
     return hiddenVideoTileKeys.includes(key);
-  }
-
-  function tilePinned(key: string) {
-    return pinnedTileKeys.includes(key);
   }
 
   function resizeLimits(key: string, index: number) {
@@ -309,7 +368,7 @@
 </script>
 
 <div bind:this={gridRoot} class="relative size-full">
-  {#if baseParticipantGrid && gridLayout}
+  {#if canRenderTiles}
     {#each stageTiles as tile, index (tile.key)}
       {#if !fullscreenTileKey || fullscreenTileKey === tile.key}
         {@const position = tileFrame(tile.key, index)}
@@ -319,24 +378,28 @@
             top={position.top}
             width={position.width}
             height={position.height}
-            draggable={!isResizing && fullscreenTileKey !== tile.key}
-            elevated={tilePinned(tile.key)}
+            draggable={isManualGrid && !isResizing && fullscreenTileKey !== tile.key}
             fullscreen={fullscreenTileKey === tile.key}
-            onMoveStart={(event) => handleMoveStart(tile.key, index, event)}
-            onMove={(event) => handleMove(tile.key, index, event)}
-            onMoveEnd={() => handleMoveEnd(tile.key, index)}
-            onResizeStart={fullscreenTileKey === tile.key ? undefined : (size) => handleResizeStart(tile.key, size)}
-            onResize={fullscreenTileKey === tile.key ? undefined : (widthPx, heightPx) => handleResize(tile.key, index, widthPx, heightPx)}
-            onResizeEnd={fullscreenTileKey === tile.key ? undefined : (widthPx, heightPx) => handleResizeEnd(tile.key, index, widthPx, heightPx)}
+            onMoveStart={isManualGrid ? (event) => handleMoveStart(tile.key, index, event) : undefined}
+            onMove={isManualGrid ? (event) => handleMove(tile.key, index, event) : undefined}
+            onMoveEnd={isManualGrid ? () => handleMoveEnd(tile.key, index) : undefined}
+            onResizeStart={isManualGrid && fullscreenTileKey !== tile.key ? (size) => handleResizeStart(tile.key, size) : undefined}
+            onResize={isManualGrid && fullscreenTileKey !== tile.key
+              ? (widthPx, heightPx) => handleResize(tile.key, index, widthPx, heightPx)
+              : undefined}
+            onResizeEnd={isManualGrid && fullscreenTileKey !== tile.key
+              ? (widthPx, heightPx) => handleResizeEnd(tile.key, index, widthPx, heightPx)
+              : undefined}
           >
             {#snippet actions()}
               <TileActionBar
                 videoHidden={tileVideoHidden(tile.key)}
-                pinned={tilePinned(tile.key)}
                 fullscreen={fullscreenTileKey === tile.key}
+                pinned={pinnedTileKey === tile.key}
+                showPin={!isManualGrid}
                 onMinimize={() => onMinimizeTile?.(tile.key)}
+                onTogglePin={() => onTogglePinTile?.(tile.key)}
                 onToggleHideVideo={() => onToggleHideVideo?.(tile.key)}
-                onTogglePin={() => onTogglePin?.(tile.key)}
                 onToggleFullscreen={() => onToggleTileFullscreen?.(tile.key)}
               />
             {/snippet}
@@ -363,6 +426,7 @@
                 localMicEnabled={tile.participant.identity === room.localParticipant.identity ? localMicEnabled : undefined}
                 hideVideos={hideParticipantVideos || tileVideoHidden(tile.key)}
                 {disableSpeakingGlows}
+                {mediaRevision}
                 fitContainer
               />
             {/if}

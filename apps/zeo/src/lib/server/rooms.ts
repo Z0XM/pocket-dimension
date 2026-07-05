@@ -34,6 +34,12 @@ export async function updateRoomVisibility(roomId: string, isPublic: boolean, up
   return room ?? null;
 }
 
+export async function updateRoomLock(roomId: string, isLocked: boolean, updatedById: string) {
+  const [room] = await db.update(schema.rooms).set({ isLocked, updatedAt: new Date(), updatedById }).where(eq(schema.rooms.id, roomId)).returning();
+
+  return room ?? null;
+}
+
 export async function findRoomBySlug(slug: string) {
   return db.query.rooms.findFirst({
     where: eq(schema.rooms.slug, slug),

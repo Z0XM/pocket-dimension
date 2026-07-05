@@ -41,6 +41,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
       id: message.id,
       senderIdentity: message.senderIdentity,
       senderDisplayName: message.senderDisplayName,
+      kind: message.kind,
       body: message.body,
       createdAt: message.createdAt.toISOString(),
     })),
@@ -59,7 +60,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
   const settings = await getOperatorSettings();
   if (!settings.chatEnabled) throw error(403, "Chat is disabled by the operator");
 
-  const { body, guestIdentity } = await readJsonBody(request, chatMessageSchema);
+  const { body, guestIdentity, kind } = await readJsonBody(request, chatMessageSchema);
 
   let identity: string;
   let displayName: string;
@@ -88,9 +89,13 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
     senderIdentity: identity,
     senderDisplayName: displayName,
     body,
+    kind,
   });
 
   if ("error" in result) {
+    if (result.error === "invalid_snapshot") {
+      throw error(400, "Invalid snapshot image");
+    }
     throw error(400, "Message cannot be empty");
   }
 
@@ -100,6 +105,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
         id: result.message.id,
         senderIdentity: result.message.senderIdentity,
         senderDisplayName: result.message.senderDisplayName,
+        kind: result.message.kind,
         body: result.message.body,
         createdAt: result.message.createdAt.toISOString(),
       },

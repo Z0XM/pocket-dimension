@@ -7,7 +7,6 @@
     width: number;
     height: number;
     draggable?: boolean;
-    elevated?: boolean;
     fullscreen?: boolean;
     onMoveStart?: (event: PointerEvent) => void;
     onMove?: (event: PointerEvent) => void;
@@ -25,7 +24,6 @@
     width,
     height,
     draggable = false,
-    elevated = false,
     fullscreen = false,
     onMoveStart,
     onMove,
@@ -38,7 +36,7 @@
   }: Props = $props();
 
   function isTileHandle(target: EventTarget | null) {
-    return target instanceof HTMLElement && Boolean(target.closest("[data-grid-tile-handle]"));
+    return target instanceof Element && Boolean(target.closest("[data-grid-tile-handle]"));
   }
 
   function startMove(event: PointerEvent) {
@@ -107,7 +105,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="group absolute {draggable ? 'cursor-grab active:cursor-grabbing' : ''} {elevated ? 'z-20' : 'z-10'} {fullscreen ? 'z-30' : ''}"
+  class="group absolute {draggable ? 'cursor-grab active:cursor-grabbing' : ''} z-10 {fullscreen ? 'z-30' : ''}"
   style:left="{left}px"
   style:top="{top}px"
   style:width="{width}px"
@@ -117,7 +115,7 @@
   {@render children()}
 
   {#if actions}
-    <div class="absolute right-1 top-1 z-20 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+    <div class="tile-actions-touch absolute right-1 top-1 z-20 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
       {@render actions()}
     </div>
   {/if}
@@ -126,7 +124,7 @@
     <button
       type="button"
       data-grid-tile-handle="resize"
-      class="absolute bottom-1 right-1 z-10 size-5 cursor-se-resize rounded-sm border border-border/70 bg-card/90 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+      class="tile-resize-touch absolute bottom-1 right-1 z-10 size-7 cursor-se-resize rounded-sm border border-border/70 bg-card/90 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring sm:size-5"
       aria-label="Resize tile"
       onpointerdown={startResize}
     >

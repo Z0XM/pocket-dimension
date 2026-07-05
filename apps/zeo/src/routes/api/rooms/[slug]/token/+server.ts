@@ -34,6 +34,12 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
   let identity: string;
   let name: string;
 
+  const isHost = locals.user?.id === room.hostUserId;
+
+  if (room.isLocked && !isHost) {
+    throw error(403, "This room is locked. The host must unlock it before new participants can join.");
+  }
+
   if (locals.user) {
     identity = locals.user.id;
     name = displayNameForUser(locals.user);
@@ -61,8 +67,6 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
   if (await isParticipantBlocked(room.id, identity)) {
     throw error(403, "You were removed from this call");
   }
-
-  const isHost = locals.user?.id === room.hostUserId;
 
   if (room.waitingRoomEnabled && !isHost) {
     const admitted = await isWaitingRoomAdmitted(room, identity);

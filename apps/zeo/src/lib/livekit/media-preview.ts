@@ -1,9 +1,27 @@
 import type { PermissionState } from "./types";
 import { buildMediaConstraints } from "./devices";
+import { isDeviceInUseError } from "./media-errors";
 
-export async function startMediaPreview(options: { audio: boolean; video: boolean; audioDeviceId?: string; videoDeviceId?: string }) {
+export type MediaPreviewResult = {
+  stream: MediaStream | null;
+  permission: PermissionState;
+  cameraInUse: boolean;
+};
+
+const emptyResult = (permission: PermissionState, cameraInUse = false): MediaPreviewResult => ({
+  stream: null,
+  permission,
+  cameraInUse,
+});
+
+export async function startMediaPreview(options: {
+  audio: boolean;
+  video: boolean;
+  audioDeviceId?: string;
+  videoDeviceId?: string;
+}): Promise<MediaPreviewResult> {
   if (!navigator.mediaDevices?.getUserMedia) {
-    return { stream: null as MediaStream | null, permission: "unavailable" as PermissionState };
+    return emptyResult("unavailable");
   }
 
   try {
@@ -15,12 +33,33 @@ export async function startMediaPreview(options: { audio: boolean; video: boolea
         videoDeviceId: options.videoDeviceId,
       })
     );
-    return { stream, permission: "granted" as PermissionState };
+    return { stream, permission: "granted", cameraInUse: false };
   } catch (error) {
     if (error instanceof DOMException && error.name === "NotAllowedError") {
-      return { stream: null, permission: "denied" as PermissionState };
+      return emptyResult("denied");
     }
-    return { stream: null, permission: "unavailable" as PermissionState };
+
+    if (options.video && options.audio) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(
+          await buildMediaConstraints({
+            audio: options.audio,
+            video: false,
+            audioDeviceId: options.audioDeviceId,
+            videoDeviceId: options.videoDeviceId,
+          })
+        );
+        return { stream, permission: "granted", cameraInUse: isDeviceInUseError(error) };
+      } catch {
+        // Fall through to generic unavailable handling.
+      }
+    }
+
+    if (options.video && isDeviceInUseError(error)) {
+      return emptyResult("unavailable", true);
+    }
+
+    return emptyResult("unavailable");
   }
 }
 

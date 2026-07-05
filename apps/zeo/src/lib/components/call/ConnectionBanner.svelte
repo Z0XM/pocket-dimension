@@ -11,7 +11,7 @@
 </script>
 
 {#if phase === "reconnecting"}
-  <div class="absolute inset-x-0 top-0 z-20 border-b border-border bg-card/95 px-4 py-2 text-center text-sm text-foreground" role="status">
+  <div class="absolute inset-x-0 top-0 z-20 border-b border-border bg-card/95 px-4 py-2 text-center text-sm text-foreground safe-top" role="status">
     Reconnecting…
   </div>
 {:else if phase === "disconnected"}

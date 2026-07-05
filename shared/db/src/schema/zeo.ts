@@ -8,6 +8,7 @@ export const zeoSchema = pgSchema("zeo");
 export const roomStatus = zeoSchema.enum("room_status", ["waiting", "active", "stale", "ended"]);
 export const sessionBlockReason = zeoSchema.enum("session_block_reason", ["removed"]);
 export const waitingEntryStatus = zeoSchema.enum("waiting_entry_status", ["pending", "admitted", "denied"]);
+export const chatMessageKind = zeoSchema.enum("chat_message_kind", ["text", "snapshot"]);
 
 export const rooms = zeoSchema.table(
   "rooms",
@@ -26,6 +27,7 @@ export const rooms = zeoSchema.table(
     waitingRoomEnabled: boolean("waiting_room_enabled").default(false).notNull(),
     isPublic: boolean("is_public").default(false).notNull(),
     isPerpetual: boolean("is_perpetual").default(false).notNull(),
+    isLocked: boolean("is_locked").default(false).notNull(),
     scheduledStartAt: timestamp("scheduled_start_at"),
     forceEndedById: uuid("force_ended_by_id").references(() => auth.user.id, { onDelete: "set null" }),
     endedAt: timestamp("ended_at"),
@@ -95,12 +97,17 @@ export const chatMessages = zeoSchema.table(
       .references(() => rooms.id, { onDelete: "cascade" }),
     senderIdentity: text("sender_identity").notNull(),
     senderDisplayName: text("sender_display_name").notNull(),
+    kind: chatMessageKind("kind").default("text").notNull(),
     body: text("body").notNull(),
     createdAt: timestamp("created_at")
       .$default(() => sql`now()`)
       .notNull(),
   },
-  (table) => [index("chat_messages_room_id_idx").on(table.roomId), index("chat_messages_room_id_created_at_idx").on(table.roomId, table.createdAt)]
+  (table) => [
+    index("chat_messages_room_id_idx").on(table.roomId),
+    index("chat_messages_room_id_created_at_idx").on(table.roomId, table.createdAt),
+    index("chat_messages_room_id_kind_idx").on(table.roomId, table.kind),
+  ]
 );
 
 export const roomWaitingEntries = zeoSchema.table(

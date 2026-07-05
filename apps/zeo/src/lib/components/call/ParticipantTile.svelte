@@ -15,6 +15,7 @@
     localMicEnabled?: boolean;
     hideVideos?: boolean;
     disableSpeakingGlows?: boolean;
+    mediaRevision?: number;
     compact?: boolean;
     fitContainer?: boolean;
   };
@@ -30,12 +31,16 @@
     localMicEnabled,
     hideVideos = false,
     disableSpeakingGlows = false,
+    mediaRevision = 0,
     compact = false,
     fitContainer = false,
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
-  let hasVideo = $derived(isCameraEnabled(participant));
+  let hasVideo = $derived.by(() => {
+    mediaRevision;
+    return isCameraEnabled(participant);
+  });
   let showVideo = $derived(hasVideo && !hideVideos);
   let micEnabled = $derived(isLocal && localMicEnabled !== undefined ? localMicEnabled : isMicrophoneEnabled(participant));
 
@@ -72,7 +77,7 @@
 
   $effect(() => {
     const el = videoEl;
-    if (!el) return;
+    if (!el || !showVideo) return;
 
     const attach = () => {
       const publication = participant.getTrackPublication(Track.Source.Camera);
@@ -90,10 +95,18 @@
     attach();
     participant.on("trackSubscribed", attach);
     participant.on("trackUnsubscribed", detach);
+    participant.on("trackPublished", attach);
+    participant.on("trackUnpublished", detach);
+    participant.on("trackMuted", attach);
+    participant.on("trackUnmuted", attach);
 
     return () => {
       participant.off("trackSubscribed", attach);
       participant.off("trackUnsubscribed", detach);
+      participant.off("trackPublished", attach);
+      participant.off("trackUnpublished", detach);
+      participant.off("trackMuted", attach);
+      participant.off("trackUnmuted", attach);
       detach();
     };
   });

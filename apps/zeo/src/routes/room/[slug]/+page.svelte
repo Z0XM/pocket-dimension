@@ -41,7 +41,9 @@
   hostName={data.hostName}
   maxParticipants={data.maxParticipants}
   isHost={data.isHost}
+  hostUserId={data.room.hostUserId}
   initialIsPublic={data.room.isPublic}
+  initialIsLocked={data.room.isLocked}
   initialIsStale={data.isStale}
   user={data.user}
   initialParticipantCount={data.participantCount}

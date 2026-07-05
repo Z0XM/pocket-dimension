@@ -4,7 +4,8 @@
   import XIcon from "@lucide/svelte/icons/x";
   import { RoomEvent, Track, type ConnectionQuality, type LocalTrackPublication, type Room, supportsAudioOutputSelection } from "livekit-client";
   import type { CallPhase, PermissionState } from "$lib/livekit/types";
-  import { startMediaPreview, stopMediaPreview, syncPreviewTracks, restartMediaPreview } from "$lib/livekit/media-preview";
+  import { startMediaPreview, stopMediaPreview, syncPreviewTracks, restartMediaPreview, type MediaPreviewResult } from "$lib/livekit/media-preview";
+  import { CAMERA_IN_USE_MESSAGE, deviceErrorMessage, isDeviceInUseError } from "$lib/livekit/media-errors";
   import { buildMediaConstraints, listMediaDevices, type MediaDeviceLists } from "$lib/livekit/devices";
   import { qualityLabel, type QualityLabel } from "$lib/livekit/connection-quality";
   import { readConnectionRttMs } from "$lib/livekit/connection-stats";
@@ -24,7 +25,7 @@
     isScreenShareActive,
     screenShareFailureMessage,
   } from "$lib/livekit/screen-share";
-  import { captureCallSnapshot } from "$lib/snapshot";
+  import { captureStageToBlob, compressSnapshotForChat, downloadSnapshotBlob } from "$lib/snapshot";
   import PreCallLobby from "$lib/components/call/PreCallLobby.svelte";
   import CallStage from "$lib/components/call/CallStage.svelte";
   import ControlBar from "$lib/components/call/ControlBar.svelte";
@@ -36,11 +37,26 @@
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
   import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
   import TileColorPicker from "$lib/components/call/TileColorPicker.svelte";
+  import { isAutoLayoutPreset, type AutoLayoutPreset } from "$lib/call/auto-layout";
+  import type { StageLayoutMode } from "$lib/stage-grid";
   import { Separator } from "$lib/components/ui/separator";
   import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import { PARTICIPANT_COLORS, resolveParticipantColor, type ParticipantColor } from "$lib/participant-colors";
-  import { readStored, readStoredFlag, STORAGE_KEYS, writeStored, writeStoredFlag } from "$lib/browser-storage";
-  import { buildStageTiles, pruneTileKeys } from "$lib/call/stage-tiles";
+  import {
+    clearActiveCallSession,
+    readActiveCallSession,
+    readStored,
+    readStoredFlag,
+    readStoredFloat,
+    readStoredInt,
+    STORAGE_KEYS,
+    writeActiveCallSession,
+    writeStored,
+    writeStoredFlag,
+    writeStoredFloat,
+    writeStoredInt,
+  } from "$lib/browser-storage";
+  import { buildStageTiles, buildCallParticipantList, pruneTileKeys } from "$lib/call/stage-tiles";
 
   type Props = {
     slug: string;
@@ -49,11 +65,13 @@
     maxParticipants: number;
     isHost: boolean;
     user: { id: string; email: string; username: string | null } | null;
+    hostUserId: string;
     initialParticipantCount: number;
     initialIsFull: boolean;
     initialIsEnded: boolean;
     initialWaitingRoomEnabled?: boolean;
     initialIsPublic?: boolean;
+    initialIsLocked?: boolean;
     initialIsStale?: boolean;
     initialIsScheduledForFuture?: boolean;
     initialScheduledStartLabel?: string | null;
@@ -69,11 +87,13 @@
     maxParticipants,
     isHost,
     user,
+    hostUserId,
     initialParticipantCount,
     initialIsFull,
     initialIsEnded,
     initialWaitingRoomEnabled = false,
     initialIsPublic = false,
+    initialIsLocked = false,
     initialIsStale = false,
     initialIsScheduledForFuture = false,
     initialScheduledStartLabel = null,
@@ -98,8 +118,10 @@
   let scheduledStartLabel = $state<string | null>(initialScheduledStartLabel);
   let isJoinable = $state(initialIsJoinable);
   let roomIsPublic = $state(initialIsPublic);
+  let roomIsLocked = $state(initialIsLocked);
   let isStale = $state(initialIsStale);
   let updatingVisibility = $state(false);
+  let updatingRoomLock = $state(false);
   let guestName = $state("");
   let errorMessage = $state<string | null>(null);
   let disconnectMessage = $state<string | null>(null);
@@ -110,6 +132,8 @@
   let speakerEnabled = $state(true);
   let camEnabled = $state(true);
   let permissionState = $state<PermissionState>("prompt");
+  let cameraInUse = $state(false);
+  let micDeviceError = $state<string | null>(null);
   let previewStream = $state<MediaStream | null>(null);
   let previewReady = $state(false);
   let mediaDevices = $state<MediaDeviceLists>({ audioInputs: [], audioOutputs: [], videoInputs: [] });
@@ -118,6 +142,13 @@
   let videoDeviceId = $state("");
   let micTestActive = $state(false);
   let showInCallDevices = $state(false);
+  let showGridSettings = $state(false);
+  let stageLayoutMode = $state<StageLayoutMode>("grid");
+  let autoLayoutPreset = $state<AutoLayoutPreset>("dynamic");
+  let galleryDensity = $state(5);
+  let sidebarSplitRatio = $state(0.72);
+  let hideNonVideoTiles = $state(false);
+  let pinnedTileKey = $state<string | null>(null);
   let micGateProcessor = $state<MicGateProcessor | null>(null);
   let inCallMicTestStream = $state<MediaStream | null>(null);
   let inCallMicTestSyncGen = 0;
@@ -135,6 +166,8 @@
   let tileColor = $state<ParticipantColor>(PARTICIPANT_COLORS[0]);
   let hideParticipantVideos = $state(false);
   let disableSpeakingGlows = $state(false);
+  let networkHintDismissed = $state(false);
+  let storedRejoinSession = $state<ReturnType<typeof readActiveCallSession>>(null);
 
   const inCallPhase = $derived(phase === "in_call" || phase === "reconnecting");
   const micMonitorStream = $derived(inCallPhase ? inCallMicTestStream : previewStream);
@@ -153,6 +186,55 @@
   function setDisableSpeakingGlows(value: boolean) {
     disableSpeakingGlows = value;
     writeStoredFlag(STORAGE_KEYS.disableSpeakingGlows, value);
+  }
+
+  function readInitialStageLayoutMode(): StageLayoutMode {
+    const stored = readStored(STORAGE_KEYS.stageLayoutMode);
+    return stored === "auto" ? "auto" : "grid";
+  }
+
+  function readInitialAutoLayoutPreset(): AutoLayoutPreset {
+    const stored = readStored(STORAGE_KEYS.autoLayoutPreset);
+    return isAutoLayoutPreset(stored) ? stored : "dynamic";
+  }
+
+  function setStageLayoutMode(mode: StageLayoutMode) {
+    stageLayoutMode = mode;
+    writeStored(STORAGE_KEYS.stageLayoutMode, mode);
+  }
+
+  function setAutoLayoutPreset(preset: AutoLayoutPreset) {
+    autoLayoutPreset = preset;
+    writeStored(STORAGE_KEYS.autoLayoutPreset, preset);
+  }
+
+  function setHideNonVideoTiles(value: boolean) {
+    hideNonVideoTiles = value;
+    writeStoredFlag(STORAGE_KEYS.hideNonVideoTiles, value);
+  }
+
+  function setGalleryDensity(value: number) {
+    galleryDensity = value;
+    writeStoredInt(STORAGE_KEYS.galleryDensity, value);
+  }
+
+  function setSidebarSplitRatio(value: number) {
+    sidebarSplitRatio = value;
+    writeStoredFloat(STORAGE_KEYS.sidebarSplitRatio, value);
+  }
+
+  function togglePinTile(key: string) {
+    pinnedTileKey = pinnedTileKey === key ? null : key;
+  }
+
+  function toggleSelfView() {
+    if (!livekitRoom) return;
+    const key = livekitRoom.localParticipant.identity;
+    if (minimizedTileKeys.includes(key)) {
+      restoreTile(key);
+    } else {
+      minimizeTile(key);
+    }
   }
 
   function readStoredPercent(key: string, fallback: number) {
@@ -186,6 +268,7 @@
   let hostWaitingTimer: ReturnType<typeof setInterval> | undefined;
 
   let chatOpen = $state(false);
+  let chatSyncToken = $state(0);
   let localConnectionQuality = $state<QualityLabel>("unknown");
   let localPingMs = $state<number | null>(null);
 
@@ -200,7 +283,6 @@
   let controlBarEl = $state<HTMLElement | null>(null);
   let controlBarReservePx = $state(0);
   let minimizedTileKeys = $state<string[]>([]);
-  let pinnedTileKeys = $state<string[]>([]);
   let hiddenVideoTileKeys = $state<string[]>([]);
   let fullscreenTileKey = $state<string | null>(null);
   let intentionalScreenShareStop = false;
@@ -229,23 +311,33 @@
     return livekitRoom ? buildStageTiles(livekitRoom) : [];
   });
 
+  const selfViewHidden = $derived(livekitRoom ? minimizedTileKeys.includes(livekitRoom.localParticipant.identity) : false);
+
+  const callParticipants = $derived.by(() => {
+    mediaRevision;
+    if (!livekitRoom) return [];
+    return buildCallParticipantList(livekitRoom, { localDisplayName, hostUserId });
+  });
+
   const minimizedTiles = $derived(stageTiles.filter((tile) => minimizedTileKeys.includes(tile.key)));
 
   $effect(() => {
     const validKeys = new Set(stageTiles.map((tile) => tile.key));
     minimizedTileKeys = pruneTileKeys(minimizedTileKeys, validKeys);
-    pinnedTileKeys = pruneTileKeys(pinnedTileKeys, validKeys);
     hiddenVideoTileKeys = pruneTileKeys(hiddenVideoTileKeys, validKeys);
     if (fullscreenTileKey && !validKeys.has(fullscreenTileKey)) {
       fullscreenTileKey = null;
+    }
+    if (pinnedTileKey && !validKeys.has(pinnedTileKey)) {
+      pinnedTileKey = null;
     }
   });
 
   function resetStageTileState() {
     minimizedTileKeys = [];
-    pinnedTileKeys = [];
     hiddenVideoTileKeys = [];
     fullscreenTileKey = null;
+    pinnedTileKey = null;
   }
 
   function minimizeTile(key: string) {
@@ -263,10 +355,6 @@
 
   function toggleTileHideVideo(key: string) {
     hiddenVideoTileKeys = hiddenVideoTileKeys.includes(key) ? hiddenVideoTileKeys.filter((entry) => entry !== key) : [...hiddenVideoTileKeys, key];
-  }
-
-  function toggleTilePin(key: string) {
-    pinnedTileKeys = pinnedTileKeys.includes(key) ? pinnedTileKeys.filter((entry) => entry !== key) : [...pinnedTileKeys, key];
   }
 
   function toggleTileFullscreen(key: string) {
@@ -314,6 +402,7 @@
     scheduledStartLabel = payload.scheduledStartLabel ?? scheduledStartLabel;
     isJoinable = payload.isJoinable ?? isJoinable;
     if (payload.isPublic !== undefined) roomIsPublic = payload.isPublic;
+    if (payload.isLocked !== undefined) roomIsLocked = payload.isLocked;
     if (payload.status === "stale") isStale = true;
     if (payload.status === "active") isStale = false;
     if (payload.isEnded && phase !== "ended") {
@@ -350,6 +439,12 @@
     }
   }
 
+  function applyPreviewResult(result: MediaPreviewResult) {
+    previewStream = result.stream;
+    permissionState = result.permission;
+    cameraInUse = result.cameraInUse;
+  }
+
   async function setupPreview() {
     const result = await startMediaPreview({
       audio: true,
@@ -357,8 +452,7 @@
       audioDeviceId: audioDeviceId || undefined,
       videoDeviceId: videoDeviceId || undefined,
     });
-    permissionState = result.permission;
-    previewStream = result.stream;
+    applyPreviewResult(result);
     previewReady = true;
 
     if (result.permission === "granted") {
@@ -435,6 +529,24 @@
     showInCallDevices = false;
   }
 
+  function closeGridSettingsPanel() {
+    showGridSettings = false;
+  }
+
+  function toggleGridSettingsPanel() {
+    if (showGridSettings) {
+      closeGridSettingsPanel();
+      return;
+    }
+    closeInCallDevicesPanel();
+    showGridSettings = true;
+  }
+
+  function openInCallDevicesPanel() {
+    closeGridSettingsPanel();
+    showInCallDevices = true;
+  }
+
   async function handleInCallAudioOutputDeviceChange(deviceId: string) {
     await changeAudioOutputDevice(deviceId);
     await inCallMicPreviewControls?.applyAudioOutputDevice(deviceId);
@@ -462,11 +574,14 @@
         audioDeviceId: deviceId,
         videoDeviceId: videoDeviceId || undefined,
       });
-      previewStream = result.stream;
-      permissionState = result.permission;
+      applyPreviewResult(result);
     } else if (livekitRoom) {
-      if (!micTestActive) {
-        await livekitRoom.switchActiveDevice("audioinput", deviceId);
+      if (!micTestActive && micEnabled) {
+        try {
+          await livekitRoom.switchActiveDevice("audioinput", deviceId);
+        } catch {
+          // Switching input can fail while the mic track is unpublished.
+        }
       }
       if (micTestActive) {
         stopInCallMicTestStream();
@@ -493,14 +608,21 @@
   async function enableLocalMicrophone() {
     if (!livekitRoom) return;
 
-    await livekitRoom.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
-
-    if (!micGateProcessor) return;
-
     try {
-      await attachMicGateProcessor(livekitRoom, micGateProcessor);
-    } catch {
-      showToast("Noise gate unavailable — using direct microphone input");
+      await livekitRoom.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
+      micDeviceError = null;
+
+      if (!micGateProcessor) return;
+
+      try {
+        await attachMicGateProcessor(livekitRoom, micGateProcessor);
+      } catch {
+        showToast("Noise gate unavailable — using direct microphone input");
+      }
+    } catch (error) {
+      micDeviceError = deviceErrorMessage(error, "microphone");
+      micEnabled = false;
+      showToast(micDeviceError);
     }
   }
 
@@ -526,10 +648,22 @@
         audioDeviceId: audioDeviceId || undefined,
         videoDeviceId: deviceId,
       });
-      previewStream = result.stream;
-      permissionState = result.permission;
+      applyPreviewResult(result);
     } else if (livekitRoom) {
-      await livekitRoom.switchActiveDevice("videoinput", deviceId);
+      if (camEnabled) {
+        try {
+          await livekitRoom.switchActiveDevice("videoinput", deviceId);
+          cameraInUse = false;
+        } catch (error) {
+          if (isDeviceInUseError(error)) {
+            cameraInUse = true;
+            camEnabled = false;
+            showToast(CAMERA_IN_USE_MESSAGE);
+          } else {
+            showToast(deviceErrorMessage(error, "camera"));
+          }
+        }
+      }
     }
   }
 
@@ -697,7 +831,7 @@
 
     await callSession.connect(payload.wsUrl, payload.token, {
       micEnabled: micEnabled && permissionState !== "denied",
-      camEnabled: camEnabled && permissionState === "granted",
+      camEnabled: camEnabled && permissionState === "granted" && !cameraInUse,
       iceServers: payload.iceServers,
       audioDeviceId: audioDeviceId || undefined,
       videoDeviceId: videoDeviceId || undefined,
@@ -709,6 +843,13 @@
     localConnectionQuality = qualityLabel(callSession.room.localParticipant.connectionQuality);
     applyRoomSpeakerState(callSession.room);
     startPingPoll();
+    networkHintDismissed = false;
+    writeActiveCallSession({
+      slug,
+      guestName: isGuest ? guestName.trim() : undefined,
+      displayName: localDisplayName,
+      joinedAt: new Date().toISOString(),
+    });
     if (permissionState === "granted") await loadMediaDevices();
     stopHostWaitingPoll();
     setPhase("in_call");
@@ -796,6 +937,121 @@
     hostWaitingTimer = undefined;
   }
 
+  async function updateRoomLock(nextIsLocked: boolean) {
+    if (!isHost || nextIsLocked === roomIsLocked) return;
+
+    updatingRoomLock = true;
+    errorMessage = null;
+
+    try {
+      const res = await fetch(`/api/rooms/${slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isLocked: nextIsLocked }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        errorMessage = payload.message ?? "Could not update room lock";
+        return;
+      }
+      roomIsLocked = payload.isLocked;
+      showToast(nextIsLocked ? "Room locked — new joins blocked" : "Room unlocked");
+    } catch {
+      errorMessage = "Could not update room lock";
+    } finally {
+      updatingRoomLock = false;
+    }
+  }
+
+  async function muteParticipant(identity: string, track: "microphone" | "camera") {
+    const res = await fetch(`/api/rooms/${slug}/mute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identity, track }),
+    });
+    if (!res.ok) {
+      showToast(`Could not mute ${track === "microphone" ? "microphone" : "camera"}`);
+      return;
+    }
+    showToast(track === "microphone" ? "Participant muted" : "Participant camera stopped");
+  }
+
+  async function removeParticipant(identity: string) {
+    if (!confirm("Remove this participant from the call?")) return;
+
+    const res = await fetch(`/api/rooms/${slug}/remove`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identity }),
+    });
+    if (!res.ok) {
+      showToast("Could not remove participant");
+      return;
+    }
+    showToast("Participant removed");
+  }
+
+  async function postSnapshotToChat(dataUrl: string) {
+    const payload: Record<string, string> = { body: dataUrl, kind: "snapshot" };
+    if (isGuest && livekitRoom) {
+      payload.guestIdentity = livekitRoom.localParticipant.identity;
+    }
+
+    const res = await fetch(`/api/rooms/${slug}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      return false;
+    }
+
+    chatSyncToken += 1;
+    return true;
+  }
+
+  async function retryMicrophone() {
+    micDeviceError = null;
+    micEnabled = true;
+    await loadMediaDevices();
+    const nextDeviceId = mediaDevices.audioInputs[0]?.deviceId;
+    if (nextDeviceId) {
+      await changeAudioDevice(nextDeviceId);
+    }
+    if (livekitRoom && inCallPhase) {
+      await enableLocalMicrophone();
+    } else if (phase === "lobby" || phase === "waiting_admission") {
+      syncPreviewTracks(previewStream, { audio: true, video: camEnabled });
+    }
+  }
+
+  async function retryCamera() {
+    cameraInUse = false;
+    camEnabled = true;
+    await loadMediaDevices();
+    const nextDeviceId = mediaDevices.videoInputs[0]?.deviceId;
+    if (nextDeviceId) {
+      await changeVideoDevice(nextDeviceId);
+    }
+    if (livekitRoom && inCallPhase) {
+      await enableLocalCamera();
+    }
+  }
+
+  async function rejoinStoredCall() {
+    const session = storedRejoinSession;
+    if (!session || session.slug !== slug) return;
+
+    if (session.guestName && isGuest) {
+      guestName = session.guestName;
+      writeStored(STORAGE_KEYS.guestDisplayName, session.guestName);
+    }
+
+    storedRejoinSession = null;
+    await joinCall();
+  }
+
   async function updateRoomVisibility(nextIsPublic: boolean) {
     if (!isHost || nextIsPublic === roomIsPublic) return;
 
@@ -854,10 +1110,13 @@
   async function leaveCall() {
     connectionGen += 1;
     chatOpen = false;
+    clearActiveCallSession();
+    storedRejoinSession = null;
     if (micTestActive) {
       micTestActive = false;
     }
     showInCallDevices = false;
+    showGridSettings = false;
     stopHostWaitingPoll();
     await teardownCall(true);
     micGateProcessor = createFreshMicGateProcessor();
@@ -904,7 +1163,6 @@
     micEnabled = !micEnabled;
 
     if (!micEnabled) {
-      audioDeviceId = "";
       micTestActive = false;
       if (phase === "lobby" || phase === "waiting_admission") {
         syncPreviewTracks(previewStream, { audio: false, video: camEnabled });
@@ -914,7 +1172,17 @@
       return;
     }
 
-    const nextDeviceId = mediaDevices.audioInputs[0]?.deviceId;
+    micDeviceError = null;
+
+    if (livekitRoom && inCallPhase) {
+      if (!audioDeviceId) {
+        audioDeviceId = mediaDevices.audioInputs[0]?.deviceId ?? "";
+      }
+      await enableLocalMicrophone();
+      return;
+    }
+
+    const nextDeviceId = audioDeviceId || mediaDevices.audioInputs[0]?.deviceId;
     if (nextDeviceId) {
       await changeAudioDevice(nextDeviceId);
       if (livekitRoom && phase !== "lobby" && phase !== "waiting_admission") {
@@ -930,32 +1198,66 @@
     }
   }
 
+  async function enableLocalCamera() {
+    if (!livekitRoom) return true;
+
+    try {
+      await livekitRoom.localParticipant.setCameraEnabled(true, {
+        deviceId: videoDeviceId || undefined,
+      });
+      cameraInUse = false;
+      return true;
+    } catch (error) {
+      if (isDeviceInUseError(error)) {
+        cameraInUse = true;
+        camEnabled = false;
+        showToast(CAMERA_IN_USE_MESSAGE);
+        return false;
+      }
+      showToast(deviceErrorMessage(error, "camera"));
+      camEnabled = false;
+      return false;
+    }
+  }
+
   async function toggleCam() {
     camEnabled = !camEnabled;
 
     if (!camEnabled) {
-      videoDeviceId = "";
+      cameraInUse = false;
       if (phase === "lobby" || phase === "waiting_admission") {
         syncPreviewTracks(previewStream, { audio: micEnabled, video: false });
       } else if (livekitRoom) {
         await livekitRoom.localParticipant.setCameraEnabled(false);
+        bumpMediaRevision();
       }
       return;
     }
 
-    const nextDeviceId = mediaDevices.videoInputs[0]?.deviceId;
+    const nextDeviceId = videoDeviceId || mediaDevices.videoInputs[0]?.deviceId;
     if (nextDeviceId) {
       await changeVideoDevice(nextDeviceId);
       if (livekitRoom && phase !== "lobby" && phase !== "waiting_admission") {
-        await livekitRoom.localParticipant.setCameraEnabled(true);
+        const enabled = await enableLocalCamera();
+        if (enabled) bumpMediaRevision();
       }
       return;
     }
 
     if (phase === "lobby" || phase === "waiting_admission") {
-      syncPreviewTracks(previewStream, { audio: micEnabled, video: true });
+      const result = await restartMediaPreview(previewStream, {
+        audio: micEnabled,
+        video: true,
+        audioDeviceId: audioDeviceId || undefined,
+        videoDeviceId: videoDeviceId || undefined,
+      });
+      applyPreviewResult(result);
+      if (cameraInUse) {
+        showToast(CAMERA_IN_USE_MESSAGE);
+      }
     } else if (livekitRoom) {
-      await livekitRoom.localParticipant.setCameraEnabled(true);
+      const enabled = await enableLocalCamera();
+      if (enabled) bumpMediaRevision();
     }
   }
 
@@ -996,8 +1298,16 @@
     snapshotFlash = true;
 
     try {
-      await captureCallSnapshot({ slug, stageRoot: stageEl });
-      showToast("Snapshot saved");
+      const blob = await captureStageToBlob(stageEl);
+      downloadSnapshotBlob(blob, slug);
+
+      if (chatEnabled) {
+        const dataUrl = await compressSnapshotForChat(blob);
+        const shared = await postSnapshotToChat(dataUrl);
+        showToast(shared ? "Snapshot shared in chat" : "Snapshot saved locally but could not share in chat");
+      } else {
+        showToast("Snapshot saved");
+      }
     } catch {
       showToast("Could not capture snapshot");
     } finally {
@@ -1008,11 +1318,27 @@
     }
   }
 
+  $effect(() => {
+    if (!inCallPhase || networkHintDismissed || localConnectionQuality !== "poor") return;
+    if (camEnabled) {
+      showToast("Poor connection — try turning off your camera or moving closer to Wi‑Fi");
+    } else {
+      showToast("Poor connection — audio-only may work better on this network");
+    }
+    networkHintDismissed = true;
+  });
+
   onMount(() => {
     if (!browser) return;
     tileColor = readInitialTileColor();
     hideParticipantVideos = readStoredFlag(STORAGE_KEYS.hideParticipantVideos);
+    hideNonVideoTiles = readStoredFlag(STORAGE_KEYS.hideNonVideoTiles);
     disableSpeakingGlows = readStoredFlag(STORAGE_KEYS.disableSpeakingGlows);
+    stageLayoutMode = readInitialStageLayoutMode();
+    autoLayoutPreset = readInitialAutoLayoutPreset();
+    galleryDensity = readStoredInt(STORAGE_KEYS.galleryDensity, 5, 1, 10);
+    sidebarSplitRatio = readStoredFloat(STORAGE_KEYS.sidebarSplitRatio, 0.72, 0.55, 0.85);
+    storedRejoinSession = readActiveCallSession();
     onPhaseChange?.(phase);
     if (!user) {
       const storedGuestName = readStored(STORAGE_KEYS.guestDisplayName);
@@ -1037,12 +1363,12 @@
 </script>
 
 {#if phase === "in_call" || phase === "connecting" || phase === "reconnecting" || (phase === "disconnected" && !isEnded)}
-  <div class="fixed inset-0 z-50 flex flex-col bg-background">
+  <div class="call-shell fixed inset-0 z-50 flex flex-col bg-background">
     <ConnectionBanner {phase} {disconnectMessage} onRejoin={phase === "disconnected" && !isEnded ? rejoinCall : undefined} />
 
     {#if toastMessage}
       <div
-        class="pointer-events-none fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-lg border border-border bg-card/95 px-4 py-2 text-sm text-foreground shadow-lg backdrop-blur-sm"
+        class="pointer-events-none fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-lg border border-border bg-card/95 px-4 py-2 text-sm text-foreground shadow-lg backdrop-blur-sm safe-top safe-x"
         role="status"
       >
         {toastMessage}
@@ -1053,6 +1379,17 @@
       <div class="pointer-events-none fixed inset-0 z-[55] bg-white/25" aria-hidden="true"></div>
     {/if}
 
+    {#if livekitRoom && (phase === "in_call" || phase === "reconnecting") && localConnectionQuality === "poor" && !networkHintDismissed}
+      <div
+        class="pointer-events-none fixed left-1/2 top-16 z-[60] w-[min(calc(100%-2rem),28rem)] -translate-x-1/2 rounded-lg border border-amber-500/40 bg-card/95 px-4 py-3 text-sm text-foreground shadow-lg backdrop-blur-sm safe-x"
+      >
+        <p class="font-medium">Network quality is poor</p>
+        <p class="mt-1 text-xs text-muted-foreground">
+          {camEnabled ? "Try turning off your camera or switching to a stronger connection." : "Stay on audio-only or move closer to your router."}
+        </p>
+      </div>
+    {/if}
+
     {#if livekitRoom && (phase === "in_call" || phase === "reconnecting")}
       {#if chatEnabled}
         <ChatPanel
@@ -1060,73 +1397,110 @@
           localIdentity={livekitRoom.localParticipant.identity}
           guestIdentity={isGuest ? livekitRoom.localParticipant.identity : null}
           open={chatOpen}
+          syncToken={chatSyncToken}
+          {isHost}
+          participants={callParticipants}
+          bottomOffset={controlBarReservePx}
+          onMuteParticipant={isHost ? muteParticipant : undefined}
+          onRemoveParticipant={isHost ? removeParticipant : undefined}
           onClose={() => (chatOpen = false)}
         />
       {/if}
 
-      {#if showInCallDevices}
-        <div class="absolute left-4 top-14 z-20 w-full max-w-md rounded-xl border border-border bg-card/95 p-4 shadow-lg backdrop-blur-sm">
-          <div class="mb-3 flex items-center justify-between">
-            <p class="text-sm font-medium text-foreground">Settings</p>
-            <button type="button" class="action-btn-ghost-destructive size-7" aria-label="Close settings" onclick={closeInCallDevicesPanel}>
-              <XIcon class="size-4" aria-hidden="true" />
-            </button>
-          </div>
-          <div class="space-y-3">
-            <DevicePicker
-              layout="stack"
-              devices={mediaDevices}
-              {audioDeviceId}
-              {audioOutputDeviceId}
-              {videoDeviceId}
-              showAudioOutput={showAudioOutputSelection}
-              micEnabled={micDisplayEnabled}
-              {speakerEnabled}
-              {camEnabled}
-              onToggleMic={toggleMic}
-              onToggleSpeaker={toggleSpeaker}
-              onToggleCam={toggleCam}
-              onAudioDeviceChange={changeAudioDevice}
-              onAudioOutputDeviceChange={handleInCallAudioOutputDeviceChange}
-              onVideoDeviceChange={changeVideoDevice}
-            />
-            <MicPreviewControls
-              bind:this={inCallMicPreviewControls}
-              layout="stack"
-              helpContext="incall"
-              bind:micTestActive
-              previewStream={micMonitorStream}
-              {micEnabled}
-              {speakerEnabled}
-              {audioOutputDeviceId}
-              {micGateProcessor}
-              permissionGranted={permissionState === "granted"}
-            />
-            <TileColorPicker compact value={tileColor} onChange={setTileColor} />
-            <div class="rounded-lg border border-border px-3">
-              <SettingToggle
-                id="hide-participant-videos"
-                label="Hide participant videos"
-                tooltip="Show colored initials instead of camera feeds for everyone in the grid."
-                checked={hideParticipantVideos}
-                onCheckedChange={setHideParticipantVideos}
+      <div class="relative min-h-0 flex-1">
+        {#if showInCallDevices}
+          <div
+            class="absolute inset-x-0 top-0 z-30 max-h-[min(88dvh,100%)] overflow-y-auto rounded-b-xl border border-border bg-card/95 p-4 shadow-lg backdrop-blur-sm safe-top safe-x sm:inset-x-auto sm:left-4 sm:top-4 sm:max-h-none sm:w-full sm:max-w-md sm:rounded-xl"
+          >
+            <div class="mb-3 flex items-center justify-between">
+              <p class="text-sm font-medium text-foreground">Settings</p>
+              <button
+                type="button"
+                class="action-btn-ghost-destructive size-11 sm:size-7"
+                aria-label="Close settings"
+                onclick={closeInCallDevicesPanel}
+              >
+                <XIcon class="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div class="space-y-3">
+              {#if cameraInUse}
+                <div class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  <p>{CAMERA_IN_USE_MESSAGE}</p>
+                  <button type="button" class="mt-2 underline" onclick={retryCamera}>Retry camera</button>
+                </div>
+              {/if}
+              {#if micDeviceError}
+                <div class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  <p>{micDeviceError}</p>
+                  <button type="button" class="mt-2 underline" onclick={retryMicrophone}>Retry microphone</button>
+                </div>
+              {/if}
+              <DevicePicker
+                layout="stack"
+                devices={mediaDevices}
+                {audioDeviceId}
+                {audioOutputDeviceId}
+                {videoDeviceId}
+                showAudioOutput={showAudioOutputSelection}
+                micEnabled={micDisplayEnabled}
+                {speakerEnabled}
+                {camEnabled}
+                onToggleMic={toggleMic}
+                onToggleSpeaker={toggleSpeaker}
+                onToggleCam={toggleCam}
+                onAudioDeviceChange={changeAudioDevice}
+                onAudioOutputDeviceChange={handleInCallAudioOutputDeviceChange}
+                onVideoDeviceChange={changeVideoDevice}
               />
-              <Separator />
-              <SettingToggle
-                id="disable-speaking-glows"
-                label="Hide speaking glows"
-                tooltip="Turn off the outer glow when someone speaks. The colored outline still appears."
-                checked={disableSpeakingGlows}
-                onCheckedChange={setDisableSpeakingGlows}
+              <MicPreviewControls
+                bind:this={inCallMicPreviewControls}
+                layout="stack"
+                helpContext="incall"
+                bind:micTestActive
+                previewStream={micMonitorStream}
+                {micEnabled}
+                {speakerEnabled}
+                {audioOutputDeviceId}
+                {micGateProcessor}
+                permissionGranted={permissionState === "granted"}
               />
+              <TileColorPicker compact value={tileColor} onChange={setTileColor} />
+              <div class="rounded-lg border border-border px-3">
+                <SettingToggle
+                  id="hide-participant-videos"
+                  label="Hide participant videos"
+                  tooltip="Show colored initials instead of camera feeds for everyone in the grid."
+                  checked={hideParticipantVideos}
+                  onCheckedChange={setHideParticipantVideos}
+                />
+                <Separator />
+                <SettingToggle
+                  id="disable-speaking-glows"
+                  label="Hide speaking glows"
+                  tooltip="Turn off the outer glow when someone speaks. The colored outline still appears."
+                  checked={disableSpeakingGlows}
+                  onCheckedChange={setDisableSpeakingGlows}
+                />
+                {#if isHost}
+                  <Separator />
+                  <SettingToggle
+                    id="room-lock"
+                    label="Lock room"
+                    tooltip="Block new participants from joining while the room stays active."
+                    checked={roomIsLocked}
+                    disabled={updatingRoomLock}
+                    onCheckedChange={updateRoomLock}
+                  />
+                {/if}
+              </div>
             </div>
           </div>
-        </div>
-      {/if}
+        {/if}
 
-      <div class="relative min-h-0 flex-1">
         <CallStage
           room={livekitRoom}
+          {slug}
           {activeSpeakerIdentity}
           {audioLevels}
           {localDisplayName}
@@ -1134,20 +1508,34 @@
           localMicEnabled={micDisplayEnabled}
           localTileColor={tileColor}
           {hideParticipantVideos}
+          {hideNonVideoTiles}
           {disableSpeakingGlows}
+          layoutMode={stageLayoutMode}
+          {autoLayoutPreset}
+          {galleryDensity}
+          {sidebarSplitRatio}
+          {pinnedTileKey}
           bottomInset={controlBarReservePx}
           {minimizedTileKeys}
-          {pinnedTileKeys}
           {hiddenVideoTileKeys}
           {fullscreenTileKey}
+          {selfViewHidden}
           onMinimizeTile={minimizeTile}
           onToggleHideVideo={toggleTileHideVideo}
-          onTogglePin={toggleTilePin}
           onToggleTileFullscreen={toggleTileFullscreen}
+          onTogglePinTile={togglePinTile}
+          {showGridSettings}
+          onLayoutModeChange={setStageLayoutMode}
+          onAutoLayoutPresetChange={setAutoLayoutPreset}
+          onHideNonVideoTilesChange={setHideNonVideoTiles}
+          onGalleryDensityChange={setGalleryDensity}
+          onSidebarSplitRatioChange={setSidebarSplitRatio}
+          onHideSelfView={toggleSelfView}
+          onCloseGridSettings={closeGridSettingsPanel}
           bind:stageRef={stageEl}
         />
       </div>
-      <div class="pointer-events-none fixed bottom-6 right-4 z-[21]">
+      <div class="pointer-events-none fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-4 z-[21] safe-x">
         <ConnectionQualityBadge label={localConnectionQuality} pingMs={localPingMs} />
       </div>
       <ControlBar
@@ -1166,14 +1554,14 @@
         onToggleScreenShare={toggleScreenShare}
         onSnapshot={takeSnapshot}
         onToggleChat={chatEnabled ? () => (chatOpen = !chatOpen) : undefined}
-        onToggleDevices={() => (showInCallDevices ? closeInCallDevicesPanel() : (showInCallDevices = true))}
+        onToggleDevices={() => (showInCallDevices ? closeInCallDevicesPanel() : openInCallDevicesPanel())}
         devicesOpen={showInCallDevices}
+        onToggleGridSettings={toggleGridSettingsPanel}
+        gridSettingsOpen={showGridSettings}
         onLeave={leaveCall}
         onEndRoom={isHost ? endRoom : undefined}
         {ending}
         {minimizedTiles}
-        {hiddenVideoTileKeys}
-        {hideParticipantVideos}
         localIdentity={livekitRoom.localParticipant.identity}
         {localDisplayName}
         localTileColor={tileColor}
@@ -1202,6 +1590,30 @@
     <div class="auth-error mb-4">{errorMessage}</div>
   {/if}
 
+  {#if storedRejoinSession?.slug === slug && phase === "lobby" && !isEnded}
+    <div class="mb-4 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
+      <p class="text-sm font-medium text-foreground">You were in this call before the page reloaded.</p>
+      <p class="mt-1 text-xs text-muted-foreground">
+        Rejoin as {storedRejoinSession.displayName ?? (guestName.trim() || "guest")}?
+      </p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button type="button" class="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" onclick={rejoinStoredCall}>
+          Rejoin call
+        </button>
+        <button
+          type="button"
+          class="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground"
+          onclick={() => {
+            storedRejoinSession = null;
+            clearActiveCallSession();
+          }}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  {/if}
+
   <PreCallLobby
     {slug}
     {roomTitle}
@@ -1219,6 +1631,7 @@
     {speakerEnabled}
     {camEnabled}
     {permissionState}
+    {cameraInUse}
     {previewStream}
     devices={mediaDevices}
     {audioDeviceId}

@@ -29,6 +29,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       hostUserId: room.hostUserId,
       waitingRoomEnabled: room.waitingRoomEnabled,
       isPublic: room.isPublic,
+      isLocked: room.isLocked,
       isPerpetual: room.isPerpetual,
       scheduledStartAt: room.scheduledStartAt?.toISOString() ?? null,
     },

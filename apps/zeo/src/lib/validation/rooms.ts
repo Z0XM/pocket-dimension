@@ -8,9 +8,14 @@ export const createRoomSchema = z.object({
   scheduledStartAt: z.string().datetime().optional(),
 });
 
-export const updateRoomSchema = z.object({
-  isPublic: z.boolean(),
-});
+export const updateRoomSchema = z
+  .object({
+    isPublic: z.boolean().optional(),
+    isLocked: z.boolean().optional(),
+  })
+  .refine((value) => value.isPublic !== undefined || value.isLocked !== undefined, {
+    message: "At least one room setting is required",
+  });
 
 export const operatorSettingsSchema = z.object({
   maxConcurrentRooms: z.number().int().min(1).max(20),
@@ -21,7 +26,8 @@ export const operatorSettingsSchema = z.object({
 });
 
 export const chatMessageSchema = z.object({
-  body: z.string().trim().min(1, "Message is required").max(2000, "Message is too long"),
+  body: z.string().trim().min(1, "Message is required").max(2_000_000, "Message is too long"),
+  kind: z.enum(["text", "snapshot"]).optional(),
   guestIdentity: z
     .string()
     .regex(/^guest_[0-9a-f-]{36}$/i, "Invalid guest identity")
@@ -47,4 +53,9 @@ export const guestTokenSchema = z.object({
 
 export const removeParticipantSchema = z.object({
   identity: z.string().min(1, "Participant identity is required"),
+});
+
+export const muteParticipantSchema = z.object({
+  identity: z.string().min(1, "Participant identity is required"),
+  track: z.enum(["microphone", "camera"]),
 });

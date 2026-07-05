@@ -14,6 +14,11 @@ function getClient() {
   return client;
 }
 
+const TRACK_SOURCE_BY_KIND = {
+  microphone: TrackSource.MICROPHONE,
+  camera: TrackSource.CAMERA,
+} as const;
+
 export async function deleteLiveKitRoom(livekitRoomName: string) {
   await getClient().deleteRoom(livekitRoomName);
 }
@@ -29,6 +34,23 @@ export async function countLiveKitParticipants(livekitRoomName: string) {
 
 export async function listLiveKitParticipants(livekitRoomName: string) {
   return getClient().listParticipants(livekitRoomName);
+}
+
+export async function muteParticipantPublishedTrack(livekitRoomName: string, identity: string, track: keyof typeof TRACK_SOURCE_BY_KIND) {
+  const source = TRACK_SOURCE_BY_KIND[track];
+  const participants = await listLiveKitParticipants(livekitRoomName);
+  const participant = participants.find((entry) => entry.identity === identity);
+  if (!participant) return false;
+
+  let muted = false;
+  for (const published of participant.tracks ?? []) {
+    if (published.source === source && published.sid) {
+      await getClient().mutePublishedTrack(livekitRoomName, identity, published.sid, true);
+      muted = true;
+    }
+  }
+
+  return muted;
 }
 
 export async function stopActiveScreenShares(livekitRoomName: string) {

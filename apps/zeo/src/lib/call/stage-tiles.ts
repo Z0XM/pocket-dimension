@@ -8,6 +8,10 @@ export type StageTileEntry = {
   participant: LocalParticipant | RemoteParticipant;
 };
 
+export function participantHasActiveVideo(participant: LocalParticipant | RemoteParticipant) {
+  return participant.isCameraEnabled;
+}
+
 export function buildStageTiles(room: Room): StageTileEntry[] {
   const items: StageTileEntry[] = [];
   const screenSharer = findScreenShareParticipant(room);
@@ -31,6 +35,12 @@ export function buildStageTiles(room: Room): StageTileEntry[] {
   return items;
 }
 
+export function filterStageTiles(tiles: StageTileEntry[], options?: { hideNonVideo?: boolean }) {
+  if (!options?.hideNonVideo) return tiles;
+
+  return tiles.filter((tile) => tile.kind === "screen-share" || participantHasActiveVideo(tile.participant));
+}
+
 export function pruneTileKeys(keys: string[], validKeys: Set<string>) {
   if (keys.length === 0) return keys;
 
@@ -40,4 +50,26 @@ export function pruneTileKeys(keys: string[], validKeys: Set<string>) {
   }
 
   return pruned;
+}
+
+export type CallParticipantInfo = {
+  identity: string;
+  displayName: string;
+  isLocal: boolean;
+  isHost: boolean;
+  isGuest: boolean;
+  micEnabled: boolean;
+  camEnabled: boolean;
+};
+
+export function buildCallParticipantList(room: Room, options: { localDisplayName: string; hostUserId: string }): CallParticipantInfo[] {
+  return listRoomParticipants(room).map((participant) => ({
+    identity: participant.identity,
+    displayName: participant.identity === room.localParticipant.identity ? options.localDisplayName : participant.name || "Participant",
+    isLocal: participant.identity === room.localParticipant.identity,
+    isHost: participant.identity === options.hostUserId,
+    isGuest: participant.identity.startsWith("guest_"),
+    micEnabled: participant.isMicrophoneEnabled,
+    camEnabled: participant.isCameraEnabled,
+  }));
 }

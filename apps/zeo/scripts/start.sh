@@ -19,6 +19,8 @@ fi
 
 cd "$APP_DIR"
 
+export BODY_SIZE_LIMIT="${BODY_SIZE_LIMIT:-2M}"
+
 if [[ -f .env ]]; then
   exec bun --env-file=.env ./build/index.js
 fi

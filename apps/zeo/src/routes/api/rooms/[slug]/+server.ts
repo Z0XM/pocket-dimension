@@ -7,6 +7,7 @@ import {
   isRoomFullForRoom,
   listOpenParticipants,
   resolveParticipantCount,
+  updateRoomLock,
   updateRoomVisibility,
 } from "$lib/server/rooms";
 import { formatScheduledStart, isRoomJoinable, isRoomScheduledForFuture } from "$lib/server/room-schedule";
@@ -36,6 +37,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
     status: room.status,
     waitingRoomEnabled: room.waitingRoomEnabled,
     isPublic: room.isPublic,
+    isLocked: room.isLocked,
     isPerpetual: room.isPerpetual,
     hostUserId: room.hostUserId,
     participantCount,
@@ -90,11 +92,21 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
     throw error(403, "Only the room host can update room settings");
   }
 
-  const { isPublic } = await readJsonBody(request, updateRoomSchema);
-  const updated = await updateRoomVisibility(room.id, isPublic, user.id);
+  const body = await readJsonBody(request, updateRoomSchema);
+  const updates: Record<string, unknown> = {};
+
+  if (body.isPublic !== undefined) {
+    const updated = await updateRoomVisibility(room.id, body.isPublic, user.id);
+    updates.isPublic = updated!.isPublic;
+  }
+
+  if (body.isLocked !== undefined) {
+    const updated = await updateRoomLock(room.id, body.isLocked, user.id);
+    updates.isLocked = updated!.isLocked;
+  }
 
   return json({
-    slug: updated!.slug,
-    isPublic: updated!.isPublic,
+    slug: room.slug,
+    ...updates,
   });
 };

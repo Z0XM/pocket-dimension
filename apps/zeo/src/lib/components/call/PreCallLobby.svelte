@@ -1,5 +1,6 @@
 <script lang="ts">
   import HashIcon from "@lucide/svelte/icons/hash";
+  import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
@@ -34,6 +35,7 @@
     speakerEnabled: boolean;
     camEnabled: boolean;
     permissionState: PermissionState;
+    cameraInUse?: boolean;
     previewStream: MediaStream | null;
     devices: MediaDeviceLists;
     audioDeviceId: string;
@@ -75,6 +77,7 @@
     speakerEnabled,
     camEnabled,
     permissionState,
+    cameraInUse = false,
     previewStream,
     devices,
     audioDeviceId,
@@ -174,8 +177,14 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
       <div class="min-w-0 flex-1 space-y-3">
         <div class="relative aspect-video max-w-md overflow-hidden rounded-lg bg-secondary">
-          {#if camEnabled && previewStream && permissionState === "granted"}
+          {#if camEnabled && previewStream && permissionState === "granted" && !cameraInUse}
             <video bind:this={previewEl} class="size-full object-cover mirror" autoplay playsinline muted></video>
+          {:else if cameraInUse && camEnabled}
+            <div class="flex size-full flex-col items-center justify-center gap-2 px-4 text-center">
+              <TriangleAlertIcon class="size-8 shrink-0 text-destructive/80" aria-hidden="true" />
+              <p class="text-sm font-medium text-foreground">Camera in use</p>
+              <p class="text-sm text-muted-foreground">Another app is using your camera. Close it, then turn your camera back on.</p>
+            </div>
           {:else if permissionState === "denied"}
             <div class="flex size-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
               Camera blocked — check browser site settings for this page.
@@ -191,7 +200,11 @@
           {/if}
         </div>
 
-        {#if permissionState === "denied"}
+        {#if cameraInUse && camEnabled}
+          <p class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            Camera unavailable — another application is using it. You can still join with your microphone.
+          </p>
+        {:else if permissionState === "denied"}
           <p class="text-xs text-muted-foreground">You can still join without devices.</p>
         {/if}
       </div>
