@@ -38,6 +38,7 @@
     onToggleTileFullscreen?: (key: string) => void;
     onTogglePinTile?: (key: string) => void;
     showGridSettings?: boolean;
+    showInCallDevices?: boolean;
     onLayoutModeChange?: (mode: StageLayoutMode) => void;
     onAutoLayoutPresetChange?: (preset: AutoLayoutPreset) => void;
     onHideNonVideoTilesChange?: (value: boolean) => void;
@@ -79,6 +80,7 @@
     onToggleTileFullscreen,
     onTogglePinTile,
     showGridSettings = false,
+    showInCallDevices = false,
     onLayoutModeChange,
     onAutoLayoutPresetChange,
     onHideNonVideoTilesChange,
@@ -185,18 +187,20 @@
     />
   {/if}
 
-  <button
-    type="button"
-    class="absolute right-3 top-3 z-30 inline-flex size-11 items-center justify-center rounded-md border border-border/70 bg-card/90 text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring safe-top sm:size-8"
-    aria-label={stageFullscreen ? "Exit stage fullscreen" : "Fullscreen stage"}
-    onclick={toggleStageFullscreen}
-  >
-    {#if stageFullscreen}
-      <Minimize2Icon class="size-4" aria-hidden="true" />
-    {:else}
-      <Maximize2Icon class="size-4" aria-hidden="true" />
-    {/if}
-  </button>
+  {#if !showGridSettings && !showInCallDevices}
+    <button
+      type="button"
+      class="absolute right-3 top-3 z-30 inline-flex size-11 items-center justify-center rounded-md border border-border/70 bg-card/90 text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring safe-top sm:size-8"
+      aria-label={stageFullscreen ? "Exit stage fullscreen" : "Fullscreen stage"}
+      onclick={toggleStageFullscreen}
+    >
+      {#if stageFullscreen}
+        <Minimize2Icon class="size-4" aria-hidden="true" />
+      {:else}
+        <Maximize2Icon class="size-4" aria-hidden="true" />
+      {/if}
+    </button>
+  {/if}
 </div>
 
 <style>
