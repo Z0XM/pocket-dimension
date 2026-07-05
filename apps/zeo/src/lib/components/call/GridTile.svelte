@@ -151,12 +151,15 @@
     <button
       type="button"
       data-grid-tile-handle="resize"
-      class="tile-resize-touch absolute bottom-1 right-1 z-10 size-11 cursor-se-resize rounded-sm border border-border/70 bg-card/90 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring sm:size-5"
+      class="tile-resize-touch absolute bottom-0 right-0 z-10 flex size-11 cursor-se-resize items-end justify-end rounded-tl-md bg-gradient-to-tl from-black/55 via-black/25 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 sm:size-7 sm:p-1.5"
       aria-label="Resize tile"
       onpointerdown={startResize}
     >
-      <span class="absolute inset-x-1 bottom-1.5 block h-px rotate-[-45deg] bg-muted-foreground/70"></span>
-      <span class="absolute inset-x-1.5 bottom-1 block h-px rotate-[-45deg] bg-muted-foreground/70"></span>
+      <span class="flex flex-col items-end gap-0.5" aria-hidden="true">
+        <span class="block h-0.5 w-3 rounded-full bg-white/80"></span>
+        <span class="block h-0.5 w-2 rounded-full bg-white/80"></span>
+        <span class="block h-0.5 w-1.5 rounded-full bg-white/80"></span>
+      </span>
     </button>
   {/if}
 </div>
