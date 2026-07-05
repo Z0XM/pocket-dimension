@@ -24,6 +24,7 @@
   import ParticipantTile from "./ParticipantTile.svelte";
   import ScreenShareTile from "./ScreenShareTile.svelte";
   import TileActionBar from "./TileActionBar.svelte";
+  import type { DetectedGesture, HandLandmark } from "$lib/gestures/gesture-types";
 
   type Props = {
     room: Room;
@@ -50,6 +51,10 @@
     onToggleHideVideo?: (key: string) => void;
     onToggleTileFullscreen?: (key: string) => void;
     onTogglePinTile?: (key: string) => void;
+    trackingOverlayVisible?: boolean;
+    handLandmarks?: HandLandmark[] | null;
+    handGesture?: DetectedGesture;
+    handGestureHoldProgress?: number;
   };
 
   const {
@@ -77,6 +82,10 @@
     onToggleHideVideo,
     onToggleTileFullscreen,
     onTogglePinTile,
+    trackingOverlayVisible = false,
+    handLandmarks = null,
+    handGesture = "none",
+    handGestureHoldProgress = 0,
   }: Props = $props();
 
   const isManualGrid = $derived(layoutMode === "grid");
@@ -428,6 +437,10 @@
                 {disableSpeakingGlows}
                 {mediaRevision}
                 fitContainer
+                trackingOverlayVisible={trackingOverlayVisible && tile.participant.identity === room.localParticipant.identity}
+                handLandmarks={tile.participant.identity === room.localParticipant.identity ? handLandmarks : null}
+                handGesture={tile.participant.identity === room.localParticipant.identity ? handGesture : "none"}
+                handGestureHoldProgress={tile.participant.identity === room.localParticipant.identity ? handGestureHoldProgress : 0}
               />
             {/if}
           </GridTile>

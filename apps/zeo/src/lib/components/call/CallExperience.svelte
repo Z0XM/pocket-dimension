@@ -37,6 +37,10 @@
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
   import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
   import TileColorPicker from "$lib/components/call/TileColorPicker.svelte";
+  import HandGestureTracker from "$lib/components/call/HandGestureTracker.svelte";
+  import GestureSettings from "$lib/components/call/GestureSettings.svelte";
+  import type { DetectedGesture, GestureAction, VideoTrackingFrame } from "$lib/gestures/gesture-types";
+  import { disposeHandLandmarker } from "$lib/gestures/hand-tracker";
   import { isAutoLayoutPreset, type AutoLayoutPreset } from "$lib/call/auto-layout";
   import type { StageLayoutMode } from "$lib/stage-grid";
   import { Separator } from "$lib/components/ui/separator";
@@ -166,10 +170,18 @@
   let tileColor = $state<ParticipantColor>(PARTICIPANT_COLORS[0]);
   let hideParticipantVideos = $state(false);
   let disableSpeakingGlows = $state(false);
+  let gesturesEnabled = $state(false);
+  let gestureOverlayVisible = $state(false);
+  let trackingFrame = $state<VideoTrackingFrame>({
+    handLandmarks: null,
+    gesture: "none",
+    holdProgress: 0,
+  });
   let networkHintDismissed = $state(false);
   let storedRejoinSession = $state<ReturnType<typeof readActiveCallSession>>(null);
 
   const inCallPhase = $derived(phase === "in_call" || phase === "reconnecting");
+  const gestureCameraAvailable = $derived(camEnabled && permissionState === "granted" && !cameraInUse);
   const micMonitorStream = $derived(inCallPhase ? inCallMicTestStream : previewStream);
   const micDisplayEnabled = $derived(micEnabled && !(inCallPhase && micTestActive));
 
@@ -186,6 +198,30 @@
   function setDisableSpeakingGlows(value: boolean) {
     disableSpeakingGlows = value;
     writeStoredFlag(STORAGE_KEYS.disableSpeakingGlows, value);
+  }
+
+  function setGesturesEnabled(value: boolean) {
+    gesturesEnabled = value;
+    writeStoredFlag(STORAGE_KEYS.gesturesEnabled, value);
+  }
+
+  function setGestureOverlayVisible(value: boolean) {
+    gestureOverlayVisible = value;
+    writeStoredFlag(STORAGE_KEYS.gestureOverlayVisible, value);
+  }
+
+  function handleTrackingFrameUpdate(frame: VideoTrackingFrame) {
+    trackingFrame = frame;
+  }
+
+  const videoTrackingActive = $derived(gesturesEnabled || gestureOverlayVisible);
+
+  async function handleGestureAction(action: GestureAction, _gesture: DetectedGesture) {
+    if (action !== "toggle_mic") return;
+
+    const wasOn = micEnabled;
+    await toggleMic();
+    showToast(wasOn ? "Gesture: microphone muted" : "Gesture: microphone unmuted");
   }
 
   function readInitialStageLayoutMode(): StageLayoutMode {
@@ -277,6 +313,24 @@
   let audioLevels = $state<Record<string, number>>({});
   let connectionGen = $state(0);
   let mediaRevision = $state(0);
+  const localGestureVideoTrack = $derived.by(() => {
+    mediaRevision;
+    camEnabled;
+    previewStream;
+    livekitRoom;
+    inCallPhase;
+    gestureCameraAvailable;
+
+    if (!gestureCameraAvailable) return null;
+
+    if (livekitRoom && inCallPhase) {
+      const publication = livekitRoom.localParticipant.getTrackPublication(Track.Source.Camera);
+      const track = publication?.track?.mediaStreamTrack;
+      if (track?.readyState === "live") return track;
+    }
+
+    return previewStream?.getVideoTracks().find((track) => track.readyState === "live") ?? null;
+  });
   let localDisplayName = $state("");
   let callSession: ReturnType<typeof createCallRoom> | null = null;
   let stageEl = $state<HTMLElement | null>(null);
@@ -1334,6 +1388,8 @@
     hideParticipantVideos = readStoredFlag(STORAGE_KEYS.hideParticipantVideos);
     hideNonVideoTiles = readStoredFlag(STORAGE_KEYS.hideNonVideoTiles);
     disableSpeakingGlows = readStoredFlag(STORAGE_KEYS.disableSpeakingGlows);
+    gesturesEnabled = readStoredFlag(STORAGE_KEYS.gesturesEnabled);
+    gestureOverlayVisible = readStoredFlag(STORAGE_KEYS.gestureOverlayVisible);
     stageLayoutMode = readInitialStageLayoutMode();
     autoLayoutPreset = readInitialAutoLayoutPreset();
     galleryDensity = readStoredInt(STORAGE_KEYS.galleryDensity, 5, 1, 10);
@@ -1359,8 +1415,18 @@
     stopWaitingPoll();
     stopHostWaitingPoll();
     teardownCall(true);
+    disposeHandLandmarker();
   });
 </script>
+
+<HandGestureTracker
+  videoTrack={localGestureVideoTrack}
+  active={(phase === "lobby" || inCallPhase) && videoTrackingActive}
+  {gesturesEnabled}
+  overlayVisible={gestureOverlayVisible}
+  onFrameUpdate={handleTrackingFrameUpdate}
+  onGestureAction={handleGestureAction}
+/>
 
 {#if phase === "in_call" || phase === "connecting" || phase === "reconnecting" || (phase === "disconnected" && !isEnded)}
   <div class="call-shell fixed inset-0 z-50 flex flex-col bg-background">
@@ -1466,6 +1532,13 @@
                 permissionGranted={permissionState === "granted"}
               />
               <TileColorPicker compact value={tileColor} onChange={setTileColor} />
+              <GestureSettings
+                {gesturesEnabled}
+                overlayVisible={gestureOverlayVisible}
+                cameraAvailable={gestureCameraAvailable}
+                onGesturesEnabledChange={setGesturesEnabled}
+                onOverlayVisibleChange={setGestureOverlayVisible}
+              />
               <div class="rounded-lg border border-border px-3">
                 <SettingToggle
                   id="hide-participant-videos"
@@ -1533,6 +1606,10 @@
           onHideSelfView={toggleSelfView}
           onCloseGridSettings={closeGridSettingsPanel}
           bind:stageRef={stageEl}
+          trackingOverlayVisible={gestureOverlayVisible}
+          handLandmarks={trackingFrame.handLandmarks}
+          handGesture={trackingFrame.gesture}
+          handGestureHoldProgress={trackingFrame.holdProgress}
         />
       </div>
       <div class="pointer-events-none fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-4 z-[21] safe-x">
@@ -1657,7 +1734,21 @@
     onVideoDeviceChange={changeVideoDevice}
     onPublicChange={isHost ? updateRoomVisibility : undefined}
     onJoin={joinCall}
+    trackingOverlayVisible={gestureOverlayVisible}
+    handLandmarks={trackingFrame.handLandmarks}
+    handGesture={trackingFrame.gesture}
+    handGestureHoldProgress={trackingFrame.holdProgress}
   />
+
+  <div class="mt-4">
+    <GestureSettings
+      {gesturesEnabled}
+      overlayVisible={gestureOverlayVisible}
+      cameraAvailable={gestureCameraAvailable}
+      onGesturesEnabledChange={setGesturesEnabled}
+      onOverlayVisibleChange={setGestureOverlayVisible}
+    />
+  </div>
 
   {#if isHost && waitingRoomEnabled}
     <div class="mt-4">

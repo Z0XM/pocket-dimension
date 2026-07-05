@@ -11,6 +11,8 @@
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
   import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
   import TileColorPicker from "$lib/components/call/TileColorPicker.svelte";
+  import HandGestureVideoOverlay from "$lib/components/call/HandGestureVideoOverlay.svelte";
+  import type { DetectedGesture, HandLandmark } from "$lib/gestures/gesture-types";
   import type { ParticipantColor } from "$lib/participant-colors";
   import { initialsForName } from "$lib/livekit/types";
   import type { MicGateProcessor } from "$lib/livekit/mic-gate-processor";
@@ -58,6 +60,10 @@
     onVideoDeviceChange: (deviceId: string) => void;
     onPublicChange?: (value: boolean) => void;
     onJoin: () => void;
+    trackingOverlayVisible?: boolean;
+    handLandmarks?: HandLandmark[] | null;
+    handGesture?: DetectedGesture;
+    handGestureHoldProgress?: number;
   };
 
   let {
@@ -100,6 +106,10 @@
     onVideoDeviceChange,
     onPublicChange,
     onJoin,
+    trackingOverlayVisible = false,
+    handLandmarks = null,
+    handGesture = "none",
+    handGestureHoldProgress = 0,
   }: Props = $props();
 
   let previewEl = $state<HTMLVideoElement | null>(null);
@@ -179,6 +189,13 @@
         <div class="relative aspect-video max-w-md overflow-hidden rounded-lg bg-secondary">
           {#if camEnabled && previewStream && permissionState === "granted" && !cameraInUse}
             <video bind:this={previewEl} class="size-full object-cover mirror" autoplay playsinline muted></video>
+            <HandGestureVideoOverlay
+              {handLandmarks}
+              gesture={handGesture}
+              holdProgress={handGestureHoldProgress}
+              visible={trackingOverlayVisible}
+              mirrored
+            />
           {:else if cameraInUse && camEnabled}
             <div class="flex size-full flex-col items-center justify-center gap-2 px-4 text-center">
               <TriangleAlertIcon class="size-8 shrink-0 text-destructive/80" aria-hidden="true" />

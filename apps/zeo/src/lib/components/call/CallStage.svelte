@@ -9,6 +9,7 @@
   import StageGridArea from "./StageGridArea.svelte";
   import VideoGrid from "./VideoGrid.svelte";
   import GridSettingsPanel from "./GridSettingsPanel.svelte";
+  import type { DetectedGesture, HandLandmark } from "$lib/gestures/gesture-types";
 
   type Props = {
     room: Room;
@@ -45,6 +46,10 @@
     onHideSelfView?: () => void;
     onCloseGridSettings?: () => void;
     stageRef?: HTMLElement | null;
+    trackingOverlayVisible?: boolean;
+    handLandmarks?: HandLandmark[] | null;
+    handGesture?: DetectedGesture;
+    handGestureHoldProgress?: number;
   };
 
   let {
@@ -82,6 +87,10 @@
     onHideSelfView,
     onCloseGridSettings,
     stageRef = $bindable(null),
+    trackingOverlayVisible = false,
+    handLandmarks = null,
+    handGesture = "none",
+    handGestureHoldProgress = 0,
   }: Props = $props();
 
   let stageEl = $state<HTMLElement | null>(null);
@@ -149,6 +158,10 @@
         {onToggleHideVideo}
         {onToggleTileFullscreen}
         {onTogglePinTile}
+        {trackingOverlayVisible}
+        {handLandmarks}
+        {handGesture}
+        {handGestureHoldProgress}
       />
     {/snippet}
   </StageGridArea>
