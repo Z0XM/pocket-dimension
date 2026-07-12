@@ -1,5 +1,4 @@
 import { Track, type LocalParticipant, type LocalTrack, type RemoteParticipant, type Room, type ScreenShareCaptureOptions } from "livekit-client";
-import { logAudioDiag } from "./call-audio-diagnostics";
 import { listRoomParticipants } from "./room-client";
 
 /** Skip LiveKit's default 1080p ideal constraints — some browsers reject them with NotSupportedError. */
@@ -174,12 +173,6 @@ export async function enableLocalScreenShare(local: LocalParticipant): Promise<S
       const audioPublished = screenShareAudioPublished(local);
       const audioFallback = audioPublished ? "published" : attempt.label === "video_only" ? "browser_unsupported" : "picker_skipped";
 
-      logAudioDiag("info", "screen_share.started", {
-        attempt: attempt.label,
-        audioPublished,
-        audioFallback,
-      });
-
       return { audioPublished, audioFallback };
     } catch (error) {
       lastError = error;
@@ -187,10 +180,6 @@ export async function enableLocalScreenShare(local: LocalParticipant): Promise<S
         throw error;
       }
 
-      logAudioDiag("warn", "screen_share.attempt_failed", {
-        attempt: attempt.label,
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
   }
 
@@ -228,10 +217,6 @@ export async function enableLocalScreenAudioShare(local: LocalParticipant): Prom
 
       await local.publishTrack(audioTrack);
 
-      logAudioDiag("info", "screen_share_audio.started", {
-        attempt: attempt.label,
-      });
-
       return { audioPublished: true, audioFallback: "published" };
     } catch (error) {
       stopHeldScreenCaptureVideo(local);
@@ -240,10 +225,6 @@ export async function enableLocalScreenAudioShare(local: LocalParticipant): Prom
         throw error;
       }
 
-      logAudioDiag("warn", "screen_share_audio.attempt_failed", {
-        attempt: attempt.label,
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
   }
 
@@ -253,13 +234,11 @@ export async function enableLocalScreenAudioShare(local: LocalParticipant): Prom
 export async function disableLocalScreenShare(local: LocalParticipant) {
   await local.setScreenShareEnabled(false);
   stopHeldScreenCaptureVideo(local);
-  logAudioDiag("info", "screen_share.stopped");
 }
 
 export async function disableLocalScreenAudioShare(local: LocalParticipant) {
   await unpublishScreenShareAudio(local);
   stopHeldScreenCaptureVideo(local);
-  logAudioDiag("info", "screen_share_audio.stopped");
 }
 
 export async function disableLocalScreenCapture(local: LocalParticipant) {
