@@ -42,6 +42,7 @@
     findScreenShareParticipant,
     isScreenShareActive,
     screenShareFailureMessage,
+    screenShareAudioHint,
   } from "$lib/livekit/screen-share";
   import { captureStageToBlob, compressSnapshotForChat, downloadSnapshotBlob } from "$lib/snapshot";
   import PreCallLobby from "$lib/components/call/PreCallLobby.svelte";
@@ -1415,8 +1416,12 @@
     }
 
     try {
-      await enableLocalScreenShare(local);
+      const result = await enableLocalScreenShare(local);
       bumpMediaRevision();
+      const hint = screenShareAudioHint(result);
+      if (hint) {
+        showToast(hint);
+      }
     } catch (error) {
       const message = screenShareFailureMessage(error);
       if (!(error instanceof DOMException && error.name === "NotAllowedError")) {
