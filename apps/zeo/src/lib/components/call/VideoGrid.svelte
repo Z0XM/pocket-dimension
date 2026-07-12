@@ -2,7 +2,7 @@
   import type { Room } from "livekit-client";
   import { buildStageTiles, filterStageTiles, type StageTileEntry } from "$lib/call/stage-tiles";
   import { computeAutoLayoutFrames, type AutoLayoutPreset } from "$lib/call/auto-layout";
-  import { computeGameLayoutFrames } from "$lib/call/game-layout";
+  import { computeGameLayoutFrames, teamColorByUserId } from "$lib/call/game-layout";
   import type { GameSnapshotTeam } from "$lib/server/game/types";
   import { gridPlacementsKey, readStored, writeStored } from "$lib/browser-storage";
   import { displayNameForParticipant } from "$lib/livekit/screen-share";
@@ -142,8 +142,15 @@
 
   const gameLayoutFrames = $derived.by(() => {
     if (!isGameLayout || !gridLayout) return null;
-    return computeGameLayoutFrames(stageTiles, gridLayout, gameTeams);
+    mediaRevision;
+    return computeGameLayoutFrames(stageTiles, gridLayout, gameTeams, autoLayoutPreset, activeSpeakerIdentity, {
+      galleryDensity,
+      sidebarSplitRatio,
+      pinnedTileKey,
+    });
   });
+
+  const gameTeamColors = $derived(teamColorByUserId(gameTeams));
 
   const canRenderTiles = $derived(
     Boolean(gridLayout && (isGameLayout ? gameLayoutFrames : isManualGrid ? baseParticipantGrid : autoLayoutFrames))
@@ -454,6 +461,7 @@
                   localIdentity: room.localParticipant.identity,
                   preferredColor: localTileColor,
                 })}
+                teamOutlineColor={isGameLayout ? (gameTeamColors.get(tile.participant.identity) ?? null) : null}
                 isLocal={tile.participant.identity === room.localParticipant.identity}
                 localMicEnabled={tile.participant.identity === room.localParticipant.identity ? localMicEnabled : undefined}
                 hideVideos={hideParticipantVideos || tileVideoHidden(tile.key)}

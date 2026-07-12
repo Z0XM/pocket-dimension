@@ -52,6 +52,7 @@
   import WaitingRoomView from "$lib/components/call/WaitingRoomView.svelte";
   import HostWaitingPanel from "$lib/components/call/HostWaitingPanel.svelte";
   import GamePanel from "$lib/components/call/GamePanel.svelte";
+  import GamePhaseBanner from "$lib/components/call/GamePhaseBanner.svelte";
   import ConnectionQualityBadge from "$lib/components/call/ConnectionQualityBadge.svelte";
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
   import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
@@ -1541,6 +1542,12 @@
   });
 
   $effect(() => {
+    if (gameActive && !gameSnapshot?.round && inCallPhase) {
+      showGamePanel = true;
+    }
+  });
+
+  $effect(() => {
     if (gameActive) {
       closeGridSettingsPanel();
       if (layoutModeBeforeGame === null && stageLayoutMode !== "game") {
@@ -1664,6 +1671,7 @@
         open={showGamePanel}
         bottomInset={controlBarReservePx}
         {isHost}
+        userId={user.id}
         {slug}
         snapshot={gameSnapshot}
         busy={gameBusy}
@@ -1671,6 +1679,8 @@
         onSnapshot={handleGameSnapshot}
         onBusyChange={(value) => (gameBusy = value)}
       />
+
+      <GamePhaseBanner snapshot={gameSnapshot} />
 
       <div class="relative min-h-0 flex-1">
         {#if showInCallDevices}
