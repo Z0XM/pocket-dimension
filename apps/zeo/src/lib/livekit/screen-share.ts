@@ -1,4 +1,4 @@
-import { Track, type LocalParticipant, type RemoteParticipant, type Room, type ScreenShareCaptureOptions } from "livekit-client";
+import { Track, type LocalParticipant, type LocalTrack, type RemoteParticipant, type Room, type ScreenShareCaptureOptions } from "livekit-client";
 import { logAudioDiag } from "./call-audio-diagnostics";
 import { listRoomParticipants } from "./room-client";
 
@@ -17,6 +17,14 @@ const SCREEN_CAPTURE_WITH_SYSTEM_AUDIO: ScreenShareCaptureOptions = {
   systemAudio: "include",
 };
 
+const AUDIO_ONLY_CAPTURE_ATTEMPTS: Array<{ label: string; options: ScreenShareCaptureOptions }> = [
+  { label: "system_audio", options: SCREEN_CAPTURE_WITH_SYSTEM_AUDIO },
+  { label: "tab_audio", options: SCREEN_CAPTURE_WITH_TAB_AUDIO },
+];
+
+/** Unpublished display-capture video kept alive so tab/system audio can continue. */
+const heldScreenCaptureVideoTracks = new WeakMap<LocalParticipant, LocalTrack>();
+
 export type ScreenShareStartResult = {
   audioPublished: boolean;
   audioFallback: "published" | "picker_skipped" | "browser_unsupported";
@@ -32,14 +40,26 @@ export function isScreenShareAudioActive(participant: LocalParticipant | RemoteP
   return Boolean(publication?.track && !publication.isMuted);
 }
 
+export function isScreenShareAudioOnlyActive(participant: LocalParticipant | RemoteParticipant) {
+  return isScreenShareAudioActive(participant) && !isScreenShareActive(participant);
+}
+
+export function isScreenCaptureActive(participant: LocalParticipant | RemoteParticipant) {
+  return isScreenShareActive(participant) || isScreenShareAudioOnlyActive(participant);
+}
+
 function screenShareAudioPublished(local: LocalParticipant) {
   return isScreenShareAudioActive(local);
 }
 
 export function findScreenShareParticipant(room: Room, excludeIdentity?: string) {
+  return findScreenCaptureParticipant(room, excludeIdentity);
+}
+
+export function findScreenCaptureParticipant(room: Room, excludeIdentity?: string) {
   for (const participant of listRoomParticipants(room)) {
     if (excludeIdentity && participant.identity === excludeIdentity) continue;
-    if (isScreenShareActive(participant)) return participant;
+    if (isScreenCaptureActive(participant)) return participant;
   }
   return null;
 }
@@ -80,9 +100,17 @@ function isRetriableScreenShareError(error: unknown) {
   return error instanceof Error && error.message.toLowerCase().includes("not supported");
 }
 
+function isMissingScreenShareAudioError(error: unknown) {
+  return error instanceof Error && error.message === "screen_share_audio_missing";
+}
+
 export function screenShareFailureMessage(error: unknown): string {
   if (error instanceof DOMException && error.name === "NotAllowedError") {
     return "Screen sharing was cancelled";
+  }
+
+  if (isMissingScreenShareAudioError(error)) {
+    return "Enable Share audio in the browser picker to share tab sound only";
   }
 
   const unavailable = screenShareUnavailableReason();
@@ -99,11 +127,38 @@ async function startScreenShare(local: LocalParticipant, options: ScreenShareCap
   await local.setScreenShareEnabled(true, options);
 }
 
+function stopHeldScreenCaptureVideo(local: LocalParticipant) {
+  const heldVideo = heldScreenCaptureVideoTracks.get(local);
+  if (!heldVideo) return;
+
+  heldVideo.stop();
+  heldScreenCaptureVideoTracks.delete(local);
+}
+
+async function unpublishScreenShareAudio(local: LocalParticipant) {
+  const publication = local.getTrackPublication(Track.Source.ScreenShareAudio);
+  if (publication?.track) {
+    await local.unpublishTrack(publication.track);
+  }
+}
+
+export function watchHeldScreenCaptureEnded(local: LocalParticipant, onEnded: () => void) {
+  const heldVideo = heldScreenCaptureVideoTracks.get(local);
+  const mediaTrack = heldVideo?.mediaStreamTrack;
+  if (!mediaTrack) return () => undefined;
+
+  const handleEnded = () => onEnded();
+  mediaTrack.addEventListener("ended", handleEnded);
+  return () => mediaTrack.removeEventListener("ended", handleEnded);
+}
+
 export async function enableLocalScreenShare(local: LocalParticipant): Promise<ScreenShareStartResult> {
   const unavailable = screenShareUnavailableReason();
   if (unavailable) {
     throw new Error(unavailable);
   }
+
+  await disableLocalScreenAudioShare(local);
 
   const attempts: Array<{ label: string; options: ScreenShareCaptureOptions }> = [
     { label: "system_audio", options: SCREEN_CAPTURE_WITH_SYSTEM_AUDIO },
@@ -142,9 +197,80 @@ export async function enableLocalScreenShare(local: LocalParticipant): Promise<S
   throw lastError instanceof Error ? lastError : new Error("Could not start screen share");
 }
 
+export async function enableLocalScreenAudioShare(local: LocalParticipant): Promise<ScreenShareStartResult> {
+  const unavailable = screenShareUnavailableReason();
+  if (unavailable) {
+    throw new Error(unavailable);
+  }
+
+  if (isScreenShareActive(local)) {
+    await disableLocalScreenShare(local);
+  }
+
+  await disableLocalScreenAudioShare(local);
+
+  let lastError: unknown;
+
+  for (const attempt of AUDIO_ONLY_CAPTURE_ATTEMPTS) {
+    try {
+      const localTracks = await local.createScreenTracks(attempt.options);
+      const videoTrack = localTracks.find((track) => track.source === Track.Source.ScreenShare);
+      const audioTrack = localTracks.find((track) => track.source === Track.Source.ScreenShareAudio);
+
+      if (videoTrack) {
+        heldScreenCaptureVideoTracks.set(local, videoTrack);
+      }
+
+      if (!audioTrack) {
+        stopHeldScreenCaptureVideo(local);
+        throw new Error("screen_share_audio_missing");
+      }
+
+      await local.publishTrack(audioTrack);
+
+      logAudioDiag("info", "screen_share_audio.started", {
+        attempt: attempt.label,
+      });
+
+      return { audioPublished: true, audioFallback: "published" };
+    } catch (error) {
+      stopHeldScreenCaptureVideo(local);
+      lastError = error;
+      if (!isRetriableScreenShareError(error) && !isMissingScreenShareAudioError(error)) {
+        throw error;
+      }
+
+      logAudioDiag("warn", "screen_share_audio.attempt_failed", {
+        attempt: attempt.label,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Could not start tab audio share");
+}
+
 export async function disableLocalScreenShare(local: LocalParticipant) {
   await local.setScreenShareEnabled(false);
+  stopHeldScreenCaptureVideo(local);
   logAudioDiag("info", "screen_share.stopped");
+}
+
+export async function disableLocalScreenAudioShare(local: LocalParticipant) {
+  await unpublishScreenShareAudio(local);
+  stopHeldScreenCaptureVideo(local);
+  logAudioDiag("info", "screen_share_audio.stopped");
+}
+
+export async function disableLocalScreenCapture(local: LocalParticipant) {
+  if (isScreenShareActive(local)) {
+    await disableLocalScreenShare(local);
+    return;
+  }
+
+  if (isScreenShareAudioOnlyActive(local)) {
+    await disableLocalScreenAudioShare(local);
+  }
 }
 
 export function screenShareAudioHint(result: ScreenShareStartResult): string | null {
@@ -157,4 +283,12 @@ export function screenShareAudioHint(result: ScreenShareStartResult): string | n
   }
 
   return "Screen shared. Enable Share audio in the browser picker to include tab sound";
+}
+
+export function screenShareAudioOnlyHint(result: ScreenShareStartResult): string | null {
+  if (result.audioPublished) {
+    return "Sharing tab audio only";
+  }
+
+  return screenShareAudioHint(result);
 }

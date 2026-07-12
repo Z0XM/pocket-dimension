@@ -39,11 +39,16 @@
   import { createMicGateProcessor, type MicGateProcessor } from "$lib/livekit/mic-gate-processor";
   import {
     disableLocalScreenShare,
+    disableLocalScreenAudioShare,
     enableLocalScreenShare,
-    findScreenShareParticipant,
+    enableLocalScreenAudioShare,
+    findScreenCaptureParticipant,
     isScreenShareActive,
+    isScreenShareAudioOnlyActive,
     screenShareFailureMessage,
     screenShareAudioHint,
+    screenShareAudioOnlyHint,
+    watchHeldScreenCaptureEnded,
   } from "$lib/livekit/screen-share";
   import { captureStageToBlob, compressSnapshotForChat, downloadSnapshotBlob } from "$lib/snapshot";
   import PreCallLobby from "$lib/components/call/PreCallLobby.svelte";
@@ -363,11 +368,13 @@
   let mutedListenTileKeys = $state<string[]>([]);
   let fullscreenTileKey = $state<string | null>(null);
   let intentionalScreenShareStop = false;
+  let intentionalScreenAudioShareStop = false;
   let snapshotting = $state(false);
   let snapshotFlash = $state(false);
   let toastMessage = $state<string | null>(null);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   let screenShareListenerCleanup: (() => void) | undefined;
+  let screenAudioShareEndedCleanup: (() => void) | undefined;
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
   let pingPollTimer: ReturnType<typeof setInterval> | undefined;
@@ -381,6 +388,11 @@
   const screenSharing = $derived.by(() => {
     mediaRevision;
     return livekitRoom ? isScreenShareActive(livekitRoom.localParticipant) : false;
+  });
+
+  const screenAudioSharing = $derived.by(() => {
+    mediaRevision;
+    return livekitRoom ? isScreenShareAudioOnlyActive(livekitRoom.localParticipant) : false;
   });
 
   const stageTiles = $derived.by(() => {
@@ -813,6 +825,8 @@
     }
     screenShareListenerCleanup?.();
     screenShareListenerCleanup = undefined;
+    screenAudioShareEndedCleanup?.();
+    screenAudioShareEndedCleanup = undefined;
     if (disconnectLiveKit && callSession) {
       await callSession.disconnect();
     }
@@ -830,18 +844,45 @@
     const onLocalTrackUnpublished = (publication: LocalTrackPublication) => {
       if (gen !== connectionGen) return;
       bumpMediaRevision();
-      if (publication.source !== Track.Source.ScreenShare) return;
-      if (intentionalScreenShareStop) {
-        intentionalScreenShareStop = false;
+      if (publication.source === Track.Source.ScreenShare) {
+        if (intentionalScreenShareStop) {
+          intentionalScreenShareStop = false;
+          return;
+        }
+        showToast("Your screen share was stopped");
         return;
       }
-      showToast("Your screen share was stopped");
+
+      if (publication.source === Track.Source.ScreenShareAudio) {
+        if (intentionalScreenAudioShareStop || intentionalScreenShareStop) {
+          intentionalScreenAudioShareStop = false;
+          return;
+        }
+        showToast("Your tab audio share was stopped");
+      }
     };
 
     room.on(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
     screenShareListenerCleanup = () => {
       room.off(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
     };
+  }
+
+  function attachScreenAudioShareEndedListener(room: Room, gen: number) {
+    screenAudioShareEndedCleanup?.();
+    screenAudioShareEndedCleanup = watchHeldScreenCaptureEnded(room.localParticipant, () => {
+      if (gen !== connectionGen) return;
+      if (intentionalScreenAudioShareStop) {
+        intentionalScreenAudioShareStop = false;
+        return;
+      }
+
+      void (async () => {
+        await disableLocalScreenAudioShare(room.localParticipant);
+        bumpMediaRevision();
+        showToast("Your tab audio share was stopped");
+      })();
+    });
   }
 
   function bindConnectionHandlers(gen: number) {
@@ -1408,6 +1449,21 @@
     }
   }
 
+  async function stopOtherScreenCapture() {
+    if (!livekitRoom) return true;
+
+    const otherSharer = findScreenCaptureParticipant(livekitRoom, livekitRoom.localParticipant.identity);
+    if (!otherSharer) return true;
+
+    const res = await fetch(`/api/rooms/${slug}/screen-share/stop-active`, { method: "POST" });
+    if (!res.ok) {
+      showToast("Could not take over screen share");
+      return false;
+    }
+
+    return true;
+  }
+
   async function toggleScreenShare() {
     if (!livekitRoom) return;
     const local = livekitRoom.localParticipant;
@@ -1419,19 +1475,43 @@
       return;
     }
 
-    const otherSharer = findScreenShareParticipant(livekitRoom, local.identity);
-    if (otherSharer) {
-      const res = await fetch(`/api/rooms/${slug}/screen-share/stop-active`, { method: "POST" });
-      if (!res.ok) {
-        showToast("Could not take over screen share");
-        return;
-      }
-    }
+    if (!(await stopOtherScreenCapture())) return;
 
     try {
       const result = await enableLocalScreenShare(local);
       bumpMediaRevision();
       const hint = screenShareAudioHint(result);
+      if (hint) {
+        showToast(hint);
+      }
+    } catch (error) {
+      const message = screenShareFailureMessage(error);
+      if (!(error instanceof DOMException && error.name === "NotAllowedError")) {
+        showToast(message);
+      }
+    }
+  }
+
+  async function toggleScreenAudioShare() {
+    if (!livekitRoom) return;
+    const local = livekitRoom.localParticipant;
+
+    if (isScreenShareAudioOnlyActive(local)) {
+      intentionalScreenAudioShareStop = true;
+      screenAudioShareEndedCleanup?.();
+      screenAudioShareEndedCleanup = undefined;
+      await disableLocalScreenAudioShare(local);
+      bumpMediaRevision();
+      return;
+    }
+
+    if (!(await stopOtherScreenCapture())) return;
+
+    try {
+      const result = await enableLocalScreenAudioShare(local);
+      attachScreenAudioShareEndedListener(livekitRoom, connectionGen);
+      bumpMediaRevision();
+      const hint = screenShareAudioOnlyHint(result);
       if (hint) {
         showToast(hint);
       }
@@ -1743,12 +1823,14 @@
         {speakerEnabled}
         {camEnabled}
         {screenSharing}
+        {screenAudioSharing}
         {snapshotting}
         {chatOpen}
         onToggleMic={toggleMic}
         onToggleSpeaker={toggleSpeaker}
         onToggleCam={toggleCam}
         onToggleScreenShare={toggleScreenShare}
+        onToggleScreenAudioShare={toggleScreenAudioShare}
         onSnapshot={takeSnapshot}
         onToggleChat={chatEnabled ? () => (chatOpen = !chatOpen) : undefined}
         onToggleDevices={() => (showInCallDevices ? closeInCallDevicesPanel() : openInCallDevicesPanel())}

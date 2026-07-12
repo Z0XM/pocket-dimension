@@ -9,9 +9,10 @@
     displayName: string;
     localIdentity: string;
     localTileColor?: ParticipantColor | null;
+    audioOnly?: boolean;
   };
 
-  const { kind, participant, displayName, localIdentity, localTileColor }: Props = $props();
+  const { kind, participant, displayName, localIdentity, localTileColor, audioOnly = false }: Props = $props();
 
   const tileColor = $derived(
     tileColorForParticipant(participant.identity, {
@@ -20,7 +21,7 @@
     })
   );
 
-  const label = $derived(kind === "screen-share" ? "Screen" : initialsForName(displayName));
+  const label = $derived(kind === "screen-share" ? (audioOnly ? "Audio" : "Screen") : initialsForName(displayName));
 </script>
 
 <div class="relative h-10 w-16 overflow-hidden rounded-md border border-border bg-secondary shadow-sm">
@@ -29,6 +30,6 @@
   </div>
 
   <div class="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white">
-    {kind === "screen-share" ? "Screen" : displayName}
+    {kind === "screen-share" ? (audioOnly ? "Audio" : "Screen") : displayName}
   </div>
 </div>

@@ -426,6 +426,7 @@
                 displayName={displayNameForParticipant(tile.participant, room.localParticipant.identity, localDisplayName)}
                 isLocal={tile.participant.identity === room.localParticipant.identity}
                 hidden={tileVideoHidden(tile.key)}
+                audioOnly={tile.audioOnly}
               />
             {:else}
               <ParticipantTile
