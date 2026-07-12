@@ -12,7 +12,6 @@
     isActiveSpeaker?: boolean;
     audioLevel?: number;
     tileColor: string;
-    isGuest?: boolean;
     isLocal?: boolean;
     localMicEnabled?: boolean;
     hideVideos?: boolean;
@@ -32,7 +31,6 @@
     isActiveSpeaker = false,
     audioLevel = 0,
     tileColor,
-    isGuest = false,
     isLocal = false,
     localMicEnabled,
     hideVideos = false,
@@ -126,7 +124,7 @@
   <div
     class="relative size-full overflow-hidden rounded-lg bg-secondary transition-[box-shadow,outline] duration-100 ease-out"
     style={speakingRingStyle}
-    aria-label="{displayName}{isLocal ? ' (you)' : ''}{isGuest ? ', guest' : ''}"
+    aria-label="{displayName}{isLocal ? ' (you)' : ''}"
   >
     {#if showVideo}
       <video bind:this={videoEl} class="size-full object-cover {isLocal ? '-scale-x-100' : ''}" autoplay playsinline muted={isLocal}></video>
@@ -147,9 +145,6 @@
 
     <div class="absolute inset-x-0 bottom-0 z-[2] flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
       <p class="truncate text-sm font-medium text-white">{displayName}{isLocal ? " (you)" : ""}</p>
-      {#if isGuest}
-        <span class="shrink-0 rounded bg-black/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/80">Guest</span>
-      {/if}
       {#if !micEnabled}
         <span class="ml-auto shrink-0 text-xs text-white/80" aria-label="Muted">Muted</span>
       {:else}

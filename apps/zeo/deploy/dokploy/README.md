@@ -230,7 +230,7 @@ After LiveKit is up, confirm zeo has matching `LIVEKIT_API_KEY` / `LIVEKIT_API_S
 | Webhook route | `curl -sI -X POST https://zeo.z0xm.com/api/webhooks/livekit` → 401 (route exists) |
 | Login | Sign up / login at https://zeo.z0xm.com |
 | Create room | User with `contributor` or `admin` role |
-| Call test | Two browsers + guest join |
+| Call test | Two browsers (authenticated users) |
 | Mobile / TURN | Join from cellular network |
 | Admin | Promote user to `admin`, open `/admin` |
 

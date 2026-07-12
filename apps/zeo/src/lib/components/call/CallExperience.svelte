@@ -86,7 +86,7 @@
     hostName: string;
     maxParticipants: number;
     isHost: boolean;
-    user: { id: string; email: string; username: string | null } | null;
+    user: { id: string; email: string; username: string | null };
     hostUserId: string;
     initialParticipantCount: number;
     initialIsFull: boolean;
@@ -124,8 +124,6 @@
     onPhaseChange,
   }: Props = $props();
 
-  const guestStorageKey = `zeo-guest:${slug}`;
-
   let phase = $state<CallPhase>(initialIsEnded ? "ended" : "lobby");
 
   function setPhase(next: CallPhase) {
@@ -144,7 +142,6 @@
   let isStale = $state(initialIsStale);
   let updatingVisibility = $state(false);
   let updatingRoomLock = $state(false);
-  let guestName = $state("");
   let errorMessage = $state<string | null>(null);
   let disconnectMessage = $state<string | null>(null);
   let joining = $state(false);
@@ -371,11 +368,8 @@
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
   let pingPollTimer: ReturnType<typeof setInterval> | undefined;
 
-  const userDisplayName = $derived(user?.username ?? user?.email ?? null);
-  const isGuest = $derived(!user);
-  const canJoinLobby = $derived(
-    !isEnded && isJoinable && !isFull && (user !== null || guestName.trim().length > 0) && previewReady && phase === "lobby"
-  );
+  const userDisplayName = $derived(user.username ?? user.email ?? null);
+  const canJoinLobby = $derived(!isEnded && isJoinable && !isFull && previewReady && phase === "lobby");
   const showAudioOutputSelection = $derived(browser ? supportsAudioOutputSelection() && mediaDevices.audioOutputs.length > 0 : false);
   const screenSharing = $derived.by(() => {
     mediaRevision;
@@ -919,29 +913,17 @@
   }
 
   async function requestToken() {
-    const body: Record<string, string> = {};
-    if (isGuest) {
-      body.guestName = guestName.trim();
-      writeStored(STORAGE_KEYS.guestDisplayName, guestName);
-      const stored = sessionStorage.getItem(guestStorageKey);
-      if (stored) body.guestIdentity = stored;
-    }
-
     const res = await fetch(`/api/rooms/${slug}/token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({}),
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(payload.message ?? "Could not join room");
     }
 
-    if (payload.identity?.startsWith("guest_")) {
-      sessionStorage.setItem(guestStorageKey, payload.identity);
-    }
-
-    localDisplayName = payload.displayName ?? guestName.trim();
+    localDisplayName = payload.displayName ?? userDisplayName ?? user.email;
 
     if (payload.status === "waiting") {
       waitingIdentity = payload.identity ?? waitingIdentity;
@@ -983,7 +965,6 @@
     networkHintDismissed = false;
     writeActiveCallSession({
       slug,
-      guestName: isGuest ? guestName.trim() : undefined,
       displayName: localDisplayName,
       joinedAt: new Date().toISOString(),
     });
@@ -994,7 +975,7 @@
   }
 
   async function pollWaitingAdmission() {
-    const identity = waitingIdentity ?? user?.id ?? sessionStorage.getItem(guestStorageKey);
+    const identity = waitingIdentity ?? user.id;
     if (!identity) return;
 
     const res = await fetch(`/api/rooms/${slug}/waiting?identity=${encodeURIComponent(identity)}`);
@@ -1055,7 +1036,7 @@
       body: JSON.stringify({ identity }),
     });
     if (!res.ok) {
-      showToast(`Could not ${action} guest`);
+      showToast(`Could not ${action} participant`);
       return;
     }
     await refreshHostWaitingList();
@@ -1130,9 +1111,6 @@
 
   async function postSnapshotToChat(dataUrl: string) {
     const payload: Record<string, string> = { body: dataUrl, kind: "snapshot" };
-    if (isGuest && livekitRoom) {
-      payload.guestIdentity = livekitRoom.localParticipant.identity;
-    }
 
     const res = await fetch(`/api/rooms/${slug}/chat`, {
       method: "POST",
@@ -1179,11 +1157,6 @@
   async function rejoinStoredCall() {
     const session = storedRejoinSession;
     if (!session || session.slug !== slug) return;
-
-    if (session.guestName && isGuest) {
-      guestName = session.guestName;
-      writeStored(STORAGE_KEYS.guestDisplayName, session.guestName);
-    }
 
     storedRejoinSession = null;
     await joinCall();
@@ -1537,12 +1510,6 @@
     sidebarSplitRatio = readStoredFloat(STORAGE_KEYS.sidebarSplitRatio, 0.72, 0.55, 0.85);
     storedRejoinSession = readActiveCallSession();
     onPhaseChange?.(phase);
-    if (!user) {
-      const storedGuestName = readStored(STORAGE_KEYS.guestDisplayName);
-      if (storedGuestName) {
-        guestName = storedGuestName;
-      }
-    }
     setupPreview();
     micGateProcessor = createFreshMicGateProcessor();
     refreshTimer = setInterval(refreshRoomMeta, 5000);
@@ -1611,7 +1578,6 @@
         <ChatPanel
           {slug}
           localIdentity={livekitRoom.localParticipant.identity}
-          guestIdentity={isGuest ? livekitRoom.localParticipant.identity : null}
           open={chatOpen}
           syncToken={chatSyncToken}
           {isHost}
@@ -1826,7 +1792,7 @@
     <div class="mb-4 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
       <p class="text-sm font-medium text-foreground">You were in this call before the page reloaded.</p>
       <p class="mt-1 text-xs text-muted-foreground">
-        Rejoin as {storedRejoinSession.displayName ?? (guestName.trim() || "guest")}?
+        Rejoin as {storedRejoinSession.displayName ?? userDisplayName ?? "you"}?
       </p>
       <div class="mt-3 flex flex-wrap gap-2">
         <button type="button" class="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground" onclick={rejoinStoredCall}>
@@ -1852,12 +1818,10 @@
     {hostName}
     {participantCount}
     {maxParticipants}
-    {isGuest}
     {isHost}
     isPublic={roomIsPublic}
     {waitingRoomEnabled}
     {isStale}
-    {guestName}
     {userDisplayName}
     {micEnabled}
     {speakerEnabled}
@@ -1877,10 +1841,6 @@
     {tileColor}
     onTileColorChange={setTileColor}
     {updatingVisibility}
-    onGuestNameChange={(v) => {
-      guestName = v;
-      writeStored(STORAGE_KEYS.guestDisplayName, v);
-    }}
     onToggleMic={toggleMic}
     onToggleSpeaker={toggleSpeaker}
     onToggleCam={toggleCam}

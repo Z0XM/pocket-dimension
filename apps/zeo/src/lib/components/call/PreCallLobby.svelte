@@ -4,8 +4,6 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
   import { Separator } from "$lib/components/ui/separator";
   import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
@@ -26,12 +24,10 @@
     hostName: string;
     participantCount: number;
     maxParticipants: number;
-    isGuest: boolean;
     isHost: boolean;
     isPublic: boolean;
     waitingRoomEnabled?: boolean;
     isStale?: boolean;
-    guestName: string;
     userDisplayName?: string | null;
     micEnabled: boolean;
     speakerEnabled: boolean;
@@ -51,7 +47,6 @@
     tileColor: ParticipantColor;
     onTileColorChange: (color: ParticipantColor) => void;
     updatingVisibility?: boolean;
-    onGuestNameChange: (value: string) => void;
     onToggleMic: () => void;
     onToggleSpeaker: () => void;
     onToggleCam: () => void;
@@ -72,12 +67,10 @@
     hostName,
     participantCount,
     maxParticipants,
-    isGuest,
     isHost,
     isPublic,
     waitingRoomEnabled = false,
     isStale = false,
-    guestName,
     userDisplayName = null,
     micEnabled,
     speakerEnabled,
@@ -97,7 +90,6 @@
     tileColor,
     onTileColorChange,
     updatingVisibility = false,
-    onGuestNameChange,
     onToggleMic,
     onToggleSpeaker,
     onToggleCam,
@@ -115,7 +107,7 @@
   let previewEl = $state<HTMLVideoElement | null>(null);
   let micPreviewControls = $state<MicPreviewControls | null>(null);
 
-  const previewDisplayName = $derived(userDisplayName?.trim() || guestName.trim() || "You");
+  const previewDisplayName = $derived(userDisplayName?.trim() || "You");
 
   async function handleAudioOutputDeviceChange(deviceId: string) {
     onAudioOutputDeviceChange?.(deviceId);
@@ -176,13 +168,6 @@
         />
       {/if}
     </div>
-
-    {#if isGuest}
-      <div class="space-y-2">
-        <Label for="guest-name">Your name</Label>
-        <Input id="guest-name" value={guestName} oninput={(e) => onGuestNameChange(e.currentTarget.value)} placeholder="Marco" maxlength={40} />
-      </div>
-    {/if}
 
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
       <div class="min-w-0 flex-1 space-y-3">

@@ -55,10 +55,3 @@
   initialIsJoinable={data.isJoinable}
   chatEnabled={data.chatEnabled}
 />
-
-{#if !data.user && !data.isEnded && showPageChrome}
-  <p class="mt-8 text-center text-sm text-muted-foreground">
-    <a href="/login?redirect=/room/{data.slug}" class="link-action"> Sign in </a>
-    for a persistent identity (optional).
-  </p>
-{/if}

@@ -19,7 +19,7 @@
 <section class="rounded-xl border border-border bg-card/60 px-6 py-5 space-y-4">
   <div>
     <h2 class="text-lg font-semibold text-foreground">Waiting room</h2>
-    <p class="text-sm text-muted-foreground">Admit guests before they can join the call.</p>
+    <p class="text-sm text-muted-foreground">Admit participants before they can join the call.</p>
   </div>
 
   {#if loading}

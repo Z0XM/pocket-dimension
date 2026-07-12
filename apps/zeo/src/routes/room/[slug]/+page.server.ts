@@ -1,12 +1,17 @@
-import { error } from "@sveltejs/kit";
+import { error, redirect } from "@sveltejs/kit";
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
 import { findRoomBySlug, getRoomLimits, isRoomFullForRoom, resolveParticipantCount } from "$lib/server/rooms";
 import { formatScheduledStart, isRoomJoinable, isRoomScheduledForFuture } from "$lib/server/room-schedule";
 import type { PageServerLoad } from "./$types";
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+export const load: PageServerLoad = async ({ params, locals, url }) => {
   const slug = params.slug;
+
+  if (!locals.user) {
+    redirect(303, `/login?redirect=${encodeURIComponent(url.pathname)}`);
+  }
+
   const room = await findRoomBySlug(slug);
 
   if (!room) {
@@ -43,13 +48,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     isJoinable: isRoomJoinable(room, { isHost: locals.user?.id === room.hostUserId }),
     isScheduledForFuture: scheduledForFuture,
     scheduledStartLabel: room.scheduledStartAt ? formatScheduledStart(room.scheduledStartAt) : null,
-    isHost: locals.user?.id === room.hostUserId,
-    user: locals.user
-      ? {
-          id: locals.user.id,
-          email: locals.user.email,
-          username: locals.user.username,
-        }
-      : null,
+    isHost: locals.user.id === room.hostUserId,
+    user: {
+      id: locals.user.id,
+      email: locals.user.email,
+      username: locals.user.username,
+    },
   };
 };

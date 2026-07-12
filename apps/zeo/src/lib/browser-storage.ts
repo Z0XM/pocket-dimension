@@ -2,7 +2,6 @@ import { browser } from "$app/environment";
 
 export const STORAGE_KEYS = {
   lastRoomName: "zeo:last-room-name",
-  guestDisplayName: "zeo:guest-display-name",
   micOutputVolume: "zeo:mic-output-volume",
   micInputCutoff: "zeo:mic-input-cutoff",
   audioOutputDeviceId: "zeo:audio-output-device-id",
@@ -24,7 +23,6 @@ export const SESSION_KEYS = {
 
 export type ActiveCallSession = {
   slug: string;
-  guestName?: string;
   displayName?: string;
   joinedAt: string;
 };
