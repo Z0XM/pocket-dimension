@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Room } from "livekit-client";
   import { buildStageTiles, filterStageTiles, type StageTileEntry } from "$lib/call/stage-tiles";
-  import type { AutoLayoutPreset } from "$lib/call/auto-layout";
+  import { computeAutoLayoutFrames, type AutoLayoutPreset } from "$lib/call/auto-layout";
   import { computeGameLayoutFrames } from "$lib/call/game-layout";
   import type { GameSnapshotTeam } from "$lib/server/game/types";
   import { gridPlacementsKey, readStored, writeStored } from "$lib/browser-storage";
