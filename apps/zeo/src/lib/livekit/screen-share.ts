@@ -1,14 +1,39 @@
 import { Track, type LocalParticipant, type RemoteParticipant, type Room, type ScreenShareCaptureOptions } from "livekit-client";
+import { logAudioDiag } from "./call-audio-diagnostics";
 import { listRoomParticipants } from "./room-client";
 
 /** Skip LiveKit's default 1080p ideal constraints — some browsers reject them with NotSupportedError. */
-const UNCONSTRAINED_SCREEN_CAPTURE: ScreenShareCaptureOptions = {
+const SCREEN_CAPTURE_VIDEO_ONLY: ScreenShareCaptureOptions = {
   resolution: { width: 0, height: 0 },
+};
+
+const SCREEN_CAPTURE_WITH_TAB_AUDIO: ScreenShareCaptureOptions = {
+  ...SCREEN_CAPTURE_VIDEO_ONLY,
+  audio: true,
+};
+
+const SCREEN_CAPTURE_WITH_SYSTEM_AUDIO: ScreenShareCaptureOptions = {
+  ...SCREEN_CAPTURE_WITH_TAB_AUDIO,
+  systemAudio: "include",
+};
+
+export type ScreenShareStartResult = {
+  audioPublished: boolean;
+  audioFallback: "published" | "picker_skipped" | "browser_unsupported";
 };
 
 export function isScreenShareActive(participant: LocalParticipant | RemoteParticipant) {
   const publication = participant.getTrackPublication(Track.Source.ScreenShare);
   return Boolean(publication?.track && !publication.isMuted);
+}
+
+export function isScreenShareAudioActive(participant: LocalParticipant | RemoteParticipant) {
+  const publication = participant.getTrackPublication(Track.Source.ScreenShareAudio);
+  return Boolean(publication?.track && !publication.isMuted);
+}
+
+function screenShareAudioPublished(local: LocalParticipant) {
+  return isScreenShareAudioActive(local);
 }
 
 export function findScreenShareParticipant(room: Room, excludeIdentity?: string) {
@@ -70,22 +95,66 @@ export function screenShareFailureMessage(error: unknown): string {
   return "Could not start screen share";
 }
 
-export async function enableLocalScreenShare(local: LocalParticipant) {
+async function startScreenShare(local: LocalParticipant, options: ScreenShareCaptureOptions) {
+  await local.setScreenShareEnabled(true, options);
+}
+
+export async function enableLocalScreenShare(local: LocalParticipant): Promise<ScreenShareStartResult> {
   const unavailable = screenShareUnavailableReason();
   if (unavailable) {
     throw new Error(unavailable);
   }
 
-  try {
-    await local.setScreenShareEnabled(true, UNCONSTRAINED_SCREEN_CAPTURE);
-    return;
-  } catch (error) {
-    if (!isRetriableScreenShareError(error)) throw error;
+  const attempts: Array<{ label: string; options: ScreenShareCaptureOptions }> = [
+    { label: "system_audio", options: SCREEN_CAPTURE_WITH_SYSTEM_AUDIO },
+    { label: "tab_audio", options: SCREEN_CAPTURE_WITH_TAB_AUDIO },
+    { label: "video_only", options: SCREEN_CAPTURE_VIDEO_ONLY },
+  ];
+
+  let lastError: unknown;
+
+  for (const attempt of attempts) {
+    try {
+      await startScreenShare(local, attempt.options);
+      const audioPublished = screenShareAudioPublished(local);
+      const audioFallback = audioPublished ? "published" : attempt.label === "video_only" ? "browser_unsupported" : "picker_skipped";
+
+      logAudioDiag("info", "screen_share.started", {
+        attempt: attempt.label,
+        audioPublished,
+        audioFallback,
+      });
+
+      return { audioPublished, audioFallback };
+    } catch (error) {
+      lastError = error;
+      if (!isRetriableScreenShareError(error)) {
+        throw error;
+      }
+
+      logAudioDiag("warn", "screen_share.attempt_failed", {
+        attempt: attempt.label,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
-  await local.setScreenShareEnabled(true);
+  throw lastError instanceof Error ? lastError : new Error("Could not start screen share");
 }
 
 export async function disableLocalScreenShare(local: LocalParticipant) {
   await local.setScreenShareEnabled(false);
+  logAudioDiag("info", "screen_share.stopped");
+}
+
+export function screenShareAudioHint(result: ScreenShareStartResult): string | null {
+  if (result.audioPublished) {
+    return "Screen shared with audio";
+  }
+
+  if (result.audioFallback === "browser_unsupported") {
+    return "Screen shared without audio — this browser does not support sharing tab or system sound";
+  }
+
+  return "Screen shared. Enable Share audio in the browser picker to include tab sound";
 }

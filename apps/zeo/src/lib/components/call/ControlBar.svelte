@@ -89,7 +89,7 @@
   const micLabel = $derived(micTesting ? "Stop mic test and unmute" : micEnabled ? "Mute microphone" : "Unmute microphone");
   const speakerLabel = $derived(speakerEnabled ? "Mute speakers" : "Unmute speakers");
   const camLabel = $derived(camEnabled ? "Turn camera off" : "Turn camera on");
-  const shareLabel = $derived(screenSharing ? "Stop sharing screen" : "Share screen");
+  const shareLabel = $derived(screenSharing ? "Stop sharing screen" : "Share screen and audio");
   const hasOverflowControls = $derived(
     Boolean(onToggleScreenShare || onSnapshot || onToggleChat || onToggleGridSettings || onToggleDevices || (isHost && onEndRoom))
   );

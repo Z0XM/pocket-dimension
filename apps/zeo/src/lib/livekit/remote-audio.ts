@@ -47,6 +47,7 @@ export function detachRemoteAudioTrack(track: RemoteTrack) {
 export function attachAllRemoteAudioTracks(room: Room) {
   let attached = 0;
   let skipped = 0;
+  let screenShareAudioAttached = 0;
 
   for (const participant of room.remoteParticipants.values()) {
     for (const publication of participant.audioTrackPublications.values()) {
@@ -56,6 +57,9 @@ export function attachAllRemoteAudioTracks(room: Room) {
         attachRemoteAudioTrack(track);
         if (!before && attachedElements.has(track)) {
           attached += 1;
+          if (publication.source === Track.Source.ScreenShareAudio) {
+            screenShareAudioAttached += 1;
+          }
         } else {
           skipped += 1;
         }
@@ -63,7 +67,7 @@ export function attachAllRemoteAudioTracks(room: Room) {
     }
   }
 
-  logAudioDiag("info", "remote_audio.attach_all", { attached, skipped });
+  logAudioDiag("info", "remote_audio.attach_all", { attached, skipped, screenShareAudioAttached });
 }
 
 export function detachAllRemoteAudioTracks(room: Room) {
