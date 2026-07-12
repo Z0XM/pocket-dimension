@@ -9,6 +9,8 @@ import {
   type RemoteParticipant,
 } from "livekit-client";
 import type { MicGateProcessor } from "./mic-gate-processor";
+import { logAudioDiag, snapshotRoomAudio } from "./call-audio-diagnostics";
+import { attachAllRemoteAudioTracks, attachRemoteAudioTrack, detachAllRemoteAudioTracks, detachRemoteAudioTrack } from "./remote-audio";
 
 export type ConnectionPhase = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
 
@@ -28,25 +30,50 @@ export function primeBrowserAudioGesture(stream?: MediaStream | null) {
   if (typeof window === "undefined") return;
 
   const audioTrack = stream?.getAudioTracks().find((track) => track.readyState === "live");
-  if (!audioTrack) return;
+  if (!audioTrack) {
+    logAudioDiag("warn", "gesture.prime_skipped", { reason: "no_live_audio_track" });
+    return;
+  }
 
   const element = new Audio();
   element.srcObject = new MediaStream([audioTrack]);
   element.volume = 0;
   element.muted = true;
-  void element.play().catch(() => {
-    // Best-effort unlock; LiveKit startAudio retries after connect.
-  });
+  void element
+    .play()
+    .then(() => {
+      logAudioDiag("info", "gesture.primed", { trackId: audioTrack.id });
+    })
+    .catch((error) => {
+      logAudioDiag("warn", "gesture.prime_failed", {
+        trackId: audioTrack.id,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
 }
 
 /** Resume LiveKit playback and the shared AudioContext used for remote audio + mic processing. */
-export async function ensureRoomAudio(room: Room) {
-  if (room.state !== "connected") return false;
+export async function ensureRoomAudio(room: Room, reason = "unspecified") {
+  if (room.state !== "connected") {
+    logAudioDiag("warn", "start_audio.skipped", { reason, roomState: room.state });
+    return false;
+  }
+
+  logAudioDiag("info", "start_audio.attempt", { reason, canPlaybackAudio: room.canPlaybackAudio });
 
   try {
     await room.startAudio();
+    logAudioDiag(room.canPlaybackAudio ? "info" : "warn", "start_audio.completed", {
+      reason,
+      canPlaybackAudio: room.canPlaybackAudio,
+    });
     return room.canPlaybackAudio;
-  } catch {
+  } catch (error) {
+    logAudioDiag("error", "start_audio.failed", {
+      reason,
+      canPlaybackAudio: room.canPlaybackAudio,
+      message: error instanceof Error ? error.message : String(error),
+    });
     return room.canPlaybackAudio;
   }
 }
@@ -106,13 +133,32 @@ async function enableMicrophone(
     deviceId: options.audioDeviceId,
   });
 
+  logAudioDiag("info", "mic.enabled", {
+    enabled,
+    deviceId: options.audioDeviceId ?? "default",
+    isMicrophoneEnabled: room.localParticipant.isMicrophoneEnabled,
+  });
+
   if (!enabled || !options.micGateProcessor) {
     return;
   }
 
   try {
     await attachMicGateProcessor(room, options.micGateProcessor);
-  } catch {
+    logAudioDiag("info", "mic.gate_attached");
+  } catch (error) {
+    const track = getLocalMicTrack(room);
+    try {
+      await track?.stopProcessor();
+      logAudioDiag("warn", "mic.gate_stopped_after_failure");
+    } catch (stopError) {
+      logAudioDiag("error", "mic.gate_stop_failed", {
+        message: stopError instanceof Error ? stopError.message : String(stopError),
+      });
+    }
+    logAudioDiag("warn", "mic.gate_attach_failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
     onMicGateFallback?.();
   }
 }
@@ -159,10 +205,12 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   room.on(RoomEvent.Reconnecting, () => handlers.onPhaseChange("reconnecting"));
   room.on(RoomEvent.Reconnected, () => {
     handlers.onPhaseChange("connected");
-    void ensureRoomAudio(room);
+    attachAllRemoteAudioTracks(room);
+    void ensureRoomAudio(room, "reconnected");
   });
   room.on(RoomEvent.Disconnected, (reason) => {
     stopAudioLevelPolling();
+    detachAllRemoteAudioTracks(room);
     handlers.onPhaseChange("disconnected");
     handlers.onDisconnect(reason);
   });
@@ -175,11 +223,18 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   room.on(RoomEvent.TrackSubscribed, (track) => {
     handlers.onParticipantsChange();
     if (track.kind === Track.Kind.Audio) {
-      void ensureRoomAudio(room);
+      attachRemoteAudioTrack(track);
+      void ensureRoomAudio(room, "track_subscribed");
     }
   });
-  room.on(RoomEvent.TrackUnsubscribed, () => handlers.onParticipantsChange());
+  room.on(RoomEvent.TrackUnsubscribed, (track) => {
+    handlers.onParticipantsChange();
+    if (track.kind === Track.Kind.Audio) {
+      detachRemoteAudioTrack(track);
+    }
+  });
   room.on(RoomEvent.AudioPlaybackStatusChanged, (canPlayback) => {
+    logAudioDiag(canPlayback ? "info" : "warn", "playback.status_changed", { canPlayback });
     handlers.onAudioPlaybackStatusChanged?.(canPlayback);
   });
   room.on(RoomEvent.LocalTrackPublished, () => handlers.onParticipantsChange());
@@ -203,7 +258,7 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   ) {
     handlers.onPhaseChange("connecting");
     await room.connect(wsUrl, token, options.iceServers?.length ? { rtcConfig: { iceServers: options.iceServers } } : undefined);
-    await ensureRoomAudio(room);
+    await ensureRoomAudio(room, "connect");
     await enableMicrophone(
       room,
       options.micEnabled,
@@ -219,10 +274,17 @@ export function createCallRoom(handlers: CallRoomHandlers) {
     if (options.audioOutputDeviceId) {
       try {
         await room.switchActiveDevice("audiooutput", options.audioOutputDeviceId);
-      } catch {
-        // Output routing is unsupported or the device is unavailable.
+        logAudioDiag("info", "audio_output.switched", { deviceId: options.audioOutputDeviceId });
+      } catch (error) {
+        logAudioDiag("warn", "audio_output.switch_failed", {
+          deviceId: options.audioOutputDeviceId,
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
+    attachAllRemoteAudioTracks(room);
+    await ensureRoomAudio(room, "connect_complete");
+    snapshotRoomAudio(room, "connect_complete");
     handlers.onPhaseChange("connected");
     handlers.onParticipantsChange();
     startAudioLevelPolling();
@@ -230,6 +292,7 @@ export function createCallRoom(handlers: CallRoomHandlers) {
 
   async function disconnect() {
     stopAudioLevelPolling();
+    detachAllRemoteAudioTracks(room);
     if (room.state !== "disconnected") {
       await room.disconnect();
     }
@@ -244,6 +307,8 @@ export function listRoomParticipants(room: Room): Array<LocalParticipant | Remot
 
 export function setRoomSpeakerMuted(room: Room, muted: boolean) {
   const volume = muted ? 0 : 1;
+
+  logAudioDiag("info", muted ? "speaker.muted" : "speaker.unmuted", { volume });
 
   for (const participant of room.remoteParticipants.values()) {
     participant.setVolume(volume);

@@ -2,7 +2,15 @@
   import { browser } from "$app/environment";
   import { onDestroy, onMount } from "svelte";
   import XIcon from "@lucide/svelte/icons/x";
-  import { RoomEvent, Track, type ConnectionQuality, type LocalTrackPublication, type Room, supportsAudioOutputSelection } from "livekit-client";
+  import {
+    RoomEvent,
+    Track,
+    type ConnectionQuality,
+    type LocalAudioTrack,
+    type LocalTrackPublication,
+    type Room,
+    supportsAudioOutputSelection,
+  } from "livekit-client";
   import type { CallPhase, PermissionState } from "$lib/livekit/types";
   import { startMediaPreview, stopMediaPreview, syncPreviewTracks, restartMediaPreview, type MediaPreviewResult } from "$lib/livekit/media-preview";
   import { CAMERA_IN_USE_MESSAGE, deviceErrorMessage, isDeviceInUseError } from "$lib/livekit/media-errors";
@@ -19,6 +27,14 @@
     wasRoomDeleted,
     type ConnectionPhase,
   } from "$lib/livekit/room-client";
+  import { attachAllRemoteAudioTracks } from "$lib/livekit/remote-audio";
+  import {
+    clearAudioDiagnostics,
+    copyAudioDiagnostics,
+    installAudioDiagnosticsConsoleApi,
+    logAudioDiag,
+    snapshotRoomAudio,
+  } from "$lib/livekit/call-audio-diagnostics";
   import { createMicGateProcessor, type MicGateProcessor } from "$lib/livekit/mic-gate-processor";
   import {
     disableLocalScreenShare,
@@ -181,6 +197,7 @@
   });
   let networkHintDismissed = $state(false);
   let audioPlaybackBlocked = $state(false);
+  let audioDiagMessage = $state<string | null>(null);
   let storedRejoinSession = $state<ReturnType<typeof readActiveCallSession>>(null);
 
   const inCallPhase = $derived(phase === "in_call" || phase === "reconnecting");
@@ -662,11 +679,25 @@
     };
   }
 
+  async function copyAudioDebugLog() {
+    try {
+      if (livekitRoom) {
+        snapshotRoomAudio(livekitRoom, "manual_copy");
+      }
+      await copyAudioDiagnostics();
+      audioDiagMessage = "Audio debug log copied";
+      showToast("Audio debug log copied");
+    } catch {
+      audioDiagMessage = "Could not copy audio debug log";
+      showToast("Could not copy audio debug log");
+    }
+  }
+
   async function enableLocalMicrophone() {
     if (!livekitRoom) return;
 
     try {
-      await ensureRoomAudio(livekitRoom);
+      await ensureRoomAudio(livekitRoom, "enable_local_mic");
       await livekitRoom.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
       micDeviceError = null;
 
@@ -675,7 +706,17 @@
       try {
         await attachMicGateProcessor(livekitRoom, micGateProcessor);
       } catch {
+        const publication = livekitRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
+        const track = publication?.track;
+        if (track && track.kind === Track.Kind.Audio) {
+          try {
+            await (track as LocalAudioTrack).stopProcessor();
+          } catch {
+            // Keep the raw microphone track if processor teardown fails.
+          }
+        }
         showToast("Noise gate unavailable — using direct microphone input");
+        logAudioDiag("warn", "mic.gate_fallback_toast", { context: "enable_local_microphone" });
       }
     } catch (error) {
       micDeviceError = deviceErrorMessage(error, "microphone");
@@ -753,6 +794,9 @@
   async function teardownCall(disconnectLiveKit: boolean) {
     stopPingPoll();
     audioPlaybackBlocked = false;
+    if (livekitRoom) {
+      snapshotRoomAudio(livekitRoom, "teardown");
+    }
     screenShareListenerCleanup?.();
     screenShareListenerCleanup = undefined;
     if (disconnectLiveKit && callSession) {
@@ -837,10 +881,14 @@
       onMicGateFallback: () => {
         if (gen !== connectionGen) return;
         showToast("Noise gate unavailable — using direct microphone input");
+        logAudioDiag("warn", "mic.gate_fallback_toast", { context: "connect" });
       },
       onAudioPlaybackStatusChanged: (canPlayback: boolean) => {
         if (gen !== connectionGen) return;
         audioPlaybackBlocked = !canPlayback;
+        if (!canPlayback) {
+          logAudioDiag("warn", "ui.playback_blocked_banner");
+        }
       },
     };
   }
@@ -906,6 +954,7 @@
     localConnectionQuality = qualityLabel(callSession.room.localParticipant.connectionQuality);
     applyRoomSpeakerState(callSession.room);
     audioPlaybackBlocked = !callSession.room.canPlaybackAudio;
+    snapshotRoomAudio(callSession.room, "connect_with_token");
     startPingPoll();
     networkHintDismissed = false;
     writeActiveCallSession({
@@ -1144,6 +1193,8 @@
   async function joinCall() {
     errorMessage = null;
     joining = true;
+    clearAudioDiagnostics();
+    logAudioDiag("info", "join.started", { slug, micEnabled, speakerEnabled, camEnabled });
     primeBrowserAudioGesture(previewStream);
 
     try {
@@ -1218,17 +1269,21 @@
     speakerEnabled = !speakerEnabled;
     applyRoomSpeakerState();
     if (speakerEnabled && livekitRoom) {
-      void ensureRoomAudio(livekitRoom);
+      void ensureRoomAudio(livekitRoom, "toggle_speaker");
     }
   }
 
   async function enableCallAudio() {
     if (!livekitRoom) return;
 
-    const started = await ensureRoomAudio(livekitRoom);
+    attachAllRemoteAudioTracks(livekitRoom);
+    const started = await ensureRoomAudio(livekitRoom, "enable_call_audio");
     audioPlaybackBlocked = !started;
     if (started) {
       applyRoomSpeakerState(livekitRoom);
+      snapshotRoomAudio(livekitRoom, "enable_call_audio");
+    } else {
+      logAudioDiag("warn", "ui.enable_call_audio_failed");
     }
   }
 
@@ -1428,6 +1483,7 @@
     }
     setupPreview();
     micGateProcessor = createFreshMicGateProcessor();
+    installAudioDiagnosticsConsoleApi();
     refreshTimer = setInterval(refreshRoomMeta, 5000);
     refreshRoomMeta();
     startHostWaitingPoll();
@@ -1564,6 +1620,16 @@
                 {micGateProcessor}
                 permissionGranted={permissionState === "granted"}
               />
+              <div class="rounded-lg border border-border px-3 py-3">
+                <p class="text-sm font-medium text-foreground">Audio debug</p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  If call audio fails, copy this log and share it. Console: <code>__zeoAudioDiag.dump()</code>
+                </p>
+                <button type="button" class="auth-btn mt-3 w-full" onclick={copyAudioDebugLog}>Copy audio debug log</button>
+                {#if audioDiagMessage}
+                  <p class="mt-2 text-xs text-muted-foreground">{audioDiagMessage}</p>
+                {/if}
+              </div>
               <TileColorPicker compact value={tileColor} onChange={setTileColor} />
               <GestureSettings
                 {gesturesEnabled}
