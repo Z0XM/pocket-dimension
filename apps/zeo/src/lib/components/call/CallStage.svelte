@@ -31,10 +31,12 @@
     bottomInset?: number;
     minimizedTileKeys?: string[];
     hiddenVideoTileKeys?: string[];
+    mutedListenTileKeys?: string[];
     fullscreenTileKey?: string | null;
     selfViewHidden?: boolean;
     onMinimizeTile?: (key: string) => void;
     onToggleHideVideo?: (key: string) => void;
+    onToggleTileListenMute?: (key: string) => void;
     onToggleTileFullscreen?: (key: string) => void;
     onTogglePinTile?: (key: string) => void;
     showGridSettings?: boolean;
@@ -73,10 +75,12 @@
     bottomInset = 0,
     minimizedTileKeys = [],
     hiddenVideoTileKeys = [],
+    mutedListenTileKeys = [],
     fullscreenTileKey = null,
     selfViewHidden = false,
     onMinimizeTile,
     onToggleHideVideo,
+    onToggleTileListenMute,
     onToggleTileFullscreen,
     onTogglePinTile,
     showGridSettings = false,
@@ -155,9 +159,11 @@
         {disableSpeakingGlows}
         {minimizedTileKeys}
         {hiddenVideoTileKeys}
+        {mutedListenTileKeys}
         {fullscreenTileKey}
         {onMinimizeTile}
         {onToggleHideVideo}
+        {onToggleTileListenMute}
         {onToggleTileFullscreen}
         {onTogglePinTile}
         {trackingOverlayVisible}

@@ -46,9 +46,11 @@
     pinnedTileKey?: string | null;
     minimizedTileKeys?: string[];
     hiddenVideoTileKeys?: string[];
+    mutedListenTileKeys?: string[];
     fullscreenTileKey?: string | null;
     onMinimizeTile?: (key: string) => void;
     onToggleHideVideo?: (key: string) => void;
+    onToggleTileListenMute?: (key: string) => void;
     onToggleTileFullscreen?: (key: string) => void;
     onTogglePinTile?: (key: string) => void;
     trackingOverlayVisible?: boolean;
@@ -77,9 +79,11 @@
     pinnedTileKey = null,
     minimizedTileKeys = [],
     hiddenVideoTileKeys = [],
+    mutedListenTileKeys = [],
     fullscreenTileKey = null,
     onMinimizeTile,
     onToggleHideVideo,
+    onToggleTileListenMute,
     onToggleTileFullscreen,
     onTogglePinTile,
     trackingOverlayVisible = false,
@@ -406,8 +410,11 @@
                 fullscreen={fullscreenTileKey === tile.key}
                 pinned={pinnedTileKey === tile.key}
                 showPin={!isManualGrid}
+                showAudioMute={tile.participant.identity !== room.localParticipant.identity}
+                audioMuted={mutedListenTileKeys.includes(tile.key)}
                 onMinimize={() => onMinimizeTile?.(tile.key)}
                 onTogglePin={() => onTogglePinTile?.(tile.key)}
+                onToggleAudioMute={() => onToggleTileListenMute?.(tile.key)}
                 onToggleHideVideo={() => onToggleHideVideo?.(tile.key)}
                 onToggleFullscreen={() => onToggleTileFullscreen?.(tile.key)}
               />
