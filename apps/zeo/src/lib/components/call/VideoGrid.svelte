@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { Room } from "livekit-client";
   import { buildStageTiles, filterStageTiles, type StageTileEntry } from "$lib/call/stage-tiles";
-  import { computeAutoLayoutFrames, type AutoLayoutPreset } from "$lib/call/auto-layout";
+  import type { AutoLayoutPreset } from "$lib/call/auto-layout";
+  import { computeGameLayoutFrames } from "$lib/call/game-layout";
+  import type { GameSnapshotTeam } from "$lib/server/game/types";
   import { gridPlacementsKey, readStored, writeStored } from "$lib/browser-storage";
   import { displayNameForParticipant } from "$lib/livekit/screen-share";
   import { tileColorForParticipant, type ParticipantColor } from "$lib/participant-colors";
@@ -57,6 +59,7 @@
     handLandmarks?: HandLandmark[] | null;
     handGesture?: DetectedGesture;
     handGestureHoldProgress?: number;
+    gameTeams?: GameSnapshotTeam[];
   };
 
   const {
@@ -90,9 +93,11 @@
     handLandmarks = null,
     handGesture = "none",
     handGestureHoldProgress = 0,
+    gameTeams = [],
   }: Props = $props();
 
   const isManualGrid = $derived(layoutMode === "grid");
+  const isGameLayout = $derived(layoutMode === "game");
 
   const gridTiles = $derived.by((): StageTileEntry[] => {
     mediaRevision;
@@ -135,7 +140,14 @@
     });
   });
 
-  const canRenderTiles = $derived(Boolean(gridLayout && (isManualGrid ? baseParticipantGrid : autoLayoutFrames)));
+  const gameLayoutFrames = $derived.by(() => {
+    if (!isGameLayout || !gridLayout) return null;
+    return computeGameLayoutFrames(stageTiles, gridLayout, gameTeams);
+  });
+
+  const canRenderTiles = $derived(
+    Boolean(gridLayout && (isGameLayout ? gameLayoutFrames : isManualGrid ? baseParticipantGrid : autoLayoutFrames))
+  );
 
   $effect(() => {
     if (!isManualGrid) {
@@ -228,6 +240,10 @@
     }
 
     if (!gridLayout) return null;
+
+    if (isGameLayout) {
+      return gameLayoutFrames?.get(key) ?? null;
+    }
 
     if (!isManualGrid) {
       return autoLayoutFrames?.[key] ?? null;

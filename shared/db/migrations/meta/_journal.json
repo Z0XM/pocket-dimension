@@ -211,6 +211,13 @@
       "when": 1782592000000,
       "tag": "0029_zeo_moderation_chat_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1783875917649,
+      "tag": "0030_zeo_game_mode",
+      "breakpoints": true
     }
   ]
 }

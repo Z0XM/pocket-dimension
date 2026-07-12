@@ -21,6 +21,7 @@
     onSidebarSplitRatioChange?: (value: number) => void;
     onHideSelfView?: () => void;
     onClose: () => void;
+    layoutLocked?: boolean;
   };
 
   const {
@@ -38,6 +39,7 @@
     onSidebarSplitRatioChange,
     onHideSelfView,
     onClose,
+    layoutLocked = false,
   }: Props = $props();
 
   const manualGrid = $derived(layoutMode === "grid");
@@ -62,11 +64,17 @@
     <SettingToggle
       id="manual-grid-layout"
       label={viewLabel}
-      tooltip={manualGrid
-        ? "Grid View shows the stage grid and lets you drag and resize tiles."
-        : "Auto View arranges and sizes tiles automatically without grid guides."}
+      tooltip={layoutLocked
+        ? "End the game to change layout settings."
+        : manualGrid
+          ? "Grid View shows the stage grid and lets you drag and resize tiles."
+          : "Auto View arranges and sizes tiles automatically without grid guides."}
       checked={manualGrid}
-      onCheckedChange={(checked) => onLayoutModeChange(checked ? "grid" : "auto")}
+      disabled={layoutLocked}
+      onCheckedChange={(checked) => {
+        if (layoutLocked) return;
+        onLayoutModeChange(checked ? "grid" : "auto");
+      }}
     />
   </div>
 

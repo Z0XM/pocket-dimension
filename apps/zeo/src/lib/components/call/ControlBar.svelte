@@ -8,6 +8,7 @@
   import AudioLinesIcon from "@lucide/svelte/icons/audio-lines";
   import PhoneOffIcon from "@lucide/svelte/icons/phone-off";
   import SettingsIcon from "@lucide/svelte/icons/settings";
+  import Gamepad2Icon from "@lucide/svelte/icons/gamepad-2";
   import LayoutGridIcon from "@lucide/svelte/icons/layout-grid";
   import SquareIcon from "@lucide/svelte/icons/square";
   import VideoIcon from "@lucide/svelte/icons/video";
@@ -43,6 +44,10 @@
     devicesOpen?: boolean;
     onToggleGridSettings?: () => void;
     gridSettingsOpen?: boolean;
+    onToggleGameMode?: () => void;
+    gamePanelOpen?: boolean;
+    showGameModeButton?: boolean;
+    gameActive?: boolean;
     onLeave: () => void;
     onEndRoom?: () => void;
     ending?: boolean;
@@ -75,6 +80,10 @@
     devicesOpen = false,
     onToggleGridSettings,
     gridSettingsOpen = false,
+    onToggleGameMode,
+    gamePanelOpen = false,
+    showGameModeButton = false,
+    gameActive = false,
     onLeave,
     onEndRoom,
     ending = false,
@@ -169,11 +178,15 @@
       e.preventDefault();
       onToggleChat();
     }
+    if ((e.key === "g" || e.key === "G") && onToggleGameMode) {
+      e.preventDefault();
+      onToggleGameMode();
+    }
     if ((e.key === "d" || e.key === "D") && onToggleDevices) {
       e.preventDefault();
       onToggleDevices();
     }
-    if ((e.key === "g" || e.key === "G") && onToggleGridSettings) {
+    if ((e.key === "g" || e.key === "G") && onToggleGridSettings && !onToggleGameMode) {
       e.preventDefault();
       onToggleGridSettings();
     }
@@ -237,6 +250,17 @@
         {/if}
       </IconControlButton>
 
+      {#if showGameModeButton && onToggleGameMode && (!compactControls || gameActive)}
+        <IconControlButton
+          label={gamePanelOpen ? "Close game mode" : "Game mode"}
+          active={gamePanelOpen || gameActive}
+          showTooltip={showTooltips}
+          onclick={onToggleGameMode}
+        >
+          <Gamepad2Icon class="size-4 {gamePanelOpen || gameActive ? 'text-participant-orange' : 'text-muted-foreground'}" />
+        </IconControlButton>
+      {/if}
+
       {#if compactControls && hasOverflowControls}
         <div bind:this={moreMenuRef} class="relative">
           <IconControlButton
@@ -291,6 +315,16 @@
                   onclick={() => runOverflowAction(onToggleChat)}
                 >
                   <MessageSquareIcon class="size-4 {chatOpen ? 'text-participant-orange' : 'text-muted-foreground'}" />
+                </IconControlButton>
+              {/if}
+              {#if showGameModeButton && onToggleGameMode && !gameActive}
+                <IconControlButton
+                  label={gamePanelOpen ? "Close game mode" : "Game mode"}
+                  active={gamePanelOpen}
+                  showTooltip={false}
+                  onclick={() => runOverflowAction(onToggleGameMode)}
+                >
+                  <Gamepad2Icon class="size-4 {gamePanelOpen ? 'text-participant-orange' : 'text-muted-foreground'}" />
                 </IconControlButton>
               {/if}
               {#if onToggleGridSettings}

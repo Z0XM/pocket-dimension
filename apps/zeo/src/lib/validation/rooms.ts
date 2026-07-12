@@ -42,3 +42,8 @@ export const muteParticipantSchema = z.object({
   identity: z.string().min(1, "Participant identity is required"),
   track: z.enum(["microphone", "camera"]),
 });
+
+export const startGameSchema = z.object({
+  gameType: z.literal("charades"),
+  teamCount: z.number().int().min(2).max(4),
+});
