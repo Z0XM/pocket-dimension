@@ -1,11 +1,12 @@
 import type { LocalParticipant, RemoteParticipant, Room } from "livekit-client";
-import { findScreenShareParticipant, screenShareTileKey } from "$lib/livekit/screen-share";
+import { findScreenCaptureParticipant, isScreenShareActive, isScreenShareAudioOnlyActive, screenShareTileKey } from "$lib/livekit/screen-share";
 import { listRoomParticipants } from "$lib/livekit/room-client";
 
 export type StageTileEntry = {
   key: string;
   kind: "participant" | "screen-share";
   participant: LocalParticipant | RemoteParticipant;
+  audioOnly?: boolean;
 };
 
 export function participantHasActiveVideo(participant: LocalParticipant | RemoteParticipant) {
@@ -14,13 +15,14 @@ export function participantHasActiveVideo(participant: LocalParticipant | Remote
 
 export function buildStageTiles(room: Room): StageTileEntry[] {
   const items: StageTileEntry[] = [];
-  const screenSharer = findScreenShareParticipant(room);
+  const screenSharer = findScreenCaptureParticipant(room);
 
   if (screenSharer) {
     items.push({
       key: screenShareTileKey(screenSharer.identity),
       kind: "screen-share",
       participant: screenSharer,
+      audioOnly: isScreenShareAudioOnlyActive(screenSharer) && !isScreenShareActive(screenSharer),
     });
   }
 

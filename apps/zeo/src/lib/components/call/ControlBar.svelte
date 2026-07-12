@@ -5,6 +5,7 @@
   import MicIcon from "@lucide/svelte/icons/mic";
   import MicOffIcon from "@lucide/svelte/icons/mic-off";
   import MonitorUpIcon from "@lucide/svelte/icons/monitor-up";
+  import AudioLinesIcon from "@lucide/svelte/icons/audio-lines";
   import PhoneOffIcon from "@lucide/svelte/icons/phone-off";
   import SettingsIcon from "@lucide/svelte/icons/settings";
   import LayoutGridIcon from "@lucide/svelte/icons/layout-grid";
@@ -28,12 +29,14 @@
     speakerEnabled?: boolean;
     camEnabled: boolean;
     screenSharing?: boolean;
+    screenAudioSharing?: boolean;
     snapshotting?: boolean;
     chatOpen?: boolean;
     onToggleMic: () => void;
     onToggleSpeaker?: () => void;
     onToggleCam: () => void;
     onToggleScreenShare?: () => void;
+    onToggleScreenAudioShare?: () => void;
     onSnapshot?: () => void;
     onToggleChat?: () => void;
     onToggleDevices?: () => void;
@@ -58,12 +61,14 @@
     speakerEnabled = true,
     camEnabled,
     screenSharing = false,
+    screenAudioSharing = false,
     snapshotting = false,
     chatOpen = false,
     onToggleMic,
     onToggleSpeaker,
     onToggleCam,
     onToggleScreenShare,
+    onToggleScreenAudioShare,
     onSnapshot,
     onToggleChat,
     onToggleDevices,
@@ -90,12 +95,27 @@
   const speakerLabel = $derived(speakerEnabled ? "Mute speakers" : "Unmute speakers");
   const camLabel = $derived(camEnabled ? "Turn camera off" : "Turn camera on");
   const shareLabel = $derived(screenSharing ? "Stop sharing screen" : "Share screen and audio");
+  const shareAudioLabel = $derived(screenAudioSharing ? "Stop sharing tab audio" : "Share tab audio only");
   const hasOverflowControls = $derived(
-    Boolean(onToggleScreenShare || onSnapshot || onToggleChat || onToggleGridSettings || onToggleDevices || (isHost && onEndRoom))
+    Boolean(
+      onToggleScreenShare ||
+      onToggleScreenAudioShare ||
+      onSnapshot ||
+      onToggleChat ||
+      onToggleGridSettings ||
+      onToggleDevices ||
+      (isHost && onEndRoom)
+    )
   );
 
   function tileDisplayName(tile: StageTileEntry) {
     return displayNameForParticipant(tile.participant, localIdentity, localDisplayName);
+  }
+
+  function tileRestoreLabel(tile: StageTileEntry) {
+    const name = tileDisplayName(tile);
+    if (tile.kind !== "screen-share") return name;
+    return tile.audioOnly ? `${name}'s audio` : `${name}'s screen`;
   }
 
   function closeMoreMenu() {
@@ -174,13 +194,14 @@
           <button
             type="button"
             class="shrink-0 rounded-md transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Restore {tile.kind === 'screen-share' ? `${tileDisplayName(tile)}'s screen` : tileDisplayName(tile)}"
+            aria-label="Restore {tileRestoreLabel(tile)}"
             onclick={() => onRestoreTile?.(tile.key)}
           >
             <MinimizedStageTile
               kind={tile.kind}
               participant={tile.participant}
               displayName={tileDisplayName(tile)}
+              audioOnly={tile.audioOnly}
               {localIdentity}
               {localTileColor}
             />
@@ -220,7 +241,7 @@
         <div bind:this={moreMenuRef} class="relative">
           <IconControlButton
             label="More call controls"
-            active={showMoreMenu || screenSharing || chatOpen || devicesOpen || gridSettingsOpen}
+            active={showMoreMenu || screenSharing || screenAudioSharing || chatOpen || devicesOpen || gridSettingsOpen}
             showTooltip={showTooltips}
             onclick={() => (showMoreMenu = !showMoreMenu)}
           >
@@ -240,6 +261,16 @@
                   onclick={() => runOverflowAction(onToggleScreenShare)}
                 >
                   <MonitorUpIcon class="size-4 {screenSharing ? 'text-participant-orange' : 'text-muted-foreground'}" />
+                </IconControlButton>
+              {/if}
+              {#if onToggleScreenAudioShare}
+                <IconControlButton
+                  label={shareAudioLabel}
+                  active={screenAudioSharing}
+                  showTooltip={false}
+                  onclick={() => runOverflowAction(onToggleScreenAudioShare)}
+                >
+                  <AudioLinesIcon class="size-4 {screenAudioSharing ? 'text-participant-orange' : 'text-muted-foreground'}" />
                 </IconControlButton>
               {/if}
               {#if onSnapshot}
@@ -300,6 +331,12 @@
         {#if onToggleScreenShare}
           <IconControlButton label={shareLabel} active={screenSharing} showTooltip={showTooltips} onclick={onToggleScreenShare}>
             <MonitorUpIcon class="size-4 {screenSharing ? 'text-participant-orange' : 'text-muted-foreground'}" />
+          </IconControlButton>
+        {/if}
+
+        {#if onToggleScreenAudioShare}
+          <IconControlButton label={shareAudioLabel} active={screenAudioSharing} showTooltip={showTooltips} onclick={onToggleScreenAudioShare}>
+            <AudioLinesIcon class="size-4 {screenAudioSharing ? 'text-participant-orange' : 'text-muted-foreground'}" />
           </IconControlButton>
         {/if}
 

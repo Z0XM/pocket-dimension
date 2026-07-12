@@ -58,7 +58,7 @@ export async function stopActiveScreenShares(livekitRoomName: string) {
 
   for (const participant of participants) {
     for (const track of participant.tracks ?? []) {
-      if (track.source === TrackSource.SCREEN_SHARE && track.sid) {
+      if ((track.source === TrackSource.SCREEN_SHARE || track.source === TrackSource.SCREEN_SHARE_AUDIO) && track.sid) {
         await getClient().mutePublishedTrack(livekitRoomName, participant.identity, track.sid, true);
       }
     }
