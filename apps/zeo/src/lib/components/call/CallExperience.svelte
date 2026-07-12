@@ -12,6 +12,8 @@
   import {
     createCallRoom,
     attachMicGateProcessor,
+    ensureRoomAudio,
+    primeBrowserAudioGesture,
     setRoomSpeakerMuted,
     wasParticipantRemoved,
     wasRoomDeleted,
@@ -178,6 +180,7 @@
     holdProgress: 0,
   });
   let networkHintDismissed = $state(false);
+  let audioPlaybackBlocked = $state(false);
   let storedRejoinSession = $state<ReturnType<typeof readActiveCallSession>>(null);
 
   const inCallPhase = $derived(phase === "in_call" || phase === "reconnecting");
@@ -663,6 +666,7 @@
     if (!livekitRoom) return;
 
     try {
+      await ensureRoomAudio(livekitRoom);
       await livekitRoom.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
       micDeviceError = null;
 
@@ -748,6 +752,7 @@
 
   async function teardownCall(disconnectLiveKit: boolean) {
     stopPingPoll();
+    audioPlaybackBlocked = false;
     screenShareListenerCleanup?.();
     screenShareListenerCleanup = undefined;
     if (disconnectLiveKit && callSession) {
@@ -833,6 +838,10 @@
         if (gen !== connectionGen) return;
         showToast("Noise gate unavailable — using direct microphone input");
       },
+      onAudioPlaybackStatusChanged: (canPlayback: boolean) => {
+        if (gen !== connectionGen) return;
+        audioPlaybackBlocked = !canPlayback;
+      },
     };
   }
 
@@ -896,6 +905,7 @@
     attachScreenShareListener(callSession.room, gen);
     localConnectionQuality = qualityLabel(callSession.room.localParticipant.connectionQuality);
     applyRoomSpeakerState(callSession.room);
+    audioPlaybackBlocked = !callSession.room.canPlaybackAudio;
     startPingPoll();
     networkHintDismissed = false;
     writeActiveCallSession({
@@ -1134,6 +1144,7 @@
   async function joinCall() {
     errorMessage = null;
     joining = true;
+    primeBrowserAudioGesture(previewStream);
 
     try {
       const tokenPayload = await requestToken();
@@ -1206,6 +1217,19 @@
   function toggleSpeaker() {
     speakerEnabled = !speakerEnabled;
     applyRoomSpeakerState();
+    if (speakerEnabled && livekitRoom) {
+      void ensureRoomAudio(livekitRoom);
+    }
+  }
+
+  async function enableCallAudio() {
+    if (!livekitRoom) return;
+
+    const started = await ensureRoomAudio(livekitRoom);
+    audioPlaybackBlocked = !started;
+    if (started) {
+      applyRoomSpeakerState(livekitRoom);
+    }
   }
 
   async function toggleMic() {
@@ -1431,6 +1455,15 @@
 {#if phase === "in_call" || phase === "connecting" || phase === "reconnecting" || (phase === "disconnected" && !isEnded)}
   <div class="call-shell fixed inset-0 z-50 flex flex-col bg-background">
     <ConnectionBanner {phase} {disconnectMessage} onRejoin={phase === "disconnected" && !isEnded ? rejoinCall : undefined} />
+
+    {#if inCallPhase && audioPlaybackBlocked}
+      <div class="absolute inset-x-0 top-0 z-20 border-b border-participant-orange/40 bg-card/95 px-4 py-2 text-center safe-top" role="alert">
+        <p class="text-sm text-foreground">Call audio is blocked by your browser.</p>
+        <button type="button" class="mt-1 text-sm font-medium text-participant-orange underline-offset-2 hover:underline" onclick={enableCallAudio}>
+          Enable audio
+        </button>
+      </div>
+    {/if}
 
     {#if toastMessage}
       <div

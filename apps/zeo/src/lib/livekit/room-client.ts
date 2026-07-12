@@ -20,7 +20,36 @@ export type CallRoomHandlers = {
   onDisconnect: (reason?: DisconnectReason) => void;
   onConnectionQuality?: (quality: ConnectionQuality, identity: string) => void;
   onMicGateFallback?: () => void;
+  onAudioPlaybackStatusChanged?: (canPlayback: boolean) => void;
 };
+
+/** Prime autoplay while the join click gesture is still active (before network I/O). */
+export function primeBrowserAudioGesture(stream?: MediaStream | null) {
+  if (typeof window === "undefined") return;
+
+  const audioTrack = stream?.getAudioTracks().find((track) => track.readyState === "live");
+  if (!audioTrack) return;
+
+  const element = new Audio();
+  element.srcObject = new MediaStream([audioTrack]);
+  element.volume = 0;
+  element.muted = true;
+  void element.play().catch(() => {
+    // Best-effort unlock; LiveKit startAudio retries after connect.
+  });
+}
+
+/** Resume LiveKit playback and the shared AudioContext used for remote audio + mic processing. */
+export async function ensureRoomAudio(room: Room) {
+  if (room.state !== "connected") return false;
+
+  try {
+    await room.startAudio();
+    return room.canPlaybackAudio;
+  } catch {
+    return room.canPlaybackAudio;
+  }
+}
 
 export function collectAudioLevels(room: Room): Record<string, number> {
   const levels: Record<string, number> = {
@@ -128,7 +157,10 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   }
 
   room.on(RoomEvent.Reconnecting, () => handlers.onPhaseChange("reconnecting"));
-  room.on(RoomEvent.Reconnected, () => handlers.onPhaseChange("connected"));
+  room.on(RoomEvent.Reconnected, () => {
+    handlers.onPhaseChange("connected");
+    void ensureRoomAudio(room);
+  });
   room.on(RoomEvent.Disconnected, (reason) => {
     stopAudioLevelPolling();
     handlers.onPhaseChange("disconnected");
@@ -140,8 +172,16 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   });
   room.on(RoomEvent.ParticipantConnected, () => handlers.onParticipantsChange());
   room.on(RoomEvent.ParticipantDisconnected, () => handlers.onParticipantsChange());
-  room.on(RoomEvent.TrackSubscribed, () => handlers.onParticipantsChange());
+  room.on(RoomEvent.TrackSubscribed, (track) => {
+    handlers.onParticipantsChange();
+    if (track.kind === Track.Kind.Audio) {
+      void ensureRoomAudio(room);
+    }
+  });
   room.on(RoomEvent.TrackUnsubscribed, () => handlers.onParticipantsChange());
+  room.on(RoomEvent.AudioPlaybackStatusChanged, (canPlayback) => {
+    handlers.onAudioPlaybackStatusChanged?.(canPlayback);
+  });
   room.on(RoomEvent.LocalTrackPublished, () => handlers.onParticipantsChange());
   room.on(RoomEvent.LocalTrackUnpublished, () => handlers.onParticipantsChange());
   room.on(RoomEvent.ConnectionQualityChanged, (quality, participant) => {
@@ -163,6 +203,7 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   ) {
     handlers.onPhaseChange("connecting");
     await room.connect(wsUrl, token, options.iceServers?.length ? { rtcConfig: { iceServers: options.iceServers } } : undefined);
+    await ensureRoomAudio(room);
     await enableMicrophone(
       room,
       options.micEnabled,
