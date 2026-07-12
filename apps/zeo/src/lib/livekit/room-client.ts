@@ -9,7 +9,6 @@ import {
   type RemoteParticipant,
 } from "livekit-client";
 import type { MicGateProcessor } from "./mic-gate-processor";
-import { logAudioDiag, snapshotRoomAudio } from "./call-audio-diagnostics";
 import { attachAllRemoteAudioTracks, attachRemoteAudioTrack, detachAllRemoteAudioTracks, detachRemoteAudioTrack } from "./remote-audio";
 
 export type ConnectionPhase = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
@@ -31,7 +30,6 @@ export function primeBrowserAudioGesture(stream?: MediaStream | null) {
 
   const audioTrack = stream?.getAudioTracks().find((track) => track.readyState === "live");
   if (!audioTrack) {
-    logAudioDiag("warn", "gesture.prime_skipped", { reason: "no_live_audio_track" });
     return;
   }
 
@@ -39,41 +37,19 @@ export function primeBrowserAudioGesture(stream?: MediaStream | null) {
   element.srcObject = new MediaStream([audioTrack]);
   element.volume = 0;
   element.muted = true;
-  void element
-    .play()
-    .then(() => {
-      logAudioDiag("info", "gesture.primed", { trackId: audioTrack.id });
-    })
-    .catch((error) => {
-      logAudioDiag("warn", "gesture.prime_failed", {
-        trackId: audioTrack.id,
-        message: error instanceof Error ? error.message : String(error),
-      });
-    });
+  void element.play().catch(() => undefined);
 }
 
 /** Resume LiveKit playback and the shared AudioContext used for remote audio + mic processing. */
 export async function ensureRoomAudio(room: Room, reason = "unspecified") {
   if (room.state !== "connected") {
-    logAudioDiag("warn", "start_audio.skipped", { reason, roomState: room.state });
     return false;
   }
 
-  logAudioDiag("info", "start_audio.attempt", { reason, canPlaybackAudio: room.canPlaybackAudio });
-
   try {
     await room.startAudio();
-    logAudioDiag(room.canPlaybackAudio ? "info" : "warn", "start_audio.completed", {
-      reason,
-      canPlaybackAudio: room.canPlaybackAudio,
-    });
     return room.canPlaybackAudio;
-  } catch (error) {
-    logAudioDiag("error", "start_audio.failed", {
-      reason,
-      canPlaybackAudio: room.canPlaybackAudio,
-      message: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
     return room.canPlaybackAudio;
   }
 }
@@ -133,32 +109,19 @@ async function enableMicrophone(
     deviceId: options.audioDeviceId,
   });
 
-  logAudioDiag("info", "mic.enabled", {
-    enabled,
-    deviceId: options.audioDeviceId ?? "default",
-    isMicrophoneEnabled: room.localParticipant.isMicrophoneEnabled,
-  });
-
   if (!enabled || !options.micGateProcessor) {
     return;
   }
 
   try {
     await attachMicGateProcessor(room, options.micGateProcessor);
-    logAudioDiag("info", "mic.gate_attached");
-  } catch (error) {
+  } catch {
     const track = getLocalMicTrack(room);
     try {
       await track?.stopProcessor();
-      logAudioDiag("warn", "mic.gate_stopped_after_failure");
-    } catch (stopError) {
-      logAudioDiag("error", "mic.gate_stop_failed", {
-        message: stopError instanceof Error ? stopError.message : String(stopError),
-      });
+    } catch {
+      // Keep the raw microphone track if processor teardown fails.
     }
-    logAudioDiag("warn", "mic.gate_attach_failed", {
-      message: error instanceof Error ? error.message : String(error),
-    });
     onMicGateFallback?.();
   }
 }
@@ -234,7 +197,6 @@ export function createCallRoom(handlers: CallRoomHandlers) {
     }
   });
   room.on(RoomEvent.AudioPlaybackStatusChanged, (canPlayback) => {
-    logAudioDiag(canPlayback ? "info" : "warn", "playback.status_changed", { canPlayback });
     handlers.onAudioPlaybackStatusChanged?.(canPlayback);
   });
   room.on(RoomEvent.LocalTrackPublished, () => handlers.onParticipantsChange());
@@ -274,17 +236,12 @@ export function createCallRoom(handlers: CallRoomHandlers) {
     if (options.audioOutputDeviceId) {
       try {
         await room.switchActiveDevice("audiooutput", options.audioOutputDeviceId);
-        logAudioDiag("info", "audio_output.switched", { deviceId: options.audioOutputDeviceId });
-      } catch (error) {
-        logAudioDiag("warn", "audio_output.switch_failed", {
-          deviceId: options.audioOutputDeviceId,
-          message: error instanceof Error ? error.message : String(error),
-        });
+      } catch {
+        // Output device switching is best-effort.
       }
     }
     attachAllRemoteAudioTracks(room);
     await ensureRoomAudio(room, "connect_complete");
-    snapshotRoomAudio(room, "connect_complete");
     handlers.onPhaseChange("connected");
     handlers.onParticipantsChange();
     startAudioLevelPolling();
@@ -307,8 +264,6 @@ export function listRoomParticipants(room: Room): Array<LocalParticipant | Remot
 
 export function setRoomSpeakerMuted(room: Room, muted: boolean) {
   const volume = muted ? 0 : 1;
-
-  logAudioDiag("info", muted ? "speaker.muted" : "speaker.unmuted", { volume });
 
   for (const participant of room.remoteParticipants.values()) {
     participant.setVolume(volume);
