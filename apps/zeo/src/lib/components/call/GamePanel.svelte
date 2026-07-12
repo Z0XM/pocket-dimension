@@ -7,6 +7,7 @@
     open: boolean;
     bottomInset?: number;
     isHost: boolean;
+    userId: string;
     slug: string;
     snapshot: GameSnapshot | null;
     busy?: boolean;
@@ -19,6 +20,7 @@
     open,
     bottomInset = 0,
     isHost,
+    userId,
     slug,
     snapshot,
     busy = false,
@@ -31,7 +33,12 @@
   let errorMessage = $state<string | null>(null);
 
   const gameActive = $derived(snapshot?.session?.status === "active");
+  const round = $derived(snapshot?.round ?? null);
   const panelBottomPx = $derived(Math.max(16, bottomInset + 16));
+  const selfParticipant = $derived(snapshot?.participants.find((participant) => participant.userId === userId) ?? null);
+  const readyCount = $derived(snapshot?.participants.filter((participant) => participant.isReady).length ?? 0);
+  const totalPlayers = $derived(snapshot?.participants.length ?? 0);
+  const allReady = $derived(totalPlayers > 0 && readyCount === totalPlayers);
 
   async function runGameAction(action: () => Promise<Response>) {
     errorMessage = null;
@@ -65,6 +72,22 @@
     void runGameAction(() =>
       fetch(`/api/rooms/${slug}/game`, {
         method: "DELETE",
+      })
+    );
+  }
+
+  function markReady() {
+    void runGameAction(() =>
+      fetch(`/api/rooms/${slug}/game/rounds/ready`, {
+        method: "POST",
+      })
+    );
+  }
+
+  function startRoundOne() {
+    void runGameAction(() =>
+      fetch(`/api/rooms/${slug}/game/rounds/start`, {
+        method: "POST",
       })
     );
   }
@@ -111,14 +134,78 @@
     {#if tab === "setup"}
       {#if gameActive}
         <div class="space-y-3 text-sm">
-          <p class="text-muted-foreground">
-            {snapshot?.session?.gameType === "charades" ? "Charades" : "Game"} is active with {snapshot?.teams.length ?? 0} teams.
-          </p>
+          {#if !round}
+            <p class="text-muted-foreground">Everyone marks ready, then the host starts round 1.</p>
+            <p class="text-xs text-muted-foreground">{readyCount}/{totalPlayers} ready</p>
+            <ul class="space-y-1.5">
+              {#each snapshot?.participants ?? [] as participant (participant.userId)}
+                <li class="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs">
+                  <span class="flex items-center gap-2">
+                    <span class="size-2.5 rounded-full" style:background-color={snapshot?.teams.find((team) => team.id === participant.teamId)?.colorKey ?? "#888"}></span>
+                    {participant.displayName}
+                  </span>
+                  <span class={participant.isReady ? "text-participant-orange" : "text-muted-foreground"}>
+                    {participant.isReady ? "Ready" : "Waiting"}
+                  </span>
+                </li>
+              {/each}
+            </ul>
+            {#if selfParticipant && !selfParticipant.isReady}
+              <button
+                type="button"
+                class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                disabled={busy}
+                onclick={markReady}
+              >
+                {busy ? "Saving…" : "I'm ready"}
+              </button>
+            {:else if selfParticipant?.isReady}
+              <p class="text-xs text-participant-orange">You are ready.</p>
+            {/if}
+            {#if isHost}
+              <button
+                type="button"
+                class="w-full rounded-lg bg-secondary px-3 py-2 text-sm font-medium text-foreground disabled:opacity-60"
+                disabled={busy || !allReady}
+                onclick={startRoundOne}
+              >
+                {busy ? "Starting…" : "Start round 1"}
+              </button>
+              {#if !allReady}
+                <p class="text-xs text-muted-foreground">Waiting for all players to mark ready.</p>
+              {/if}
+            {/if}
+          {:else if round.phase === "ready_check"}
+            <p class="text-muted-foreground">Round {round.roundNumber} finished — mark ready for the next round.</p>
+            <p class="text-xs text-muted-foreground">{readyCount}/{totalPlayers} ready</p>
+            {#if selfParticipant && !selfParticipant.isReady}
+              <button
+                type="button"
+                class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                disabled={busy}
+                onclick={markReady}
+              >
+                {busy ? "Saving…" : "I'm ready"}
+              </button>
+            {:else if selfParticipant?.isReady}
+              <p class="text-xs text-participant-orange">You are ready. Waiting for others…</p>
+            {/if}
+          {:else}
+            <p class="text-muted-foreground">
+              Round {round.roundNumber} — {round.phase.replaceAll("_", " ")}
+            </p>
+            <p class="text-xs text-muted-foreground">Word submission and guessing controls arrive in the next release.</p>
+          {/if}
+
           <ul class="space-y-1 text-xs text-muted-foreground">
             {#each snapshot?.teams ?? [] as team (team.id)}
-              <li>{team.name}: {team.memberUserIds.length} players</li>
+              <li class="flex items-center gap-2">
+                <span class="size-2.5 rounded-full" style:background-color={team.colorKey}></span>
+                {team.name}: {team.score} pts · {team.memberUserIds.length} players
+              </li>
             {/each}
           </ul>
+
           {#if isHost}
             <button
               type="button"
@@ -132,7 +219,7 @@
         </div>
       {:else if isHost}
         <div class="space-y-3">
-          <p class="text-sm text-muted-foreground">Start Charades with two teams. Gameplay rounds arrive in a later release.</p>
+          <p class="text-sm text-muted-foreground">Start Charades with two teams. Players will mark ready before round 1.</p>
           <button
             type="button"
             class="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
@@ -156,7 +243,7 @@
           {/each}
         </ul>
       {:else}
-        <p class="text-sm text-muted-foreground">No scores yet. Points appear after Charades rounds.</p>
+        <p class="text-sm text-muted-foreground">No scores yet. Points appear after accepted guesses.</p>
       {/if}
     {/if}
   </div>

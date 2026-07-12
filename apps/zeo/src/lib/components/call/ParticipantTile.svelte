@@ -12,6 +12,7 @@
     isActiveSpeaker?: boolean;
     audioLevel?: number;
     tileColor: string;
+    teamOutlineColor?: string | null;
     isLocal?: boolean;
     localMicEnabled?: boolean;
     hideVideos?: boolean;
@@ -31,6 +32,7 @@
     isActiveSpeaker = false,
     audioLevel = 0,
     tileColor,
+    teamOutlineColor = null,
     isLocal = false,
     localMicEnabled,
     hideVideos = false,
@@ -79,6 +81,9 @@
     }
     if (isActiveSpeaker) {
       return `outline: 2px solid ${glowColor(42)}; outline-offset: -2px;`;
+    }
+    if (teamOutlineColor) {
+      return `outline: 3px solid ${teamOutlineColor}; outline-offset: 2px;`;
     }
     return undefined;
   });
