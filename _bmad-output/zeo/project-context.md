@@ -45,6 +45,8 @@
 
 All specs live under `_bmad-output/zeo/planning-artifacts/`.
 
+Phase 4 (Game Mode): see `prd-zeo-game-mode-2026-07-12/`, `ux-zeo-game-mode-2026-07-12/`, `architecture-game-mode.md`.
+
 ## Implementation order
 
 Epics 1 → 2 → 4 (slice) → 3 → 4–5 → 6 per `epics.md`.
