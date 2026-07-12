@@ -227,7 +227,7 @@ UX-GM-6: Auth gate replaces guest lobby path.
 **So that** we get fresh teams.
 
 **Acceptance criteria:**
-- [ ] `POST /api/rooms/[slug]/game/shuffle` — only when `round.phase === ready_check`
+- [ ] `POST /api/rooms/[slug]/game/shuffle` — when no active round yet **or** `round.phase === ready_check` (covers game lobby before round 1 and between rounds per FR-GM-11)
 - [ ] Rebalances to min 2 per team; 422 if impossible
 - [ ] Clears all `is_ready` flags
 - [ ] Publishes SSE snapshot
