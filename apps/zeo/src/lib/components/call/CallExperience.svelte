@@ -2,7 +2,15 @@
   import { browser } from "$app/environment";
   import { onDestroy, onMount } from "svelte";
   import XIcon from "@lucide/svelte/icons/x";
-  import { RoomEvent, Track, type ConnectionQuality, type LocalTrackPublication, type Room, supportsAudioOutputSelection } from "livekit-client";
+  import {
+    RoomEvent,
+    Track,
+    type ConnectionQuality,
+    type LocalAudioTrack,
+    type LocalTrackPublication,
+    type Room,
+    supportsAudioOutputSelection,
+  } from "livekit-client";
   import type { CallPhase, PermissionState } from "$lib/livekit/types";
   import { startMediaPreview, stopMediaPreview, syncPreviewTracks, restartMediaPreview, type MediaPreviewResult } from "$lib/livekit/media-preview";
   import { CAMERA_IN_USE_MESSAGE, deviceErrorMessage, isDeviceInUseError } from "$lib/livekit/media-errors";
@@ -19,6 +27,7 @@
     wasRoomDeleted,
     type ConnectionPhase,
   } from "$lib/livekit/room-client";
+  import { attachAllRemoteAudioTracks } from "$lib/livekit/remote-audio";
   import { createMicGateProcessor, type MicGateProcessor } from "$lib/livekit/mic-gate-processor";
   import {
     disableLocalScreenShare,
@@ -675,6 +684,15 @@
       try {
         await attachMicGateProcessor(livekitRoom, micGateProcessor);
       } catch {
+        const publication = livekitRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
+        const track = publication?.track;
+        if (track && track.kind === Track.Kind.Audio) {
+          try {
+            await (track as LocalAudioTrack).stopProcessor();
+          } catch {
+            // Keep the raw microphone track if processor teardown fails.
+          }
+        }
         showToast("Noise gate unavailable — using direct microphone input");
       }
     } catch (error) {
@@ -1225,6 +1243,7 @@
   async function enableCallAudio() {
     if (!livekitRoom) return;
 
+    attachAllRemoteAudioTracks(livekitRoom);
     const started = await ensureRoomAudio(livekitRoom);
     audioPlaybackBlocked = !started;
     if (started) {

@@ -9,6 +9,7 @@ import {
   type RemoteParticipant,
 } from "livekit-client";
 import type { MicGateProcessor } from "./mic-gate-processor";
+import { attachAllRemoteAudioTracks, attachRemoteAudioTrack, detachAllRemoteAudioTracks, detachRemoteAudioTrack } from "./remote-audio";
 
 export type ConnectionPhase = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
 
@@ -113,6 +114,12 @@ async function enableMicrophone(
   try {
     await attachMicGateProcessor(room, options.micGateProcessor);
   } catch {
+    const track = getLocalMicTrack(room);
+    try {
+      await track?.stopProcessor();
+    } catch {
+      // Fall back to the raw microphone track if processor teardown fails.
+    }
     onMicGateFallback?.();
   }
 }
@@ -159,10 +166,12 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   room.on(RoomEvent.Reconnecting, () => handlers.onPhaseChange("reconnecting"));
   room.on(RoomEvent.Reconnected, () => {
     handlers.onPhaseChange("connected");
+    attachAllRemoteAudioTracks(room);
     void ensureRoomAudio(room);
   });
   room.on(RoomEvent.Disconnected, (reason) => {
     stopAudioLevelPolling();
+    detachAllRemoteAudioTracks(room);
     handlers.onPhaseChange("disconnected");
     handlers.onDisconnect(reason);
   });
@@ -175,10 +184,16 @@ export function createCallRoom(handlers: CallRoomHandlers) {
   room.on(RoomEvent.TrackSubscribed, (track) => {
     handlers.onParticipantsChange();
     if (track.kind === Track.Kind.Audio) {
+      attachRemoteAudioTrack(track);
       void ensureRoomAudio(room);
     }
   });
-  room.on(RoomEvent.TrackUnsubscribed, () => handlers.onParticipantsChange());
+  room.on(RoomEvent.TrackUnsubscribed, (track) => {
+    handlers.onParticipantsChange();
+    if (track.kind === Track.Kind.Audio) {
+      detachRemoteAudioTrack(track);
+    }
+  });
   room.on(RoomEvent.AudioPlaybackStatusChanged, (canPlayback) => {
     handlers.onAudioPlaybackStatusChanged?.(canPlayback);
   });
@@ -223,6 +238,8 @@ export function createCallRoom(handlers: CallRoomHandlers) {
         // Output routing is unsupported or the device is unavailable.
       }
     }
+    attachAllRemoteAudioTracks(room);
+    await ensureRoomAudio(room);
     handlers.onPhaseChange("connected");
     handlers.onParticipantsChange();
     startAudioLevelPolling();
@@ -230,6 +247,7 @@ export function createCallRoom(handlers: CallRoomHandlers) {
 
   async function disconnect() {
     stopAudioLevelPolling();
+    detachAllRemoteAudioTracks(room);
     if (room.state !== "disconnected") {
       await room.disconnect();
     }
