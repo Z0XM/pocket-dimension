@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Volume2Icon from "@lucide/svelte/icons/volume-2";
+  import VolumeOffIcon from "@lucide/svelte/icons/volume-off";
   import EyeIcon from "@lucide/svelte/icons/eye";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import Maximize2Icon from "@lucide/svelte/icons/maximize-2";
@@ -10,10 +12,13 @@
     fullscreen?: boolean;
     pinned?: boolean;
     showPin?: boolean;
+    audioMuted?: boolean;
+    showAudioMute?: boolean;
     onMinimize?: () => void;
     onToggleHideVideo?: () => void;
     onToggleFullscreen?: () => void;
     onTogglePin?: () => void;
+    onToggleAudioMute?: () => void;
   };
 
   const {
@@ -21,10 +26,13 @@
     fullscreen = false,
     pinned = false,
     showPin = false,
+    audioMuted = false,
+    showAudioMute = false,
     onMinimize,
     onToggleHideVideo,
     onToggleFullscreen,
     onTogglePin,
+    onToggleAudioMute,
   }: Props = $props();
 
   const actionClass =
@@ -53,6 +61,22 @@
       onclick={onTogglePin}
     >
       <PinIcon class="size-3.5" aria-hidden="true" />
+    </button>
+  {/if}
+
+  {#if showAudioMute && onToggleAudioMute}
+    <button
+      type="button"
+      class="{actionClass} {audioMuted ? 'bg-white/20 text-white' : ''}"
+      aria-label={audioMuted ? "Unmute tile audio" : "Mute tile audio"}
+      aria-pressed={audioMuted}
+      onclick={onToggleAudioMute}
+    >
+      {#if audioMuted}
+        <VolumeOffIcon class="size-3.5" aria-hidden="true" />
+      {:else}
+        <Volume2Icon class="size-3.5" aria-hidden="true" />
+      {/if}
     </button>
   {/if}
 

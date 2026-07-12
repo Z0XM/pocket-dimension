@@ -28,6 +28,7 @@
     type ConnectionPhase,
   } from "$lib/livekit/room-client";
   import { attachAllRemoteAudioTracks } from "$lib/livekit/remote-audio";
+  import { applyAllTileListenVolumes } from "$lib/livekit/tile-listen-mute";
   import {
     clearAudioDiagnostics,
     copyAudioDiagnostics,
@@ -359,6 +360,7 @@
   let controlBarReservePx = $state(0);
   let minimizedTileKeys = $state<string[]>([]);
   let hiddenVideoTileKeys = $state<string[]>([]);
+  let mutedListenTileKeys = $state<string[]>([]);
   let fullscreenTileKey = $state<string | null>(null);
   let intentionalScreenShareStop = false;
   let snapshotting = $state(false);
@@ -400,6 +402,7 @@
     const validKeys = new Set(stageTiles.map((tile) => tile.key));
     minimizedTileKeys = pruneTileKeys(minimizedTileKeys, validKeys);
     hiddenVideoTileKeys = pruneTileKeys(hiddenVideoTileKeys, validKeys);
+    mutedListenTileKeys = pruneTileKeys(mutedListenTileKeys, validKeys);
     if (fullscreenTileKey && !validKeys.has(fullscreenTileKey)) {
       fullscreenTileKey = null;
     }
@@ -411,6 +414,7 @@
   function resetStageTileState() {
     minimizedTileKeys = [];
     hiddenVideoTileKeys = [];
+    mutedListenTileKeys = [];
     fullscreenTileKey = null;
     pinnedTileKey = null;
   }
@@ -430,6 +434,12 @@
 
   function toggleTileHideVideo(key: string) {
     hiddenVideoTileKeys = hiddenVideoTileKeys.includes(key) ? hiddenVideoTileKeys.filter((entry) => entry !== key) : [...hiddenVideoTileKeys, key];
+  }
+
+  function toggleTileListenMute(key: string) {
+    const nextMuted = !mutedListenTileKeys.includes(key);
+    mutedListenTileKeys = nextMuted ? [...mutedListenTileKeys, key] : mutedListenTileKeys.filter((entry) => entry !== key);
+    applyRoomSpeakerState();
   }
 
   function toggleTileFullscreen(key: string) {
@@ -671,7 +681,10 @@
 
   function applyRoomSpeakerState(room: Room | null = livekitRoom) {
     if (!room || room.state !== "connected") return;
-    setRoomSpeakerMuted(room, !speakerEnabled);
+    applyAllTileListenVolumes(room, {
+      speakersEnabled: speakerEnabled,
+      mutedTileKeys: new Set(mutedListenTileKeys),
+    });
   }
 
   function micCaptureOptions() {
@@ -1695,10 +1708,12 @@
           bottomInset={controlBarReservePx}
           {minimizedTileKeys}
           {hiddenVideoTileKeys}
+          {mutedListenTileKeys}
           {fullscreenTileKey}
           {selfViewHidden}
           onMinimizeTile={minimizeTile}
           onToggleHideVideo={toggleTileHideVideo}
+          onToggleTileListenMute={toggleTileListenMute}
           onToggleTileFullscreen={toggleTileFullscreen}
           onTogglePinTile={togglePinTile}
           {showGridSettings}
