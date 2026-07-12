@@ -51,6 +51,7 @@
   import ChatPanel from "$lib/components/call/ChatPanel.svelte";
   import WaitingRoomView from "$lib/components/call/WaitingRoomView.svelte";
   import HostWaitingPanel from "$lib/components/call/HostWaitingPanel.svelte";
+  import GamePanel from "$lib/components/call/GamePanel.svelte";
   import ConnectionQualityBadge from "$lib/components/call/ConnectionQualityBadge.svelte";
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
   import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
@@ -60,7 +61,9 @@
   import type { DetectedGesture, GestureAction, VideoTrackingFrame } from "$lib/gestures/gesture-types";
   import { disposeHandLandmarker } from "$lib/gestures/hand-tracker";
   import { isAutoLayoutPreset, type AutoLayoutPreset } from "$lib/call/auto-layout";
+  import { createGameStateStore } from "$lib/call/game-state";
   import type { StageLayoutMode } from "$lib/stage-grid";
+  import type { GameSnapshot } from "$lib/server/game/types";
   import { Separator } from "$lib/components/ui/separator";
   import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import { PARTICIPANT_COLORS, resolveParticipantColor, type ParticipantColor } from "$lib/participant-colors";
@@ -162,6 +165,11 @@
   let micTestActive = $state(false);
   let showInCallDevices = $state(false);
   let showGridSettings = $state(false);
+  let showGamePanel = $state(false);
+  let gameBusy = $state(false);
+  let gameSnapshot = $state<GameSnapshot | null>(null);
+  let layoutModeBeforeGame = $state<StageLayoutMode | null>(null);
+  const gameState = createGameStateStore();
   let stageLayoutMode = $state<StageLayoutMode>("grid");
   let autoLayoutPreset = $state<AutoLayoutPreset>("dynamic");
   let galleryDensity = $state(5);
@@ -197,6 +205,8 @@
   let storedRejoinSession = $state<ReturnType<typeof readActiveCallSession>>(null);
 
   const inCallPhase = $derived(phase === "in_call" || phase === "reconnecting");
+  const gameActive = $derived(gameSnapshot?.session?.status === "active");
+  const showGameModeButton = $derived(isHost || gameActive);
   const gestureCameraAvailable = $derived(camEnabled && permissionState === "granted" && !cameraInUse);
   const micMonitorStream = $derived(inCallPhase ? inCallMicTestStream : previewStream);
   const micDisplayEnabled = $derived(micEnabled && !(inCallPhase && micTestActive));
@@ -251,8 +261,28 @@
   }
 
   function setStageLayoutMode(mode: StageLayoutMode) {
+    if (gameActive) return;
     stageLayoutMode = mode;
     writeStored(STORAGE_KEYS.stageLayoutMode, mode);
+  }
+
+  function closeGamePanel() {
+    showGamePanel = false;
+  }
+
+  function toggleGamePanel() {
+    if (showGamePanel) {
+      closeGamePanel();
+      return;
+    }
+    chatOpen = false;
+    closeInCallDevicesPanel();
+    closeGridSettingsPanel();
+    showGamePanel = true;
+  }
+
+  function handleGameSnapshot(next: GameSnapshot | null) {
+    gameSnapshot = next;
   }
 
   function setAutoLayoutPreset(preset: AutoLayoutPreset) {
@@ -617,16 +647,19 @@
   }
 
   function toggleGridSettingsPanel() {
+    if (gameActive) return;
     if (showGridSettings) {
       closeGridSettingsPanel();
       return;
     }
     closeInCallDevicesPanel();
+    closeGamePanel();
     showGridSettings = true;
   }
 
   function openInCallDevicesPanel() {
     closeGridSettingsPanel();
+    closeGamePanel();
     showInCallDevices = true;
   }
 
@@ -1228,6 +1261,8 @@
     }
     showInCallDevices = false;
     showGridSettings = false;
+    closeGamePanel();
+    gameState.disconnect();
     stopHostWaitingPoll();
     await teardownCall(true);
     micGateProcessor = createFreshMicGateProcessor();
@@ -1487,6 +1522,41 @@
   }
 
   $effect(() => {
+    if (!browser) return;
+    const unsubscribe = gameState.snapshot.subscribe((value) => {
+      gameSnapshot = value;
+    });
+    return unsubscribe;
+  });
+
+  $effect(() => {
+    if (!browser) return;
+    if (inCallPhase) {
+      gameState.connect(slug);
+      return () => gameState.disconnect();
+    }
+    gameState.disconnect();
+    gameSnapshot = null;
+    closeGamePanel();
+  });
+
+  $effect(() => {
+    if (gameActive) {
+      closeGridSettingsPanel();
+      if (layoutModeBeforeGame === null && stageLayoutMode !== "game") {
+        layoutModeBeforeGame = stageLayoutMode;
+      }
+      stageLayoutMode = "game";
+      return;
+    }
+
+    if (layoutModeBeforeGame !== null) {
+      stageLayoutMode = layoutModeBeforeGame;
+      layoutModeBeforeGame = null;
+    }
+  });
+
+  $effect(() => {
     if (!inCallPhase || networkHintDismissed || localConnectionQuality !== "poor") return;
     if (camEnabled) {
       showToast("Poor connection — try turning off your camera or moving closer to Wi‑Fi");
@@ -1522,6 +1592,7 @@
     if (toastTimer) clearTimeout(toastTimer);
     stopWaitingPoll();
     stopHostWaitingPoll();
+    gameState.disconnect();
     teardownCall(true);
     disposeHandLandmarker();
   });
@@ -1588,6 +1659,18 @@
           onClose={() => (chatOpen = false)}
         />
       {/if}
+
+      <GamePanel
+        open={showGamePanel}
+        bottomInset={controlBarReservePx}
+        {isHost}
+        {slug}
+        snapshot={gameSnapshot}
+        busy={gameBusy}
+        onClose={closeGamePanel}
+        onSnapshot={handleGameSnapshot}
+        onBusyChange={(value) => (gameBusy = value)}
+      />
 
       <div class="relative min-h-0 flex-1">
         {#if showInCallDevices}
@@ -1717,6 +1800,8 @@
           onTogglePinTile={togglePinTile}
           {showGridSettings}
           {showInCallDevices}
+          layoutLocked={gameActive}
+          gameTeams={gameSnapshot?.teams ?? []}
           onLayoutModeChange={setStageLayoutMode}
           onAutoLayoutPresetChange={setAutoLayoutPreset}
           onHideNonVideoTilesChange={setHideNonVideoTiles}
@@ -1754,8 +1839,12 @@
         onToggleChat={chatEnabled ? () => (chatOpen = !chatOpen) : undefined}
         onToggleDevices={() => (showInCallDevices ? closeInCallDevicesPanel() : openInCallDevicesPanel())}
         devicesOpen={showInCallDevices}
-        onToggleGridSettings={toggleGridSettingsPanel}
+        onToggleGridSettings={gameActive ? undefined : toggleGridSettingsPanel}
         gridSettingsOpen={showGridSettings}
+        onToggleGameMode={showGameModeButton ? toggleGamePanel : undefined}
+        gamePanelOpen={showGamePanel}
+        {showGameModeButton}
+        {gameActive}
         onLeave={leaveCall}
         onEndRoom={isHost ? endRoom : undefined}
         {ending}

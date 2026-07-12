@@ -10,6 +10,7 @@
   import VideoGrid from "./VideoGrid.svelte";
   import GridSettingsPanel from "./GridSettingsPanel.svelte";
   import type { DetectedGesture, HandLandmark } from "$lib/gestures/gesture-types";
+  import type { GameSnapshotTeam } from "$lib/server/game/types";
 
   type Props = {
     room: Room;
@@ -48,6 +49,8 @@
     onSidebarSplitRatioChange?: (value: number) => void;
     onHideSelfView?: () => void;
     onCloseGridSettings?: () => void;
+    layoutLocked?: boolean;
+    gameTeams?: GameSnapshotTeam[];
     stageRef?: HTMLElement | null;
     trackingOverlayVisible?: boolean;
     handLandmarks?: HandLandmark[] | null;
@@ -92,6 +95,8 @@
     onSidebarSplitRatioChange,
     onHideSelfView,
     onCloseGridSettings,
+    layoutLocked = false,
+    gameTeams = [],
     stageRef = $bindable(null),
     trackingOverlayVisible = false,
     handLandmarks = null,
@@ -170,6 +175,7 @@
         {handLandmarks}
         {handGesture}
         {handGestureHoldProgress}
+        {gameTeams}
       />
     {/snippet}
   </StageGridArea>
@@ -183,6 +189,7 @@
       {galleryDensity}
       {sidebarSplitRatio}
       {selfViewHidden}
+      layoutLocked={layoutLocked}
       {onLayoutModeChange}
       {onAutoLayoutPresetChange}
       {onHideNonVideoTilesChange}

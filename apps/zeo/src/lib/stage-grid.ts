@@ -8,7 +8,7 @@ export type StageGridLayout = {
   height: number;
 };
 
-export type StageLayoutMode = "grid" | "auto";
+export type StageLayoutMode = "grid" | "auto" | "game";
 
 export function stageGridLayoutsEqual(a: StageGridLayout | null, b: StageGridLayout | null) {
   if (a === b) return true;
