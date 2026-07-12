@@ -1,11 +1,11 @@
 import { json, error } from "@sveltejs/kit";
-import { displayNameForUser } from "$lib/server/authz";
+import { displayNameForUser, requireUser } from "$lib/server/authz";
 import { listChatMessages, sendChatMessage } from "$lib/server/chat";
 import { readJsonBody } from "$lib/server/http";
 import { isParticipantBlocked } from "$lib/server/session-blocks";
 import { getOperatorSettings } from "$lib/server/operator-settings";
 import { findRoomBySlug } from "$lib/server/rooms";
-import { findWaitingEntry, isWaitingRoomAdmitted } from "$lib/server/waiting-room";
+import { isWaitingRoomAdmitted } from "$lib/server/waiting-room";
 import { chatMessageSchema } from "$lib/validation/rooms";
 import type { RequestHandler } from "./$types";
 
@@ -60,23 +60,12 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
   const settings = await getOperatorSettings();
   if (!settings.chatEnabled) throw error(403, "Chat is disabled by the operator");
 
-  const { body, guestIdentity, kind } = await readJsonBody(request, chatMessageSchema);
+  const user = requireUser(locals);
+  const { body, kind } = await readJsonBody(request, chatMessageSchema);
 
-  let identity: string;
-  let displayName: string;
-  const isHost = locals.user?.id === room.hostUserId;
-
-  if (locals.user) {
-    identity = locals.user.id;
-    displayName = displayNameForUser(locals.user);
-  } else {
-    if (!guestIdentity) {
-      throw error(400, "Guest identity is required");
-    }
-    identity = guestIdentity;
-    const waitingEntry = await findWaitingEntry(room.id, identity);
-    displayName = waitingEntry?.displayName ?? "Guest";
-  }
+  const identity = user.id;
+  const displayName = displayNameForUser(user);
+  const isHost = user.id === room.hostUserId;
 
   await assertCanChat(room, identity, isHost);
 

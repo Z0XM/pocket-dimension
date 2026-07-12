@@ -28,27 +28,10 @@ export const operatorSettingsSchema = z.object({
 export const chatMessageSchema = z.object({
   body: z.string().trim().min(1, "Message is required").max(2_000_000, "Message is too long"),
   kind: z.enum(["text", "snapshot"]).optional(),
-  guestIdentity: z
-    .string()
-    .regex(/^guest_[0-9a-f-]{36}$/i, "Invalid guest identity")
-    .optional(),
 });
 
 export const waitingActionSchema = z.object({
   identity: z.string().min(1, "Participant identity is required"),
-});
-
-export const guestTokenSchema = z.object({
-  guestName: z
-    .string()
-    .trim()
-    .min(1, "Display name is required")
-    .max(40, "Display name is too long")
-    .regex(/^[\p{L}\p{N}\s._-]+$/u, "Display name contains invalid characters"),
-  guestIdentity: z
-    .string()
-    .regex(/^guest_[0-9a-f-]{36}$/i, "Invalid guest identity")
-    .optional(),
 });
 
 export const removeParticipantSchema = z.object({

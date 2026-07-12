@@ -248,7 +248,6 @@ export async function endRoomById(roomId: string, options?: { reason?: string; s
 }
 
 export async function recordParticipantJoined(options: { roomId: string; identity: string; displayName?: string }) {
-  const isGuest = options.identity.startsWith("guest_");
   const existing = await db.query.roomParticipants.findFirst({
     where: and(
       eq(schema.roomParticipants.roomId, options.roomId),
@@ -264,9 +263,9 @@ export async function recordParticipantJoined(options: { roomId: string; identit
     await db.insert(schema.roomParticipants).values({
       roomId: options.roomId,
       participantIdentity: options.identity,
-      userId: isGuest ? null : options.identity,
-      guestDisplayName: isGuest ? (options.displayName ?? options.identity) : null,
-      isGuest,
+      userId: options.identity,
+      guestDisplayName: null,
+      isGuest: false,
     });
     incrementLiveParticipantCount(options.roomId);
     return;

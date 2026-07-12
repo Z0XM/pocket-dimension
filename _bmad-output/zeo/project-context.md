@@ -29,8 +29,7 @@
 | Action | Who |
 |--------|-----|
 | Create room | `contributor` or `admin` only (`auth.users.role`) |
-| Join authenticated | Any logged-in user (unless session-blocked) |
-| Join as guest | Anyone with room link + display name (unless session-blocked) |
+| Join authenticated | Any logged-in user (required for all zeo joins) |
 | Host remove | Blocks rejoin for that room session until room ends |
 
 ## Features in / out of scope

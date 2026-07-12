@@ -162,7 +162,7 @@
           <SettingToggle
             id="waiting-room"
             label="Require approval"
-            tooltip="Guests wait in a lobby until the host lets them in."
+            tooltip="Participants wait in a lobby until the host lets them in."
             bind:checked={waitingRoomEnabled}
             disabled={!userCanCreate}
           />

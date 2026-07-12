@@ -57,6 +57,10 @@ Only `auth-service` defines a `test` script and it runs with `--passWithNoTests`
 
 Better Auth is configured with `secure: true` / `sameSite: "none"` cookies (`shared/auth/src/index.ts`). Over plain `http://localhost` the browser will not persist the session cookie, so a full logged-in session may not stick locally. Account **creation/signup** works fine; verifying users typically requires flipping `email_verified` in the DB since email delivery is disabled by default.
 
+### zeo join policy
+
+**zeo requires login** to join any room (`/room/[slug]` redirects unauthenticated users to sign-in). Guest join without an account is not supported.
+
 ### markitdown (optional, standalone)
 
 Needs a Python venv plus `ffmpeg` + `exiftool` (both installed in the snapshot): `cd apps/markitdown && bun run setup:python`. Defaults to port 3006 — conflicts with `me-via-you`; run only one or change `PORT`.

@@ -84,11 +84,3 @@ export function generateRoomSlug(options?: { suffix?: number }) {
 
   return base;
 }
-
-export function generateGuestIdentity() {
-  return `guest_${crypto.randomUUID()}`;
-}
-
-export function sanitizeGuestDisplayName(name: string) {
-  return name.trim().slice(0, 40);
-}

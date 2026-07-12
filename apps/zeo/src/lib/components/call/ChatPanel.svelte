@@ -23,7 +23,6 @@
   type Props = {
     slug: string;
     localIdentity: string;
-    guestIdentity?: string | null;
     open: boolean;
     syncToken?: number;
     isHost?: boolean;
@@ -37,7 +36,6 @@
   const {
     slug,
     localIdentity,
-    guestIdentity = null,
     open,
     syncToken = 0,
     isHost = false,
@@ -86,7 +84,6 @@
 
     try {
       const payload: Record<string, string> = { body, kind: "text" };
-      if (guestIdentity) payload.guestIdentity = guestIdentity;
 
       const res = await fetch(`/api/rooms/${slug}/chat`, {
         method: "POST",

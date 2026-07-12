@@ -438,7 +438,6 @@
                   localIdentity: room.localParticipant.identity,
                   preferredColor: localTileColor,
                 })}
-                isGuest={tile.participant.identity.startsWith("guest_")}
                 isLocal={tile.participant.identity === room.localParticipant.identity}
                 localMicEnabled={tile.participant.identity === room.localParticipant.identity ? localMicEnabled : undefined}
                 hideVideos={hideParticipantVideos || tileVideoHidden(tile.key)}
