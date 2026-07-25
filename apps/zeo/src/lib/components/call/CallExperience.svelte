@@ -85,8 +85,10 @@
   import { disposeHandLandmarker } from "$lib/gestures/hand-tracker";
   import { isAutoLayoutPreset, type AutoLayoutPreset } from "$lib/call/auto-layout";
   import { createGameStateStore } from "$lib/call/game-state";
+  import { createListeningStateStore } from "$lib/call/listening-state";
   import type { StageLayoutMode } from "$lib/stage-grid";
   import type { GameSnapshot } from "$lib/server/game/types";
+  import type { ListeningSnapshot } from "$lib/server/listening/types";
   import { Separator } from "$lib/components/ui/separator";
   import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import { PARTICIPANT_COLORS, resolveParticipantColor, type ParticipantColor } from "$lib/participant-colors";
@@ -192,9 +194,13 @@
   let showGridSettings = $state(false);
   let showGamePanel = $state(false);
   let gameBusy = $state(false);
+  let listeningBusy = $state(false);
   let gameSnapshot = $state<GameSnapshot | null>(null);
+  let listeningSnapshot = $state<ListeningSnapshot | null>(null);
+  let youtubeLinked = $state(false);
   let layoutModeBeforeGame = $state<StageLayoutMode | null>(null);
   const gameState = createGameStateStore();
+  const listeningState = createListeningStateStore();
   let stageLayoutMode = $state<StageLayoutMode>("grid");
   let autoLayoutPreset = $state<AutoLayoutPreset>("dynamic");
   let galleryDensity = $state(5);
@@ -231,7 +237,9 @@
 
   const inCallPhase = $derived(phase === "in_call" || phase === "reconnecting");
   const gameActive = $derived(gameSnapshot?.session?.status === "active");
-  const showGameModeButton = $derived(isHost || gameActive);
+  const listeningActive = $derived(Boolean(listeningSnapshot?.session && !listeningSnapshot.session.endedAt));
+  const listeningIsDj = $derived(listeningSnapshot?.session?.djUserId === user.id || isHost);
+  const showGameModeButton = $derived(true);
   const gestureCameraAvailable = $derived(camEnabled && permissionState === "granted" && !cameraInUse);
   const micMonitorStream = $derived(inCallPhase ? inCallMicTestStream : previewStream);
   const micDisplayEnabled = $derived(micEnabled && !(inCallPhase && micTestActive));
@@ -308,6 +316,53 @@
 
   function handleGameSnapshot(next: GameSnapshot | null) {
     gameSnapshot = next;
+  }
+
+  function handleListeningSnapshot(next: ListeningSnapshot | null) {
+    listeningSnapshot = next;
+  }
+
+  async function refreshYouTubeLink() {
+    try {
+      const response = await fetch("/api/me/youtube-link");
+      if (!response.ok) return;
+      const body = (await response.json()) as { linked?: boolean };
+      youtubeLinked = Boolean(body.linked);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function listeningTransport(path: "play" | "pause" | "skip" | "previous", body?: Record<string, unknown>) {
+    listeningBusy = true;
+    try {
+      const response = await fetch(`/api/rooms/${slug}/listening/${path}`, {
+        method: "POST",
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!response.ok) return;
+      const next = (await response.json()) as ListeningSnapshot;
+      listeningSnapshot = next.session && !next.session.endedAt ? next : null;
+    } finally {
+      listeningBusy = false;
+    }
+  }
+
+  async function listeningSeek(positionMs: number) {
+    listeningBusy = true;
+    try {
+      const response = await fetch(`/api/rooms/${slug}/listening/seek`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ positionMs }),
+      });
+      if (!response.ok) return;
+      const next = (await response.json()) as ListeningSnapshot;
+      listeningSnapshot = next.session && !next.session.endedAt ? next : null;
+    } finally {
+      listeningBusy = false;
+    }
   }
 
   function setAutoLayoutPreset(preset: AutoLayoutPreset) {
@@ -415,10 +470,14 @@
   let showTileStats = $state(readStoredFlag(STORAGE_KEYS.showTileStats, true));
   let tileStats = $state<Record<string, TileMediaStats>>({});
   let videoQuality = $state<VideoQualityOption>(
-    isVideoQualityOption(readStored(STORAGE_KEYS.videoQuality)) ? (readStored(STORAGE_KEYS.videoQuality) as VideoQualityOption) : DEFAULT_VIDEO_QUALITY
+    isVideoQualityOption(readStored(STORAGE_KEYS.videoQuality))
+      ? (readStored(STORAGE_KEYS.videoQuality) as VideoQualityOption)
+      : DEFAULT_VIDEO_QUALITY
   );
   let audioQuality = $state<AudioQualityOption>(
-    isAudioQualityOption(readStored(STORAGE_KEYS.audioQuality)) ? (readStored(STORAGE_KEYS.audioQuality) as AudioQualityOption) : DEFAULT_AUDIO_QUALITY
+    isAudioQualityOption(readStored(STORAGE_KEYS.audioQuality))
+      ? (readStored(STORAGE_KEYS.audioQuality) as AudioQualityOption)
+      : DEFAULT_AUDIO_QUALITY
   );
   let tileStatsPollTimer: ReturnType<typeof setInterval> | undefined;
   let intentionalScreenShareStop = false;
@@ -443,7 +502,12 @@
 
   const stageTiles = $derived.by(() => {
     mediaRevision;
-    return livekitRoom ? buildStageTiles(livekitRoom) : [];
+    return livekitRoom
+      ? buildStageTiles(livekitRoom, {
+          listeningActive,
+          listeningBotIdentity: listeningSnapshot?.session?.botIdentity ?? null,
+        })
+      : [];
   });
 
   const selfViewHidden = $derived(livekitRoom ? minimizedTileKeys.includes(livekitRoom.localParticipant.identity) : false);
@@ -979,7 +1043,10 @@
       return;
     }
 
-    const tiles = buildStageTiles(room).map((tile) => ({
+    const tiles = buildStageTiles(room, {
+      listeningActive,
+      listeningBotIdentity: listeningSnapshot?.session?.botIdentity ?? null,
+    }).map((tile) => ({
       key: tile.key,
       kind: tile.kind,
       identity: tile.participant.identity,
@@ -1452,6 +1519,7 @@
     showGridSettings = false;
     closeGamePanel();
     gameState.disconnect();
+    listeningState.disconnect();
     stopHostWaitingPoll();
     await teardownCall(true);
     micGateProcessor = createFreshMicGateProcessor();
@@ -1738,12 +1806,27 @@
 
   $effect(() => {
     if (!browser) return;
+    const unsubscribe = listeningState.snapshot.subscribe((value) => {
+      listeningSnapshot = value;
+    });
+    return unsubscribe;
+  });
+
+  $effect(() => {
+    if (!browser) return;
     if (inCallPhase) {
       gameState.connect(slug);
-      return () => gameState.disconnect();
+      listeningState.connect(slug);
+      void refreshYouTubeLink();
+      return () => {
+        gameState.disconnect();
+        listeningState.disconnect();
+      };
     }
     gameState.disconnect();
+    listeningState.disconnect();
     gameSnapshot = null;
+    listeningSnapshot = null;
     closeGamePanel();
   });
 
@@ -1806,6 +1889,7 @@
     stopWaitingPoll();
     stopHostWaitingPoll();
     gameState.disconnect();
+    listeningState.disconnect();
     teardownCall(true);
     disposeHandLandmarker();
   });
@@ -1880,10 +1964,15 @@
         userId={user.id}
         {slug}
         snapshot={gameSnapshot}
+        {listeningSnapshot}
+        {youtubeLinked}
         busy={gameBusy}
+        {listeningBusy}
         onClose={closeGamePanel}
         onSnapshot={handleGameSnapshot}
+        onListeningSnapshot={handleListeningSnapshot}
         onBusyChange={(value) => (gameBusy = value)}
+        onListeningBusyChange={(value) => (listeningBusy = value)}
       />
 
       <GamePhaseBanner snapshot={gameSnapshot} />
@@ -2038,6 +2127,14 @@
           {showInCallDevices}
           layoutLocked={gameActive}
           gameTeams={gameSnapshot?.teams ?? []}
+          {listeningSnapshot}
+          {listeningIsDj}
+          {listeningBusy}
+          onListeningPlay={() => void listeningTransport("play")}
+          onListeningPause={() => void listeningTransport("pause")}
+          onListeningSkip={() => void listeningTransport("skip")}
+          onListeningPrevious={() => void listeningTransport("previous")}
+          onListeningSeek={(positionMs) => void listeningSeek(positionMs)}
           onLayoutModeChange={setStageLayoutMode}
           onAutoLayoutPresetChange={setAutoLayoutPreset}
           onHideNonVideoTilesChange={setHideNonVideoTiles}

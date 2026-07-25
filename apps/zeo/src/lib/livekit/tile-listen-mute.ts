@@ -1,7 +1,7 @@
 import { Track, type RemoteParticipant, type Room } from "livekit-client";
 import { screenShareTileKey } from "./screen-share";
 
-export type TileListenKind = "participant" | "screen-share";
+export type TileListenKind = "participant" | "screen-share" | "listening";
 
 export const DEFAULT_TILE_VOLUME = 100;
 
@@ -50,5 +50,8 @@ export function applyAllTileListenVolumes(
       tileVolumeForKey(tileVolumes, screenShareTileKey(participant.identity)),
       speakersEnabled
     );
+    if (participant.identity.startsWith("listening-bot:")) {
+      applyRemoteTileListenVolume(participant, "listening", tileVolumeForKey(tileVolumes, `listening:${participant.identity}`), speakersEnabled);
+    }
   }
 }

@@ -16,6 +16,15 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => v === "true"),
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  YOUTUBE_DATA_API_KEY: z.string().min(1).optional(),
+  YOUTUBE_TOKEN_SECRET: z.string().min(32).optional(),
+  MUSIC_WORKER_URL: z.string().min(1).default("http://127.0.0.1:3010"),
+  MUSIC_WORKER_SECRET: z.string().min(1).optional(),
+  PUBLIC_APP_URL: z.string().min(1).optional(),
+  PUBLIC_ZEO_URL: z.string().min(1).optional(),
+  PUBLIC_ZEO_ORIGIN: z.string().min(1).optional(),
 });
 
 export type ZeoEnv = z.infer<typeof envSchema>;

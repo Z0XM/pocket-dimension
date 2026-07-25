@@ -4,7 +4,7 @@
   import { tileColorForParticipant, type ParticipantColor } from "$lib/participant-colors";
 
   type Props = {
-    kind: "participant" | "screen-share";
+    kind: "participant" | "screen-share" | "listening";
     participant: LocalParticipant | RemoteParticipant;
     displayName: string;
     localIdentity: string;
@@ -21,7 +21,8 @@
     })
   );
 
-  const label = $derived(kind === "screen-share" ? (audioOnly ? "Audio" : "Screen") : initialsForName(displayName));
+  const label = $derived(kind === "listening" ? "Listen" : kind === "screen-share" ? (audioOnly ? "Audio" : "Screen") : initialsForName(displayName));
+  const footer = $derived(kind === "listening" ? "Listening" : kind === "screen-share" ? (audioOnly ? "Audio" : "Screen") : displayName);
 </script>
 
 <div class="relative h-10 w-16 overflow-hidden rounded-md border border-border bg-secondary shadow-sm">
@@ -30,6 +31,6 @@
   </div>
 
   <div class="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white">
-    {kind === "screen-share" ? (audioOnly ? "Audio" : "Screen") : displayName}
+    {footer}
   </div>
 </div>

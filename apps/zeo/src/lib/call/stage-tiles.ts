@@ -2,22 +2,46 @@ import type { LocalParticipant, RemoteParticipant, Room } from "livekit-client";
 import { findScreenCaptureParticipant, isScreenShareActive, isScreenShareAudioOnlyActive, screenShareTileKey } from "$lib/livekit/screen-share";
 import { listRoomParticipants } from "$lib/livekit/room-client";
 
+export const LISTENING_BOT_PREFIX = "listening-bot:";
+
 export type StageTileEntry = {
   key: string;
-  kind: "participant" | "screen-share";
+  kind: "participant" | "screen-share" | "listening";
   participant: LocalParticipant | RemoteParticipant;
   audioOnly?: boolean;
 };
+
+export function isListeningBotIdentity(identity: string) {
+  return identity.startsWith(LISTENING_BOT_PREFIX);
+}
+
+export function listeningTileKey(botIdentity: string) {
+  return `listening:${botIdentity}`;
+}
 
 export function participantHasActiveVideo(participant: LocalParticipant | RemoteParticipant) {
   return participant.isCameraEnabled;
 }
 
-export function buildStageTiles(room: Room): StageTileEntry[] {
+export function findListeningBotParticipant(room: Room, botIdentity?: string | null) {
+  if (botIdentity) {
+    if (room.localParticipant.identity === botIdentity) return room.localParticipant;
+    return room.remoteParticipants.get(botIdentity) ?? null;
+  }
+
+  for (const participant of listRoomParticipants(room)) {
+    if (isListeningBotIdentity(participant.identity)) {
+      return participant;
+    }
+  }
+  return null;
+}
+
+export function buildStageTiles(room: Room, options?: { listeningBotIdentity?: string | null; listeningActive?: boolean }): StageTileEntry[] {
   const items: StageTileEntry[] = [];
   const screenSharer = findScreenCaptureParticipant(room);
 
-  if (screenSharer) {
+  if (screenSharer && !isListeningBotIdentity(screenSharer.identity)) {
     items.push({
       key: screenShareTileKey(screenSharer.identity),
       kind: "screen-share",
@@ -26,7 +50,19 @@ export function buildStageTiles(room: Room): StageTileEntry[] {
     });
   }
 
+  if (options?.listeningActive) {
+    const bot = findListeningBotParticipant(room, options.listeningBotIdentity) ?? room.localParticipant;
+    const identity = options.listeningBotIdentity || bot.identity;
+    items.push({
+      key: listeningTileKey(identity),
+      kind: "listening",
+      participant: bot,
+      audioOnly: true,
+    });
+  }
+
   for (const participant of listRoomParticipants(room)) {
+    if (isListeningBotIdentity(participant.identity)) continue;
     items.push({
       key: participant.identity,
       kind: "participant",
@@ -40,7 +76,7 @@ export function buildStageTiles(room: Room): StageTileEntry[] {
 export function filterStageTiles(tiles: StageTileEntry[], options?: { hideNonVideo?: boolean }) {
   if (!options?.hideNonVideo) return tiles;
 
-  return tiles.filter((tile) => tile.kind === "screen-share" || participantHasActiveVideo(tile.participant));
+  return tiles.filter((tile) => tile.kind === "screen-share" || tile.kind === "listening" || participantHasActiveVideo(tile.participant));
 }
 
 export function pruneTileKeys(keys: string[], validKeys: Set<string>) {
@@ -65,13 +101,15 @@ export type CallParticipantInfo = {
 };
 
 export function buildCallParticipantList(room: Room, options: { localDisplayName: string; hostUserId: string }): CallParticipantInfo[] {
-  return listRoomParticipants(room).map((participant) => ({
-    identity: participant.identity,
-    displayName: participant.identity === room.localParticipant.identity ? options.localDisplayName : participant.name || "Participant",
-    isLocal: participant.identity === room.localParticipant.identity,
-    isHost: participant.identity === options.hostUserId,
-    isGuest: participant.identity.startsWith("guest_"),
-    micEnabled: participant.isMicrophoneEnabled,
-    camEnabled: participant.isCameraEnabled,
-  }));
+  return listRoomParticipants(room)
+    .filter((participant) => !isListeningBotIdentity(participant.identity))
+    .map((participant) => ({
+      identity: participant.identity,
+      displayName: participant.identity === room.localParticipant.identity ? options.localDisplayName : participant.name || "Participant",
+      isLocal: participant.identity === room.localParticipant.identity,
+      isHost: participant.identity === options.hostUserId,
+      isGuest: participant.identity.startsWith("guest_"),
+      micEnabled: participant.isMicrophoneEnabled,
+      camEnabled: participant.isCameraEnabled,
+    }));
 }

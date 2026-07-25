@@ -238,7 +238,7 @@
 
       {#if showGameModeButton && onToggleGameMode && (!compactControls || gameActive)}
         <IconControlButton
-          label={gamePanelOpen ? "Close game mode" : "Game mode"}
+          label={gamePanelOpen ? "Close games and apps" : "Games and Apps"}
           active={gamePanelOpen || gameActive}
           showTooltip={showTooltips}
           onclick={onToggleGameMode}
@@ -295,7 +295,7 @@
               {/if}
               {#if showGameModeButton && onToggleGameMode && !gameActive}
                 <IconControlButton
-                  label={gamePanelOpen ? "Close game mode" : "Game mode"}
+                  label={gamePanelOpen ? "Close games and apps" : "Games and Apps"}
                   active={gamePanelOpen}
                   showTooltip={false}
                   onclick={() => runOverflowAction(onToggleGameMode)}

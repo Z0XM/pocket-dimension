@@ -1,0 +1,20 @@
+{
+  "name": "@pocket-dimension/zeo-music-worker",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --format esm --target bun",
+    "typecheck": "tsc --noEmit",
+    "lint": "prettier --check ."
+  },
+  "dependencies": {
+    "@livekit/rtc-node": "^0.13.31"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "latest"
+  }
+}
