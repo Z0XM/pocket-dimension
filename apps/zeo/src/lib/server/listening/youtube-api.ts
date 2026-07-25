@@ -105,19 +105,33 @@ function bestThumbnail(thumbnails: unknown) {
   return values.sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0]?.url ?? null;
 }
 
-async function youtubeFetch<T>(path: string, params: Record<string, string>, accessToken?: string): Promise<T> {
+type YoutubeFetchAuth = {
+  /** OAuth user token — required for mine=true / library calls. */
+  accessToken?: string;
+  /**
+   * When true, always send the OAuth bearer token.
+   * When false/omitted, prefer YOUTUBE_DATA_API_KEY for public search/videos
+   * (avoids "insufficient authentication scopes" from a narrow user token).
+   */
+  requireUserAuth?: boolean;
+};
+
+async function youtubeFetch<T>(path: string, params: Record<string, string>, auth: YoutubeFetchAuth = {}): Promise<T> {
   const url = new URL(`${DATA_API_URL}/${path}`);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
 
   const headers: HeadersInit = {};
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
+  const useUserAuth = Boolean(auth.requireUserAuth && auth.accessToken);
+  if (useUserAuth) {
+    headers.Authorization = `Bearer ${auth.accessToken}`;
   } else if (env.YOUTUBE_DATA_API_KEY) {
     url.searchParams.set("key", env.YOUTUBE_DATA_API_KEY);
+  } else if (auth.accessToken) {
+    headers.Authorization = `Bearer ${auth.accessToken}`;
   } else {
-    throw error(503, "YouTube Data API credentials are not configured");
+    throw error(503, "YouTube Data API credentials are not configured (set YOUTUBE_DATA_API_KEY)");
   }
 
   const response = await fetch(url, { headers });
@@ -136,7 +150,7 @@ export async function listYouTubePlaylists(userId: string): Promise<YouTubePlayl
       snippet?: { title?: string; thumbnails?: unknown };
       contentDetails?: { itemCount?: number };
     }>;
-  }>("playlists", { part: "snippet,contentDetails", mine: "true", maxResults: "50" }, accessToken);
+  }>("playlists", { part: "snippet,contentDetails", mine: "true", maxResults: "50" }, { accessToken, requireUserAuth: true });
 
   return [
     { id: "LL", title: "Liked videos", thumbnailUrl: null, itemCount: null, source: "library_yt" },
@@ -162,12 +176,12 @@ export async function listYouTubePlaylistItems(userId: string, playlistId: strin
       };
       contentDetails?: { videoId?: string };
     }>;
-  }>("playlistItems", { part: "snippet,contentDetails", playlistId, maxResults: "50" }, accessToken);
+  }>("playlistItems", { part: "snippet,contentDetails", playlistId, maxResults: "50" }, { accessToken, requireUserAuth: true });
 
   const ids = (body.items ?? [])
     .map((item) => item.contentDetails?.videoId ?? item.snippet?.resourceId?.videoId)
     .filter((id): id is string => Boolean(id));
-  const metadata = await videoMetadataMap(ids, accessToken);
+  const metadata = await videoMetadataMap(ids);
 
   const results: YouTubeVideoResult[] = [];
   for (const item of body.items ?? []) {
@@ -193,13 +207,10 @@ export async function searchYouTubeVideos(query: string, accessToken?: string): 
       id?: { videoId?: string };
       snippet?: { title?: string; channelTitle?: string; thumbnails?: unknown };
     }>;
-  }>(
-    "search",
-    { part: "snippet", q: query, type: "video", maxResults: "10", safeSearch: "none" },
-    env.YOUTUBE_DATA_API_KEY ? undefined : accessToken
-  );
+  }>("search", { part: "snippet", q: query, type: "video", maxResults: "10", safeSearch: "none" }, { accessToken });
 
   const ids = (body.items ?? []).map((item) => item.id?.videoId).filter((id): id is string => Boolean(id));
+  // Public metadata — prefer API key over user OAuth token.
   const metadata = await videoMetadataMap(ids, accessToken);
 
   const results: YouTubeVideoResult[] = [];
@@ -233,7 +244,7 @@ async function videoMetadataMap(videoIds: string[], accessToken?: string) {
       snippet?: { title?: string; channelTitle?: string; thumbnails?: unknown };
       contentDetails?: { duration?: string };
     }>;
-  }>("videos", { part: "snippet,contentDetails", id: [...new Set(videoIds)].join(",") }, accessToken);
+  }>("videos", { part: "snippet,contentDetails", id: [...new Set(videoIds)].join(",") }, { accessToken });
 
   return new Map(
     (body.items ?? []).map((item) => [
