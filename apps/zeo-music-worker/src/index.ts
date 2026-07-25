@@ -40,8 +40,42 @@ async function resolveBinary(candidates: string[]) {
 
 const FFMPEG_BIN = await resolveBinary(["ffmpeg", "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"]);
 const YT_DLP_BIN = await resolveBinary(["yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"]);
+const DENO_BIN = await resolveBinary(["deno", "/usr/local/bin/deno", "/usr/bin/deno"]);
 const ffmpegOk = Boolean(FFMPEG_BIN);
 const ytDlpOk = Boolean(YT_DLP_BIN);
+const denoOk = Boolean(DENO_BIN);
+
+const COOKIES_PATH = await resolveCookiesPath();
+
+async function resolveCookiesPath() {
+  const fromEnv = Bun.env.YTDLP_COOKIES_FILE?.trim();
+  if (fromEnv) {
+    const file = Bun.file(fromEnv);
+    if (await file.exists()) return fromEnv;
+    console.warn(`YTDLP_COOKIES_FILE set but missing: ${fromEnv}`);
+  }
+
+  const inline = Bun.env.YTDLP_COOKIES?.trim();
+  if (!inline) return null;
+
+  const path = "/tmp/ytdlp-cookies.txt";
+  await Bun.write(path, inline.endsWith("\n") ? inline : `${inline}\n`);
+  return path;
+}
+
+function ytDlpBaseArgs() {
+  const args: string[] = [];
+  if (DENO_BIN) {
+    args.push("--js-runtimes", `deno:${DENO_BIN}`);
+  } else {
+    // Bun is already in this image; yt-dlp supports it through 1.3.14 (deprecated).
+    args.push("--js-runtimes", "bun");
+  }
+  if (COOKIES_PATH) {
+    args.push("--cookies", COOKIES_PATH);
+  }
+  return args;
+}
 
 const activeJobs = new Map<string, PlaybackState>();
 const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<Record<string, any>>;
@@ -110,25 +144,42 @@ async function fetchBotToken(job: PlayJob) {
 async function resolveAudioUrl(videoId: string) {
   if (!YT_DLP_BIN) throw new Error("yt-dlp not found on PATH");
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  const proc = Bun.spawn([YT_DLP_BIN, "-f", "bestaudio", "-g", videoUrl], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+  const base = ytDlpBaseArgs();
 
-  if (exitCode !== 0) {
-    throw new Error(stderr.trim() || "yt-dlp failed");
+  // Prefer default clients; fall back to android/web if YouTube challenges the datacenter IP.
+  const attempts: string[][] = [
+    [...base, "-f", "bestaudio", "-g", videoUrl],
+    [...base, "--extractor-args", "youtube:player_client=android,web", "-f", "bestaudio", "-g", videoUrl],
+  ];
+
+  let lastError = "yt-dlp failed";
+  for (const args of attempts) {
+    const proc = Bun.spawn([YT_DLP_BIN, ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+
+    if (exitCode === 0) {
+      const audioUrl = stdout
+        .split("\n")
+        .map((line) => line.trim())
+        .find(Boolean);
+      if (audioUrl) return audioUrl;
+      lastError = "yt-dlp did not return an audio URL";
+      continue;
+    }
+
+    lastError = stderr.trim() || "yt-dlp failed";
   }
 
-  const audioUrl = stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .find(Boolean);
-  if (!audioUrl) {
-    throw new Error("yt-dlp did not return an audio URL");
+  if (/sign in to confirm you.re not a bot/i.test(lastError) && !COOKIES_PATH) {
+    throw new Error(
+      `${lastError}\nHint: set YTDLP_COOKIES_FILE or YTDLP_COOKIES on the music-worker (Netscape cookies.txt). See apps/zeo-music-worker/README.md.`
+    );
   }
 
-  return audioUrl;
+  throw new Error(lastError);
 }
 
 async function connectRtc(job: PlayJob) {
@@ -305,8 +356,11 @@ Bun.serve({
         ok: ffmpegOk && ytDlpOk,
         ffmpeg: ffmpegOk,
         ytDlp: ytDlpOk,
+        deno: denoOk,
+        cookies: Boolean(COOKIES_PATH),
         ffmpegBin: FFMPEG_BIN,
         ytDlpBin: YT_DLP_BIN,
+        denoBin: DENO_BIN,
       });
     }
     if (request.method === "POST" && url.pathname.startsWith("/jobs/")) {
@@ -317,9 +371,17 @@ Bun.serve({
 });
 
 console.info(`zeo music worker listening on ${HOST}:${PORT}`);
-console.info(`tools: ffmpeg=${ffmpegOk ? FFMPEG_BIN : "MISSING"} yt-dlp=${ytDlpOk ? YT_DLP_BIN : "MISSING"}`);
+console.info(
+  `tools: ffmpeg=${ffmpegOk ? FFMPEG_BIN : "MISSING"} yt-dlp=${ytDlpOk ? YT_DLP_BIN : "MISSING"} deno=${denoOk ? DENO_BIN : "MISSING"} cookies=${COOKIES_PATH ?? "none"}`
+);
 if (!ffmpegOk || !ytDlpOk) {
   console.warn("Playback will fail until ffmpeg and yt-dlp are installed (use apps/zeo-music-worker/Dockerfile in prod).");
+}
+if (!denoOk) {
+  console.warn("Deno missing — yt-dlp will fall back to bun for YouTube EJS (install Deno via Dockerfile).");
+}
+if (!COOKIES_PATH) {
+  console.warn("No YTDLP_COOKIES / YTDLP_COOKIES_FILE — YouTube may return 'Sign in to confirm you’re not a bot' from datacenter IPs.");
 }
 
 export {};
