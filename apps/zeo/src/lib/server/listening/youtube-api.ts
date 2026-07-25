@@ -231,8 +231,49 @@ export async function searchYouTubeVideos(query: string, accessToken?: string): 
   return results;
 }
 
+async function resolveYouTubeVideoViaOEmbed(videoId: string): Promise<YouTubeVideoResult | null> {
+  try {
+    const url = new URL("https://www.youtube.com/oembed");
+    url.searchParams.set("url", `https://www.youtube.com/watch?v=${videoId}`);
+    url.searchParams.set("format", "json");
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const body = (await response.json()) as { title?: string; author_name?: string; thumbnail_url?: string };
+    return {
+      videoId,
+      title: body.title?.trim() || videoId,
+      channelTitle: body.author_name?.trim() || null,
+      thumbnailUrl: body.thumbnail_url?.trim() || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+      durationMs: null,
+      source: "url",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveYouTubeVideo(videoId: string, accessToken?: string): Promise<YouTubeVideoResult | null> {
-  return (await videoMetadataMap([videoId], accessToken)).get(videoId) ?? null;
+  const fromApi = await videoMetadataMap([videoId], accessToken).catch(() => null);
+  const hit = fromApi?.get(videoId);
+  if (hit) {
+    return {
+      ...hit,
+      thumbnailUrl: hit.thumbnailUrl ?? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    };
+  }
+
+  const fromOEmbed = await resolveYouTubeVideoViaOEmbed(videoId);
+  if (fromOEmbed) return fromOEmbed;
+
+  // Last resort so URL-enqueued items still show art (title falls back to videoId in sessions).
+  return {
+    videoId,
+    title: videoId,
+    channelTitle: null,
+    thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    durationMs: null,
+    source: "url",
+  };
 }
 
 async function videoMetadataMap(videoIds: string[], accessToken?: string) {
