@@ -21,7 +21,7 @@
 - Do not exceed **2 concurrent rooms** or **6 participants per room** — enforce before LiveKit token mint.
 - Use **SFU (LiveKit)**, never pure P2P mesh for group calls.
 - **One active screen share** at a time.
-- Cap video at **720p**; prefer **480p** when 5–6 on camera.
+- Default/recommended video **720p**; prefer **480p** when 5–6 on camera. User-selectable quality may go up to **1080p** (see `specs/spec-stream-media-controls/`).
 - Dev port: **3008**. PostgreSQL schema: **`zeo`**.
 
 ## Access rules
