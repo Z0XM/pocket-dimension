@@ -22,6 +22,10 @@
     type StageGridLayout,
     type StageLayoutMode,
   } from "$lib/stage-grid";
+  import type { LocalParticipant } from "livekit-client";
+  import { isScreenShareActive, isScreenShareAudioActive, isScreenShareAudioAvailable } from "$lib/livekit/screen-share";
+  import { isTileListenMuted, tileVolumeForKey } from "$lib/livekit/tile-listen-mute";
+  import type { TileMediaStats } from "$lib/livekit/tile-stats";
   import GridTile from "./GridTile.svelte";
   import ParticipantTile from "./ParticipantTile.svelte";
   import ScreenShareTile from "./ScreenShareTile.svelte";
@@ -48,13 +52,19 @@
     pinnedTileKey?: string | null;
     minimizedTileKeys?: string[];
     hiddenVideoTileKeys?: string[];
-    mutedListenTileKeys?: string[];
+    tileVolumes?: Record<string, number>;
+    speakersEnabled?: boolean;
+    showTileStats?: boolean;
+    tileStats?: Record<string, TileMediaStats>;
     fullscreenTileKey?: string | null;
     onMinimizeTile?: (key: string) => void;
     onToggleHideVideo?: (key: string) => void;
     onToggleTileListenMute?: (key: string) => void;
+    onTileVolumeChange?: (key: string, volume: number) => void;
     onToggleTileFullscreen?: (key: string) => void;
     onTogglePinTile?: (key: string) => void;
+    onToggleLocalShareVideo?: () => void;
+    onToggleLocalShareAudio?: () => void;
     trackingOverlayVisible?: boolean;
     handLandmarks?: HandLandmark[] | null;
     handGesture?: DetectedGesture;
@@ -82,13 +92,19 @@
     pinnedTileKey = null,
     minimizedTileKeys = [],
     hiddenVideoTileKeys = [],
-    mutedListenTileKeys = [],
+    tileVolumes = {},
+    speakersEnabled = true,
+    showTileStats = true,
+    tileStats = {},
     fullscreenTileKey = null,
     onMinimizeTile,
     onToggleHideVideo,
     onToggleTileListenMute,
+    onTileVolumeChange,
     onToggleTileFullscreen,
     onTogglePinTile,
+    onToggleLocalShareVideo,
+    onToggleLocalShareAudio,
     trackingOverlayVisible = false,
     handLandmarks = null,
     handGesture = "none",
@@ -434,7 +450,7 @@
                 pinned={pinnedTileKey === tile.key}
                 showPin={!isManualGrid}
                 showAudioMute={tile.participant.identity !== room.localParticipant.identity}
-                audioMuted={mutedListenTileKeys.includes(tile.key)}
+                audioMuted={isTileListenMuted(tileVolumes, tile.key)}
                 onMinimize={() => onMinimizeTile?.(tile.key)}
                 onTogglePin={() => onTogglePinTile?.(tile.key)}
                 onToggleAudioMute={() => onToggleTileListenMute?.(tile.key)}
@@ -444,14 +460,30 @@
             {/snippet}
 
             {#if tile.kind === "screen-share"}
+              {@const isLocalShare = tile.participant.identity === room.localParticipant.identity}
+              {@const localShareParticipant = isLocalShare ? (tile.participant as LocalParticipant) : null}
               <ScreenShareTile
                 participant={tile.participant}
                 displayName={displayNameForParticipant(tile.participant, room.localParticipant.identity, localDisplayName)}
-                isLocal={tile.participant.identity === room.localParticipant.identity}
+                isLocal={isLocalShare}
                 hidden={tileVideoHidden(tile.key)}
                 audioOnly={tile.audioOnly}
+                showStats={showTileStats}
+                stats={tileStats[tile.key]}
+                audioLevel={audioLevels[tile.participant.identity] ?? 0}
+                listenVolume={tileVolumeForKey(tileVolumes, tile.key)}
+                {speakersEnabled}
+                onListenVolumeChange={isLocalShare ? undefined : (volume) => onTileVolumeChange?.(tile.key, volume)}
+                shareVideoEnabled={localShareParticipant ? isScreenShareActive(localShareParticipant) : !tile.audioOnly}
+                shareAudioEnabled={localShareParticipant ? isScreenShareAudioActive(localShareParticipant) : false}
+                shareAudioAvailable={localShareParticipant
+                  ? isScreenShareAudioAvailable(localShareParticipant) || isScreenShareAudioActive(localShareParticipant)
+                  : false}
+                onToggleShareVideo={isLocalShare ? onToggleLocalShareVideo : undefined}
+                onToggleShareAudio={isLocalShare ? onToggleLocalShareAudio : undefined}
               />
             {:else}
+              {@const isLocalTile = tile.participant.identity === room.localParticipant.identity}
               <ParticipantTile
                 participant={tile.participant}
                 displayName={displayNameFor(tile.participant.identity, tile.participant.name)}
@@ -462,16 +494,21 @@
                   preferredColor: localTileColor,
                 })}
                 teamOutlineColor={isGameLayout ? (gameTeamColors.get(tile.participant.identity) ?? null) : null}
-                isLocal={tile.participant.identity === room.localParticipant.identity}
-                localMicEnabled={tile.participant.identity === room.localParticipant.identity ? localMicEnabled : undefined}
+                isLocal={isLocalTile}
+                localMicEnabled={isLocalTile ? localMicEnabled : undefined}
                 hideVideos={hideParticipantVideos || tileVideoHidden(tile.key)}
                 {disableSpeakingGlows}
                 {mediaRevision}
                 fitContainer
-                trackingOverlayVisible={trackingOverlayVisible && tile.participant.identity === room.localParticipant.identity}
-                handLandmarks={tile.participant.identity === room.localParticipant.identity ? handLandmarks : null}
-                handGesture={tile.participant.identity === room.localParticipant.identity ? handGesture : "none"}
-                handGestureHoldProgress={tile.participant.identity === room.localParticipant.identity ? handGestureHoldProgress : 0}
+                trackingOverlayVisible={trackingOverlayVisible && isLocalTile}
+                handLandmarks={isLocalTile ? handLandmarks : null}
+                handGesture={isLocalTile ? handGesture : "none"}
+                handGestureHoldProgress={isLocalTile ? handGestureHoldProgress : 0}
+                showStats={showTileStats}
+                stats={tileStats[tile.key]}
+                listenVolume={tileVolumeForKey(tileVolumes, tile.key)}
+                {speakersEnabled}
+                onListenVolumeChange={isLocalTile ? undefined : (volume) => onTileVolumeChange?.(tile.key, volume)}
               />
             {/if}
           </GridTile>

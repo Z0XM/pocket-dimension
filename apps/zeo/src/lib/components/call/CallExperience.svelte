@@ -5,6 +5,7 @@
   import {
     RoomEvent,
     Track,
+    VideoQuality,
     type ConnectionQuality,
     type LocalAudioTrack,
     type LocalTrackPublication,
@@ -28,19 +29,39 @@
     type ConnectionPhase,
   } from "$lib/livekit/room-client";
   import { attachAllRemoteAudioTracks } from "$lib/livekit/remote-audio";
-  import { applyAllTileListenVolumes } from "$lib/livekit/tile-listen-mute";
+  import {
+    applyAllTileListenVolumes,
+    clampTileVolume,
+    DEFAULT_TILE_VOLUME,
+    isTileListenMuted,
+    tileVolumeForKey,
+  } from "$lib/livekit/tile-listen-mute";
   import { createMicGateProcessor, type MicGateProcessor } from "$lib/livekit/mic-gate-processor";
   import {
-    disableLocalScreenShare,
+    DEFAULT_AUDIO_QUALITY,
+    DEFAULT_VIDEO_QUALITY,
+    isAudioQualityOption,
+    isVideoQualityOption,
+    roomOptionsForMediaQuality,
+    videoPresetForOption,
+    type AudioQualityOption,
+    type VideoQualityOption,
+  } from "$lib/livekit/media-quality";
+  import { collectTileStats, type TileMediaStats } from "$lib/livekit/tile-stats";
+  import {
+    disableLocalScreenCapture,
     disableLocalScreenAudioShare,
     enableLocalScreenShare,
-    enableLocalScreenAudioShare,
     findScreenCaptureParticipant,
+    isScreenCaptureActive,
     isScreenShareActive,
-    isScreenShareAudioOnlyActive,
+    isScreenShareAudioActive,
+    isScreenShareAudioAvailable,
     screenShareFailureMessage,
     screenShareAudioHint,
-    screenShareAudioOnlyHint,
+    setLocalScreenShareAudioEnabled,
+    setLocalScreenShareVideoEnabled,
+    stopShareIfNoMedia,
     watchHeldScreenCaptureEnded,
   } from "$lib/livekit/screen-share";
   import { captureStageToBlob, compressSnapshotForChat, downloadSnapshotBlob } from "$lib/snapshot";
@@ -55,6 +76,7 @@
   import GamePhaseBanner from "$lib/components/call/GamePhaseBanner.svelte";
   import ConnectionQualityBadge from "$lib/components/call/ConnectionQualityBadge.svelte";
   import DevicePicker from "$lib/components/call/DevicePicker.svelte";
+  import MediaQualitySettings from "$lib/components/call/MediaQualitySettings.svelte";
   import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
   import TileColorPicker from "$lib/components/call/TileColorPicker.svelte";
   import HandGestureTracker from "$lib/components/call/HandGestureTracker.svelte";
@@ -75,12 +97,14 @@
     readStoredFlag,
     readStoredFloat,
     readStoredInt,
+    readStoredTileVolumes,
     STORAGE_KEYS,
     writeActiveCallSession,
     writeStored,
     writeStoredFlag,
     writeStoredFloat,
     writeStoredInt,
+    writeStoredTileVolumes,
   } from "$lib/browser-storage";
   import { buildStageTiles, buildCallParticipantList, pruneTileKeys } from "$lib/call/stage-tiles";
 
@@ -385,8 +409,18 @@
   let controlBarReservePx = $state(0);
   let minimizedTileKeys = $state<string[]>([]);
   let hiddenVideoTileKeys = $state<string[]>([]);
-  let mutedListenTileKeys = $state<string[]>([]);
+  let tileVolumes = $state<Record<string, number>>(readStoredTileVolumes());
+  let tileVolumeBeforeMute = $state<Record<string, number>>({});
   let fullscreenTileKey = $state<string | null>(null);
+  let showTileStats = $state(readStoredFlag(STORAGE_KEYS.showTileStats, true));
+  let tileStats = $state<Record<string, TileMediaStats>>({});
+  let videoQuality = $state<VideoQualityOption>(
+    isVideoQualityOption(readStored(STORAGE_KEYS.videoQuality)) ? (readStored(STORAGE_KEYS.videoQuality) as VideoQualityOption) : DEFAULT_VIDEO_QUALITY
+  );
+  let audioQuality = $state<AudioQualityOption>(
+    isAudioQualityOption(readStored(STORAGE_KEYS.audioQuality)) ? (readStored(STORAGE_KEYS.audioQuality) as AudioQualityOption) : DEFAULT_AUDIO_QUALITY
+  );
+  let tileStatsPollTimer: ReturnType<typeof setInterval> | undefined;
   let intentionalScreenShareStop = false;
   let intentionalScreenAudioShareStop = false;
   let snapshotting = $state(false);
@@ -404,12 +438,7 @@
   const showAudioOutputSelection = $derived(browser ? supportsAudioOutputSelection() && mediaDevices.audioOutputs.length > 0 : false);
   const screenSharing = $derived.by(() => {
     mediaRevision;
-    return livekitRoom ? isScreenShareActive(livekitRoom.localParticipant) : false;
-  });
-
-  const screenAudioSharing = $derived.by(() => {
-    mediaRevision;
-    return livekitRoom ? isScreenShareAudioOnlyActive(livekitRoom.localParticipant) : false;
+    return livekitRoom ? isScreenCaptureActive(livekitRoom.localParticipant) : false;
   });
 
   const stageTiles = $derived.by(() => {
@@ -431,7 +460,6 @@
     const validKeys = new Set(stageTiles.map((tile) => tile.key));
     minimizedTileKeys = pruneTileKeys(minimizedTileKeys, validKeys);
     hiddenVideoTileKeys = pruneTileKeys(hiddenVideoTileKeys, validKeys);
-    mutedListenTileKeys = pruneTileKeys(mutedListenTileKeys, validKeys);
     if (fullscreenTileKey && !validKeys.has(fullscreenTileKey)) {
       fullscreenTileKey = null;
     }
@@ -443,9 +471,25 @@
   function resetStageTileState() {
     minimizedTileKeys = [];
     hiddenVideoTileKeys = [];
-    mutedListenTileKeys = [];
     fullscreenTileKey = null;
     pinnedTileKey = null;
+    tileStats = {};
+  }
+
+  function persistTileVolumes(next: Record<string, number>) {
+    tileVolumes = next;
+    writeStoredTileVolumes(next);
+  }
+
+  function setTileListenVolume(key: string, volume: number) {
+    const nextVolume = clampTileVolume(volume);
+    const next = { ...tileVolumes, [key]: nextVolume };
+    if (nextVolume > 0) {
+      const { [key]: _removed, ...rest } = tileVolumeBeforeMute;
+      tileVolumeBeforeMute = rest;
+    }
+    persistTileVolumes(next);
+    applyRoomSpeakerState();
   }
 
   function minimizeTile(key: string) {
@@ -466,9 +510,15 @@
   }
 
   function toggleTileListenMute(key: string) {
-    const nextMuted = !mutedListenTileKeys.includes(key);
-    mutedListenTileKeys = nextMuted ? [...mutedListenTileKeys, key] : mutedListenTileKeys.filter((entry) => entry !== key);
-    applyRoomSpeakerState();
+    if (isTileListenMuted(tileVolumes, key)) {
+      const restored = tileVolumeBeforeMute[key] ?? DEFAULT_TILE_VOLUME;
+      setTileListenVolume(key, restored > 0 ? restored : DEFAULT_TILE_VOLUME);
+      return;
+    }
+
+    const current = tileVolumeForKey(tileVolumes, key);
+    tileVolumeBeforeMute = { ...tileVolumeBeforeMute, [key]: current > 0 ? current : DEFAULT_TILE_VOLUME };
+    setTileListenVolume(key, 0);
   }
 
   function toggleTileFullscreen(key: string) {
@@ -715,8 +765,109 @@
     if (!room || room.state !== "connected") return;
     applyAllTileListenVolumes(room, {
       speakersEnabled: speakerEnabled,
-      mutedTileKeys: new Set(mutedListenTileKeys),
+      tileVolumes,
     });
+  }
+
+  function subscribedVideoQualityFor(option: VideoQualityOption) {
+    switch (option) {
+      case "360p":
+        return VideoQuality.LOW;
+      case "480p":
+        return VideoQuality.MEDIUM;
+      default:
+        return VideoQuality.HIGH;
+    }
+  }
+
+  function applySubscribedVideoQuality(room: Room | null = livekitRoom, option: VideoQualityOption = videoQuality) {
+    if (!room) return;
+    const quality = subscribedVideoQualityFor(option);
+    for (const participant of room.remoteParticipants.values()) {
+      for (const publication of participant.videoTrackPublications.values()) {
+        try {
+          publication.setVideoQuality(quality);
+        } catch {
+          // Best-effort — adaptiveStream may already manage layers.
+        }
+      }
+    }
+  }
+
+  async function applyLocalMediaQuality(nextVideo: VideoQualityOption, nextAudio: AudioQualityOption) {
+    const room = livekitRoom;
+    if (!room || room.state !== "connected") return;
+
+    const options = roomOptionsForMediaQuality(nextVideo, nextAudio);
+    room.options.videoCaptureDefaults = {
+      ...room.options.videoCaptureDefaults,
+      ...options.videoCaptureDefaults,
+    };
+    room.options.publishDefaults = {
+      ...room.options.publishDefaults,
+      ...options.publishDefaults,
+    };
+
+    const wasCamEnabled = room.localParticipant.isCameraEnabled;
+    const wasMicEnabled = room.localParticipant.isMicrophoneEnabled;
+    const videoPreset = videoPresetForOption(nextVideo);
+
+    if (wasCamEnabled) {
+      try {
+        await room.localParticipant.setCameraEnabled(false);
+        await room.localParticipant.setCameraEnabled(true, {
+          deviceId: videoDeviceId || undefined,
+          resolution: videoPreset.resolution,
+        });
+      } catch {
+        showToast("Could not apply video quality to the camera");
+      }
+    }
+
+    if (wasMicEnabled) {
+      try {
+        await room.localParticipant.setMicrophoneEnabled(false);
+        await room.localParticipant.setMicrophoneEnabled(true, {
+          deviceId: audioDeviceId || undefined,
+        });
+        // Re-attach mic gate after republish.
+        if (micGateProcessor) {
+          try {
+            await attachMicGateProcessor(room, micGateProcessor);
+          } catch {
+            // Keep raw mic if gate fails.
+          }
+        }
+      } catch {
+        showToast("Could not apply audio quality to the microphone");
+      }
+    }
+
+    applySubscribedVideoQuality(room, nextVideo);
+    bumpMediaRevision();
+  }
+
+  function setVideoQualityPreference(value: VideoQualityOption) {
+    videoQuality = value;
+    writeStored(STORAGE_KEYS.videoQuality, value);
+    void applyLocalMediaQuality(value, audioQuality);
+  }
+
+  function setAudioQualityPreference(value: AudioQualityOption) {
+    audioQuality = value;
+    writeStored(STORAGE_KEYS.audioQuality, value);
+    void applyLocalMediaQuality(videoQuality, value);
+  }
+
+  function setShowTileStats(value: boolean) {
+    showTileStats = value;
+    writeStoredFlag(STORAGE_KEYS.showTileStats, value);
+    if (!value) {
+      tileStats = {};
+      stopTileStatsPoll();
+    } else if (livekitRoom) {
+      startTileStatsPoll(livekitRoom);
+    }
   }
 
   function micCaptureOptions() {
@@ -822,8 +973,39 @@
     localPingMs = null;
   }
 
+  async function refreshTileStats(room: Room | null = livekitRoom) {
+    if (!showTileStats || !room || room.state !== "connected") {
+      tileStats = {};
+      return;
+    }
+
+    const tiles = buildStageTiles(room).map((tile) => ({
+      key: tile.key,
+      kind: tile.kind,
+      identity: tile.participant.identity,
+    }));
+    tileStats = await collectTileStats(room, tiles);
+  }
+
+  function startTileStatsPoll(room: Room | null = livekitRoom) {
+    stopTileStatsPoll();
+    if (!showTileStats || !room) return;
+    void refreshTileStats(room);
+    tileStatsPollTimer = setInterval(() => {
+      void refreshTileStats(room);
+    }, 2000);
+  }
+
+  function stopTileStatsPoll() {
+    if (tileStatsPollTimer) {
+      clearInterval(tileStatsPollTimer);
+      tileStatsPollTimer = undefined;
+    }
+  }
+
   async function teardownCall(disconnectLiveKit: boolean) {
     stopPingPoll();
+    stopTileStatsPoll();
     audioPlaybackBlocked = false;
     screenShareListenerCleanup?.();
     screenShareListenerCleanup = undefined;
@@ -912,6 +1094,10 @@
         bumpMediaRevision();
         livekitRoom = callSession?.room ?? null;
         applyRoomSpeakerState(livekitRoom);
+        applySubscribedVideoQuality(livekitRoom, videoQuality);
+        if (showTileStats) {
+          void refreshTileStats(livekitRoom);
+        }
       },
       onConnectionQuality: (quality: ConnectionQuality, identity: string) => {
         if (gen !== connectionGen) return;
@@ -978,7 +1164,7 @@
     connectionGen += 1;
     const gen = connectionGen;
 
-    callSession = createCallRoom(bindConnectionHandlers(gen));
+    callSession = createCallRoom(bindConnectionHandlers(gen), { videoQuality, audioQuality });
     livekitRoom = callSession.room;
 
     await callSession.connect(payload.wsUrl, payload.token, {
@@ -994,8 +1180,10 @@
     attachScreenShareListener(callSession.room, gen);
     localConnectionQuality = qualityLabel(callSession.room.localParticipant.connectionQuality);
     applyRoomSpeakerState(callSession.room);
+    applySubscribedVideoQuality(callSession.room, videoQuality);
     audioPlaybackBlocked = !callSession.room.canPlaybackAudio;
     startPingPoll();
+    startTileStatsPoll(callSession.room);
     networkHintDismissed = false;
     writeActiveCallSession({
       slug,
@@ -1365,6 +1553,7 @@
     try {
       await livekitRoom.localParticipant.setCameraEnabled(true, {
         deviceId: videoDeviceId || undefined,
+        resolution: videoPresetForOption(videoQuality).resolution,
       });
       cameraInUse = false;
       return true;
@@ -1441,9 +1630,12 @@
     if (!livekitRoom) return;
     const local = livekitRoom.localParticipant;
 
-    if (isScreenShareActive(local)) {
+    if (isScreenCaptureActive(local)) {
       intentionalScreenShareStop = true;
-      await disableLocalScreenShare(local);
+      intentionalScreenAudioShareStop = true;
+      screenAudioShareEndedCleanup?.();
+      screenAudioShareEndedCleanup = undefined;
+      await disableLocalScreenCapture(local);
       bumpMediaRevision();
       return;
     }
@@ -1452,6 +1644,9 @@
 
     try {
       const result = await enableLocalScreenShare(local);
+      if (!isScreenShareActive(local) && isScreenShareAudioActive(local)) {
+        attachScreenAudioShareEndedListener(livekitRoom, connectionGen);
+      }
       bumpMediaRevision();
       const hint = screenShareAudioHint(result);
       if (hint) {
@@ -1465,34 +1660,49 @@
     }
   }
 
-  async function toggleScreenAudioShare() {
+  async function toggleLocalShareVideo() {
     if (!livekitRoom) return;
     const local = livekitRoom.localParticipant;
+    const nextEnabled = !isScreenShareActive(local);
 
-    if (isScreenShareAudioOnlyActive(local)) {
-      intentionalScreenAudioShareStop = true;
-      screenAudioShareEndedCleanup?.();
-      screenAudioShareEndedCleanup = undefined;
-      await disableLocalScreenAudioShare(local);
+    try {
+      if (!nextEnabled) {
+        intentionalScreenShareStop = true;
+      }
+      await setLocalScreenShareVideoEnabled(local, nextEnabled);
+      if (!isScreenShareActive(local) && isScreenShareAudioActive(local)) {
+        attachScreenAudioShareEndedListener(livekitRoom, connectionGen);
+      }
+      await stopShareIfNoMedia(local);
       bumpMediaRevision();
+    } catch (error) {
+      showToast(screenShareFailureMessage(error));
+    }
+  }
+
+  async function toggleLocalShareAudio() {
+    if (!livekitRoom) return;
+    const local = livekitRoom.localParticipant;
+    const nextEnabled = !isScreenShareAudioActive(local);
+
+    if (nextEnabled && !isScreenShareAudioAvailable(local) && !isScreenShareAudioActive(local)) {
+      showToast("Share audio was not granted in the browser picker — stop and share again with audio enabled");
       return;
     }
 
-    if (!(await stopOtherScreenCapture())) return;
-
     try {
-      const result = await enableLocalScreenAudioShare(local);
-      attachScreenAudioShareEndedListener(livekitRoom, connectionGen);
+      if (!nextEnabled) {
+        intentionalScreenAudioShareStop = true;
+      }
+      await setLocalScreenShareAudioEnabled(local, nextEnabled);
+      await stopShareIfNoMedia(local);
       bumpMediaRevision();
-      const hint = screenShareAudioOnlyHint(result);
-      if (hint) {
-        showToast(hint);
-      }
     } catch (error) {
-      const message = screenShareFailureMessage(error);
-      if (!(error instanceof DOMException && error.name === "NotAllowedError")) {
-        showToast(message);
+      if (error instanceof Error && error.message === "screen_share_audio_unavailable") {
+        showToast("Share audio was not granted in the browser picker — stop and share again with audio enabled");
+        return;
       }
+      showToast(screenShareFailureMessage(error));
     }
   }
 
@@ -1748,6 +1958,12 @@
                 onGesturesEnabledChange={setGesturesEnabled}
                 onOverlayVisibleChange={setGestureOverlayVisible}
               />
+              <MediaQualitySettings
+                {videoQuality}
+                {audioQuality}
+                onVideoQualityChange={setVideoQualityPreference}
+                onAudioQualityChange={setAudioQualityPreference}
+              />
               <div class="rounded-lg border border-border px-3">
                 <SettingToggle
                   id="hide-participant-videos"
@@ -1763,6 +1979,14 @@
                   tooltip="Turn off the outer glow when someone speaks. The colored outline still appears."
                   checked={disableSpeakingGlows}
                   onCheckedChange={setDisableSpeakingGlows}
+                />
+                <Separator />
+                <SettingToggle
+                  id="show-tile-stats"
+                  label="Show tile stats"
+                  tooltip="Ping, video/audio quality, and fps on every tile."
+                  checked={showTileStats}
+                  onCheckedChange={setShowTileStats}
                 />
                 {#if isHost}
                   <Separator />
@@ -1800,14 +2024,20 @@
           bottomInset={controlBarReservePx}
           {minimizedTileKeys}
           {hiddenVideoTileKeys}
-          {mutedListenTileKeys}
+          {tileVolumes}
+          speakersEnabled={speakerEnabled}
+          {showTileStats}
+          {tileStats}
           {fullscreenTileKey}
           {selfViewHidden}
           onMinimizeTile={minimizeTile}
           onToggleHideVideo={toggleTileHideVideo}
           onToggleTileListenMute={toggleTileListenMute}
+          onTileVolumeChange={setTileListenVolume}
           onToggleTileFullscreen={toggleTileFullscreen}
           onTogglePinTile={togglePinTile}
+          onToggleLocalShareVideo={toggleLocalShareVideo}
+          onToggleLocalShareAudio={toggleLocalShareAudio}
           {showGridSettings}
           {showInCallDevices}
           layoutLocked={gameActive}
@@ -1837,14 +2067,12 @@
         {speakerEnabled}
         {camEnabled}
         {screenSharing}
-        {screenAudioSharing}
         {snapshotting}
         {chatOpen}
         onToggleMic={toggleMic}
         onToggleSpeaker={toggleSpeaker}
         onToggleCam={toggleCam}
         onToggleScreenShare={toggleScreenShare}
-        onToggleScreenAudioShare={toggleScreenAudioShare}
         onSnapshot={takeSnapshot}
         onToggleChat={chatEnabled ? () => (chatOpen = !chatOpen) : undefined}
         onToggleDevices={() => (showInCallDevices ? closeInCallDevicesPanel() : openInCallDevicesPanel())}

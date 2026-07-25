@@ -9,6 +9,13 @@ import {
   type RemoteParticipant,
 } from "livekit-client";
 import type { MicGateProcessor } from "./mic-gate-processor";
+import {
+  DEFAULT_AUDIO_QUALITY,
+  DEFAULT_VIDEO_QUALITY,
+  roomOptionsForMediaQuality,
+  type AudioQualityOption,
+  type VideoQualityOption,
+} from "./media-quality";
 import { attachAllRemoteAudioTracks, attachRemoteAudioTrack, detachAllRemoteAudioTracks, detachRemoteAudioTrack } from "./remote-audio";
 
 export type ConnectionPhase = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
@@ -126,11 +133,16 @@ async function enableMicrophone(
   }
 }
 
-export function createCallRoom(handlers: CallRoomHandlers) {
-  const room = new Room({
-    adaptiveStream: true,
-    dynacast: true,
-  });
+export function createCallRoom(
+  handlers: CallRoomHandlers,
+  mediaQuality: {
+    videoQuality?: VideoQualityOption;
+    audioQuality?: AudioQualityOption;
+  } = {}
+) {
+  const room = new Room(
+    roomOptionsForMediaQuality(mediaQuality.videoQuality ?? DEFAULT_VIDEO_QUALITY, mediaQuality.audioQuality ?? DEFAULT_AUDIO_QUALITY)
+  );
 
   let audioLevelFrame: number | null = null;
   let lastAudioLevels: Record<string, number> = {};

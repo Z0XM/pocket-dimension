@@ -11,6 +11,7 @@
   import GridSettingsPanel from "./GridSettingsPanel.svelte";
   import type { DetectedGesture, HandLandmark } from "$lib/gestures/gesture-types";
   import type { GameSnapshotTeam } from "$lib/server/game/types";
+  import type { TileMediaStats } from "$lib/livekit/tile-stats";
 
   type Props = {
     room: Room;
@@ -32,14 +33,20 @@
     bottomInset?: number;
     minimizedTileKeys?: string[];
     hiddenVideoTileKeys?: string[];
-    mutedListenTileKeys?: string[];
+    tileVolumes?: Record<string, number>;
+    speakersEnabled?: boolean;
+    showTileStats?: boolean;
+    tileStats?: Record<string, TileMediaStats>;
     fullscreenTileKey?: string | null;
     selfViewHidden?: boolean;
     onMinimizeTile?: (key: string) => void;
     onToggleHideVideo?: (key: string) => void;
     onToggleTileListenMute?: (key: string) => void;
+    onTileVolumeChange?: (key: string, volume: number) => void;
     onToggleTileFullscreen?: (key: string) => void;
     onTogglePinTile?: (key: string) => void;
+    onToggleLocalShareVideo?: () => void;
+    onToggleLocalShareAudio?: () => void;
     showGridSettings?: boolean;
     showInCallDevices?: boolean;
     onLayoutModeChange?: (mode: StageLayoutMode) => void;
@@ -78,14 +85,20 @@
     bottomInset = 0,
     minimizedTileKeys = [],
     hiddenVideoTileKeys = [],
-    mutedListenTileKeys = [],
+    tileVolumes = {},
+    speakersEnabled = true,
+    showTileStats = true,
+    tileStats = {},
     fullscreenTileKey = null,
     selfViewHidden = false,
     onMinimizeTile,
     onToggleHideVideo,
     onToggleTileListenMute,
+    onTileVolumeChange,
     onToggleTileFullscreen,
     onTogglePinTile,
+    onToggleLocalShareVideo,
+    onToggleLocalShareAudio,
     showGridSettings = false,
     showInCallDevices = false,
     onLayoutModeChange,
@@ -164,13 +177,19 @@
         {disableSpeakingGlows}
         {minimizedTileKeys}
         {hiddenVideoTileKeys}
-        {mutedListenTileKeys}
+        {tileVolumes}
+        {speakersEnabled}
+        {showTileStats}
+        {tileStats}
         {fullscreenTileKey}
         {onMinimizeTile}
         {onToggleHideVideo}
         {onToggleTileListenMute}
+        {onTileVolumeChange}
         {onToggleTileFullscreen}
         {onTogglePinTile}
+        {onToggleLocalShareVideo}
+        {onToggleLocalShareAudio}
         {trackingOverlayVisible}
         {handLandmarks}
         {handGesture}

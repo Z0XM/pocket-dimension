@@ -2,8 +2,11 @@
   import { Track, type LocalParticipant, type RemoteParticipant } from "livekit-client";
   import { initialsForName } from "$lib/livekit/types";
   import { isCameraEnabled, isMicrophoneEnabled } from "$lib/livekit/room-client";
+  import type { TileMediaStats } from "$lib/livekit/tile-stats";
   import AudioLevelIndicator from "./AudioLevelIndicator.svelte";
   import HandGestureVideoOverlay from "./HandGestureVideoOverlay.svelte";
+  import TileStatsOverlay from "./TileStatsOverlay.svelte";
+  import TileVolumeSlider from "./TileVolumeSlider.svelte";
   import type { DetectedGesture, HandLandmark } from "$lib/gestures/gesture-types";
 
   type Props = {
@@ -24,6 +27,11 @@
     handLandmarks?: HandLandmark[] | null;
     handGesture?: DetectedGesture;
     handGestureHoldProgress?: number;
+    showStats?: boolean;
+    stats?: TileMediaStats | null;
+    listenVolume?: number;
+    speakersEnabled?: boolean;
+    onListenVolumeChange?: (volume: number) => void;
   };
 
   const {
@@ -44,6 +52,11 @@
     handLandmarks = null,
     handGesture = "none",
     handGestureHoldProgress = 0,
+    showStats = false,
+    stats = null,
+    listenVolume = 100,
+    speakersEnabled = true,
+    onListenVolumeChange,
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
@@ -58,6 +71,7 @@
   const clampedLevel = $derived(Math.min(1, Math.max(0, audioLevel)));
   const isSpeaking = $derived(micEnabled && clampedLevel > SPEAKING_THRESHOLD);
   const glowColor = (alpha: number) => `color-mix(in srgb, ${tileColor} ${alpha}%, transparent)`;
+  const showVolumeSlider = $derived(!isLocal && Boolean(onListenVolumeChange));
 
   const speakingGlowStyle = $derived.by(() => {
     if (!isSpeaking || disableSpeakingGlows) return undefined;
@@ -131,6 +145,10 @@
     style={speakingRingStyle}
     aria-label="{displayName}{isLocal ? ' (you)' : ''}"
   >
+    {#if showStats}
+      <TileStatsOverlay {stats} />
+    {/if}
+
     {#if showVideo}
       <video bind:this={videoEl} class="size-full object-cover {isLocal ? '-scale-x-100' : ''}" autoplay playsinline muted={isLocal}></video>
       {#if isLocal && trackingOverlayVisible}
@@ -149,12 +167,22 @@
     {/if}
 
     <div class="absolute inset-x-0 bottom-0 z-[2] flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
-      <p class="truncate text-sm font-medium text-white">{displayName}{isLocal ? " (you)" : ""}</p>
-      {#if !micEnabled}
-        <span class="ml-auto shrink-0 text-xs text-white/80" aria-label="Muted">Muted</span>
-      {:else}
-        <AudioLevelIndicator class="ml-auto shrink-0" level={audioLevel} />
-      {/if}
+      <p class="min-w-0 truncate text-sm font-medium text-white">{displayName}{isLocal ? " (you)" : ""}</p>
+      <div class="ml-auto flex shrink-0 items-center gap-1.5">
+        {#if !micEnabled}
+          <span class="text-xs text-white/80" aria-label="Muted">Muted</span>
+        {:else}
+          <AudioLevelIndicator class="shrink-0" level={audioLevel} />
+        {/if}
+        {#if showVolumeSlider}
+          <TileVolumeSlider
+            value={listenVolume}
+            disabled={!speakersEnabled}
+            label="Volume for {displayName}"
+            onChange={(value) => onListenVolumeChange?.(value)}
+          />
+        {/if}
+      </div>
     </div>
   </div>
 </div>

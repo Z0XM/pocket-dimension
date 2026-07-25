@@ -252,6 +252,101 @@ export async function disableLocalScreenCapture(local: LocalParticipant) {
   }
 }
 
+function hasScreenSharePublication(local: LocalParticipant) {
+  return Boolean(local.getTrackPublication(Track.Source.ScreenShare)?.track);
+}
+
+function hasScreenShareAudioPublication(local: LocalParticipant) {
+  return Boolean(local.getTrackPublication(Track.Source.ScreenShareAudio)?.track);
+}
+
+/** True when display capture granted audio (published or held session still has audio track). */
+export function isScreenShareAudioAvailable(local: LocalParticipant) {
+  return hasScreenShareAudioPublication(local);
+}
+
+/**
+ * Toggle published screen video while keeping the capture session when audio remains on.
+ * Turning video off with no audio stops the whole share.
+ */
+export async function setLocalScreenShareVideoEnabled(local: LocalParticipant, enabled: boolean) {
+  const publication = local.getTrackPublication(Track.Source.ScreenShare);
+
+  if (enabled) {
+    if (publication?.track) {
+      if (publication.isMuted) {
+        await publication.unmute();
+      }
+      return;
+    }
+
+    // Re-enable from audio-only (held video) or start a fresh share if needed.
+    const heldVideo = heldScreenCaptureVideoTracks.get(local);
+    if (heldVideo) {
+      await local.publishTrack(heldVideo, { source: Track.Source.ScreenShare });
+      heldScreenCaptureVideoTracks.delete(local);
+      return;
+    }
+
+    await enableLocalScreenShare(local);
+    return;
+  }
+
+  if (!publication?.track) {
+    return;
+  }
+
+  if (isScreenShareAudioActive(local)) {
+    // Keep capture alive for audio-only share.
+    const track = publication.track;
+    heldScreenCaptureVideoTracks.set(local, track);
+    await local.unpublishTrack(track, false);
+    return;
+  }
+
+  await disableLocalScreenCapture(local);
+}
+
+/**
+ * Toggle published screen audio. Turning audio off with no video stops the whole share.
+ */
+export async function setLocalScreenShareAudioEnabled(local: LocalParticipant, enabled: boolean) {
+  const publication = local.getTrackPublication(Track.Source.ScreenShareAudio);
+
+  if (enabled) {
+    if (publication?.track) {
+      if (publication.isMuted) {
+        await publication.unmute();
+      }
+      return;
+    }
+    // Cannot add audio without a new getDisplayMedia prompt.
+    throw new Error("screen_share_audio_unavailable");
+  }
+
+  if (publication?.track) {
+    await local.unpublishTrack(publication.track);
+  }
+
+  if (!isScreenShareActive(local) && !hasScreenSharePublication(local)) {
+    await disableLocalScreenCapture(local);
+    return;
+  }
+
+  if (!isScreenShareActive(local)) {
+    await disableLocalScreenCapture(local);
+  }
+}
+
+/** After a tile toggle, stop sharing if neither video nor audio remains published. */
+export async function stopShareIfNoMedia(local: LocalParticipant) {
+  const videoOn = isScreenShareActive(local);
+  const audioOn = isScreenShareAudioActive(local);
+  if (!videoOn && !audioOn) {
+    await disableLocalScreenCapture(local);
+  }
+}
+
 export function screenShareAudioHint(result: ScreenShareStartResult): string | null {
   if (result.audioPublished) {
     return "Screen shared with audio";
