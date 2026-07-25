@@ -1,4 +1,5 @@
 import {
+  createAudioAnalyser,
   DisconnectReason,
   Room,
   RoomEvent,
@@ -6,6 +7,7 @@ import {
   type ConnectionQuality,
   type LocalAudioTrack,
   type LocalParticipant,
+  type RemoteAudioTrack,
   type RemoteParticipant,
 } from "livekit-client";
 import type { MicGateProcessor } from "./mic-gate-processor";
@@ -17,6 +19,7 @@ import {
   type VideoQualityOption,
 } from "./media-quality";
 import { attachAllRemoteAudioTracks, attachRemoteAudioTrack, detachAllRemoteAudioTracks, detachRemoteAudioTrack } from "./remote-audio";
+import { screenShareTileKey } from "./screen-share";
 
 export type ConnectionPhase = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
 
@@ -61,15 +64,86 @@ export async function ensureRoomAudio(room: Room, reason = "unspecified") {
   }
 }
 
+type ScreenShareLevelAnalyser = {
+  trackSid: string;
+  calculateVolume: () => number;
+  cleanup: () => Promise<void>;
+};
+
+const screenShareLevelAnalysers = new Map<string, ScreenShareLevelAnalyser>();
+
+function readScreenShareAudioLevel(participant: LocalParticipant | RemoteParticipant): number {
+  const publication = participant.getTrackPublication(Track.Source.ScreenShareAudio);
+  const track = publication?.track;
+  if (!track || publication?.isMuted || track.kind !== Track.Kind.Audio) {
+    return 0;
+  }
+
+  const key = screenShareTileKey(participant.identity);
+  const trackSid = track.sid || track.mediaStreamTrack?.id || key;
+  const existing = screenShareLevelAnalysers.get(key);
+  if (existing && existing.trackSid === trackSid) {
+    try {
+      return Math.min(1, Math.max(0, existing.calculateVolume()));
+    } catch {
+      return 0;
+    }
+  }
+
+  if (existing) {
+    void existing.cleanup();
+    screenShareLevelAnalysers.delete(key);
+  }
+
+  try {
+    const analyser = createAudioAnalyser(track as LocalAudioTrack | RemoteAudioTrack, {
+      fftSize: 32,
+      smoothingTimeConstant: 0.2,
+    });
+    const trackSid = track.sid || track.mediaStreamTrack?.id || key;
+    screenShareLevelAnalysers.set(key, {
+      trackSid,
+      calculateVolume: analyser.calculateVolume,
+      cleanup: analyser.cleanup,
+    });
+    return Math.min(1, Math.max(0, analyser.calculateVolume()));
+  } catch {
+    return 0;
+  }
+}
+
+function cleanupScreenShareLevelAnalysers(activeKeys?: ReadonlySet<string>) {
+  for (const [key, analyser] of screenShareLevelAnalysers) {
+    if (activeKeys && activeKeys.has(key)) continue;
+    void analyser.cleanup();
+    screenShareLevelAnalysers.delete(key);
+  }
+}
+
 export function collectAudioLevels(room: Room): Record<string, number> {
   const levels: Record<string, number> = {
     [room.localParticipant.identity]: room.localParticipant.audioLevel,
   };
+  const activeScreenShareKeys = new Set<string>();
+
+  const localScreenKey = screenShareTileKey(room.localParticipant.identity);
+  const localScreenLevel = readScreenShareAudioLevel(room.localParticipant);
+  if (localScreenLevel > 0 || room.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio)?.track) {
+    levels[localScreenKey] = localScreenLevel;
+    activeScreenShareKeys.add(localScreenKey);
+  }
 
   for (const participant of room.remoteParticipants.values()) {
     levels[participant.identity] = participant.audioLevel;
+    const screenKey = screenShareTileKey(participant.identity);
+    const screenLevel = readScreenShareAudioLevel(participant);
+    if (screenLevel > 0 || participant.getTrackPublication(Track.Source.ScreenShareAudio)?.track) {
+      levels[screenKey] = screenLevel;
+      activeScreenShareKeys.add(screenKey);
+    }
   }
 
+  cleanupScreenShareLevelAnalysers(activeScreenShareKeys);
   return levels;
 }
 
@@ -153,6 +227,7 @@ export function createCallRoom(
       audioLevelFrame = null;
     }
     lastAudioLevels = {};
+    cleanupScreenShareLevelAnalysers();
   }
 
   function publishAudioLevels(force = false) {

@@ -33,6 +33,7 @@ describe("media-quality", () => {
     const options = roomOptionsForMediaQuality("720p", "48");
     expect(options.videoCaptureDefaults.resolution.height).toBe(720);
     expect(options.publishDefaults.videoEncoding).toEqual(videoPresetForOption("720p").encoding);
+    expect(options.publishDefaults.screenShareEncoding).toEqual(videoPresetForOption("720p").encoding);
     expect(options.publishDefaults.audioPreset).toEqual(audioPresetForOption("48"));
   });
 });

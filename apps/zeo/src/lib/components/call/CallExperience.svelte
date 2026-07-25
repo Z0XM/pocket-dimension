@@ -811,6 +811,7 @@
     const wasCamEnabled = room.localParticipant.isCameraEnabled;
     const wasMicEnabled = room.localParticipant.isMicrophoneEnabled;
     const videoPreset = videoPresetForOption(nextVideo);
+    const publishQuality = subscribedVideoQualityFor(nextVideo);
 
     if (wasCamEnabled) {
       try {
@@ -840,6 +841,17 @@
         }
       } catch {
         showToast("Could not apply audio quality to the microphone");
+      }
+    }
+
+    // Active screen-share video: apply publishing quality / encoding ceiling without restarting capture.
+    const screenPublication = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+    const screenVideoTrack = screenPublication?.videoTrack;
+    if (screenVideoTrack) {
+      try {
+        screenVideoTrack.setPublishingQuality(publishQuality);
+      } catch {
+        // Best-effort — dynacast may already manage layers.
       }
     }
 
@@ -1698,10 +1710,6 @@
       await stopShareIfNoMedia(local);
       bumpMediaRevision();
     } catch (error) {
-      if (error instanceof Error && error.message === "screen_share_audio_unavailable") {
-        showToast("Share audio was not granted in the browser picker — stop and share again with audio enabled");
-        return;
-      }
       showToast(screenShareFailureMessage(error));
     }
   }

@@ -470,7 +470,7 @@
                 audioOnly={tile.audioOnly}
                 showStats={showTileStats}
                 stats={tileStats[tile.key]}
-                audioLevel={audioLevels[tile.participant.identity] ?? 0}
+                audioLevel={audioLevels[tile.key] ?? 0}
                 listenVolume={tileVolumeForKey(tileVolumes, tile.key)}
                 {speakersEnabled}
                 onListenVolumeChange={isLocalShare ? undefined : (volume) => onTileVolumeChange?.(tile.key, volume)}

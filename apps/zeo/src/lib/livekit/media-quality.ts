@@ -59,6 +59,7 @@ export function roomOptionsForMediaQuality(video: VideoQualityOption, audio: Aud
     publishDefaults: {
       videoEncoding: videoPreset.encoding,
       videoSimulcastLayers: simulcastLayersFor(video),
+      screenShareEncoding: videoPreset.encoding,
       audioPreset,
     },
   };
