@@ -15,12 +15,33 @@ type PlaybackState = PlayJob & {
 };
 
 const PORT = Number(Bun.env.PORT ?? 3010);
+const HOST = Bun.env.HOST ?? "0.0.0.0";
 const SECRET = Bun.env.MUSIC_WORKER_SECRET ?? "";
 const ZEO_APP_URL = (Bun.env.ZEO_APP_URL ?? Bun.env.PUBLIC_ZEO_URL ?? "http://127.0.0.1:3008").replace(/\/$/, "");
 const SAMPLE_RATE = 48_000;
 const CHANNELS = 2;
 const FRAME_SAMPLES_PER_CHANNEL = 960;
 const FRAME_BYTES = FRAME_SAMPLES_PER_CHANNEL * CHANNELS * 2;
+
+/** Dokploy/Railpack sometimes ship a PATH without /usr/bin — prefer absolute paths. */
+async function resolveBinary(candidates: string[]) {
+  for (const candidate of candidates) {
+    for (const flag of ["-version", "--version"] as const) {
+      try {
+        const proc = Bun.spawn([candidate, flag], { stdout: "pipe", stderr: "pipe" });
+        if ((await proc.exited) === 0) return candidate;
+      } catch {
+        // try next
+      }
+    }
+  }
+  return null;
+}
+
+const FFMPEG_BIN = await resolveBinary(["ffmpeg", "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"]);
+const YT_DLP_BIN = await resolveBinary(["yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"]);
+const ffmpegOk = Boolean(FFMPEG_BIN);
+const ytDlpOk = Boolean(YT_DLP_BIN);
 
 const activeJobs = new Map<string, PlaybackState>();
 const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<Record<string, any>>;
@@ -87,8 +108,9 @@ async function fetchBotToken(job: PlayJob) {
 }
 
 async function resolveAudioUrl(videoId: string) {
+  if (!YT_DLP_BIN) throw new Error("yt-dlp not found on PATH");
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  const proc = Bun.spawn(["yt-dlp", "-f", "bestaudio", "-g", videoUrl], {
+  const proc = Bun.spawn([YT_DLP_BIN, "-f", "bestaudio", "-g", videoUrl], {
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -127,6 +149,7 @@ async function connectRtc(job: PlayJob) {
 }
 
 async function pumpFfmpegToLiveKit(state: PlaybackState, audioUrl: string) {
+  if (!FFMPEG_BIN) throw new Error("ffmpeg not found on PATH");
   const { rtc, room, source } = await connectRtc(state);
   state.room = room;
 
@@ -148,7 +171,7 @@ async function pumpFfmpegToLiveKit(state: PlaybackState, audioUrl: string) {
     "pipe:1",
   ];
 
-  const ffmpeg = Bun.spawn(["ffmpeg", ...args], {
+  const ffmpeg = Bun.spawn([FFMPEG_BIN, ...args], {
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -272,20 +295,8 @@ async function handleJob(request: Request, path: string) {
   return json({ error: "not found" }, 404);
 }
 
-async function binaryAvailable(command: string) {
-  try {
-    const proc = Bun.spawn([command, "--version"], { stdout: "pipe", stderr: "pipe" });
-    const exitCode = await proc.exited;
-    return exitCode === 0;
-  } catch {
-    return false;
-  }
-}
-
-const ffmpegOk = await binaryAvailable("ffmpeg");
-const ytDlpOk = await binaryAvailable("yt-dlp");
-
 Bun.serve({
+  hostname: HOST,
   port: PORT,
   async fetch(request) {
     const url = new URL(request.url);
@@ -294,6 +305,8 @@ Bun.serve({
         ok: ffmpegOk && ytDlpOk,
         ffmpeg: ffmpegOk,
         ytDlp: ytDlpOk,
+        ffmpegBin: FFMPEG_BIN,
+        ytDlpBin: YT_DLP_BIN,
       });
     }
     if (request.method === "POST" && url.pathname.startsWith("/jobs/")) {
@@ -303,10 +316,10 @@ Bun.serve({
   },
 });
 
-console.info(`zeo music worker listening on :${PORT}`);
-console.info(`tools: ffmpeg=${ffmpegOk ? "ok" : "MISSING"} yt-dlp=${ytDlpOk ? "ok" : "MISSING"}`);
+console.info(`zeo music worker listening on ${HOST}:${PORT}`);
+console.info(`tools: ffmpeg=${ffmpegOk ? FFMPEG_BIN : "MISSING"} yt-dlp=${ytDlpOk ? YT_DLP_BIN : "MISSING"}`);
 if (!ffmpegOk || !ytDlpOk) {
-  console.warn("Playback will fail until ffmpeg and yt-dlp are on PATH (use apps/zeo-music-worker/Dockerfile in prod).");
+  console.warn("Playback will fail until ffmpeg and yt-dlp are installed (use apps/zeo-music-worker/Dockerfile in prod).");
 }
 
 export {};

@@ -17,9 +17,12 @@ FROM oven/bun:1.3.5-slim AS runner
 WORKDIR /app
 
 ENV PORT=3010
+ENV HOST=0.0.0.0
 ENV HUSKY=0
+# Ensure /usr/bin (apt ffmpeg) is always visible even if Dokploy overrides PATH
+ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# ffmpeg + yt-dlp (latest binary from GitHub releases)
+# ffmpeg (apt) + yt-dlp (latest binary from GitHub releases)
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -29,10 +32,11 @@ RUN apt-get update \
   && curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
     -o /usr/local/bin/yt-dlp \
   && chmod a+rx /usr/local/bin/yt-dlp \
+  && ln -sf /usr/bin/ffmpeg /usr/local/bin/ffmpeg \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
-  && ffmpeg -version | head -n 1 \
-  && yt-dlp --version
+  && /usr/bin/ffmpeg -version | head -n 1 \
+  && /usr/local/bin/yt-dlp --version
 
 # Standalone package root (not the monorepo) — only worker runtime deps.
 # Do not run `bun pm ls` here: there is no lockfile in this image context.

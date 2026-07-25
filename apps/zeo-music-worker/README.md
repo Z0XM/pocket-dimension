@@ -50,11 +50,23 @@ If the worker cannot call the public zeo URL, use Dokploy’s internal service U
 ### zeo env (pair)
 
 ```env
-MUSIC_WORKER_URL=http://<music-worker-service-name>:3010
+MUSIC_WORKER_URL=http://<music-worker-container-name>:3010
 MUSIC_WORKER_SECRET=<same secret>
 ```
 
-Service name is whatever Dokploy assigns on the compose/network (check Dokploy → music-worker → Network / hostname).
+Use the **real Docker container name** on `dokploy-network` (often not literally `zeo-music-worker`). On the VPS:
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Networks}}" | grep -i music
+```
+
+Both zeo and the worker must share `dokploy-network`. If zeo gets `FailedToOpenSocket` / `ConnectionRefused`, from zeo’s terminal:
+
+```bash
+curl -sS http://<container-name>:3010/health
+```
+
+If that fails, `docker network connect dokploy-network <container-name>` then retry.
 
 ### Verify in container
 
