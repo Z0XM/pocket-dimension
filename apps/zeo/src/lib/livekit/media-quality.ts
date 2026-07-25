@@ -46,6 +46,10 @@ export function audioQualityLabel(option: AudioQualityOption): string {
   return `${option} kbps`;
 }
 
+export function videoSimulcastLayersFor(option: VideoQualityOption): VideoPreset[] {
+  return simulcastLayersFor(option);
+}
+
 export function roomOptionsForMediaQuality(video: VideoQualityOption, audio: AudioQualityOption) {
   const videoPreset = videoPresetForOption(video);
   const audioPreset = audioPresetForOption(audio);
@@ -58,7 +62,7 @@ export function roomOptionsForMediaQuality(video: VideoQualityOption, audio: Aud
     },
     publishDefaults: {
       videoEncoding: videoPreset.encoding,
-      videoSimulcastLayers: simulcastLayersFor(video),
+      videoSimulcastLayers: videoSimulcastLayersFor(video),
       screenShareEncoding: videoPreset.encoding,
       audioPreset,
     },

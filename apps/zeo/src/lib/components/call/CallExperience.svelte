@@ -37,12 +37,12 @@
     tileVolumeForKey,
   } from "$lib/livekit/tile-listen-mute";
   import { createMicGateProcessor, type MicGateProcessor } from "$lib/livekit/mic-gate-processor";
+  import { applyLocalAudioExportQuality, applyLocalVideoExportQuality } from "$lib/livekit/apply-media-quality";
   import {
     DEFAULT_AUDIO_QUALITY,
     DEFAULT_VIDEO_QUALITY,
     isAudioQualityOption,
     isVideoQualityOption,
-    roomOptionsForMediaQuality,
     videoPresetForOption,
     type AudioQualityOption,
     type VideoQualityOption,
@@ -783,10 +783,13 @@
   function applySubscribedVideoQuality(room: Room | null = livekitRoom, option: VideoQualityOption = videoQuality) {
     if (!room) return;
     const quality = subscribedVideoQualityFor(option);
+    const preset = videoPresetForOption(option);
+    const dimensions = { width: preset.width, height: preset.height };
     for (const participant of room.remoteParticipants.values()) {
       for (const publication of participant.videoTrackPublications.values()) {
         try {
           publication.setVideoQuality(quality);
+          publication.setVideoDimensions(dimensions);
         } catch {
           // Best-effort — adaptiveStream may already manage layers.
         }
@@ -794,81 +797,66 @@
     }
   }
 
-  async function applyLocalMediaQuality(nextVideo: VideoQualityOption, nextAudio: AudioQualityOption) {
+  async function applyVideoQualityPreference(nextVideo: VideoQualityOption) {
     const room = livekitRoom;
     if (!room || room.state !== "connected") return;
 
-    const options = roomOptionsForMediaQuality(nextVideo, nextAudio);
-    room.options.videoCaptureDefaults = {
-      ...room.options.videoCaptureDefaults,
-      ...options.videoCaptureDefaults,
-    };
-    room.options.publishDefaults = {
-      ...room.options.publishDefaults,
-      ...options.publishDefaults,
-    };
-
-    const wasCamEnabled = room.localParticipant.isCameraEnabled;
-    const wasMicEnabled = room.localParticipant.isMicrophoneEnabled;
-    const videoPreset = videoPresetForOption(nextVideo);
-    const publishQuality = subscribedVideoQualityFor(nextVideo);
-
-    if (wasCamEnabled) {
-      try {
-        await room.localParticipant.setCameraEnabled(false);
-        await room.localParticipant.setCameraEnabled(true, {
-          deviceId: videoDeviceId || undefined,
-          resolution: videoPreset.resolution,
-        });
-      } catch {
-        showToast("Could not apply video quality to the camera");
-      }
+    try {
+      // Republish camera/screen with the selected capture + encode caps (export quality).
+      await applyLocalVideoExportQuality(room, nextVideo, audioQuality, {
+        videoDeviceId: videoDeviceId || undefined,
+      });
+      applySubscribedVideoQuality(room, nextVideo);
+    } catch {
+      showToast("Could not apply video quality");
     }
 
-    if (wasMicEnabled) {
-      try {
-        await room.localParticipant.setMicrophoneEnabled(false);
-        await room.localParticipant.setMicrophoneEnabled(true, {
-          deviceId: audioDeviceId || undefined,
-        });
-        // Re-attach mic gate after republish.
-        if (micGateProcessor) {
-          try {
-            await attachMicGateProcessor(room, micGateProcessor);
-          } catch {
-            // Keep raw mic if gate fails.
-          }
-        }
-      } catch {
-        showToast("Could not apply audio quality to the microphone");
-      }
-    }
-
-    // Active screen-share video: apply publishing quality / encoding ceiling without restarting capture.
-    const screenPublication = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
-    const screenVideoTrack = screenPublication?.videoTrack;
-    if (screenVideoTrack) {
-      try {
-        screenVideoTrack.setPublishingQuality(publishQuality);
-      } catch {
-        // Best-effort — dynacast may already manage layers.
-      }
-    }
-
-    applySubscribedVideoQuality(room, nextVideo);
     bumpMediaRevision();
+    void refreshTileStats(room);
+  }
+
+  async function applyAudioQualityPreference(nextAudio: AudioQualityOption) {
+    const room = livekitRoom;
+    if (!room || room.state !== "connected") return;
+
+    try {
+      // Republish mic/screen-audio with the selected bitrate cap (export quality).
+      await applyLocalAudioExportQuality(room, videoQuality, nextAudio, {
+        attachMicGate: async () => {
+          if (!micGateProcessor) return;
+          await attachMicGateProcessor(room, micGateProcessor);
+        },
+      });
+      await ensureRoomAudio(room, "audio_quality_change");
+      applyRoomSpeakerState(room);
+    } catch {
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
+        if (micGateProcessor) {
+          await attachMicGateProcessor(room, micGateProcessor);
+        }
+        await ensureRoomAudio(room, "audio_quality_recover");
+        applyRoomSpeakerState(room);
+      } catch {
+        // fall through
+      }
+      showToast("Could not apply audio quality — try toggling your mic");
+    }
+
+    bumpMediaRevision();
+    void refreshTileStats(room);
   }
 
   function setVideoQualityPreference(value: VideoQualityOption) {
     videoQuality = value;
     writeStored(STORAGE_KEYS.videoQuality, value);
-    void applyLocalMediaQuality(value, audioQuality);
+    void applyVideoQualityPreference(value);
   }
 
   function setAudioQualityPreference(value: AudioQualityOption) {
     audioQuality = value;
     writeStored(STORAGE_KEYS.audioQuality, value);
-    void applyLocalMediaQuality(videoQuality, value);
+    void applyAudioQualityPreference(value);
   }
 
   function setShowTileStats(value: boolean) {
