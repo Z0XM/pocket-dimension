@@ -62,9 +62,9 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
     const session = await findActiveListeningSession(room.id);
     if (!session) throw Object.assign(new Error("no_active_listening"), { code: "no_active_listening" });
 
-    const needsMetadata = !body.title || body.channelTitle === undefined || body.thumbnailUrl === undefined || body.durationMs === undefined;
+    const needsMetadata = !body.title || !body.thumbnailUrl || body.channelTitle === undefined || body.durationMs === undefined;
     const accessToken = needsMetadata ? await getYouTubeAccessTokenForUser(session.linkerUserId) : null;
-    const metadata = needsMetadata ? await resolveYouTubeVideo(videoId, accessToken ?? undefined).catch(() => null) : null;
+    const metadata = needsMetadata ? await resolveYouTubeVideo(videoId, accessToken ?? undefined) : null;
 
     return json(
       await enqueueListeningItem({
@@ -73,7 +73,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
         videoId,
         title: body.title ?? metadata?.title,
         channelTitle: body.channelTitle ?? metadata?.channelTitle ?? null,
-        thumbnailUrl: body.thumbnailUrl ?? metadata?.thumbnailUrl ?? null,
+        thumbnailUrl: body.thumbnailUrl ?? metadata?.thumbnailUrl ?? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
         durationMs: body.durationMs ?? metadata?.durationMs ?? null,
         source: body.source ?? (body.url ? "url" : "search"),
       })

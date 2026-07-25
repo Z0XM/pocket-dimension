@@ -169,9 +169,10 @@
       return;
     }
     const body = (await response.json()) as {
+      items?: Array<{ videoId: string; title: string; channelTitle: string; thumbnailUrl: string | null; source: string }>;
       results?: Array<{ videoId: string; title: string; channelTitle: string; thumbnailUrl: string | null; source: string }>;
     };
-    searchResults = body.results ?? [];
+    searchResults = body.items ?? body.results ?? [];
   }
 
   function enqueueVideo(item: { videoId: string; title: string; channelTitle?: string | null; thumbnailUrl?: string | null; source?: string }) {
