@@ -113,6 +113,22 @@ function extractAudioKbps(report: RTCStatsReport | null, direction: Direction, s
   return null;
 }
 
+function captureDimensions(participant: Participant, source: Track.Source) {
+  const publication = participant.getTrackPublication(source);
+  const mediaTrack = publication?.track?.mediaStreamTrack;
+  if (!mediaTrack || publication?.isMuted) return { width: undefined as number | undefined, height: undefined as number | undefined };
+
+  try {
+    const settings = mediaTrack.getSettings();
+    return {
+      width: typeof settings.width === "number" ? settings.width : undefined,
+      height: typeof settings.height === "number" ? settings.height : undefined,
+    };
+  } catch {
+    return { width: undefined, height: undefined };
+  }
+}
+
 async function statsForParticipant(
   participant: LocalParticipant | RemoteParticipant,
   kind: "participant" | "screen-share",
@@ -126,9 +142,14 @@ async function statsForParticipant(
   const video = extractVideoFields(videoReport, direction);
   const audioKbps = extractAudioKbps(audioReport, direction, `${participant.identity}:${kind}:audio`);
 
+  // Prefer MediaStreamTrack settings for local capture — RTP outbound layers can lag or report a simulcast layer.
+  const capture = participant.isLocal ? captureDimensions(participant, videoSource) : { width: undefined, height: undefined };
+  const width = capture.width ?? video.width;
+  const height = capture.height ?? video.height;
+
   return {
     pingMs: video.rttMs ?? roomPingMs,
-    videoQuality: formatVideoQuality(video.width, video.height),
+    videoQuality: formatVideoQuality(width, height),
     audioKbps,
     fps: video.fps ?? null,
   };
