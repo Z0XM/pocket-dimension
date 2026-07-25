@@ -50,23 +50,23 @@ If the worker cannot call the public zeo URL, use Dokploy’s internal service U
 ### zeo env (pair)
 
 ```env
-MUSIC_WORKER_URL=http://<music-worker-container-name>:3010
+# Swarm: service name only (strip .1.<taskid> from docker ps Names)
+MUSIC_WORKER_URL=http://pocketdimension-zeomusicworker-XXXXXX:3010
 MUSIC_WORKER_SECRET=<same secret>
 ```
 
-Use the **real Docker container name** on `dokploy-network` (often not literally `zeo-music-worker`). On the VPS:
+On Dokploy/Swarm, `docker ps` shows **task** names like `…-qqj6xp.1.abc123`. Those change every redeploy and cause `ConnectionRefused`. Use the stable **service** name (`…-qqj6xp`).
 
 ```bash
 docker ps --format "table {{.Names}}\t{{.Networks}}" | grep -i music
+docker service ls | grep -i music
 ```
 
-Both zeo and the worker must share `dokploy-network`. If zeo gets `FailedToOpenSocket` / `ConnectionRefused`, from zeo’s terminal:
+Both apps must share `dokploy-network`. From zeo’s terminal:
 
 ```bash
-curl -sS http://<container-name>:3010/health
+curl -sS http://pocketdimension-zeomusicworker-XXXXXX:3010/health
 ```
-
-If that fails, `docker network connect dokploy-network <container-name>` then retry.
 
 ### Verify in container
 
