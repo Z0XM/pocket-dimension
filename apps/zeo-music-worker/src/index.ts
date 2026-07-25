@@ -272,12 +272,29 @@ async function handleJob(request: Request, path: string) {
   return json({ error: "not found" }, 404);
 }
 
+async function binaryAvailable(command: string) {
+  try {
+    const proc = Bun.spawn([command, "--version"], { stdout: "pipe", stderr: "pipe" });
+    const exitCode = await proc.exited;
+    return exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+const ffmpegOk = await binaryAvailable("ffmpeg");
+const ytDlpOk = await binaryAvailable("yt-dlp");
+
 Bun.serve({
   port: PORT,
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ ok: true });
+      return json({
+        ok: ffmpegOk && ytDlpOk,
+        ffmpeg: ffmpegOk,
+        ytDlp: ytDlpOk,
+      });
     }
     if (request.method === "POST" && url.pathname.startsWith("/jobs/")) {
       return handleJob(request, url.pathname);
@@ -287,3 +304,9 @@ Bun.serve({
 });
 
 console.info(`zeo music worker listening on :${PORT}`);
+console.info(`tools: ffmpeg=${ffmpegOk ? "ok" : "MISSING"} yt-dlp=${ytDlpOk ? "ok" : "MISSING"}`);
+if (!ffmpegOk || !ytDlpOk) {
+  console.warn("Playback will fail until ffmpeg and yt-dlp are on PATH (use apps/zeo-music-worker/Dockerfile in prod).");
+}
+
+export {};
