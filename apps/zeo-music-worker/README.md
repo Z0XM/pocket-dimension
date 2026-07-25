@@ -61,11 +61,32 @@ Export cookies that won’t rotate immediately:
 2. In that same tab, open `https://www.youtube.com/robots.txt`  
 3. Export `youtube.com` cookies with a browser extension (e.g. “Get cookies.txt LOCALLY”)  
 4. Close the private window (don’t browse YouTube with that session again)  
-5. Mount the file into the worker and set `YTDLP_COOKIES_FILE`, or paste into `YTDLP_COOKIES`
+5. Put cookies on the worker (see below)
 
 See [yt-dlp cookie export tips](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies). Prefer a **throwaway** Google account — using a main account risks bans.
 
-Dokploy: upload the file as a mount (e.g. `/cookies/youtube.txt`) or paste into an env var.
+#### Dokploy: multiline cookies
+
+Env UIs often reject real newlines. Prefer **base64** (one line):
+
+```bash
+# Linux
+base64 -w0 cookies.txt
+# macOS
+base64 -i cookies.txt | tr -d '\n'
+```
+
+Then on the music-worker:
+
+```env
+YTDLP_COOKIES_B64=<paste the single-line base64 output>
+```
+
+Alternatives:
+
+- Mount the file and set `YTDLP_COOKIES_FILE=/cookies/youtube.txt`
+- `YTDLP_COOKIES` with real multiline (only if Dokploy allows it), or with literal `\n` between lines
+
 
 ### zeo env (pair)
 

@@ -55,7 +55,21 @@ async function resolveCookiesPath() {
     console.warn(`YTDLP_COOKIES_FILE set but missing: ${fromEnv}`);
   }
 
-  const inline = Bun.env.YTDLP_COOKIES?.trim();
+  // Prefer base64 for Dokploy/UI env vars that cannot store real newlines.
+  const b64 = Bun.env.YTDLP_COOKIES_B64?.trim();
+  let inline = Bun.env.YTDLP_COOKIES?.trim() ?? "";
+  if (b64) {
+    try {
+      inline = Buffer.from(b64, "base64").toString("utf8").trim();
+    } catch (cause) {
+      console.warn("YTDLP_COOKIES_B64 decode failed", cause);
+      inline = "";
+    }
+  } else if (inline.includes("\\n") && !inline.includes("\n")) {
+    // Some dashboards paste multiline as literal \n sequences.
+    inline = inline.replace(/\\n/g, "\n");
+  }
+
   if (!inline) return null;
 
   const path = "/tmp/ytdlp-cookies.txt";
