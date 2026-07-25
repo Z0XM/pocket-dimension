@@ -22,21 +22,36 @@ ENV HUSKY=0
 # Ensure /usr/bin (apt ffmpeg) is always visible even if Dokploy overrides PATH
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# ffmpeg (apt) + yt-dlp (latest binary from GitHub releases)
+# ffmpeg + yt-dlp + Deno (required for YouTube EJS challenge solving)
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     ffmpeg \
     python3 \
+    unzip \
   && curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
     -o /usr/local/bin/yt-dlp \
   && chmod a+rx /usr/local/bin/yt-dlp \
   && ln -sf /usr/bin/ffmpeg /usr/local/bin/ffmpeg \
+  && arch="$(dpkg --print-architecture)" \
+  && case "$arch" in \
+       amd64) denofile=deno-x86_64-unknown-linux-gnu.zip ;; \
+       arm64) denofile=deno-aarch64-unknown-linux-gnu.zip ;; \
+       *) echo "unsupported arch: $arch" >&2; exit 1 ;; \
+     esac \
+  && curl -fsSL "https://github.com/denoland/deno/releases/latest/download/${denofile}" \
+    -o /tmp/deno.zip \
+  && unzip -o /tmp/deno.zip -d /usr/local/bin \
+  && chmod a+rx /usr/local/bin/deno \
+  && rm -f /tmp/deno.zip \
+  && apt-get purge -y unzip \
+  && apt-get autoremove -y \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
   && /usr/bin/ffmpeg -version | head -n 1 \
-  && /usr/local/bin/yt-dlp --version
+  && /usr/local/bin/yt-dlp --version \
+  && /usr/local/bin/deno --version
 
 # Standalone package root (not the monorepo) — only worker runtime deps.
 # Do not run `bun pm ls` here: there is no lockfile in this image context.
@@ -50,5 +65,5 @@ COPY apps/zeo-music-worker/src ./src
 
 EXPOSE 3010
 
-# Env injected by Dokploy: PORT, MUSIC_WORKER_SECRET, ZEO_APP_URL
+# Env injected by Dokploy: PORT, MUSIC_WORKER_SECRET, ZEO_APP_URL, YTDLP_COOKIES_FILE / YTDLP_COOKIES
 CMD ["bun", "src/index.ts"]
