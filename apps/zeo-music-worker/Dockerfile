@@ -8,10 +8,10 @@
 #   Port:            3010
 #   Public domain:   none (internal only — zeo calls it on the Docker network)
 
-FROM oven/bun:1.2-slim AS runner
+# Match root package.json packageManager (bun@1.3.5)
+FROM oven/bun:1.3.5-slim AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
 ENV PORT=3010
 
 # ffmpeg + yt-dlp (latest binary from GitHub releases)
@@ -34,7 +34,10 @@ COPY scripts ./scripts
 COPY shared ./shared
 COPY apps ./apps
 
+# Install before NODE_ENV=production — production env can make bun want lockfile changes
 RUN bun install --frozen-lockfile
+
+ENV NODE_ENV=production
 
 WORKDIR /app/apps/zeo-music-worker
 EXPOSE 3010
