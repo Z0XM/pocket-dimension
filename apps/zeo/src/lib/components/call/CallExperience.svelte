@@ -783,10 +783,13 @@
   function applySubscribedVideoQuality(room: Room | null = livekitRoom, option: VideoQualityOption = videoQuality) {
     if (!room) return;
     const quality = subscribedVideoQualityFor(option);
+    const preset = videoPresetForOption(option);
+    const dimensions = { width: preset.width, height: preset.height };
     for (const participant of room.remoteParticipants.values()) {
       for (const publication of participant.videoTrackPublications.values()) {
         try {
           publication.setVideoQuality(quality);
+          publication.setVideoDimensions(dimensions);
         } catch {
           // Best-effort — adaptiveStream may already manage layers.
         }
@@ -794,9 +797,9 @@
     }
   }
 
-  async function applyLocalMediaQuality(nextVideo: VideoQualityOption, nextAudio: AudioQualityOption) {
+  function syncRoomMediaQualityOptions(nextVideo: VideoQualityOption, nextAudio: AudioQualityOption) {
     const room = livekitRoom;
-    if (!room || room.state !== "connected") return;
+    if (!room) return roomOptionsForMediaQuality(nextVideo, nextAudio);
 
     const options = roomOptionsForMediaQuality(nextVideo, nextAudio);
     room.options.videoCaptureDefaults = {
@@ -807,46 +810,32 @@
       ...room.options.publishDefaults,
       ...options.publishDefaults,
     };
+    return options;
+  }
 
-    const wasCamEnabled = room.localParticipant.isCameraEnabled;
-    const wasMicEnabled = room.localParticipant.isMicrophoneEnabled;
+  async function applyVideoQualityPreference(nextVideo: VideoQualityOption) {
+    const room = livekitRoom;
+    if (!room || room.state !== "connected") return;
+
+    syncRoomMediaQualityOptions(nextVideo, audioQuality);
     const videoPreset = videoPresetForOption(nextVideo);
     const publishQuality = subscribedVideoQualityFor(nextVideo);
 
-    if (wasCamEnabled) {
+    // Restart capture in place — do NOT toggle mic (that was cutting call audio).
+    const cameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.videoTrack;
+    if (cameraTrack && room.localParticipant.isCameraEnabled) {
       try {
-        await room.localParticipant.setCameraEnabled(false);
-        await room.localParticipant.setCameraEnabled(true, {
+        await cameraTrack.restartTrack({
           deviceId: videoDeviceId || undefined,
           resolution: videoPreset.resolution,
         });
+        cameraTrack.setPublishingQuality(publishQuality);
       } catch {
         showToast("Could not apply video quality to the camera");
       }
     }
 
-    if (wasMicEnabled) {
-      try {
-        await room.localParticipant.setMicrophoneEnabled(false);
-        await room.localParticipant.setMicrophoneEnabled(true, {
-          deviceId: audioDeviceId || undefined,
-        });
-        // Re-attach mic gate after republish.
-        if (micGateProcessor) {
-          try {
-            await attachMicGateProcessor(room, micGateProcessor);
-          } catch {
-            // Keep raw mic if gate fails.
-          }
-        }
-      } catch {
-        showToast("Could not apply audio quality to the microphone");
-      }
-    }
-
-    // Active screen-share video: apply publishing quality / encoding ceiling without restarting capture.
-    const screenPublication = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
-    const screenVideoTrack = screenPublication?.videoTrack;
+    const screenVideoTrack = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
     if (screenVideoTrack) {
       try {
         screenVideoTrack.setPublishingQuality(publishQuality);
@@ -857,18 +846,74 @@
 
     applySubscribedVideoQuality(room, nextVideo);
     bumpMediaRevision();
+    void refreshTileStats(room);
+  }
+
+  async function applyAudioQualityPreference(nextAudio: AudioQualityOption) {
+    const room = livekitRoom;
+    if (!room || room.state !== "connected") return;
+
+    const options = syncRoomMediaQualityOptions(videoQuality, nextAudio);
+    const micPublication = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+    const micTrack = micPublication?.audioTrack;
+    if (!micTrack || !room.localParticipant.isMicrophoneEnabled) {
+      bumpMediaRevision();
+      return;
+    }
+
+    // Republish the same track with the new audio preset — never leave mic disabled on failure.
+    try {
+      try {
+        await micTrack.stopProcessor();
+      } catch {
+        // Processor may already be absent.
+      }
+
+      await room.localParticipant.unpublishTrack(micTrack, false);
+      await room.localParticipant.publishTrack(micTrack, {
+        source: Track.Source.Microphone,
+        audioPreset: options.publishDefaults.audioPreset,
+      });
+
+      if (micGateProcessor) {
+        try {
+          await attachMicGateProcessor(room, micGateProcessor);
+        } catch {
+          // Keep raw mic if gate fails.
+        }
+      }
+
+      await ensureRoomAudio(room, "audio_quality_change");
+      applyRoomSpeakerState(room);
+    } catch {
+      // Best-effort recovery so the user is not stuck silent.
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
+        if (micGateProcessor) {
+          await attachMicGateProcessor(room, micGateProcessor);
+        }
+        await ensureRoomAudio(room, "audio_quality_recover");
+        applyRoomSpeakerState(room);
+      } catch {
+        // fall through
+      }
+      showToast("Could not apply audio quality — try toggling your mic");
+    }
+
+    bumpMediaRevision();
+    void refreshTileStats(room);
   }
 
   function setVideoQualityPreference(value: VideoQualityOption) {
     videoQuality = value;
     writeStored(STORAGE_KEYS.videoQuality, value);
-    void applyLocalMediaQuality(value, audioQuality);
+    void applyVideoQualityPreference(value);
   }
 
   function setAudioQualityPreference(value: AudioQualityOption) {
     audioQuality = value;
     writeStored(STORAGE_KEYS.audioQuality, value);
-    void applyLocalMediaQuality(videoQuality, value);
+    void applyAudioQualityPreference(value);
   }
 
   function setShowTileStats(value: boolean) {
