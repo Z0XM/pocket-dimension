@@ -22,7 +22,7 @@ export function isAutoLayoutPreset(value: string | null): value is AutoLayoutPre
 export function resolveAutoLayoutPreset(preset: AutoLayoutPreset, tiles: StageTileEntry[]): Exclude<AutoLayoutPreset, "dynamic"> | "gallery" {
   if (preset !== "dynamic") return preset;
 
-  if (tiles.some((tile) => tile.kind === "screen-share")) return "sidebar";
+  if (tiles.some((tile) => tile.kind === "screen-share" || tile.kind === "listening")) return "sidebar";
   if (tiles.length <= 2) return "speaker";
   return "gallery";
 }
@@ -44,6 +44,9 @@ function findPrimaryTileIndex(tiles: StageTileEntry[], activeSpeakerIdentity: st
 
   const screenShareIndex = tiles.findIndex((tile) => tile.kind === "screen-share");
   if (screenShareIndex >= 0) return screenShareIndex;
+
+  const listeningIndex = tiles.findIndex((tile) => tile.kind === "listening");
+  if (listeningIndex >= 0) return listeningIndex;
 
   if (activeSpeakerIdentity) {
     const activeSpeakerIndex = tiles.findIndex((tile) => tile.kind === "participant" && tile.participant.identity === activeSpeakerIdentity);

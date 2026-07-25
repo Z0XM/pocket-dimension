@@ -11,15 +11,10 @@ export const waitingEntryStatus = zeoSchema.enum("waiting_entry_status", ["pendi
 export const chatMessageKind = zeoSchema.enum("chat_message_kind", ["text", "snapshot"]);
 export const gameType = zeoSchema.enum("game_type", ["charades"]);
 export const gameSessionStatus = zeoSchema.enum("game_session_status", ["setup", "active", "ended"]);
-export const gameRoundPhase = zeoSchema.enum("game_round_phase", [
-  "submission",
-  "passed_on",
-  "act",
-  "verdict",
-  "ready_check",
-  "completed",
-]);
+export const gameRoundPhase = zeoSchema.enum("game_round_phase", ["submission", "passed_on", "act", "verdict", "ready_check", "completed"]);
 export const gameVerdict = zeoSchema.enum("game_verdict", ["accepted", "rejected"]);
+export const listeningPlaybackState = zeoSchema.enum("listening_playback_state", ["idle", "playing", "paused", "error"]);
+export const listeningQueueSource = zeoSchema.enum("listening_queue_source", ["library_yt", "library_ytm", "search", "url"]);
 
 export const rooms = zeoSchema.table(
   "rooms",
@@ -156,10 +151,7 @@ export const gameSessions = zeoSchema.table(
     gameType: gameType("game_type").notNull(),
     status: gameSessionStatus("status").default("setup").notNull(),
     teamCount: integer("team_count").notNull(),
-    config: jsonb("config")
-      .$type<Record<string, unknown>>()
-      .default({})
-      .notNull(),
+    config: jsonb("config").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: timestamp("created_at")
       .$default(() => sql`now()`)
       .notNull(),
@@ -168,7 +160,9 @@ export const gameSessions = zeoSchema.table(
   (table) => [
     index("game_sessions_room_id_idx").on(table.roomId),
     index("game_sessions_status_idx").on(table.status),
-    uniqueIndex("game_sessions_one_active_per_room").on(table.roomId).where(sql`${table.status} = 'active'`),
+    uniqueIndex("game_sessions_one_active_per_room")
+      .on(table.roomId)
+      .where(sql`${table.status} = 'active'`),
   ]
 );
 
@@ -289,6 +283,82 @@ export const roomScores = zeoSchema.table(
       .notNull(),
   },
   (table) => [primaryKey({ columns: [table.roomId, table.userId] }), index("room_scores_room_id_idx").on(table.roomId)]
+);
+
+export const youtubeAccountLinks = zeoSchema.table("youtube_account_links", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => auth.user.id, { onDelete: "cascade" }),
+  googleSub: text("google_sub").notNull(),
+  refreshTokenEnc: text("refresh_token_enc").notNull(),
+  accessTokenEnc: text("access_token_enc").notNull(),
+  accessExpiresAt: timestamp("access_expires_at").notNull(),
+  scopes: text("scopes").array().notNull(),
+  linkedAt: timestamp("linked_at")
+    .$default(() => sql`now()`)
+    .notNull(),
+  revokedAt: timestamp("revoked_at"),
+});
+
+export const listeningSessions = zeoSchema.table(
+  "listening_sessions",
+  {
+    id,
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "cascade" }),
+    linkerUserId: uuid("linker_user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    djUserId: uuid("dj_user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    playbackState: listeningPlaybackState("playback_state").default("idle").notNull(),
+    currentQueueItemId: uuid("current_queue_item_id"),
+    positionMs: integer("position_ms").default(0).notNull(),
+    errorMessage: text("error_message"),
+    botIdentity: text("bot_identity").notNull(),
+    createdAt: timestamp("created_at")
+      .$default(() => sql`now()`)
+      .notNull(),
+    endedAt: timestamp("ended_at"),
+  },
+  (table) => [
+    index("listening_sessions_room_id_idx").on(table.roomId),
+    index("listening_sessions_linker_user_id_idx").on(table.linkerUserId),
+    index("listening_sessions_dj_user_id_idx").on(table.djUserId),
+    uniqueIndex("listening_sessions_one_active_per_room")
+      .on(table.roomId)
+      .where(sql`${table.endedAt} IS NULL`),
+  ]
+);
+
+export const listeningQueueItems = zeoSchema.table(
+  "listening_queue_items",
+  {
+    id,
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => listeningSessions.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    videoId: text("video_id").notNull(),
+    title: text("title").notNull(),
+    channelTitle: text("channel_title"),
+    thumbnailUrl: text("thumbnail_url"),
+    durationMs: integer("duration_ms"),
+    source: listeningQueueSource("source").notNull(),
+    addedByUserId: uuid("added_by_user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at")
+      .$default(() => sql`now()`)
+      .notNull(),
+  },
+  (table) => [
+    unique("listening_queue_items_session_position_unique").on(table.sessionId, table.position),
+    index("listening_queue_items_session_id_idx").on(table.sessionId),
+    index("listening_queue_items_added_by_user_id_idx").on(table.addedByUserId),
+  ]
 );
 
 export const operatorSettings = zeoSchema.table("operator_settings", {

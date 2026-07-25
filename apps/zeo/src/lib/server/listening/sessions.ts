@@ -1,0 +1,395 @@
+import { db, schema } from "@pocket-dimension/db";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
+import { listOpenParticipants } from "$lib/server/rooms";
+import { listeningEventBus } from "./event-bus";
+import { buildListeningSnapshot, buildListeningSnapshotForRoom } from "./snapshot";
+import { listeningWorkerBridge } from "./worker-bridge";
+import type { ListeningQueueSource, ListeningSnapshot } from "./types";
+
+const QUEUE_LIMIT = 50;
+const AUTO_SKIP_DELAY_MS = 3_000;
+
+type RoomLike = { id: string; hostUserId: string; livekitRoomName: string };
+type ListeningSession = typeof schema.listeningSessions.$inferSelect;
+
+function codedError(code: string) {
+  return Object.assign(new Error(code), { code });
+}
+
+export async function findActiveListeningSession(roomId: string) {
+  return db.query.listeningSessions.findFirst({
+    where: and(eq(schema.listeningSessions.roomId, roomId), isNull(schema.listeningSessions.endedAt)),
+    orderBy: [desc(schema.listeningSessions.createdAt)],
+  });
+}
+
+export async function getRoomListeningSnapshot(roomId: string): Promise<ListeningSnapshot | null> {
+  return buildListeningSnapshotForRoom(roomId);
+}
+
+export async function publishListeningSnapshot(sessionId: string) {
+  const snapshot = await buildListeningSnapshot(sessionId);
+  if (!snapshot) return null;
+  listeningEventBus.publish(sessionId, snapshot);
+  return snapshot;
+}
+
+async function requireYouTubeLink(userId: string) {
+  const link = await db.query.youtubeAccountLinks.findFirst({
+    where: and(eq(schema.youtubeAccountLinks.userId, userId), isNull(schema.youtubeAccountLinks.revokedAt)),
+  });
+  if (!link) {
+    throw codedError("youtube_link_required");
+  }
+  return link;
+}
+
+export async function startListeningSession(input: { roomId: string; userId: string }) {
+  await requireYouTubeLink(input.userId);
+
+  const existing = await findActiveListeningSession(input.roomId);
+  if (existing) {
+    throw codedError("active_listening_exists");
+  }
+
+  const [session] = await db
+    .insert(schema.listeningSessions)
+    .values({
+      roomId: input.roomId,
+      linkerUserId: input.userId,
+      djUserId: input.userId,
+      playbackState: "idle",
+      currentQueueItemId: null,
+      positionMs: 0,
+      errorMessage: null,
+      botIdentity: `listening-bot:${input.roomId}`,
+      createdAt: new Date(),
+    })
+    .returning();
+
+  const snapshot = await publishListeningSnapshot(session.id);
+  return snapshot!;
+}
+
+export function canEndListeningSession(session: ListeningSession, room: { hostUserId: string }, userId: string) {
+  return userId === room.hostUserId || userId === session.linkerUserId || userId === session.djUserId;
+}
+
+export function requireListeningDj(session: ListeningSession, room: { hostUserId: string }, userId: string) {
+  if (userId !== room.hostUserId && userId !== session.djUserId) {
+    throw codedError("not_listening_dj");
+  }
+}
+
+export async function endListeningSession(input: { roomId: string; sessionId: string }) {
+  await db
+    .update(schema.listeningSessions)
+    .set({ playbackState: "idle", endedAt: new Date(), errorMessage: null })
+    .where(and(eq(schema.listeningSessions.id, input.sessionId), eq(schema.listeningSessions.roomId, input.roomId)));
+
+  await listeningWorkerBridge.stop(input.sessionId);
+
+  const snapshot = await buildListeningSnapshot(input.sessionId);
+  if (snapshot) {
+    listeningEventBus.publish(input.sessionId, snapshot);
+  }
+  listeningEventBus.closeSession(input.sessionId);
+  return snapshot;
+}
+
+export async function endListeningSessionsForLinker(userId: string) {
+  const sessions = await db.query.listeningSessions.findMany({
+    where: and(eq(schema.listeningSessions.linkerUserId, userId), isNull(schema.listeningSessions.endedAt)),
+  });
+
+  for (const session of sessions) {
+    await endListeningSession({ roomId: session.roomId, sessionId: session.id });
+  }
+}
+
+async function activeSessionOrThrow(roomId: string) {
+  const session = await findActiveListeningSession(roomId);
+  if (!session) {
+    throw codedError("no_active_listening");
+  }
+  return session;
+}
+
+async function currentQueueCount(sessionId: string) {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.listeningQueueItems)
+    .where(eq(schema.listeningQueueItems.sessionId, sessionId));
+  return rows[0]?.count ?? 0;
+}
+
+export async function enqueueListeningItem(input: {
+  roomId: string;
+  addedByUserId: string;
+  videoId: string;
+  title?: string;
+  channelTitle?: string | null;
+  thumbnailUrl?: string | null;
+  durationMs?: number | null;
+  source: ListeningQueueSource;
+}) {
+  const session = await activeSessionOrThrow(input.roomId);
+  const count = await currentQueueCount(session.id);
+  if (count >= QUEUE_LIMIT) {
+    throw codedError("queue_limit_reached");
+  }
+
+  const [{ position }] = await db
+    .select({ position: sql<number>`coalesce(max(${schema.listeningQueueItems.position}), -1) + 1` })
+    .from(schema.listeningQueueItems)
+    .where(eq(schema.listeningQueueItems.sessionId, session.id));
+
+  await db.insert(schema.listeningQueueItems).values({
+    sessionId: session.id,
+    position,
+    videoId: input.videoId,
+    title: input.title?.trim() || input.videoId,
+    channelTitle: input.channelTitle ?? null,
+    thumbnailUrl: input.thumbnailUrl ?? null,
+    durationMs: input.durationMs ?? null,
+    source: input.source,
+    addedByUserId: input.addedByUserId,
+    createdAt: new Date(),
+  });
+
+  return publishListeningSnapshot(session.id);
+}
+
+export async function setListeningDj(input: { room: RoomLike; sessionId: string; targetUserId: string }) {
+  const openParticipants = await listOpenParticipants(input.room.id);
+  const isMember = input.room.hostUserId === input.targetUserId || openParticipants.some((participant) => participant.userId === input.targetUserId);
+  if (!isMember) {
+    throw codedError("target_not_room_member");
+  }
+
+  await db
+    .update(schema.listeningSessions)
+    .set({ djUserId: input.targetUserId })
+    .where(
+      and(
+        eq(schema.listeningSessions.id, input.sessionId),
+        eq(schema.listeningSessions.roomId, input.room.id),
+        isNull(schema.listeningSessions.endedAt)
+      )
+    );
+
+  return publishListeningSnapshot(input.sessionId);
+}
+
+async function queueItemById(sessionId: string, itemId: string) {
+  return db.query.listeningQueueItems.findFirst({
+    where: and(eq(schema.listeningQueueItems.sessionId, sessionId), eq(schema.listeningQueueItems.id, itemId)),
+  });
+}
+
+async function firstQueueItem(sessionId: string) {
+  return db.query.listeningQueueItems.findFirst({
+    where: eq(schema.listeningQueueItems.sessionId, sessionId),
+    orderBy: [asc(schema.listeningQueueItems.position), asc(schema.listeningQueueItems.createdAt)],
+  });
+}
+
+async function nextQueueItem(session: ListeningSession) {
+  const current = session.currentQueueItemId ? await queueItemById(session.id, session.currentQueueItemId) : null;
+  if (!current) return firstQueueItem(session.id);
+
+  return db.query.listeningQueueItems.findFirst({
+    where: and(eq(schema.listeningQueueItems.sessionId, session.id), gt(schema.listeningQueueItems.position, current.position)),
+    orderBy: [asc(schema.listeningQueueItems.position), asc(schema.listeningQueueItems.createdAt)],
+  });
+}
+
+async function previousQueueItem(session: ListeningSession) {
+  const current = session.currentQueueItemId ? await queueItemById(session.id, session.currentQueueItemId) : null;
+  if (!current) return firstQueueItem(session.id);
+
+  return (
+    (await db.query.listeningQueueItems.findFirst({
+      where: and(eq(schema.listeningQueueItems.sessionId, session.id), lt(schema.listeningQueueItems.position, current.position)),
+      orderBy: [desc(schema.listeningQueueItems.position), desc(schema.listeningQueueItems.createdAt)],
+    })) ?? current
+  );
+}
+
+async function setIdle(session: ListeningSession) {
+  await db
+    .update(schema.listeningSessions)
+    .set({ playbackState: "idle", currentQueueItemId: null, positionMs: 0, errorMessage: null })
+    .where(eq(schema.listeningSessions.id, session.id));
+  await listeningWorkerBridge.stop(session.id);
+  return publishListeningSnapshot(session.id);
+}
+
+async function playQueueItem(room: RoomLike, session: ListeningSession, item: typeof schema.listeningQueueItems.$inferSelect, positionMs = 0) {
+  await db
+    .update(schema.listeningSessions)
+    .set({
+      playbackState: "playing",
+      currentQueueItemId: item.id,
+      positionMs,
+      errorMessage: null,
+    })
+    .where(and(eq(schema.listeningSessions.id, session.id), isNull(schema.listeningSessions.endedAt)));
+
+  await listeningWorkerBridge.play({
+    sessionId: session.id,
+    roomId: room.id,
+    livekitRoomName: room.livekitRoomName,
+    videoId: item.videoId,
+    positionMs,
+    botIdentity: session.botIdentity,
+  });
+
+  return publishListeningSnapshot(session.id);
+}
+
+export async function playListening(room: RoomLike) {
+  const session = await activeSessionOrThrow(room.id);
+  const current = session.currentQueueItemId ? await queueItemById(session.id, session.currentQueueItemId) : null;
+  if (current && session.playbackState === "paused") {
+    await db
+      .update(schema.listeningSessions)
+      .set({ playbackState: "playing", errorMessage: null })
+      .where(eq(schema.listeningSessions.id, session.id));
+    await listeningWorkerBridge.resume(session.id);
+    return publishListeningSnapshot(session.id);
+  }
+
+  const item = current ?? (await firstQueueItem(session.id));
+  if (!item) return setIdle(session);
+  return playQueueItem(room, session, item, session.currentQueueItemId === item.id ? session.positionMs : 0);
+}
+
+export async function pauseListening(roomId: string) {
+  const session = await activeSessionOrThrow(roomId);
+  await db.update(schema.listeningSessions).set({ playbackState: "paused", errorMessage: null }).where(eq(schema.listeningSessions.id, session.id));
+  await listeningWorkerBridge.pause(session.id);
+  return publishListeningSnapshot(session.id);
+}
+
+export async function seekListening(roomId: string, positionMs: number) {
+  const session = await activeSessionOrThrow(roomId);
+  await db
+    .update(schema.listeningSessions)
+    .set({ positionMs: Math.max(0, positionMs), errorMessage: null })
+    .where(eq(schema.listeningSessions.id, session.id));
+  await listeningWorkerBridge.seek(session.id, Math.max(0, positionMs));
+  return publishListeningSnapshot(session.id);
+}
+
+export async function skipListening(room: RoomLike) {
+  const session = await activeSessionOrThrow(room.id);
+  const item = await nextQueueItem(session);
+  if (!item) return setIdle(session);
+  return playQueueItem(room, session, item, 0);
+}
+
+export async function previousListening(room: RoomLike) {
+  const session = await activeSessionOrThrow(room.id);
+  const item = await previousQueueItem(session);
+  if (!item) return setIdle(session);
+  return playQueueItem(room, session, item, 0);
+}
+
+export async function removeListeningQueueItem(roomId: string, itemId: string) {
+  const session = await activeSessionOrThrow(roomId);
+  const item = await queueItemById(session.id, itemId);
+  if (!item) {
+    throw codedError("queue_item_not_found");
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.listeningQueueItems).where(eq(schema.listeningQueueItems.id, itemId));
+    const remaining = await tx.query.listeningQueueItems.findMany({
+      where: eq(schema.listeningQueueItems.sessionId, session.id),
+      orderBy: [asc(schema.listeningQueueItems.position), asc(schema.listeningQueueItems.createdAt)],
+    });
+    for (let index = 0; index < remaining.length; index++) {
+      await tx.update(schema.listeningQueueItems).set({ position: index }).where(eq(schema.listeningQueueItems.id, remaining[index].id));
+    }
+    if (session.currentQueueItemId === itemId) {
+      await tx
+        .update(schema.listeningSessions)
+        .set({ currentQueueItemId: null, playbackState: "idle", positionMs: 0, errorMessage: null })
+        .where(eq(schema.listeningSessions.id, session.id));
+    }
+  });
+
+  if (session.currentQueueItemId === itemId) {
+    await listeningWorkerBridge.stop(session.id);
+  }
+
+  return publishListeningSnapshot(session.id);
+}
+
+export async function reorderListeningQueue(roomId: string, orderedIds: string[]) {
+  const session = await activeSessionOrThrow(roomId);
+  const items = await db.query.listeningQueueItems.findMany({
+    where: eq(schema.listeningQueueItems.sessionId, session.id),
+    orderBy: [asc(schema.listeningQueueItems.position), asc(schema.listeningQueueItems.createdAt)],
+  });
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const ordered = [
+    ...orderedIds.map((id) => itemById.get(id)).filter((item): item is typeof schema.listeningQueueItems.$inferSelect => Boolean(item)),
+    ...items.filter((item) => !orderedIds.includes(item.id)),
+  ];
+
+  await db.transaction(async (tx) => {
+    for (let index = 0; index < ordered.length; index++) {
+      await tx
+        .update(schema.listeningQueueItems)
+        .set({ position: index + 1000 })
+        .where(eq(schema.listeningQueueItems.id, ordered[index].id));
+    }
+    for (let index = 0; index < ordered.length; index++) {
+      await tx.update(schema.listeningQueueItems).set({ position: index }).where(eq(schema.listeningQueueItems.id, ordered[index].id));
+    }
+  });
+
+  return publishListeningSnapshot(session.id);
+}
+
+export async function updateListeningPlaybackFields(
+  roomId: string,
+  values: Partial<Pick<ListeningSession, "playbackState" | "currentQueueItemId" | "positionMs" | "errorMessage">>
+) {
+  const session = await activeSessionOrThrow(roomId);
+  await db.update(schema.listeningSessions).set(values).where(eq(schema.listeningSessions.id, session.id));
+  return publishListeningSnapshot(session.id);
+}
+
+export async function handleListeningWorkerEvent(input: { sessionId: string; event: "track_ended" | "track_error"; errorMessage?: string | null }) {
+  const session = await db.query.listeningSessions.findFirst({
+    where: and(eq(schema.listeningSessions.id, input.sessionId), isNull(schema.listeningSessions.endedAt)),
+  });
+  if (!session) return null;
+
+  const room = await db.query.rooms.findFirst({
+    where: eq(schema.rooms.id, session.roomId),
+  });
+  if (!room) return null;
+
+  if (input.event === "track_ended") {
+    return skipListening(room);
+  }
+
+  await db
+    .update(schema.listeningSessions)
+    .set({
+      playbackState: "error",
+      errorMessage: input.errorMessage ?? "Track failed",
+    })
+    .where(eq(schema.listeningSessions.id, session.id));
+  const snapshot = await publishListeningSnapshot(session.id);
+
+  setTimeout(() => {
+    void skipListening(room);
+  }, AUTO_SKIP_DELAY_MS);
+
+  return snapshot;
+}

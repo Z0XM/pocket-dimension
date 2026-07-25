@@ -11,6 +11,7 @@
   import GridSettingsPanel from "./GridSettingsPanel.svelte";
   import type { DetectedGesture, HandLandmark } from "$lib/gestures/gesture-types";
   import type { GameSnapshotTeam } from "$lib/server/game/types";
+  import type { ListeningSnapshot } from "$lib/server/listening/types";
   import type { TileMediaStats } from "$lib/livekit/tile-stats";
 
   type Props = {
@@ -58,6 +59,14 @@
     onCloseGridSettings?: () => void;
     layoutLocked?: boolean;
     gameTeams?: GameSnapshotTeam[];
+    listeningSnapshot?: ListeningSnapshot | null;
+    listeningIsDj?: boolean;
+    listeningBusy?: boolean;
+    onListeningPlay?: () => void;
+    onListeningPause?: () => void;
+    onListeningSkip?: () => void;
+    onListeningPrevious?: () => void;
+    onListeningSeek?: (positionMs: number) => void;
     stageRef?: HTMLElement | null;
     trackingOverlayVisible?: boolean;
     handLandmarks?: HandLandmark[] | null;
@@ -110,6 +119,14 @@
     onCloseGridSettings,
     layoutLocked = false,
     gameTeams = [],
+    listeningSnapshot = null,
+    listeningIsDj = false,
+    listeningBusy = false,
+    onListeningPlay,
+    onListeningPause,
+    onListeningSkip,
+    onListeningPrevious,
+    onListeningSeek,
     stageRef = $bindable(null),
     trackingOverlayVisible = false,
     handLandmarks = null,
@@ -195,6 +212,14 @@
         {handGesture}
         {handGestureHoldProgress}
         {gameTeams}
+        {listeningSnapshot}
+        {listeningIsDj}
+        {listeningBusy}
+        {onListeningPlay}
+        {onListeningPause}
+        {onListeningSkip}
+        {onListeningPrevious}
+        {onListeningSeek}
       />
     {/snippet}
   </StageGridArea>
@@ -208,7 +233,7 @@
       {galleryDensity}
       {sidebarSplitRatio}
       {selfViewHidden}
-      layoutLocked={layoutLocked}
+      {layoutLocked}
       {onLayoutModeChange}
       {onAutoLayoutPresetChange}
       {onHideNonVideoTilesChange}

@@ -4,6 +4,7 @@
   import { computeAutoLayoutFrames, type AutoLayoutPreset } from "$lib/call/auto-layout";
   import { computeGameLayoutFrames, teamColorByUserId } from "$lib/call/game-layout";
   import type { GameSnapshotTeam } from "$lib/server/game/types";
+  import type { ListeningSnapshot } from "$lib/server/listening/types";
   import { gridPlacementsKey, readStored, writeStored } from "$lib/browser-storage";
   import { displayNameForParticipant } from "$lib/livekit/screen-share";
   import { tileColorForParticipant, type ParticipantColor } from "$lib/participant-colors";
@@ -29,6 +30,7 @@
   import GridTile from "./GridTile.svelte";
   import ParticipantTile from "./ParticipantTile.svelte";
   import ScreenShareTile from "./ScreenShareTile.svelte";
+  import ListeningTile from "./ListeningTile.svelte";
   import TileActionBar from "./TileActionBar.svelte";
   import type { DetectedGesture, HandLandmark } from "$lib/gestures/gesture-types";
 
@@ -70,6 +72,14 @@
     handGesture?: DetectedGesture;
     handGestureHoldProgress?: number;
     gameTeams?: GameSnapshotTeam[];
+    listeningSnapshot?: ListeningSnapshot | null;
+    listeningIsDj?: boolean;
+    listeningBusy?: boolean;
+    onListeningPlay?: () => void;
+    onListeningPause?: () => void;
+    onListeningSkip?: () => void;
+    onListeningPrevious?: () => void;
+    onListeningSeek?: (positionMs: number) => void;
   };
 
   const {
@@ -110,14 +120,29 @@
     handGesture = "none",
     handGestureHoldProgress = 0,
     gameTeams = [],
+    listeningSnapshot = null,
+    listeningIsDj = false,
+    listeningBusy = false,
+    onListeningPlay,
+    onListeningPause,
+    onListeningSkip,
+    onListeningPrevious,
+    onListeningSeek,
   }: Props = $props();
 
   const isManualGrid = $derived(layoutMode === "grid");
   const isGameLayout = $derived(layoutMode === "game");
+  const listeningActive = $derived(Boolean(listeningSnapshot?.session && !listeningSnapshot.session.endedAt));
 
   const gridTiles = $derived.by((): StageTileEntry[] => {
     mediaRevision;
-    return filterStageTiles(buildStageTiles(room), { hideNonVideo: hideNonVideoTiles });
+    return filterStageTiles(
+      buildStageTiles(room, {
+        listeningActive,
+        listeningBotIdentity: listeningSnapshot?.session?.botIdentity ?? null,
+      }),
+      { hideNonVideo: hideNonVideoTiles }
+    );
   });
 
   const stageTiles = $derived.by(() => {
@@ -168,9 +193,7 @@
 
   const gameTeamColors = $derived(teamColorByUserId(gameTeams));
 
-  const canRenderTiles = $derived(
-    Boolean(gridLayout && (isGameLayout ? gameLayoutFrames : isManualGrid ? baseParticipantGrid : autoLayoutFrames))
-  );
+  const canRenderTiles = $derived(Boolean(gridLayout && (isGameLayout ? gameLayoutFrames : isManualGrid ? baseParticipantGrid : autoLayoutFrames)));
 
   $effect(() => {
     if (!isManualGrid) {
@@ -459,7 +482,22 @@
               />
             {/snippet}
 
-            {#if tile.kind === "screen-share"}
+            {#if tile.kind === "listening"}
+              <ListeningTile
+                snapshot={listeningSnapshot}
+                isDj={listeningIsDj}
+                busy={listeningBusy}
+                audioLevel={audioLevels[tile.participant.identity] ?? audioLevels[tile.key] ?? 0}
+                listenVolume={tileVolumeForKey(tileVolumes, tile.key)}
+                {speakersEnabled}
+                onPlay={onListeningPlay}
+                onPause={onListeningPause}
+                onSkip={onListeningSkip}
+                onPrevious={onListeningPrevious}
+                onSeek={onListeningSeek}
+                onListenVolumeChange={(volume) => onTileVolumeChange?.(tile.key, volume)}
+              />
+            {:else if tile.kind === "screen-share"}
               {@const isLocalShare = tile.participant.identity === room.localParticipant.identity}
               {@const localShareParticipant = isLocalShare ? (tile.participant as LocalParticipant) : null}
               <ScreenShareTile

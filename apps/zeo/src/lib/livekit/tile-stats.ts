@@ -17,7 +17,7 @@ export const EMPTY_TILE_STATS: TileMediaStats = {
 
 export type TileStatsTarget = {
   key: string;
-  kind: "participant" | "screen-share";
+  kind: "participant" | "screen-share" | "listening";
   identity: string;
 };
 
@@ -65,9 +65,7 @@ function extractVideoFields(report: RTCStatsReport | null, direction: Direction)
     }
 
     const match =
-      direction === "inbound"
-        ? stat.type === "inbound-rtp" && stat.kind === "video"
-        : stat.type === "outbound-rtp" && stat.kind === "video";
+      direction === "inbound" ? stat.type === "inbound-rtp" && stat.kind === "video" : stat.type === "outbound-rtp" && stat.kind === "video";
     if (!match) continue;
 
     if (typeof stat.frameWidth === "number") width = stat.frameWidth;
@@ -97,9 +95,7 @@ function extractAudioKbps(report: RTCStatsReport | null, direction: Direction, s
 
   for (const stat of report.values()) {
     const match =
-      direction === "inbound"
-        ? stat.type === "inbound-rtp" && stat.kind === "audio"
-        : stat.type === "outbound-rtp" && stat.kind === "audio";
+      direction === "inbound" ? stat.type === "inbound-rtp" && stat.kind === "audio" : stat.type === "outbound-rtp" && stat.kind === "audio";
     if (!match) continue;
 
     const bitrate = (stat as { bitrate?: number }).bitrate;
@@ -131,7 +127,7 @@ function captureDimensions(participant: Participant, source: Track.Source) {
 
 async function statsForParticipant(
   participant: LocalParticipant | RemoteParticipant,
-  kind: "participant" | "screen-share",
+  kind: "participant" | "screen-share" | "listening",
   roomPingMs: number | null
 ): Promise<TileMediaStats> {
   const direction: Direction = participant.isLocal ? "outbound" : "inbound";
@@ -161,8 +157,7 @@ export async function collectTileStats(room: Room, tiles: ReadonlyArray<TileStat
 
   await Promise.all(
     tiles.map(async (tile) => {
-      const participant =
-        tile.identity === room.localParticipant.identity ? room.localParticipant : room.remoteParticipants.get(tile.identity);
+      const participant = tile.identity === room.localParticipant.identity ? room.localParticipant : room.remoteParticipants.get(tile.identity);
       if (!participant) {
         result[tile.key] = { ...EMPTY_TILE_STATS, pingMs: roomPingMs };
         return;

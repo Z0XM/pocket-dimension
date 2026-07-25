@@ -1,0 +1,251 @@
+import { db, schema } from "@pocket-dimension/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { error } from "@sveltejs/kit";
+import { env } from "$lib/server/env";
+import { decryptToken, encryptToken } from "./tokens";
+import { refreshYouTubeAccessToken } from "./youtube-oauth";
+import type { ListeningQueueSource } from "./types";
+
+const DATA_API_URL = "https://www.googleapis.com/youtube/v3";
+const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
+
+export type YouTubeVideoResult = {
+  videoId: string;
+  title: string;
+  channelTitle: string | null;
+  thumbnailUrl: string | null;
+  durationMs: number | null;
+  source: ListeningQueueSource;
+};
+
+export type YouTubePlaylist = {
+  id: string;
+  title: string;
+  thumbnailUrl: string | null;
+  itemCount: number | null;
+  source: "library_yt";
+};
+
+export async function getYouTubeAccessTokenForUser(userId: string) {
+  const link = await db.query.youtubeAccountLinks.findFirst({
+    where: and(eq(schema.youtubeAccountLinks.userId, userId), isNull(schema.youtubeAccountLinks.revokedAt)),
+  });
+  if (!link) return null;
+
+  if (link.accessExpiresAt.getTime() > Date.now() + 60_000) {
+    return decryptToken(link.accessTokenEnc);
+  }
+
+  const refreshToken = decryptToken(link.refreshTokenEnc);
+  const refreshed = await refreshYouTubeAccessToken(refreshToken);
+  await db
+    .update(schema.youtubeAccountLinks)
+    .set({
+      accessTokenEnc: encryptToken(refreshed.accessToken),
+      accessExpiresAt: refreshed.accessExpiresAt,
+      scopes: refreshed.scopes,
+      revokedAt: null,
+    })
+    .where(eq(schema.youtubeAccountLinks.userId, userId));
+
+  return refreshed.accessToken;
+}
+
+export async function requireYouTubeAccessTokenForUser(userId: string) {
+  const accessToken = await getYouTubeAccessTokenForUser(userId);
+  if (!accessToken) {
+    throw error(403, "YouTube account is not linked");
+  }
+  return accessToken;
+}
+
+export function parseYouTubeVideoId(input: string) {
+  const value = input.trim();
+  if (YOUTUBE_ID_PATTERN.test(value)) return value;
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+
+  if (url.hostname === "youtu.be") {
+    const id = url.pathname.split("/").filter(Boolean)[0];
+    return id && YOUTUBE_ID_PATTERN.test(id) ? id : null;
+  }
+
+  if (!/(^|\.)youtube\.com$/.test(url.hostname)) {
+    return null;
+  }
+
+  const watchId = url.searchParams.get("v");
+  if (watchId && YOUTUBE_ID_PATTERN.test(watchId)) return watchId;
+
+  const [kind, id] = url.pathname.split("/").filter(Boolean);
+  if ((kind === "shorts" || kind === "embed" || kind === "live") && id && YOUTUBE_ID_PATTERN.test(id)) {
+    return id;
+  }
+
+  return null;
+}
+
+function durationToMs(duration: string | undefined) {
+  if (!duration) return null;
+  const match = duration.match(/^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+  if (!match) return null;
+
+  const [, days = "0", hours = "0", minutes = "0", seconds = "0"] = match;
+  return Number(days) * 24 * 60 * 60 * 1000 + Number(hours) * 60 * 60 * 1000 + Number(minutes) * 60 * 1000 + Number(seconds) * 1000;
+}
+
+function bestThumbnail(thumbnails: unknown) {
+  if (!thumbnails || typeof thumbnails !== "object") return null;
+  const values = Object.values(thumbnails as Record<string, { url?: string; width?: number }>);
+  return values.sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0]?.url ?? null;
+}
+
+async function youtubeFetch<T>(path: string, params: Record<string, string>, accessToken?: string): Promise<T> {
+  const url = new URL(`${DATA_API_URL}/${path}`);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+
+  const headers: HeadersInit = {};
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  } else if (env.YOUTUBE_DATA_API_KEY) {
+    url.searchParams.set("key", env.YOUTUBE_DATA_API_KEY);
+  } else {
+    throw error(503, "YouTube Data API credentials are not configured");
+  }
+
+  const response = await fetch(url, { headers });
+  const body = (await response.json().catch(() => ({}))) as T & { error?: { message?: string } };
+  if (!response.ok) {
+    throw error(response.status, body.error?.message ?? "YouTube Data API request failed");
+  }
+  return body;
+}
+
+export async function listYouTubePlaylists(userId: string): Promise<YouTubePlaylist[]> {
+  const accessToken = await requireYouTubeAccessTokenForUser(userId);
+  const body = await youtubeFetch<{
+    items?: Array<{
+      id: string;
+      snippet?: { title?: string; thumbnails?: unknown };
+      contentDetails?: { itemCount?: number };
+    }>;
+  }>("playlists", { part: "snippet,contentDetails", mine: "true", maxResults: "50" }, accessToken);
+
+  return [
+    { id: "LL", title: "Liked videos", thumbnailUrl: null, itemCount: null, source: "library_yt" },
+    ...(body.items ?? []).map((item) => ({
+      id: item.id,
+      title: item.snippet?.title ?? "Untitled playlist",
+      thumbnailUrl: bestThumbnail(item.snippet?.thumbnails),
+      itemCount: item.contentDetails?.itemCount ?? null,
+      source: "library_yt" as const,
+    })),
+  ];
+}
+
+export async function listYouTubePlaylistItems(userId: string, playlistId: string): Promise<YouTubeVideoResult[]> {
+  const accessToken = await requireYouTubeAccessTokenForUser(userId);
+  const body = await youtubeFetch<{
+    items?: Array<{
+      snippet?: {
+        title?: string;
+        channelTitle?: string;
+        thumbnails?: unknown;
+        resourceId?: { videoId?: string };
+      };
+      contentDetails?: { videoId?: string };
+    }>;
+  }>("playlistItems", { part: "snippet,contentDetails", playlistId, maxResults: "50" }, accessToken);
+
+  const ids = (body.items ?? [])
+    .map((item) => item.contentDetails?.videoId ?? item.snippet?.resourceId?.videoId)
+    .filter((id): id is string => Boolean(id));
+  const metadata = await videoMetadataMap(ids, accessToken);
+
+  const results: YouTubeVideoResult[] = [];
+  for (const item of body.items ?? []) {
+    const videoId = item.contentDetails?.videoId ?? item.snippet?.resourceId?.videoId;
+    if (!videoId) continue;
+    const details = metadata.get(videoId);
+    results.push({
+      videoId,
+      title: item.snippet?.title ?? details?.title ?? "Untitled video",
+      channelTitle: item.snippet?.channelTitle ?? details?.channelTitle ?? null,
+      thumbnailUrl: bestThumbnail(item.snippet?.thumbnails) ?? details?.thumbnailUrl ?? null,
+      durationMs: details?.durationMs ?? null,
+      source: "library_yt",
+    });
+  }
+
+  return results;
+}
+
+export async function searchYouTubeVideos(query: string, accessToken?: string): Promise<YouTubeVideoResult[]> {
+  const body = await youtubeFetch<{
+    items?: Array<{
+      id?: { videoId?: string };
+      snippet?: { title?: string; channelTitle?: string; thumbnails?: unknown };
+    }>;
+  }>(
+    "search",
+    { part: "snippet", q: query, type: "video", maxResults: "10", safeSearch: "none" },
+    env.YOUTUBE_DATA_API_KEY ? undefined : accessToken
+  );
+
+  const ids = (body.items ?? []).map((item) => item.id?.videoId).filter((id): id is string => Boolean(id));
+  const metadata = await videoMetadataMap(ids, accessToken);
+
+  const results: YouTubeVideoResult[] = [];
+  for (const item of body.items ?? []) {
+    const videoId = item.id?.videoId;
+    if (!videoId) continue;
+    const details = metadata.get(videoId);
+    results.push({
+      videoId,
+      title: item.snippet?.title ?? details?.title ?? "Untitled video",
+      channelTitle: item.snippet?.channelTitle ?? details?.channelTitle ?? null,
+      thumbnailUrl: bestThumbnail(item.snippet?.thumbnails) ?? details?.thumbnailUrl ?? null,
+      durationMs: details?.durationMs ?? null,
+      source: "search",
+    });
+  }
+
+  return results;
+}
+
+export async function resolveYouTubeVideo(videoId: string, accessToken?: string): Promise<YouTubeVideoResult | null> {
+  return (await videoMetadataMap([videoId], accessToken)).get(videoId) ?? null;
+}
+
+async function videoMetadataMap(videoIds: string[], accessToken?: string) {
+  if (videoIds.length === 0) return new Map<string, YouTubeVideoResult>();
+
+  const body = await youtubeFetch<{
+    items?: Array<{
+      id: string;
+      snippet?: { title?: string; channelTitle?: string; thumbnails?: unknown };
+      contentDetails?: { duration?: string };
+    }>;
+  }>("videos", { part: "snippet,contentDetails", id: [...new Set(videoIds)].join(",") }, accessToken);
+
+  return new Map(
+    (body.items ?? []).map((item) => [
+      item.id,
+      {
+        videoId: item.id,
+        title: item.snippet?.title ?? "Untitled video",
+        channelTitle: item.snippet?.channelTitle ?? null,
+        thumbnailUrl: bestThumbnail(item.snippet?.thumbnails),
+        durationMs: durationToMs(item.contentDetails?.duration),
+        source: "search" as const,
+      },
+    ])
+  );
+}
