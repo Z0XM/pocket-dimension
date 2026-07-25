@@ -3,7 +3,7 @@
 **Goal:** Consolidate share controls onto the stream tile, add per-tile listen volume, global A/V quality prefs, optional per-tile stats, and a speech-friendly level meter.
 
 **Spec:** `specs/spec-stream-media-controls/SPEC.md`  
-**Suggested sprint entry:** after current backlog; stories below map 1:1 to CAP-1…CAP-5 with a thin stats spike story first if needed.
+**Suggested sprint entry:** after current backlog; stories below map 1:1 to CAP-1…CAP-5.
 
 ---
 
@@ -15,11 +15,13 @@
 
 **Acceptance criteria**
 
-- [ ] Control bar exposes a single Share start/stop control; “Share tab audio only” removed from bar and overflow
+- [ ] Control bar exposes a single Share start/stop control; “Share tab audio only” fully removed (no menu/long-press fallback)
 - [ ] Starting Share requests display capture with audio when supported; both share toggles default on when tracks exist
 - [ ] Local stream tile has controls to turn video sharing on/off and audio sharing on/off independently
+- [ ] Video off + audio on = audio-only share for remotes
+- [ ] **Both toggles off stops sharing** (capture torn down; bar returns to idle)
 - [ ] Remote participants see muted/absent tracks when local toggles turn media off
-- [ ] Stop Share ends the capture session; single-sharer policy unchanged
+- [ ] Single-sharer policy unchanged
 - [ ] Keyboard/screen-reader labels present for new controls
 
 **Primary files:** `ControlBar.svelte`, `CallExperience.svelte`, `screen-share.ts`, `ScreenShareTile.svelte`
@@ -39,24 +41,25 @@
 - [ ] Global speaker mute forces silence; unmuting restores prior per-tile volumes
 - [ ] Listen-mute action sets volume to 0 / restores previous nonzero value
 - [ ] Local tiles do not offer a self-listen volume slider
-- [ ] Volumes are session-scoped (survive participant reorder, clear on leave)
+- [ ] Volumes **persist across sessions** in `localStorage` keyed by tile identity + kind (`{identity}` / `screen-share:{identity}`)
+- [ ] When a matching tile reappears, its slider and LiveKit volume restore from storage
 
-**Primary files:** `ParticipantTile.svelte`, `ScreenShareTile.svelte`, `tile-listen-mute.ts`, `CallExperience.svelte`, `VideoGrid.svelte`
+**Primary files:** `ParticipantTile.svelte`, `ScreenShareTile.svelte`, `tile-listen-mute.ts`, `CallExperience.svelte`, `browser-storage.ts`, `VideoGrid.svelte`
 
 ---
 
 ### Story 16.3 — Global audio/video quality in Settings
 
 **Capabilities:** CAP-3  
-**I want** audio and video quality presets in Settings,  
+**I want** concrete audio and video quality caps in Settings,  
 **So that** one choice shapes all of my streams.
 
 **Acceptance criteria**
 
-- [ ] In-call Settings includes Video quality and Audio quality presets (Low / Medium / High)
-- [ ] High video ≤720p; Medium/Low step down capture/encode (and/or subscribe quality) for all relevant streams
-- [ ] Audio presets map to LiveKit audio publish/subscribe quality knobs used project-wide for that user
-- [ ] Preference persists via new `STORAGE_KEYS` and reapplies on join
+- [ ] In-call Settings includes Video quality: `360p` / `480p` / `720p` / `1080p` (labels = caps, not Low/Medium/High)
+- [ ] Audio quality: `24 kbps` / `48 kbps` / `96 kbps` / `128 kbps` (mapped to LiveKit audio presets)
+- [ ] Choice applies to all of that user’s relevant publish/subscribe streams
+- [ ] Preference persists via `STORAGE_KEYS` and reapplies on join (defaults `720p` / `48 kbps`)
 - [ ] Changing preset mid-call updates active streams with at most a brief camera republish blip
 
 **Primary files:** `CallExperience.svelte`, `room-client.ts`, `browser-storage.ts`, device/publish helpers
@@ -66,12 +69,12 @@
 ### Story 16.4 — Per-tile stats overlay + Settings toggle
 
 **Capabilities:** CAP-4  
-**I want** ping and A/V quality numbers on each tile, with a master off switch,  
+**I want** ping, video quality, audio quality, and fps on each tile, with a master off switch,  
 **So that** I can diagnose call health without clutter when I do not need it.
 
 **Acceptance criteria**
 
-- [ ] Top-left overlay on each stage tile shows ping (ms), video quality number(s), audio quality number(s)
+- [ ] Top-left overlay on each stage tile shows **ping (ms)**, **video quality number**, **audio quality number (kbps)**, and **fps**
 - [ ] Missing metrics render as `—` without breaking layout
 - [ ] Settings toggle “Show tile stats” shows/hides overlay on all tiles for this user
 - [ ] Preference persists in `localStorage` (default on)
@@ -102,10 +105,10 @@
 ## Suggested implementation order
 
 1. **16.5** — isolated, low risk, unlocks nicer CAP-2 UI  
-2. **16.2** — volume beside meter  
+2. **16.2** — volume beside meter + persistence  
 3. **16.1** — share consolidation (most behavior risk)  
-4. **16.3** — quality presets  
-5. **16.4** — stats (may need short RTC stats spike; can split spike tasks into the story)
+4. **16.3** — quality caps  
+5. **16.4** — stats (RTC stats wiring)
 
 ## Sprint status keys (for later `sprint-status.yaml`)
 
