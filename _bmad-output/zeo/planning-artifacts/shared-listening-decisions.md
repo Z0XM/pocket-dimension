@@ -15,11 +15,22 @@
 | “Screen-share YT Music tab → zeo reads title/art/seek/queue” | **False.** `getDisplayMedia` yields pixels + audio only. No Media Session bridge from other tabs. |
 | “Stream YT Music audio through LiveKit / extract audio from videos” | **Violates YouTube API ToS** (no separating audio; must preserve standard player experience). |
 
-**What Premium *does* help with (in-browser):** if a participant is signed into Google with YouTube/YT Music Premium in that browser profile, **their** YouTube iframe playback may be ad-light / background-eligible per Google’s product rules. zeo cannot assume every participant has Premium; sync and UX must tolerate ads and autoplay gates.
-
 **Viable official path:** **YouTube IFrame Player API** (+ optional **YouTube Data API v3** for search/metadata). Most YouTube Music catalog tracks map to a playable **YouTube `videoId`**. Product copy should say **“YouTube”** (or “YouTube / Music links”), not claim native YouTube Music app control.
 
 **Rejected for zeo:** InnerTube / ytmusicapi / yt-dlp / unofficial stream URLs into the SFU. Fragile, ToS-hostile, ops burden, Premium cookies become a credential risk.
+
+### Ads & whose account plays
+
+| Question | Answer |
+|----------|--------|
+| Whose account plays the video? | **Each participant’s own browser / Google session** — not the DJ’s, not a zeo service account. The iframe is YouTube’s player inside that user’s browser; cookies decide signed-in vs logged-out. |
+| Does zeo “log in as” the Premium user for everyone? | **No.** There is no supported way to inject the DJ’s Premium into other people’s embeds. |
+| Will the player show ads? | **Often yes for non‑Premium / signed-out viewers.** YouTube decides per viewer. zeo cannot disable ads (ToS forbids blocking/modifying ads). |
+| What does *my* Premium do? | If **that viewer** is signed into Google in the same browser with **YouTube Premium** (or a plan that includes ad-free YouTube), **their** embed is typically ad-free. **YouTube Music–only** plans in some regions may **not** remove video ads — Music Premium ≠ always YouTube Premium. |
+| Sync impact | If DJ is Premium (no pre-roll) and a listener gets a 15s ad, **positions diverge**. MVP must tolerate this (re-sync after ad, or “waiting on ad” UI). Room cannot guarantee identical timelines unless **every** listener is ad-free. |
+| Data API key | Used only for **search/metadata** on the server. It is **not** a playback identity and does not buy ad-free for clients. |
+
+**Product implication:** Shared Listening is “same track, roughly same time,” not bit-identical broadcast. For a friend group where everyone has YouTube Premium and is signed in, the experience is close to seamless; mixed Premium/free rooms will feel ad-skewed.
 
 ---
 
