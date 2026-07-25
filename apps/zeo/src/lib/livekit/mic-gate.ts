@@ -19,6 +19,21 @@ export type MicGateController = {
   destroy: () => void;
 };
 
+function scheduleFrame(callback: () => void): number {
+  if (typeof globalThis.requestAnimationFrame === "function") {
+    return globalThis.requestAnimationFrame(callback);
+  }
+  return globalThis.setTimeout(callback, 16) as unknown as number;
+}
+
+function cancelFrame(id: number) {
+  if (typeof globalThis.cancelAnimationFrame === "function") {
+    globalThis.cancelAnimationFrame(id);
+    return;
+  }
+  globalThis.clearTimeout(id);
+}
+
 export function createMicGateController(audioContext: AudioContext): MicGateController {
   const analyser = audioContext.createAnalyser();
   analyser.fftSize = 256;
@@ -39,6 +54,8 @@ export function createMicGateController(audioContext: AudioContext): MicGateCont
   let cutoff = 0.05;
   let gateOpen = true;
   let gateFrame = 0;
+  let gateGeneration = 0;
+  let alive = true;
 
   volumeGain.gain.value = volume;
   gateGain.gain.value = 1;
@@ -50,7 +67,11 @@ export function createMicGateController(audioContext: AudioContext): MicGateCont
     gateGain.gain.value = 1;
   }
 
-  function updateGate() {
+  function updateGate(generation: number) {
+    if (!alive || generation !== gateGeneration) {
+      return;
+    }
+
     if (!source) {
       gateGain.gain.value = 0;
       return;
@@ -69,17 +90,20 @@ export function createMicGateController(audioContext: AudioContext): MicGateCont
     }
 
     gateGain.gain.value = gateOpen ? 1 : 0;
-    gateFrame = requestAnimationFrame(updateGate);
+    gateFrame = scheduleFrame(() => updateGate(generation));
   }
 
   function startGateLoop() {
-    cancelAnimationFrame(gateFrame);
-    gateFrame = requestAnimationFrame(updateGate);
+    cancelFrame(gateFrame);
+    gateGeneration += 1;
+    const generation = gateGeneration;
+    gateFrame = scheduleFrame(() => updateGate(generation));
   }
 
   function stopGateLoop() {
-    cancelAnimationFrame(gateFrame);
+    cancelFrame(gateFrame);
     gateFrame = 0;
+    gateGeneration += 1;
   }
 
   return {
@@ -96,7 +120,7 @@ export function createMicGateController(audioContext: AudioContext): MicGateCont
 
       if (!track) return;
 
-      source = audioContext.createMediaStreamSource(new MediaStream([track]));
+      source = audioContext.createMediaStreamSource(new globalThis.MediaStream([track]));
       source.connect(analyser);
       startGateLoop();
     },
@@ -108,6 +132,7 @@ export function createMicGateController(audioContext: AudioContext): MicGateCont
       return measureAudioLevel(analyser, levelSamples);
     },
     destroy() {
+      alive = false;
       stopGateLoop();
       disconnectSource();
       analyser.disconnect();
