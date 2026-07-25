@@ -7,7 +7,6 @@
     Track,
     VideoQuality,
     type ConnectionQuality,
-    type LocalAudioTrack,
     type LocalTrackPublication,
     type Room,
     supportsAudioOutputSelection,
@@ -28,6 +27,7 @@
     wasRoomDeleted,
     type ConnectionPhase,
   } from "$lib/livekit/room-client";
+  import { disableLocalMicrophone, enableLocalMicrophoneWithGate } from "$lib/livekit/local-mic";
   import { attachAllRemoteAudioTracks } from "$lib/livekit/remote-audio";
   import {
     applyAllTileListenVolumes,
@@ -716,7 +716,7 @@
     const gen = inCallMicTestSyncGen;
 
     setRoomSpeakerMuted(livekitRoom, true);
-    await livekitRoom.localParticipant.setMicrophoneEnabled(false);
+    await disableLocalMicrophone(livekitRoom);
     if (gen !== inCallMicTestSyncGen) return;
 
     try {
@@ -945,25 +945,16 @@
 
     try {
       await ensureRoomAudio(livekitRoom, "enable_local_mic");
-      await livekitRoom.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
+      // Always rebuild the gate on unmute so WebAudio/capture is reconnected cleanly.
+      const attached = await enableLocalMicrophoneWithGate(livekitRoom, {
+        deviceId: audioDeviceId || undefined,
+        createProcessor: createFreshMicGateProcessor,
+        onGateFallback: () => {
+          showToast("Noise gate unavailable — using direct microphone input");
+        },
+      });
+      micGateProcessor = attached ?? createFreshMicGateProcessor();
       micDeviceError = null;
-
-      if (!micGateProcessor) return;
-
-      try {
-        await attachMicGateProcessor(livekitRoom, micGateProcessor);
-      } catch {
-        const publication = livekitRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
-        const track = publication?.track;
-        if (track && track.kind === Track.Kind.Audio) {
-          try {
-            await (track as LocalAudioTrack).stopProcessor();
-          } catch {
-            // Keep the raw microphone track if processor teardown fails.
-          }
-        }
-        showToast("Noise gate unavailable — using direct microphone input");
-      }
     } catch (error) {
       micDeviceError = deviceErrorMessage(error, "microphone");
       micEnabled = false;
@@ -1584,7 +1575,7 @@
       if (phase === "lobby" || phase === "waiting_admission") {
         syncPreviewTracks(previewStream, { audio: false, video: camEnabled });
       } else if (livekitRoom) {
-        await livekitRoom.localParticipant.setMicrophoneEnabled(false);
+        await disableLocalMicrophone(livekitRoom);
       }
       return;
     }

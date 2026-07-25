@@ -9,6 +9,8 @@ export type MicGateProcessor = TrackProcessor<Track.Kind.Audio, AudioProcessorOp
 export function createMicGateProcessor(initial?: { volume?: number; cutoff?: number }): MicGateProcessor {
   let controller: MicGateController | null = null;
   let processedTrack: MediaStreamTrack | undefined;
+  /** Retained across restart — LiveKit's track reacquire path omits audioContext in restart opts. */
+  let audioContext: AudioContext | undefined;
 
   const processor: MicGateProcessor = {
     name: "zeo-mic-gate",
@@ -20,11 +22,17 @@ export function createMicGateProcessor(initial?: { volume?: number; cutoff?: num
       controller?.setCutoff(cutoff);
     },
     async init(opts) {
-      if (opts.audioContext.state === "suspended") {
-        await opts.audioContext.resume();
+      const nextContext = opts.audioContext ?? audioContext;
+      if (!nextContext) {
+        throw new Error("Audio context is required to initialize the mic gate processor");
+      }
+      audioContext = nextContext;
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
       }
 
-      controller = createMicGateController(opts.audioContext);
+      controller = createMicGateController(audioContext);
       if (initial?.volume !== undefined) {
         controller.setVolume(initial.volume);
       }
@@ -43,8 +51,15 @@ export function createMicGateProcessor(initial?: { volume?: number; cutoff?: num
       processor.processedTrack = processedTrack;
     },
     async restart(opts) {
+      const nextContext = opts.audioContext ?? audioContext;
+      if (!nextContext) {
+        throw new Error("Audio context is required to restart the mic gate processor");
+      }
       await processor.destroy();
-      await processor.init(opts);
+      await processor.init({
+        ...opts,
+        audioContext: nextContext,
+      });
     },
     async destroy() {
       controller?.destroy();
