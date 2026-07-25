@@ -19,6 +19,25 @@
 
 **Rejected for zeo:** InnerTube / ytmusicapi / yt-dlp / unofficial stream URLs into the SFU. Fragile, ToS-hostile, ops burden, Premium cookies become a credential risk.
 
+### Alternative considered: server headless browser (single source)
+
+**Idea:** Run Chrome (Playwright/Puppeteer) on the VPS → open YouTube / YT Music → room controls that browser remotely → capture tab A/V → publish into LiveKit so everyone hears/sees the **same** stream.
+
+**Technically:** Feasible in principle. LiveKit’s own egress stack already does “headless Chrome + Xvfb + PulseAudio → encode.” A zeo “DJ bot” participant could publish that capture into the room; control surface stays HTTP/SSE (click, paste URL, next). Perfect A/V sync; ads happen once.
+
+**Why we still reject it for zeo MVP (and recommend against as the product path):**
+
+| Issue | Detail |
+|-------|--------|
+| YouTube ToS | Automating YT/YTM, capturing playback, and **redistributing** that media to other users is outside the allowed IFrame/Data API model. High ban / legal risk. |
+| Account / Premium | The headless session must be **logged into someone’s Google account**. Streaming that Premium session to up to 6 people is account sharing / multi-access abuse. Storing Google cookies on the server is a credential-security hazard (2FA, theft, session revocation). |
+| Bot / CAPTCHA | Google actively challenges automated Chrome on YT Music; headless breaks often. |
+| VPS cost | ~1 Chrome + virtual display + encode per active listen room. On Hostinger **KVM 2** (already LiveKit + Postgres + apps, ≤2 rooms), this is heavy and noisy under load. LiveKit docs ballpark web-capture paths around **multiple CPU cores** per job. |
+| Latency / quality | Extra encode hop (browser → PCM/RGB → WebRTC) vs each client hitting YouTube CDN. Music still OK; not free. |
+| Ops | Persistent browser profiles, crash recovery, display servers, audio sinks — a second product’s worth of infra. |
+
+**Verdict:** Solves sync/ads elegantly on paper; **wrong fit** for zeo’s scale, ToS posture, and KVM 2. Prefer per-client IFrame + SSE sync. Revisit only if Google ships an official multi-user / Connect-style API.
+
 ### Ads & whose account plays
 
 | Question | Answer |
@@ -231,6 +250,7 @@ Mirror game-mode authz: room membership required; DJ checks on transport routes.
 - Screen-share metadata detection
 - Karaoke pitch / stem separation
 - Server-side audio mixing into the call
+- **Server headless browser** as the shared playback source (see §0 alternative)
 
 ---
 
