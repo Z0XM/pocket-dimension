@@ -29,15 +29,31 @@ RUN apt-get update \
   && ffmpeg -version | head -n 1 \
   && yt-dlp --version
 
+# Root + every workspace package.json (required for bun.lock / frozen install).
+# Root .dockerignore may omit other apps' sources but must keep these manifests.
 COPY package.json bun.lock turbo.json ./
-COPY scripts ./scripts
-COPY shared ./shared
-COPY apps ./apps
+COPY scripts/package.json ./scripts/
+COPY shared/auth/package.json ./shared/auth/
+COPY shared/db/package.json ./shared/db/
+COPY shared/utils/package.json ./shared/utils/
+COPY apps/auth-service/package.json ./apps/auth-service/
+COPY apps/chhan-chhan/package.json ./apps/chhan-chhan/
+COPY apps/howwasyourday/package.json ./apps/howwasyourday/
+COPY apps/markitdown/package.json ./apps/markitdown/
+COPY apps/me-via-you/package.json ./apps/me-via-you/
+COPY apps/pocket/package.json ./apps/pocket/
+COPY apps/rhymes/package.json ./apps/rhymes/
+COPY apps/watchlist/package.json ./apps/watchlist/
+COPY apps/zeo/package.json ./apps/zeo/
+COPY apps/zeo-music-worker/package.json ./apps/zeo-music-worker/
 
 # Install before NODE_ENV=production — production env can make bun want lockfile changes
 RUN bun install --frozen-lockfile
 
 ENV NODE_ENV=production
+
+# Worker runtime sources only
+COPY apps/zeo-music-worker ./apps/zeo-music-worker
 
 WORKDIR /app/apps/zeo-music-worker
 EXPOSE 3010
