@@ -13,9 +13,10 @@ Cloudflare DNS
   zeo-livekit-turn.z0xm.com → DNS only → Traefik → LiveKit TURN TLS (:5349)
 
 Dokploy (Hostinger VPS)
-  Application: zeo           (Railpack)
-  Application: auth-service  (existing — required)
-  Template: LiveKit          (livekit + redis; egress/ingress optional)
+  Application: zeo               (Railpack)
+  Application: zeo-music-worker  (Dockerfile — ffmpeg + yt-dlp; internal only)
+  Application: auth-service      (existing — required)
+  Template: LiveKit              (livekit + redis; egress/ingress optional)
   Database: PostgreSQL 18
 ```
 
@@ -148,6 +149,47 @@ Deploy and verify:
 curl -sf https://zeo.z0xm.com/health
 # {"status":"ok","app":"zeo"}
 ```
+
+For **Shared Listening**, also set Google OAuth + worker env (see [../env/production.env.example](../env/production.env.example)) and deploy the music-worker in the next step.
+
+## 5b. Deploy zeo-music-worker (Dockerfile)
+
+Shared Listening needs **`ffmpeg`** and **`yt-dlp`** on the worker image. Railpack does not provide them — use the dedicated Dockerfile.
+
+Full detail: [../../../zeo-music-worker/README.md](../../../zeo-music-worker/README.md).
+
+1. Dokploy → **Applications** → **Create**
+2. **Source:** same Git repo / branch as zeo
+3. **Build type:** **Dockerfile** (not Railpack)
+4. **Dockerfile path:** `apps/zeo-music-worker/Dockerfile`
+5. **Build context:** `/` (repo root)
+6. **Port:** `3010`
+7. **Public domain:** none (internal only)
+
+Worker env:
+
+```env
+PORT=3010
+MUSIC_WORKER_SECRET=<shared secret>
+ZEO_APP_URL=https://zeo.z0xm.com
+```
+
+On the **zeo** app, add:
+
+```env
+MUSIC_WORKER_URL=http://<music-worker-hostname>:3010
+MUSIC_WORKER_SECRET=<same shared secret>
+```
+
+Verify (Dokploy → music-worker → Terminal):
+
+```bash
+which ffmpeg yt-dlp
+curl -sS http://127.0.0.1:3010/health
+# expect "ffmpeg": true, "ytDlp": true
+```
+
+`yt-dlp` is pinned to **latest** at image build time. Rebuild/redeploy the worker periodically when YouTube extractors break.
 
 ## 6. Deploy LiveKit (Dokploy template)
 
