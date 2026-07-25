@@ -23,6 +23,8 @@ bun run --filter @pocket-dimension/zeo-music-worker dev
 
 Railpack images do **not** include `ffmpeg` / `yt-dlp`. Deploy this worker as a **Dockerfile** app.
 
+The image uses **`oven/bun:1.3.5-slim`** (same as root `packageManager`). If Dokploy fails with `lockfile is frozen`, confirm the Dockerfile on the deployed branch includes that tag and does **not** set `NODE_ENV=production` before `bun install`.
+
 ### Dokploy settings
 
 | Setting | Value |
