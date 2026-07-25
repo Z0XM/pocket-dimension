@@ -70,9 +70,28 @@ Dokploy: upload the file as a mount (e.g. `/cookies/youtube.txt`) or paste into 
 ### zeo env (pair)
 
 ```env
+<<<<<<< HEAD
 # Dokploy Swarm: service name only (strip .1.<taskid> from docker ps)
+=======
+# Swarm: service name only (strip .1.<taskid> from docker ps Names)
+>>>>>>> origin/main
 MUSIC_WORKER_URL=http://pocketdimension-zeomusicworker-XXXXXX:3010
 MUSIC_WORKER_SECRET=<same secret>
+```
+
+<<<<<<< HEAD
+Both apps must share `dokploy-network`. From zeo’s terminal:
+
+```bash
+curl -sS http://pocketdimension-zeomusicworker-XXXXXX:3010/health
+```
+
+=======
+On Dokploy/Swarm, `docker ps` shows **task** names like `…-qqj6xp.1.abc123`. Those change every redeploy and cause `ConnectionRefused`. Use the stable **service** name (`…-qqj6xp`).
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Networks}}" | grep -i music
+docker service ls | grep -i music
 ```
 
 Both apps must share `dokploy-network`. From zeo’s terminal:
@@ -81,6 +100,7 @@ Both apps must share `dokploy-network`. From zeo’s terminal:
 curl -sS http://pocketdimension-zeomusicworker-XXXXXX:3010/health
 ```
 
+>>>>>>> origin/main
 ### Verify in container
 
 ```bash

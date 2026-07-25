@@ -179,7 +179,8 @@ YTDLP_COOKIES_FILE=/cookies/youtube.txt
 On the **zeo** app, add:
 
 ```env
-MUSIC_WORKER_URL=http://<music-worker-container-name>:3010
+# Dokploy Swarm: use the SERVICE name only (no .1.<taskid> suffix)
+MUSIC_WORKER_URL=http://pocketdimension-zeomusicworker-XXXXXX:3010
 MUSIC_WORKER_SECRET=<same shared secret>
 ```
 
@@ -187,29 +188,34 @@ MUSIC_WORKER_SECRET=<same shared secret>
 
 `ConnectionRefused` / `FailedToOpenSocket` usually means zeo and the worker are on **different Docker networks**, or the hostname is wrong.
 
+**Dokploy Swarm hostnames:** `docker ps` shows task names like:
+
+```text
+pocketdimension-zeomusicworker-qqj6xp.1.6jno8bfba3pkr8n1ic06rpfki
+```
+
+Do **not** put that full string in `MUSIC_WORKER_URL` — the `.1.<id>` task dies on every redeploy. Use the **service** name (strip `.1.…`):
+
+```env
+MUSIC_WORKER_URL=http://pocketdimension-zeomusicworker-qqj6xp:3010
+```
+
 1. Both apps must be on **`dokploy-network`** (Dokploy often only attaches apps that have a domain).
-2. Find the real container name (SSH on the VPS):
+2. Find the service / task name (SSH on the VPS):
 
 ```bash
 docker ps --format "table {{.Names}}\t{{.Networks}}" | grep -i music
+docker service ls | grep -i music
 ```
 
-Use that **Names** value in `MUSIC_WORKER_URL` (not a guess like `zeo-music-worker` unless it matches).
-
-3. From the **zeo** container terminal, test:
+3. From the **zeo** container terminal, test the **service** name (not the task id):
 
 ```bash
-getent hosts <music-worker-container-name>
-curl -sS http://<music-worker-container-name>:3010/health
+getent hosts pocketdimension-zeomusicworker-qqj6xp
+curl -sS http://pocketdimension-zeomusicworker-qqj6xp:3010/health
 ```
 
-If DNS fails, connect the worker to the shared network (SSH):
-
-```bash
-docker network connect dokploy-network <music-worker-container-name>
-```
-
-Then redeploy or keep that connect, and set `MUSIC_WORKER_URL` to the working name.
+If DNS fails, ensure both services are on `dokploy-network` (Dokploy app Advanced / networks, or attach a domain so Dokploy joins the network).
 
 Verify tools (Dokploy → music-worker → Terminal):
 
