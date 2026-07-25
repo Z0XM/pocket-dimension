@@ -11,10 +11,10 @@
     "lint": "prettier --check ."
   },
   "dependencies": {
-    "@livekit/rtc-node": "^0.13.31"
+    "@livekit/rtc-node": "0.13.31"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "latest"
+    "@types/bun": "^1.3.5",
+    "typescript": "^5.9.3"
   }
 }

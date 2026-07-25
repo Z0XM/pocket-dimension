@@ -23,11 +23,9 @@ bun run --filter @pocket-dimension/zeo-music-worker dev
 
 Railpack images do **not** include `ffmpeg` / `yt-dlp`. Deploy this worker as a **Dockerfile** app.
 
-The image uses **`oven/bun:1.3.5-slim`** (same as root `packageManager`).
+The image uses **`oven/bun:1.3.5-slim`** (debian/glibc — required by `@livekit/rtc-node`; Alpine/musl will not work).
 
-If Dokploy fails with `lockfile is frozen`:
-1. Confirm this Dockerfile sets `NODE_ENV=production` **after** `bun install`
-2. Confirm root `.dockerignore` keeps every workspace `package.json` (it may omit other apps’ sources, but not their manifests — otherwise Bun rewrites the lockfile)
+The Dockerfile installs the worker as a **standalone** package (`bun install --production` on `apps/zeo-music-worker/package.json` only). It does **not** run a monorepo `bun install --frozen-lockfile`, which was failing in Dokploy on unrelated workspace packages.
 
 ### Dokploy settings
 
