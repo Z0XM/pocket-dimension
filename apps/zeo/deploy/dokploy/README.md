@@ -177,14 +177,42 @@ ZEO_APP_URL=https://zeo.z0xm.com
 On the **zeo** app, add:
 
 ```env
-MUSIC_WORKER_URL=http://<music-worker-hostname>:3010
+MUSIC_WORKER_URL=http://<music-worker-container-name>:3010
 MUSIC_WORKER_SECRET=<same shared secret>
 ```
 
-Verify (Dokploy → music-worker → Terminal):
+### Networking (required)
+
+`ConnectionRefused` / `FailedToOpenSocket` usually means zeo and the worker are on **different Docker networks**, or the hostname is wrong.
+
+1. Both apps must be on **`dokploy-network`** (Dokploy often only attaches apps that have a domain).
+2. Find the real container name (SSH on the VPS):
 
 ```bash
-which ffmpeg yt-dlp
+docker ps --format "table {{.Names}}\t{{.Networks}}" | grep -i music
+```
+
+Use that **Names** value in `MUSIC_WORKER_URL` (not a guess like `zeo-music-worker` unless it matches).
+
+3. From the **zeo** container terminal, test:
+
+```bash
+getent hosts <music-worker-container-name>
+curl -sS http://<music-worker-container-name>:3010/health
+```
+
+If DNS fails, connect the worker to the shared network (SSH):
+
+```bash
+docker network connect dokploy-network <music-worker-container-name>
+```
+
+Then redeploy or keep that connect, and set `MUSIC_WORKER_URL` to the working name.
+
+Verify tools (Dokploy → music-worker → Terminal):
+
+```bash
+ls -la /usr/bin/ffmpeg /usr/local/bin/yt-dlp
 curl -sS http://127.0.0.1:3010/health
 # expect "ffmpeg": true, "ytDlp": true
 ```
