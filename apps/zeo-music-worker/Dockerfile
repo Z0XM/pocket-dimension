@@ -34,10 +34,10 @@ RUN apt-get update \
   && ffmpeg -version | head -n 1 \
   && yt-dlp --version
 
-# Standalone package root (not the monorepo) — only worker runtime deps
+# Standalone package root (not the monorepo) — only worker runtime deps.
+# Do not run `bun pm ls` here: there is no lockfile in this image context.
 COPY apps/zeo-music-worker/package.json ./
 RUN bun install --production --ignore-scripts \
-  && bun pm ls \
   && test -e node_modules/@livekit/rtc-node
 
 ENV NODE_ENV=production
