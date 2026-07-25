@@ -172,6 +172,8 @@ Worker env:
 PORT=3010
 MUSIC_WORKER_SECRET=<shared secret>
 ZEO_APP_URL=https://zeo.z0xm.com
+# Required on most VPS IPs — Netscape youtube.com cookies (see apps/zeo-music-worker/README.md)
+YTDLP_COOKIES_FILE=/cookies/youtube.txt
 ```
 
 On the **zeo** app, add:
