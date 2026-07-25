@@ -289,9 +289,15 @@ DJ handoff polish, playlist enqueue-all (capped), richer app catalog metadata, w
 
 ---
 
-## 9. Next steps
+## 9. Artifacts & next steps
 
-1. **Spike** (Phase 0) — prove resolve + bot audio  
-2. **SPEC** `shared-listening` (+ companion for Games and Apps shell) **or** short PRD addendum  
-3. Implement shell rename (1a) in parallel with spike if desired  
-4. Architecture note: `architecture-shared-listening.md` (worker deploy beside LiveKit)
+**Written:**
+
+- PRD: `prds/prd-zeo-shared-listening-2026-07-25/` (`prd.md`, `addendum.md`)
+- SPEC: `specs/spec-shared-listening/` (`SPEC.md` + brownfield, stack, ux, stories)
+
+**Next:**
+
+1. **Spike** (Phase 0 / Story S0) — prove resolve + bot audio  
+2. Implement shell (S1) in parallel with spike if desired  
+3. Optional: `architecture-shared-listening.md` (worker deploy beside LiveKit)
