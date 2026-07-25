@@ -37,12 +37,12 @@
     tileVolumeForKey,
   } from "$lib/livekit/tile-listen-mute";
   import { createMicGateProcessor, type MicGateProcessor } from "$lib/livekit/mic-gate-processor";
+  import { applyLocalAudioExportQuality, applyLocalVideoExportQuality } from "$lib/livekit/apply-media-quality";
   import {
     DEFAULT_AUDIO_QUALITY,
     DEFAULT_VIDEO_QUALITY,
     isAudioQualityOption,
     isVideoQualityOption,
-    roomOptionsForMediaQuality,
     videoPresetForOption,
     type AudioQualityOption,
     type VideoQualityOption,
@@ -797,54 +797,20 @@
     }
   }
 
-  function syncRoomMediaQualityOptions(nextVideo: VideoQualityOption, nextAudio: AudioQualityOption) {
-    const room = livekitRoom;
-    if (!room) return roomOptionsForMediaQuality(nextVideo, nextAudio);
-
-    const options = roomOptionsForMediaQuality(nextVideo, nextAudio);
-    room.options.videoCaptureDefaults = {
-      ...room.options.videoCaptureDefaults,
-      ...options.videoCaptureDefaults,
-    };
-    room.options.publishDefaults = {
-      ...room.options.publishDefaults,
-      ...options.publishDefaults,
-    };
-    return options;
-  }
-
   async function applyVideoQualityPreference(nextVideo: VideoQualityOption) {
     const room = livekitRoom;
     if (!room || room.state !== "connected") return;
 
-    syncRoomMediaQualityOptions(nextVideo, audioQuality);
-    const videoPreset = videoPresetForOption(nextVideo);
-    const publishQuality = subscribedVideoQualityFor(nextVideo);
-
-    // Restart capture in place — do NOT toggle mic (that was cutting call audio).
-    const cameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.videoTrack;
-    if (cameraTrack && room.localParticipant.isCameraEnabled) {
-      try {
-        await cameraTrack.restartTrack({
-          deviceId: videoDeviceId || undefined,
-          resolution: videoPreset.resolution,
-        });
-        cameraTrack.setPublishingQuality(publishQuality);
-      } catch {
-        showToast("Could not apply video quality to the camera");
-      }
+    try {
+      // Republish camera/screen with the selected capture + encode caps (export quality).
+      await applyLocalVideoExportQuality(room, nextVideo, audioQuality, {
+        videoDeviceId: videoDeviceId || undefined,
+      });
+      applySubscribedVideoQuality(room, nextVideo);
+    } catch {
+      showToast("Could not apply video quality");
     }
 
-    const screenVideoTrack = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
-    if (screenVideoTrack) {
-      try {
-        screenVideoTrack.setPublishingQuality(publishQuality);
-      } catch {
-        // Best-effort — dynacast may already manage layers.
-      }
-    }
-
-    applySubscribedVideoQuality(room, nextVideo);
     bumpMediaRevision();
     void refreshTileStats(room);
   }
@@ -853,40 +819,17 @@
     const room = livekitRoom;
     if (!room || room.state !== "connected") return;
 
-    const options = syncRoomMediaQualityOptions(videoQuality, nextAudio);
-    const micPublication = room.localParticipant.getTrackPublication(Track.Source.Microphone);
-    const micTrack = micPublication?.audioTrack;
-    if (!micTrack || !room.localParticipant.isMicrophoneEnabled) {
-      bumpMediaRevision();
-      return;
-    }
-
-    // Republish the same track with the new audio preset — never leave mic disabled on failure.
     try {
-      try {
-        await micTrack.stopProcessor();
-      } catch {
-        // Processor may already be absent.
-      }
-
-      await room.localParticipant.unpublishTrack(micTrack, false);
-      await room.localParticipant.publishTrack(micTrack, {
-        source: Track.Source.Microphone,
-        audioPreset: options.publishDefaults.audioPreset,
-      });
-
-      if (micGateProcessor) {
-        try {
+      // Republish mic/screen-audio with the selected bitrate cap (export quality).
+      await applyLocalAudioExportQuality(room, videoQuality, nextAudio, {
+        attachMicGate: async () => {
+          if (!micGateProcessor) return;
           await attachMicGateProcessor(room, micGateProcessor);
-        } catch {
-          // Keep raw mic if gate fails.
-        }
-      }
-
+        },
+      });
       await ensureRoomAudio(room, "audio_quality_change");
       applyRoomSpeakerState(room);
     } catch {
-      // Best-effort recovery so the user is not stuck silent.
       try {
         await room.localParticipant.setMicrophoneEnabled(true, micCaptureOptions());
         if (micGateProcessor) {
