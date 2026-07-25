@@ -84,3 +84,11 @@ development_status:
   8-2-scheduled-rooms: done
   8-3-operator-configuration: done
   epic-8-retrospective: optional
+
+  epic-16: done
+  16-1-single-share-control-and-tile-av-toggles: done
+  16-2-per-tile-output-volume-slider: done
+  16-3-global-audio-video-quality-settings: done
+  16-4-per-tile-stats-overlay-and-toggle: done
+  16-5-nonlinear-audio-level-display: done
+  epic-16-retrospective: optional

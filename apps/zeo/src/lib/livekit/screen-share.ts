@@ -1,4 +1,12 @@
-import { Track, type LocalParticipant, type LocalTrack, type RemoteParticipant, type Room, type ScreenShareCaptureOptions } from "livekit-client";
+import {
+  isLocalParticipant,
+  Track,
+  type LocalParticipant,
+  type LocalTrack,
+  type RemoteParticipant,
+  type Room,
+  type ScreenShareCaptureOptions,
+} from "livekit-client";
 import { listRoomParticipants } from "./room-client";
 
 /** Skip LiveKit's default 1080p ideal constraints — some browsers reject them with NotSupportedError. */
@@ -21,7 +29,7 @@ const AUDIO_ONLY_CAPTURE_ATTEMPTS: Array<{ label: string; options: ScreenShareCa
   { label: "tab_audio", options: SCREEN_CAPTURE_WITH_TAB_AUDIO },
 ];
 
-/** Unpublished display-capture video kept alive so tab/system audio can continue. */
+/** Unpublished display-capture video kept alive so tab/system audio can continue (legacy audio-only path). */
 const heldScreenCaptureVideoTracks = new WeakMap<LocalParticipant, LocalTrack>();
 
 export type ScreenShareStartResult = {
@@ -43,8 +51,26 @@ export function isScreenShareAudioOnlyActive(participant: LocalParticipant | Rem
   return isScreenShareAudioActive(participant) && !isScreenShareActive(participant);
 }
 
+function hasScreenSharePublication(participant: LocalParticipant | RemoteParticipant) {
+  return Boolean(participant.getTrackPublication(Track.Source.ScreenShare)?.track);
+}
+
+function hasScreenShareAudioPublication(participant: LocalParticipant | RemoteParticipant) {
+  return Boolean(participant.getTrackPublication(Track.Source.ScreenShareAudio)?.track);
+}
+
+function hasHeldScreenCaptureVideo(local: LocalParticipant) {
+  return heldScreenCaptureVideoTracks.has(local);
+}
+
+/** True while any screen/display capture media is still held or published (including muted). */
 export function isScreenCaptureActive(participant: LocalParticipant | RemoteParticipant) {
-  return isScreenShareActive(participant) || isScreenShareAudioOnlyActive(participant);
+  if (hasScreenSharePublication(participant) || hasScreenShareAudioPublication(participant)) {
+    return true;
+  }
+
+  // Local-only held video from the legacy audio-only capture path.
+  return isLocalParticipant(participant) && hasHeldScreenCaptureVideo(participant);
 }
 
 function screenShareAudioPublished(local: LocalParticipant) {
@@ -110,6 +136,10 @@ export function screenShareFailureMessage(error: unknown): string {
 
   if (isMissingScreenShareAudioError(error)) {
     return "Enable Share audio in the browser picker to share tab sound only";
+  }
+
+  if (error instanceof Error && error.message === "screen_share_audio_unavailable") {
+    return "Share audio was not granted in the browser picker — stop and share again with audio enabled";
   }
 
   const unavailable = screenShareUnavailableReason();
@@ -179,7 +209,6 @@ export async function enableLocalScreenShare(local: LocalParticipant): Promise<S
       if (!isRetriableScreenShareError(error)) {
         throw error;
       }
-
     }
   }
 
@@ -192,7 +221,7 @@ export async function enableLocalScreenAudioShare(local: LocalParticipant): Prom
     throw new Error(unavailable);
   }
 
-  if (isScreenShareActive(local)) {
+  if (hasScreenSharePublication(local) || isScreenShareActive(local)) {
     await disableLocalScreenShare(local);
   }
 
@@ -224,7 +253,6 @@ export async function enableLocalScreenAudioShare(local: LocalParticipant): Prom
       if (!isRetriableScreenShareError(error) && !isMissingScreenShareAudioError(error)) {
         throw error;
       }
-
     }
   }
 
@@ -232,7 +260,9 @@ export async function enableLocalScreenAudioShare(local: LocalParticipant): Prom
 }
 
 export async function disableLocalScreenShare(local: LocalParticipant) {
-  await local.setScreenShareEnabled(false);
+  if (hasScreenSharePublication(local) || isScreenShareActive(local)) {
+    await local.setScreenShareEnabled(false);
+  }
   stopHeldScreenCaptureVideo(local);
 }
 
@@ -241,14 +271,86 @@ export async function disableLocalScreenAudioShare(local: LocalParticipant) {
   stopHeldScreenCaptureVideo(local);
 }
 
+/** Full teardown: published (muted or not) tracks + any held capture video. */
 export async function disableLocalScreenCapture(local: LocalParticipant) {
-  if (isScreenShareActive(local)) {
-    await disableLocalScreenShare(local);
+  if (hasScreenSharePublication(local) || isScreenShareActive(local)) {
+    await local.setScreenShareEnabled(false);
+  }
+  await unpublishScreenShareAudio(local);
+  stopHeldScreenCaptureVideo(local);
+}
+
+/** True when display capture granted audio (published, including muted). */
+export function isScreenShareAudioAvailable(local: LocalParticipant) {
+  return hasScreenShareAudioPublication(local);
+}
+
+/**
+ * Toggle screen video sharing via mute/unmute when a publication exists.
+ * Turning video off with no audio (and no muted audio to keep) stops the whole share.
+ */
+export async function setLocalScreenShareVideoEnabled(local: LocalParticipant, enabled: boolean) {
+  const publication = local.getTrackPublication(Track.Source.ScreenShare);
+
+  if (enabled) {
+    if (publication?.track) {
+      if (publication.isMuted) {
+        await publication.unmute();
+      }
+      return;
+    }
+
+    const heldVideo = heldScreenCaptureVideoTracks.get(local);
+    if (heldVideo) {
+      await local.publishTrack(heldVideo, { source: Track.Source.ScreenShare });
+      heldScreenCaptureVideoTracks.delete(local);
+      return;
+    }
+
+    await enableLocalScreenShare(local);
     return;
   }
 
-  if (isScreenShareAudioOnlyActive(local)) {
-    await disableLocalScreenAudioShare(local);
+  if (publication?.track && !publication.isMuted) {
+    await publication.mute();
+  }
+
+  // Both off (no unmuted audio) → full stop, including held tracks.
+  if (!isScreenShareAudioActive(local)) {
+    await disableLocalScreenCapture(local);
+  }
+}
+
+/**
+ * Toggle screen audio sharing via mute/unmute so it can be turned back on.
+ * Turning audio off with no video stops the whole share.
+ */
+export async function setLocalScreenShareAudioEnabled(local: LocalParticipant, enabled: boolean) {
+  const publication = local.getTrackPublication(Track.Source.ScreenShareAudio);
+
+  if (enabled) {
+    if (publication?.track) {
+      if (publication.isMuted) {
+        await publication.unmute();
+      }
+      return;
+    }
+    throw new Error("screen_share_audio_unavailable");
+  }
+
+  if (publication?.track && !publication.isMuted) {
+    await publication.mute();
+  }
+
+  if (!isScreenShareActive(local)) {
+    await disableLocalScreenCapture(local);
+  }
+}
+
+/** After a tile toggle, stop sharing if neither video nor audio remains unmuted. */
+export async function stopShareIfNoMedia(local: LocalParticipant) {
+  if (!isScreenShareActive(local) && !isScreenShareAudioActive(local)) {
+    await disableLocalScreenCapture(local);
   }
 }
 

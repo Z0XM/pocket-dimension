@@ -21,7 +21,7 @@
 - Do not exceed **2 concurrent rooms** or **6 participants per room** — enforce before LiveKit token mint.
 - Use **SFU (LiveKit)**, never pure P2P mesh for group calls.
 - **One active screen share** at a time.
-- Cap video at **720p**; prefer **480p** when 5–6 on camera.
+- Default/recommended video **720p**; prefer **480p** when 5–6 on camera. User-selectable quality may go up to **1080p** (see `specs/spec-stream-media-controls/`).
 - Dev port: **3008**. PostgreSQL schema: **`zeo`**.
 
 ## Access rules
@@ -45,6 +45,8 @@
 All specs live under `_bmad-output/zeo/planning-artifacts/`.
 
 Phase 4 (Game Mode): see `prd-zeo-game-mode-2026-07-12/`, `ux-zeo-game-mode-2026-07-12/`, `architecture-game-mode.md`, `epics-game-mode.md`.
+
+Stream media controls (tile share toggles, per-tile volume, A/V quality, tile stats, nonlinear level meter): `specs/spec-stream-media-controls/` (Epic 16 stories in `stories.md`).
 
 ## Implementation order
 

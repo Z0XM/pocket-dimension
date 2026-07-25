@@ -15,6 +15,10 @@ export const STORAGE_KEYS = {
   sidebarSplitRatio: "zeo:sidebar-split-ratio",
   gesturesEnabled: "zeo:gestures-enabled",
   gestureOverlayVisible: "zeo:gesture-overlay-visible",
+  videoQuality: "zeo:video-quality",
+  audioQuality: "zeo:audio-quality",
+  showTileStats: "zeo:show-tile-stats",
+  tileVolumes: "zeo:tile-volumes",
 } as const;
 
 export const SESSION_KEYS = {
@@ -120,6 +124,33 @@ export function clearActiveCallSession() {
 
   try {
     sessionStorage.removeItem(SESSION_KEYS.activeCall);
+  } catch {
+    // Ignore storage failures
+  }
+}
+
+export function readStoredTileVolumes(): Record<string, number> {
+  const raw = readStored(STORAGE_KEYS.tileVolumes);
+  if (!raw) return {};
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object") return {};
+
+    const volumes: Record<string, number> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value !== "number" || !Number.isFinite(value)) continue;
+      volumes[key] = Math.min(100, Math.max(0, Math.round(value)));
+    }
+    return volumes;
+  } catch {
+    return {};
+  }
+}
+
+export function writeStoredTileVolumes(volumes: Record<string, number>) {
+  try {
+    writeStored(STORAGE_KEYS.tileVolumes, JSON.stringify(volumes));
   } catch {
     // Ignore storage failures
   }
