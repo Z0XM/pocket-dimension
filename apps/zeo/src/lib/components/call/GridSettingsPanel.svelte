@@ -6,19 +6,21 @@
   import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import type { StageLayoutMode } from "$lib/stage-grid";
 
+  type LayoutOption = "grid" | AutoLayoutPreset;
+
   type Props = {
     layoutMode: StageLayoutMode;
     autoLayoutPreset: AutoLayoutPreset;
     bottomInset?: number;
     hideNonVideoTiles?: boolean;
-    galleryDensity?: number;
     sidebarSplitRatio?: number;
+    speakerMainRatio?: number;
     selfViewHidden?: boolean;
     onLayoutModeChange: (mode: StageLayoutMode) => void;
     onAutoLayoutPresetChange: (preset: AutoLayoutPreset) => void;
     onHideNonVideoTilesChange?: (value: boolean) => void;
-    onGalleryDensityChange?: (value: number) => void;
     onSidebarSplitRatioChange?: (value: number) => void;
+    onSpeakerMainRatioChange?: (value: number) => void;
     onHideSelfView?: () => void;
     onClose: () => void;
     layoutLocked?: boolean;
@@ -29,24 +31,39 @@
     autoLayoutPreset,
     bottomInset = 0,
     hideNonVideoTiles = false,
-    galleryDensity = 5,
     sidebarSplitRatio = 0.72,
+    speakerMainRatio = 0.72,
     selfViewHidden = false,
     onLayoutModeChange,
     onAutoLayoutPresetChange,
     onHideNonVideoTilesChange,
-    onGalleryDensityChange,
     onSidebarSplitRatioChange,
+    onSpeakerMainRatioChange,
     onHideSelfView,
     onClose,
     layoutLocked = false,
   }: Props = $props();
 
-  const manualGrid = $derived(layoutMode === "grid");
-  const viewLabel = $derived(manualGrid ? "Grid View" : "Auto View");
   const panelBottomPx = $derived(Math.max(16, bottomInset + 16));
-  const showGalleryDensity = $derived(!manualGrid && (autoLayoutPreset === "gallery" || autoLayoutPreset === "dynamic"));
-  const showSidebarSplit = $derived(!manualGrid && (autoLayoutPreset === "sidebar" || autoLayoutPreset === "dynamic"));
+  const showSidebarSplit = $derived(layoutMode === "auto" && autoLayoutPreset === "sidebar");
+  const showSpeakerMain = $derived(layoutMode === "auto" && autoLayoutPreset === "speaker");
+
+  const layoutOptions: Array<{ id: LayoutOption; label: string }> = [{ id: "grid", label: "Grid" }, ...AUTO_LAYOUT_PRESETS];
+
+  function isSelected(option: LayoutOption) {
+    if (option === "grid") return layoutMode === "grid";
+    return layoutMode === "auto" && autoLayoutPreset === option;
+  }
+
+  function selectLayout(option: LayoutOption) {
+    if (layoutLocked) return;
+    if (option === "grid") {
+      onLayoutModeChange("grid");
+      return;
+    }
+    onLayoutModeChange("auto");
+    onAutoLayoutPresetChange(option);
+  }
 </script>
 
 <div
@@ -60,22 +77,24 @@
     </button>
   </div>
 
-  <div class="rounded-lg border border-border px-3">
-    <SettingToggle
-      id="manual-grid-layout"
-      label={viewLabel}
-      tooltip={layoutLocked
-        ? "End the game to change layout settings."
-        : manualGrid
-          ? "Grid View shows the stage grid and lets you drag and resize tiles."
-          : "Auto View arranges and sizes tiles automatically without grid guides."}
-      checked={manualGrid}
-      disabled={layoutLocked}
-      onCheckedChange={(checked) => {
-        if (layoutLocked) return;
-        onLayoutModeChange(checked ? "grid" : "auto");
-      }}
-    />
+  <div class="space-y-2">
+    <p class="text-xs font-medium text-foreground">Layout</p>
+    <div class="grid grid-cols-2 gap-2">
+      {#each layoutOptions as option (option.id)}
+        <button
+          type="button"
+          class="rounded-lg border px-3 py-2 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-50 {isSelected(option.id)
+            ? 'border-primary bg-primary/10 text-foreground'
+            : 'border-border bg-secondary/30 text-muted-foreground hover:border-primary/30 hover:bg-secondary/60 hover:text-foreground'}"
+          aria-pressed={isSelected(option.id)}
+          disabled={layoutLocked}
+          title={layoutLocked ? "End the game to change layout settings." : undefined}
+          onclick={() => selectLayout(option.id)}
+        >
+          <span class="block text-sm font-medium">{option.label}</span>
+        </button>
+      {/each}
+    </div>
   </div>
 
   {#if onHideSelfView}
@@ -106,61 +125,41 @@
     </div>
   {/if}
 
-  {#if !manualGrid}
+  {#if showSpeakerMain && onSpeakerMainRatioChange}
     <div class="mt-4 space-y-2">
-      <p class="text-xs font-medium text-foreground">Layout</p>
-      <div class="grid grid-cols-2 gap-2">
-        {#each AUTO_LAYOUT_PRESETS as preset (preset.id)}
-          <button
-            type="button"
-            class="rounded-lg border px-3 py-2 text-left transition-colors {autoLayoutPreset === preset.id
-              ? 'border-primary bg-primary/10 text-foreground'
-              : 'border-border bg-secondary/30 text-muted-foreground hover:border-primary/30 hover:bg-secondary/60 hover:text-foreground'}"
-            aria-pressed={autoLayoutPreset === preset.id}
-            onclick={() => onAutoLayoutPresetChange(preset.id)}
-          >
-            <span class="block text-sm font-medium">{preset.label}</span>
-          </button>
-        {/each}
+      <div class="flex items-center justify-between text-xs">
+        <span class="font-medium text-foreground">Main stage height</span>
+        <span class="text-muted-foreground">{Math.round(speakerMainRatio * 100)}%</span>
       </div>
+      <input
+        type="range"
+        min="0.55"
+        max="0.85"
+        step="0.01"
+        value={speakerMainRatio}
+        class="w-full accent-primary"
+        aria-label="Speaker main stage height"
+        oninput={(event) => onSpeakerMainRatioChange(Number.parseFloat((event.currentTarget as HTMLInputElement).value))}
+      />
     </div>
+  {/if}
 
-    {#if showGalleryDensity && onGalleryDensityChange}
-      <div class="mt-4 space-y-2">
-        <div class="flex items-center justify-between text-xs">
-          <span class="font-medium text-foreground">Gallery density</span>
-          <span class="text-muted-foreground">{galleryDensity}/10</span>
-        </div>
-        <input
-          type="range"
-          min="1"
-          max="10"
-          step="1"
-          value={galleryDensity}
-          class="w-full accent-primary"
-          aria-label="Gallery density"
-          oninput={(event) => onGalleryDensityChange(Number.parseInt((event.currentTarget as HTMLInputElement).value, 10))}
-        />
+  {#if showSidebarSplit && onSidebarSplitRatioChange}
+    <div class="mt-4 space-y-2">
+      <div class="flex items-center justify-between text-xs">
+        <span class="font-medium text-foreground">Main stage width</span>
+        <span class="text-muted-foreground">{Math.round(sidebarSplitRatio * 100)}%</span>
       </div>
-    {/if}
-
-    {#if showSidebarSplit && onSidebarSplitRatioChange}
-      <div class="mt-4 space-y-2">
-        <div class="flex items-center justify-between text-xs">
-          <span class="font-medium text-foreground">Main stage width</span>
-          <span class="text-muted-foreground">{Math.round(sidebarSplitRatio * 100)}%</span>
-        </div>
-        <input
-          type="range"
-          min="0.55"
-          max="0.85"
-          step="0.01"
-          value={sidebarSplitRatio}
-          class="w-full accent-primary"
-          aria-label="Sidebar split ratio"
-          oninput={(event) => onSidebarSplitRatioChange(Number.parseFloat((event.currentTarget as HTMLInputElement).value))}
-        />
-      </div>
-    {/if}
+      <input
+        type="range"
+        min="0.55"
+        max="0.85"
+        step="0.01"
+        value={sidebarSplitRatio}
+        class="w-full accent-primary"
+        aria-label="Sidebar split ratio"
+        oninput={(event) => onSidebarSplitRatioChange(Number.parseFloat((event.currentTarget as HTMLInputElement).value))}
+      />
+    </div>
   {/if}
 </div>

@@ -1,4 +1,4 @@
-export type ListeningPlaybackState = "idle" | "playing" | "paused" | "error";
+export type ListeningPlaybackState = "idle" | "loading" | "playing" | "paused" | "error";
 export type ListeningQueueSource = "library_yt" | "library_ytm" | "search" | "url";
 
 export type ListeningSnapshotSession = {
@@ -9,6 +9,8 @@ export type ListeningSnapshotSession = {
   playbackState: ListeningPlaybackState;
   currentQueueItemId: string | null;
   positionMs: number;
+  positionUpdatedAt: string;
+  playbackGeneration: number;
   errorMessage: string | null;
   botIdentity: string;
   createdAt: string;
@@ -32,6 +34,7 @@ export type ListeningSnapshotQueueItem = {
 
 export type ListeningSnapshot = {
   version: number;
+  serverNow: string;
   session: ListeningSnapshotSession | null;
   currentItem: ListeningSnapshotQueueItem | null;
   queue: ListeningSnapshotQueueItem[];

@@ -17,7 +17,7 @@ export const EMPTY_TILE_STATS: TileMediaStats = {
 
 export type TileStatsTarget = {
   key: string;
-  kind: "participant" | "screen-share" | "listening";
+  kind: "participant" | "screen-share" | "listening" | "demo";
   identity: string;
 };
 
@@ -127,9 +127,13 @@ function captureDimensions(participant: Participant, source: Track.Source) {
 
 async function statsForParticipant(
   participant: LocalParticipant | RemoteParticipant,
-  kind: "participant" | "screen-share" | "listening",
+  kind: TileStatsTarget["kind"],
   roomPingMs: number | null
 ): Promise<TileMediaStats> {
+  if (kind === "demo") {
+    return { ...EMPTY_TILE_STATS, pingMs: roomPingMs };
+  }
+
   const direction: Direction = participant.isLocal ? "outbound" : "inbound";
   const videoSource = kind === "screen-share" ? Track.Source.ScreenShare : Track.Source.Camera;
   const audioSource = kind === "screen-share" ? Track.Source.ScreenShareAudio : Track.Source.Microphone;

@@ -1,5 +1,5 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { listOpenParticipants } from "$lib/server/rooms";
 import { listeningEventBus } from "./event-bus";
 import { buildListeningSnapshot, buildListeningSnapshotForRoom } from "./snapshot";
@@ -14,6 +14,14 @@ type ListeningSession = typeof schema.listeningSessions.$inferSelect;
 
 function codedError(code: string) {
   return Object.assign(new Error(code), { code });
+}
+
+function estimatedPositionMs(session: ListeningSession, at = new Date()) {
+  if (session.playbackState !== "playing") {
+    return Math.max(0, session.positionMs);
+  }
+  const elapsed = Math.max(0, at.getTime() - session.positionUpdatedAt.getTime());
+  return Math.max(0, session.positionMs + elapsed);
 }
 
 export async function findActiveListeningSession(roomId: string) {
@@ -52,6 +60,7 @@ export async function startListeningSession(input: { roomId: string; userId: str
     throw codedError("active_listening_exists");
   }
 
+  const now = new Date();
   const [session] = await db
     .insert(schema.listeningSessions)
     .values({
@@ -61,9 +70,11 @@ export async function startListeningSession(input: { roomId: string; userId: str
       playbackState: "idle",
       currentQueueItemId: null,
       positionMs: 0,
+      positionUpdatedAt: now,
+      playbackGeneration: 0,
       errorMessage: null,
       botIdentity: `listening-bot:${input.roomId}`,
-      createdAt: new Date(),
+      createdAt: now,
     })
     .returning();
 
@@ -100,6 +111,16 @@ export async function endListeningSession(input: { roomId: string; sessionId: st
 export async function endListeningSessionsForLinker(userId: string) {
   const sessions = await db.query.listeningSessions.findMany({
     where: and(eq(schema.listeningSessions.linkerUserId, userId), isNull(schema.listeningSessions.endedAt)),
+  });
+
+  for (const session of sessions) {
+    await endListeningSession({ roomId: session.roomId, sessionId: session.id });
+  }
+}
+
+export async function endListeningSessionsForRoom(roomId: string) {
+  const sessions = await db.query.listeningSessions.findMany({
+    where: and(eq(schema.listeningSessions.roomId, roomId), isNull(schema.listeningSessions.endedAt)),
   });
 
   for (const session of sessions) {
@@ -217,21 +238,35 @@ async function previousQueueItem(session: ListeningSession) {
 }
 
 async function setIdle(session: ListeningSession) {
+  const now = new Date();
   await db
     .update(schema.listeningSessions)
-    .set({ playbackState: "idle", currentQueueItemId: null, positionMs: 0, errorMessage: null })
+    .set({
+      playbackState: "idle",
+      currentQueueItemId: null,
+      positionMs: 0,
+      positionUpdatedAt: now,
+      playbackGeneration: session.playbackGeneration + 1,
+      errorMessage: null,
+    })
     .where(eq(schema.listeningSessions.id, session.id));
   await listeningWorkerBridge.stop(session.id);
   return publishListeningSnapshot(session.id);
 }
 
 async function playQueueItem(room: RoomLike, session: ListeningSession, item: typeof schema.listeningQueueItems.$inferSelect, positionMs = 0) {
+  const now = new Date();
+  const generation = session.playbackGeneration + 1;
+  const safePosition = Math.max(0, positionMs);
+
   await db
     .update(schema.listeningSessions)
     .set({
-      playbackState: "playing",
+      playbackState: "loading",
       currentQueueItemId: item.id,
-      positionMs,
+      positionMs: safePosition,
+      positionUpdatedAt: now,
+      playbackGeneration: generation,
       errorMessage: null,
     })
     .where(and(eq(schema.listeningSessions.id, session.id), isNull(schema.listeningSessions.endedAt)));
@@ -241,7 +276,8 @@ async function playQueueItem(room: RoomLike, session: ListeningSession, item: ty
     roomId: room.id,
     livekitRoomName: room.livekitRoomName,
     videoId: item.videoId,
-    positionMs,
+    positionMs: safePosition,
+    generation,
     botIdentity: session.botIdentity,
   });
 
@@ -251,12 +287,20 @@ async function playQueueItem(room: RoomLike, session: ListeningSession, item: ty
 export async function playListening(room: RoomLike) {
   const session = await activeSessionOrThrow(room.id);
   const current = session.currentQueueItemId ? await queueItemById(session.id, session.currentQueueItemId) : null;
-  if (current && session.playbackState === "paused") {
+
+  if (current && (session.playbackState === "paused" || session.playbackState === "loading")) {
+    const now = new Date();
+    const generation = session.playbackGeneration + 1;
     await db
       .update(schema.listeningSessions)
-      .set({ playbackState: "playing", errorMessage: null })
+      .set({
+        playbackState: "loading",
+        positionUpdatedAt: now,
+        playbackGeneration: generation,
+        errorMessage: null,
+      })
       .where(eq(schema.listeningSessions.id, session.id));
-    await listeningWorkerBridge.resume(session.id);
+    await listeningWorkerBridge.resume(session.id, generation);
     return publishListeningSnapshot(session.id);
   }
 
@@ -267,18 +311,59 @@ export async function playListening(room: RoomLike) {
 
 export async function pauseListening(roomId: string) {
   const session = await activeSessionOrThrow(roomId);
-  await db.update(schema.listeningSessions).set({ playbackState: "paused", errorMessage: null }).where(eq(schema.listeningSessions.id, session.id));
-  await listeningWorkerBridge.pause(session.id);
+  const now = new Date();
+  const positionMs = estimatedPositionMs(session, now);
+
+  await db
+    .update(schema.listeningSessions)
+    .set({
+      playbackState: "paused",
+      positionMs,
+      positionUpdatedAt: now,
+      errorMessage: null,
+    })
+    .where(eq(schema.listeningSessions.id, session.id));
+
+  await listeningWorkerBridge.pause(session.id, session.playbackGeneration);
   return publishListeningSnapshot(session.id);
 }
 
 export async function seekListening(roomId: string, positionMs: number) {
   const session = await activeSessionOrThrow(roomId);
+  const now = new Date();
+  const generation = session.playbackGeneration + 1;
+  const safePosition = Math.max(0, positionMs);
+  const current = session.currentQueueItemId ? await queueItemById(session.id, session.currentQueueItemId) : null;
+
   await db
     .update(schema.listeningSessions)
-    .set({ positionMs: Math.max(0, positionMs), errorMessage: null })
+    .set({
+      playbackState: current ? "loading" : "idle",
+      positionMs: safePosition,
+      positionUpdatedAt: now,
+      playbackGeneration: generation,
+      errorMessage: null,
+    })
     .where(eq(schema.listeningSessions.id, session.id));
-  await listeningWorkerBridge.seek(session.id, Math.max(0, positionMs));
+
+  if (current) {
+    const room = await db.query.rooms.findFirst({ where: eq(schema.rooms.id, roomId) });
+    if (room) {
+      // Prefer full play job so generation/video context stays consistent for cold workers.
+      await listeningWorkerBridge.play({
+        sessionId: session.id,
+        roomId: room.id,
+        livekitRoomName: room.livekitRoomName,
+        videoId: current.videoId,
+        positionMs: safePosition,
+        generation,
+        botIdentity: session.botIdentity,
+      });
+    } else {
+      await listeningWorkerBridge.seek(session.id, safePosition, generation);
+    }
+  }
+
   return publishListeningSnapshot(session.id);
 }
 
@@ -303,6 +388,7 @@ export async function removeListeningQueueItem(roomId: string, itemId: string) {
     throw codedError("queue_item_not_found");
   }
 
+  const now = new Date();
   await db.transaction(async (tx) => {
     await tx.delete(schema.listeningQueueItems).where(eq(schema.listeningQueueItems.id, itemId));
     const remaining = await tx.query.listeningQueueItems.findMany({
@@ -315,7 +401,13 @@ export async function removeListeningQueueItem(roomId: string, itemId: string) {
     if (session.currentQueueItemId === itemId) {
       await tx
         .update(schema.listeningSessions)
-        .set({ currentQueueItemId: null, playbackState: "idle", positionMs: 0, errorMessage: null })
+        .set({
+          currentQueueItemId: null,
+          playbackState: "idle",
+          positionMs: 0,
+          positionUpdatedAt: now,
+          errorMessage: null,
+        })
         .where(eq(schema.listeningSessions.id, session.id));
     }
   });
@@ -356,14 +448,25 @@ export async function reorderListeningQueue(roomId: string, orderedIds: string[]
 
 export async function updateListeningPlaybackFields(
   roomId: string,
-  values: Partial<Pick<ListeningSession, "playbackState" | "currentQueueItemId" | "positionMs" | "errorMessage">>
+  values: Partial<
+    Pick<ListeningSession, "playbackState" | "currentQueueItemId" | "positionMs" | "positionUpdatedAt" | "playbackGeneration" | "errorMessage">
+  >
 ) {
   const session = await activeSessionOrThrow(roomId);
   await db.update(schema.listeningSessions).set(values).where(eq(schema.listeningSessions.id, session.id));
   return publishListeningSnapshot(session.id);
 }
 
-export async function handleListeningWorkerEvent(input: { sessionId: string; event: "track_ended" | "track_error"; errorMessage?: string | null }) {
+export type ListeningWorkerEventInput = {
+  sessionId: string;
+  event: "track_ended" | "track_error" | "playback_started" | "paused" | "resumed" | "position";
+  generation?: number | null;
+  positionMs?: number | null;
+  at?: string | null;
+  errorMessage?: string | null;
+};
+
+export async function handleListeningWorkerEvent(input: ListeningWorkerEventInput) {
   const session = await db.query.listeningSessions.findFirst({
     where: and(eq(schema.listeningSessions.id, input.sessionId), isNull(schema.listeningSessions.endedAt)),
   });
@@ -374,14 +477,75 @@ export async function handleListeningWorkerEvent(input: { sessionId: string; eve
   });
   if (!room) return null;
 
+  const eventGeneration = input.generation;
+  // Ignore only strictly stale events from an older play generation.
+  if (typeof eventGeneration === "number" && eventGeneration < session.playbackGeneration) {
+    return null;
+  }
+
+  const at = input.at ? new Date(input.at) : new Date();
+  const positionMs = typeof input.positionMs === "number" ? Math.max(0, Math.round(input.positionMs)) : session.positionMs;
+
   if (input.event === "track_ended") {
     return skipListening(room);
+  }
+
+  // For non-end events, require an exact generation match when provided.
+  if (typeof eventGeneration === "number" && eventGeneration !== session.playbackGeneration) {
+    return null;
+  }
+
+  if (input.event === "playback_started" || input.event === "resumed") {
+    // Ignore late start acks after the DJ already paused this generation.
+    if (session.playbackState === "paused") {
+      return null;
+    }
+    await db
+      .update(schema.listeningSessions)
+      .set({
+        playbackState: "playing",
+        positionMs,
+        positionUpdatedAt: at,
+        errorMessage: null,
+      })
+      .where(eq(schema.listeningSessions.id, session.id));
+    return publishListeningSnapshot(session.id);
+  }
+
+  if (input.event === "paused") {
+    await db
+      .update(schema.listeningSessions)
+      .set({
+        playbackState: "paused",
+        positionMs,
+        positionUpdatedAt: at,
+        errorMessage: null,
+      })
+      .where(eq(schema.listeningSessions.id, session.id));
+    return publishListeningSnapshot(session.id);
+  }
+
+  if (input.event === "position") {
+    if (session.playbackState !== "playing" && session.playbackState !== "loading") {
+      return null;
+    }
+    await db
+      .update(schema.listeningSessions)
+      .set({
+        playbackState: "playing",
+        positionMs,
+        positionUpdatedAt: at,
+      })
+      .where(eq(schema.listeningSessions.id, session.id));
+    return publishListeningSnapshot(session.id);
   }
 
   await db
     .update(schema.listeningSessions)
     .set({
       playbackState: "error",
+      positionMs,
+      positionUpdatedAt: at,
       errorMessage: input.errorMessage ?? "Track failed",
     })
     .where(eq(schema.listeningSessions.id, session.id));

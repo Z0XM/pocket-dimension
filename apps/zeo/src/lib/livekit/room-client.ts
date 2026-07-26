@@ -18,7 +18,13 @@ import {
   type AudioQualityOption,
   type VideoQualityOption,
 } from "./media-quality";
-import { attachAllRemoteAudioTracks, attachRemoteAudioTrack, detachAllRemoteAudioTracks, detachRemoteAudioTrack } from "./remote-audio";
+import {
+  attachAllRemoteAudioTracks,
+  attachRemoteAudioTrack,
+  detachAllRemoteAudioTracks,
+  detachRemoteAudioTrack,
+  reapplyRoomAudioOutput,
+} from "./remote-audio";
 import { screenShareTileKey } from "./screen-share";
 
 export type ConnectionPhase = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
@@ -274,7 +280,7 @@ export function createCallRoom(
     handlers.onParticipantsChange();
     if (track.kind === Track.Kind.Audio) {
       attachRemoteAudioTrack(track);
-      void ensureRoomAudio(room, "track_subscribed");
+      void reapplyRoomAudioOutput(room).then(() => ensureRoomAudio(room, "track_subscribed"));
     }
   });
   room.on(RoomEvent.TrackUnsubscribed, (track) => {
@@ -320,12 +326,10 @@ export function createCallRoom(
     await room.localParticipant.setCameraEnabled(options.camEnabled, {
       deviceId: options.videoDeviceId,
     });
-    if (options.audioOutputDeviceId) {
-      try {
-        await room.switchActiveDevice("audiooutput", options.audioOutputDeviceId);
-      } catch {
-        // Output device switching is best-effort.
-      }
+    try {
+      await reapplyRoomAudioOutput(room, options.audioOutputDeviceId);
+    } catch {
+      // Output device switching is best-effort.
     }
     attachAllRemoteAudioTracks(room);
     await ensureRoomAudio(room, "connect_complete");

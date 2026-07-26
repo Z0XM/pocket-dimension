@@ -6,6 +6,7 @@ type WorkerPlayJob = {
   livekitRoomName: string;
   videoId: string;
   positionMs?: number;
+  generation: number;
   botIdentity: string;
 };
 
@@ -44,14 +45,14 @@ export const listeningWorkerBridge = {
   play(job: WorkerPlayJob) {
     return postWorkerJob("/jobs/play", job);
   },
-  pause(sessionId: string) {
-    return postWorkerJob("/jobs/pause", { sessionId });
+  pause(sessionId: string, generation: number) {
+    return postWorkerJob("/jobs/pause", { sessionId, generation });
   },
-  resume(sessionId: string) {
-    return postWorkerJob("/jobs/resume", { sessionId });
+  resume(sessionId: string, generation: number) {
+    return postWorkerJob("/jobs/resume", { sessionId, generation });
   },
-  seek(sessionId: string, positionMs: number) {
-    return postWorkerJob("/jobs/seek", { sessionId, positionMs });
+  seek(sessionId: string, positionMs: number, generation: number) {
+    return postWorkerJob("/jobs/seek", { sessionId, positionMs, generation });
   },
   skip(sessionId: string) {
     return postWorkerJob("/jobs/skip", { sessionId });

@@ -1,4 +1,5 @@
 import { RoomServiceClient, TrackSource } from "livekit-server-sdk";
+import { isListeningBotIdentity } from "$lib/listening/bot-identity";
 import { env } from "./env";
 
 function liveKitHttpHost() {
@@ -29,7 +30,7 @@ export async function removeLiveKitParticipant(livekitRoomName: string, identity
 
 export async function countLiveKitParticipants(livekitRoomName: string) {
   const participants = await getClient().listParticipants(livekitRoomName);
-  return participants.length;
+  return participants.filter((participant) => !isListeningBotIdentity(participant.identity)).length;
 }
 
 export async function listLiveKitParticipants(livekitRoomName: string) {

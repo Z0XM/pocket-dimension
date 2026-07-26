@@ -1,18 +1,32 @@
 import type { LocalParticipant, RemoteParticipant, Room } from "livekit-client";
+import { LISTENING_BOT_PREFIX, isListeningBotIdentity } from "$lib/listening/bot-identity";
 import { findScreenCaptureParticipant, isScreenShareActive, isScreenShareAudioOnlyActive, screenShareTileKey } from "$lib/livekit/screen-share";
 import { listRoomParticipants } from "$lib/livekit/room-client";
 
-export const LISTENING_BOT_PREFIX = "listening-bot:";
+export { LISTENING_BOT_PREFIX, isListeningBotIdentity };
 
 export type StageTileEntry = {
   key: string;
-  kind: "participant" | "screen-share" | "listening";
+  kind: "participant" | "screen-share" | "listening" | "demo";
   participant: LocalParticipant | RemoteParticipant;
   audioOnly?: boolean;
+  /** Optional display label (used by development demo tiles). */
+  label?: string;
 };
 
-export function isListeningBotIdentity(identity: string) {
-  return identity.startsWith(LISTENING_BOT_PREFIX);
+/** Dev-only synthetic tiles for layout testing. */
+export function appendDemoStageTiles(tiles: StageTileEntry[], room: Room, count: number): StageTileEntry[] {
+  const safeCount = Math.max(0, Math.min(24, Math.floor(count)));
+  if (safeCount <= 0) return tiles;
+
+  const demos: StageTileEntry[] = Array.from({ length: safeCount }, (_, index) => ({
+    key: `demo-tile-${index + 1}`,
+    kind: "demo",
+    participant: room.localParticipant,
+    label: `Demo ${index + 1}`,
+  }));
+
+  return [...tiles, ...demos];
 }
 
 export function listeningTileKey(botIdentity: string) {
@@ -76,7 +90,9 @@ export function buildStageTiles(room: Room, options?: { listeningBotIdentity?: s
 export function filterStageTiles(tiles: StageTileEntry[], options?: { hideNonVideo?: boolean }) {
   if (!options?.hideNonVideo) return tiles;
 
-  return tiles.filter((tile) => tile.kind === "screen-share" || tile.kind === "listening" || participantHasActiveVideo(tile.participant));
+  return tiles.filter(
+    (tile) => tile.kind === "screen-share" || tile.kind === "listening" || tile.kind === "demo" || participantHasActiveVideo(tile.participant)
+  );
 }
 
 export function pruneTileKeys(keys: string[], validKeys: Set<string>) {

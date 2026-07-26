@@ -9,6 +9,9 @@ export type MediaDeviceLists = {
   videoInputs: MediaDeviceOption[];
 };
 
+/** Browser sink id used when no specific output is selected (`HTMLMediaElement.setSinkId`). */
+export const SYSTEM_DEFAULT_AUDIO_OUTPUT = "default";
+
 function formatDeviceLabel(label: string) {
   return label
     .replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)/gi, "")

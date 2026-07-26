@@ -104,6 +104,7 @@
   );
 
   function tileDisplayName(tile: StageTileEntry) {
+    if (tile.kind === "demo") return tile.label ?? "Demo";
     return displayNameForParticipant(tile.participant, localIdentity, localDisplayName);
   }
 

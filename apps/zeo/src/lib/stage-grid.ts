@@ -400,3 +400,61 @@ export function placementsOverlap(
 
   return !(a.col + aSpan.cols <= b.col || b.col + bSpan.cols <= a.col || a.row + aSpan.rows <= b.row || b.row + bSpan.rows <= a.row);
 }
+
+export type OccupiedGridTile = {
+  placement: GridCellPlacement;
+  size: { width: number; height: number };
+};
+
+/**
+ * Place a tile near stage center without overlapping existing tiles.
+ * Searches outward in rings from the centered cell; falls back to the
+ * clamped center (even if overlapping) when the stage is full.
+ */
+export function findCenteredPlacement(
+  stage: StageGridLayout,
+  size: { width: number; height: number },
+  occupied: OccupiedGridTile[]
+): GridCellPlacement {
+  const span = tileSpanCells(size.width, size.height, stage.cellSize);
+  const maxCol = Math.max(0, stage.cols - span.cols);
+  const maxRow = Math.max(0, stage.rows - span.rows);
+  const centerCol = Math.floor(maxCol / 2);
+  const centerRow = Math.floor(maxRow / 2);
+
+  function isFree(candidate: GridCellPlacement) {
+    for (const other of occupied) {
+      if (placementsOverlap(candidate, size, other.placement, other.size, stage.cellSize)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  const seen = new Set<string>();
+
+  function tryAt(col: number, row: number): GridCellPlacement | null {
+    if (col < 0 || row < 0 || col > maxCol || row > maxRow) return null;
+    const key = `${col},${row}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    const candidate = { col, row };
+    return isFree(candidate) ? candidate : null;
+  }
+
+  const centered = tryAt(centerCol, centerRow);
+  if (centered) return centered;
+
+  const maxRing = Math.max(maxCol, maxRow) + 1;
+  for (let ring = 1; ring <= maxRing; ring++) {
+    for (let dr = -ring; dr <= ring; dr++) {
+      for (let dc = -ring; dc <= ring; dc++) {
+        if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring) continue;
+        const found = tryAt(centerCol + dc, centerRow + dr);
+        if (found) return found;
+      }
+    }
+  }
+
+  return { col: centerCol, row: centerRow };
+}

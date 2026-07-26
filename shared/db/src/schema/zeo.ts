@@ -13,7 +13,7 @@ export const gameType = zeoSchema.enum("game_type", ["charades"]);
 export const gameSessionStatus = zeoSchema.enum("game_session_status", ["setup", "active", "ended"]);
 export const gameRoundPhase = zeoSchema.enum("game_round_phase", ["submission", "passed_on", "act", "verdict", "ready_check", "completed"]);
 export const gameVerdict = zeoSchema.enum("game_verdict", ["accepted", "rejected"]);
-export const listeningPlaybackState = zeoSchema.enum("listening_playback_state", ["idle", "playing", "paused", "error"]);
+export const listeningPlaybackState = zeoSchema.enum("listening_playback_state", ["idle", "loading", "playing", "paused", "error"]);
 export const listeningQueueSource = zeoSchema.enum("listening_queue_source", ["library_yt", "library_ytm", "search", "url"]);
 
 export const rooms = zeoSchema.table(
@@ -316,6 +316,10 @@ export const listeningSessions = zeoSchema.table(
     playbackState: listeningPlaybackState("playback_state").default("idle").notNull(),
     currentQueueItemId: uuid("current_queue_item_id"),
     positionMs: integer("position_ms").default(0).notNull(),
+    positionUpdatedAt: timestamp("position_updated_at")
+      .$default(() => sql`now()`)
+      .notNull(),
+    playbackGeneration: integer("playback_generation").default(0).notNull(),
     errorMessage: text("error_message"),
     botIdentity: text("bot_identity").notNull(),
     createdAt: timestamp("created_at")

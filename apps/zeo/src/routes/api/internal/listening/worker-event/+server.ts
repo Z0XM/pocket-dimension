@@ -7,7 +7,10 @@ import type { RequestHandler } from "./$types";
 
 const workerEventSchema = z.object({
   sessionId: z.string().min(1),
-  event: z.enum(["track_ended", "track_error"]),
+  event: z.enum(["track_ended", "track_error", "playback_started", "paused", "resumed", "position"]),
+  generation: z.number().int().nonnegative().optional().nullable(),
+  positionMs: z.number().nonnegative().optional().nullable(),
+  at: z.string().optional().nullable(),
   errorMessage: z.string().nullable().optional(),
 });
 

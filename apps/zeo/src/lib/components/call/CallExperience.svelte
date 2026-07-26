@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
+  import { browser, dev } from "$app/environment";
   import { onDestroy, onMount } from "svelte";
   import {
     RoomEvent,
@@ -27,7 +27,7 @@
     type ConnectionPhase,
   } from "$lib/livekit/room-client";
   import { disableLocalMicrophone, enableLocalMicrophoneWithGate } from "$lib/livekit/local-mic";
-  import { attachAllRemoteAudioTracks } from "$lib/livekit/remote-audio";
+  import { attachAllRemoteAudioTracks, reapplyRoomAudioOutput } from "$lib/livekit/remote-audio";
   import {
     applyAllTileListenVolumes,
     clampTileVolume,
@@ -78,9 +78,10 @@
   import HandGestureTracker from "$lib/components/call/HandGestureTracker.svelte";
   import GestureSettings from "$lib/components/call/GestureSettings.svelte";
   import InCallSettingsPanel from "$lib/components/call/InCallSettingsPanel.svelte";
+  import DevFloatingCard from "$lib/components/call/DevFloatingCard.svelte";
   import type { DetectedGesture, GestureAction, VideoTrackingFrame } from "$lib/gestures/gesture-types";
   import { disposeHandLandmarker } from "$lib/gestures/hand-tracker";
-  import { isAutoLayoutPreset, type AutoLayoutPreset } from "$lib/call/auto-layout";
+  import { normalizeAutoLayoutPreset, type AutoLayoutPreset } from "$lib/call/auto-layout";
   import { createGameStateStore } from "$lib/call/game-state";
   import { createListeningStateStore } from "$lib/call/listening-state";
   import type { StageLayoutMode } from "$lib/stage-grid";
@@ -93,17 +94,15 @@
     readStored,
     readStoredFlag,
     readStoredFloat,
-    readStoredInt,
     readStoredTileVolumes,
     STORAGE_KEYS,
     writeActiveCallSession,
     writeStored,
     writeStoredFlag,
     writeStoredFloat,
-    writeStoredInt,
     writeStoredTileVolumes,
   } from "$lib/browser-storage";
-  import { buildStageTiles, buildCallParticipantList, pruneTileKeys } from "$lib/call/stage-tiles";
+  import { appendDemoStageTiles, buildStageTiles, buildCallParticipantList, pruneTileKeys } from "$lib/call/stage-tiles";
 
   type Props = {
     slug: string;
@@ -190,6 +189,8 @@
   let micTestActive = $state(false);
   let showInCallDevices = $state(false);
   let showGridSettings = $state(false);
+  /** Dev-only placeholder tiles for layout testing. */
+  let demoTileCount = $state(0);
   let showGamePanel = $state(false);
   let gameBusy = $state(false);
   let listeningBusy = $state(false);
@@ -200,11 +201,11 @@
   const gameState = createGameStateStore();
   const listeningState = createListeningStateStore();
   let stageLayoutMode = $state<StageLayoutMode>("grid");
-  let autoLayoutPreset = $state<AutoLayoutPreset>("dynamic");
-  let galleryDensity = $state(5);
+  let autoLayoutPreset = $state<AutoLayoutPreset>("gallery");
   let sidebarSplitRatio = $state(0.72);
+  let speakerMainRatio = $state(0.72);
   let hideNonVideoTiles = $state(false);
-  let pinnedTileKey = $state<string | null>(null);
+  let pinnedTileKeys = $state<string[]>([]);
   let micGateProcessor = $state<MicGateProcessor | null>(null);
   let inCallMicTestStream = $state<MediaStream | null>(null);
   let inCallMicTestSyncGen = 0;
@@ -287,14 +288,19 @@
   }
 
   function readInitialAutoLayoutPreset(): AutoLayoutPreset {
-    const stored = readStored(STORAGE_KEYS.autoLayoutPreset);
-    return isAutoLayoutPreset(stored) ? stored : "dynamic";
+    return normalizeAutoLayoutPreset(readStored(STORAGE_KEYS.autoLayoutPreset));
+  }
+
+  function clearPinnedTiles() {
+    if (pinnedTileKeys.length === 0) return;
+    pinnedTileKeys = [];
   }
 
   function setStageLayoutMode(mode: StageLayoutMode) {
     if (gameActive) return;
     stageLayoutMode = mode;
     writeStored(STORAGE_KEYS.stageLayoutMode, mode);
+    if (mode !== "auto") clearPinnedTiles();
   }
 
   function closeGamePanel() {
@@ -366,6 +372,7 @@
   function setAutoLayoutPreset(preset: AutoLayoutPreset) {
     autoLayoutPreset = preset;
     writeStored(STORAGE_KEYS.autoLayoutPreset, preset);
+    if (preset !== "speaker" && preset !== "sidebar") clearPinnedTiles();
   }
 
   function setHideNonVideoTiles(value: boolean) {
@@ -373,18 +380,22 @@
     writeStoredFlag(STORAGE_KEYS.hideNonVideoTiles, value);
   }
 
-  function setGalleryDensity(value: number) {
-    galleryDensity = value;
-    writeStoredInt(STORAGE_KEYS.galleryDensity, value);
-  }
-
   function setSidebarSplitRatio(value: number) {
     sidebarSplitRatio = value;
     writeStoredFloat(STORAGE_KEYS.sidebarSplitRatio, value);
   }
 
+  function setSpeakerMainRatio(value: number) {
+    speakerMainRatio = value;
+    writeStoredFloat(STORAGE_KEYS.speakerMainRatio, value);
+  }
+
   function togglePinTile(key: string) {
-    pinnedTileKey = pinnedTileKey === key ? null : key;
+    if (pinnedTileKeys.includes(key)) {
+      pinnedTileKeys = pinnedTileKeys.filter((entry) => entry !== key);
+      return;
+    }
+    pinnedTileKeys = [...pinnedTileKeys, key];
   }
 
   function toggleSelfView() {
@@ -506,12 +517,13 @@
 
   const stageTiles = $derived.by(() => {
     mediaRevision;
-    return livekitRoom
-      ? buildStageTiles(livekitRoom, {
-          listeningActive,
-          listeningBotIdentity: listeningSnapshot?.session?.botIdentity ?? null,
-        })
-      : [];
+    demoTileCount;
+    if (!livekitRoom) return [];
+    const tiles = buildStageTiles(livekitRoom, {
+      listeningActive,
+      listeningBotIdentity: listeningSnapshot?.session?.botIdentity ?? null,
+    });
+    return dev ? appendDemoStageTiles(tiles, livekitRoom, demoTileCount) : tiles;
   });
 
   const selfViewHidden = $derived(livekitRoom ? minimizedTileKeys.includes(livekitRoom.localParticipant.identity) : false);
@@ -531,16 +543,14 @@
     if (fullscreenTileKey && !validKeys.has(fullscreenTileKey)) {
       fullscreenTileKey = null;
     }
-    if (pinnedTileKey && !validKeys.has(pinnedTileKey)) {
-      pinnedTileKey = null;
-    }
+    pinnedTileKeys = pruneTileKeys(pinnedTileKeys, validKeys);
   });
 
   function resetStageTileState() {
     minimizedTileKeys = [];
     hiddenVideoTileKeys = [];
     fullscreenTileKey = null;
-    pinnedTileKey = null;
+    pinnedTileKeys = [];
     tileStats = {};
   }
 
@@ -985,11 +995,9 @@
     writeStored(STORAGE_KEYS.audioOutputDeviceId, deviceId);
 
     if (livekitRoom) {
-      try {
-        await livekitRoom.switchActiveDevice("audiooutput", deviceId || "default");
-      } catch {
-        // Output routing is unsupported or the device is unavailable.
-      }
+      await reapplyRoomAudioOutput(livekitRoom, audioOutputDeviceId);
+      await ensureRoomAudio(livekitRoom, "audio_output_change");
+      applyRoomSpeakerState(livekitRoom);
     }
   }
 
@@ -1576,6 +1584,7 @@
     if (!livekitRoom) return;
 
     attachAllRemoteAudioTracks(livekitRoom);
+    await reapplyRoomAudioOutput(livekitRoom, audioOutputDeviceId);
     const started = await ensureRoomAudio(livekitRoom, "enable_call_audio");
     audioPlaybackBlocked = !started;
     if (started) {
@@ -1856,6 +1865,7 @@
         layoutModeBeforeGame = stageLayoutMode;
       }
       stageLayoutMode = "game";
+      clearPinnedTiles();
       return;
     }
 
@@ -1885,8 +1895,8 @@
     gestureOverlayVisible = readStoredFlag(STORAGE_KEYS.gestureOverlayVisible);
     stageLayoutMode = readInitialStageLayoutMode();
     autoLayoutPreset = readInitialAutoLayoutPreset();
-    galleryDensity = readStoredInt(STORAGE_KEYS.galleryDensity, 5, 1, 10);
     sidebarSplitRatio = readStoredFloat(STORAGE_KEYS.sidebarSplitRatio, 0.72, 0.55, 0.85);
+    speakerMainRatio = readStoredFloat(STORAGE_KEYS.speakerMainRatio, 0.72, 0.55, 0.85);
     storedRejoinSession = readActiveCallSession();
     onPhaseChange?.(phase);
     setupPreview();
@@ -1993,6 +2003,7 @@
         onClose={closeGamePanel}
         onSnapshot={handleGameSnapshot}
         onListeningSnapshot={handleListeningSnapshot}
+        onYouTubeLinked={() => void refreshYouTubeLink()}
         onBusyChange={(value) => (gameBusy = value)}
         onListeningBusyChange={(value) => (listeningBusy = value)}
       />
@@ -2064,9 +2075,9 @@
           {disableSpeakingGlows}
           layoutMode={stageLayoutMode}
           {autoLayoutPreset}
-          {galleryDensity}
           {sidebarSplitRatio}
-          {pinnedTileKey}
+          {speakerMainRatio}
+          {pinnedTileKeys}
           bottomInset={controlBarReservePx}
           {minimizedTileKeys}
           {hiddenVideoTileKeys}
@@ -2096,11 +2107,12 @@
           onListeningSkip={() => void listeningTransport("skip")}
           onListeningPrevious={() => void listeningTransport("previous")}
           onListeningSeek={(positionMs) => void listeningSeek(positionMs)}
+          onListeningSnapshot={handleListeningSnapshot}
           onLayoutModeChange={setStageLayoutMode}
           onAutoLayoutPresetChange={setAutoLayoutPreset}
           onHideNonVideoTilesChange={setHideNonVideoTiles}
-          onGalleryDensityChange={setGalleryDensity}
           onSidebarSplitRatioChange={setSidebarSplitRatio}
+          onSpeakerMainRatioChange={setSpeakerMainRatio}
           onHideSelfView={toggleSelfView}
           onCloseGridSettings={closeGridSettingsPanel}
           bind:stageRef={stageEl}
@@ -2108,11 +2120,63 @@
           handLandmarks={trackingFrame.handLandmarks}
           handGesture={trackingFrame.gesture}
           handGestureHoldProgress={trackingFrame.holdProgress}
+          demoTileCount={dev ? demoTileCount : 0}
         />
       </div>
       <div class="pointer-events-none fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-4 z-[21] safe-x">
         <ConnectionQualityBadge label={localConnectionQuality} pingMs={localPingMs} />
       </div>
+
+      {#if dev && inCallPhase}
+        <DevFloatingCard id="demo-tiles" title="Dev · demo tiles" ariaLabel="Temporary demo tile controls" defaultPlacement="bottom-right">
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="inline-flex size-8 items-center justify-center rounded-md border border-border bg-card text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-40"
+              aria-label="Fewer demo tiles"
+              disabled={demoTileCount <= 0}
+              onclick={() => (demoTileCount = Math.max(0, demoTileCount - 1))}
+            >
+              −
+            </button>
+            <input
+              type="number"
+              min="0"
+              max="24"
+              value={demoTileCount}
+              class="h-8 w-full rounded-md border border-border bg-background px-2 text-center text-sm text-foreground"
+              aria-label="Demo tile count"
+              oninput={(event) => {
+                const next = Number((event.currentTarget as HTMLInputElement).value);
+                demoTileCount = Number.isFinite(next) ? Math.max(0, Math.min(24, Math.floor(next))) : 0;
+              }}
+            />
+            <button
+              type="button"
+              class="inline-flex size-8 items-center justify-center rounded-md border border-border bg-card text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-40"
+              aria-label="More demo tiles"
+              disabled={demoTileCount >= 24}
+              onclick={() => (demoTileCount = Math.min(24, demoTileCount + 1))}
+            >
+              +
+            </button>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-1">
+            {#each [0, 2, 4, 8, 12] as preset (preset)}
+              <button
+                type="button"
+                class="rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors {demoTileCount === preset
+                  ? 'border-participant-orange/50 bg-participant-orange/15 text-foreground'
+                  : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'}"
+                onclick={() => (demoTileCount = preset)}
+              >
+                {preset}
+              </button>
+            {/each}
+          </div>
+        </DevFloatingCard>
+      {/if}
+
       <ControlBar
         bind:barRef={controlBarEl}
         {isHost}

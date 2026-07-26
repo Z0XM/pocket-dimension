@@ -6,6 +6,7 @@ import type { ListeningSnapshot, ListeningSnapshotQueueItem, ListeningSnapshotSe
 export function emptyListeningSnapshot(): ListeningSnapshot {
   return {
     version: 0,
+    serverNow: new Date().toISOString(),
     session: null,
     currentItem: null,
     queue: [],
@@ -32,6 +33,8 @@ function serializeSession(session: typeof schema.listeningSessions.$inferSelect)
     playbackState: session.playbackState,
     currentQueueItemId: session.currentQueueItemId,
     positionMs: session.positionMs,
+    positionUpdatedAt: session.positionUpdatedAt.toISOString(),
+    playbackGeneration: session.playbackGeneration,
     errorMessage: session.errorMessage,
     botIdentity: session.botIdentity,
     createdAt: session.createdAt.toISOString(),
@@ -72,6 +75,7 @@ export async function buildListeningSnapshot(sessionId: string): Promise<Listeni
 
   return {
     version: Date.now(),
+    serverNow: new Date().toISOString(),
     session: serializeSession(session),
     currentItem: queue.find((item) => item.id === session.currentQueueItemId) ?? null,
     queue,

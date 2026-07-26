@@ -56,7 +56,7 @@
     <button
       type="button"
       class="{actionClass} {pinned ? 'bg-white/20 text-white' : ''}"
-      aria-label={pinned ? "Unpin spotlight" : "Pin spotlight"}
+      aria-label={pinned ? "Unpin from main stage" : "Pin to main stage"}
       aria-pressed={pinned}
       onclick={onTogglePin}
     >

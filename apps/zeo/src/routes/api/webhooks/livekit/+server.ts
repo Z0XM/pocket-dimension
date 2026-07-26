@@ -1,7 +1,9 @@
 import { json, error } from "@sveltejs/kit";
 import { WebhookReceiver } from "livekit-server-sdk";
+import { isListeningBotIdentity } from "$lib/listening/bot-identity";
 import { ROOM_EMPTY_GRACE_SECONDS } from "$lib/server/constants";
 import { env } from "$lib/server/env";
+import { endListeningSessionsForRoom } from "$lib/server/listening/sessions";
 import { getLiveParticipantCount } from "$lib/server/room-occupancy";
 import { scheduleRoomEmptyGrace } from "$lib/server/room-grace";
 import { findRoomByLiveKitName, markRoomStale, recordParticipantJoined, recordParticipantLeft } from "$lib/server/rooms";
@@ -51,7 +53,9 @@ export const POST: RequestHandler = async ({ request }) => {
       break;
     case "participant_left":
       await recordParticipantLeft({ roomId: room.id, identity: identity! });
-      if (getLiveParticipantCount(room.id) === 0 && room.status !== "ended") {
+      if (!isListeningBotIdentity(identity!) && getLiveParticipantCount(room.id) === 0 && room.status !== "ended") {
+        // Stop shared listening as soon as the last human leaves (bots don't count).
+        await endListeningSessionsForRoom(room.id);
         scheduleRoomEmptyGrace(room.id, ROOM_EMPTY_GRACE_SECONDS);
       }
       break;

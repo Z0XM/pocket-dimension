@@ -10,6 +10,7 @@ const STATE_COOKIE = "zeo_youtube_oauth_state";
 type StoredState = {
   state: string;
   returnTo: string;
+  popup?: boolean;
 };
 
 function readStoredState(value: string | undefined) {
@@ -61,6 +62,10 @@ export const GET: RequestHandler = async ({ locals, url, cookies }) => {
         revokedAt: null,
       },
     });
+
+  if (storedState.popup) {
+    throw redirect(302, "/auth/youtube/popup-done");
+  }
 
   throw redirect(302, storedState.returnTo || "/");
 };

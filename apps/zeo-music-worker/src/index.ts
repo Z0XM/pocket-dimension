@@ -4,15 +4,32 @@ type PlayJob = {
   livekitRoomName: string;
   videoId: string;
   positionMs?: number;
+  generation: number;
+  botIdentity: string;
+};
+
+type RtcSession = {
+  rtc: Record<string, any>;
+  room: { disconnect?: () => Promise<void> | void; localParticipant?: any };
+  source: { captureFrame: (frame: unknown) => Promise<void> };
+  track: unknown;
+  roomId: string;
+  livekitRoomName: string;
   botIdentity: string;
 };
 
 type PlaybackState = PlayJob & {
   stopped: boolean;
   paused: boolean;
+  started: boolean;
+  positionMs: number;
+  audioUrl?: string;
   ffmpeg?: Bun.Subprocess;
-  room?: { disconnect?: () => Promise<void> | void };
+  rtcSession?: RtcSession;
+  pumpToken: number;
 };
+
+type WorkerEvent = "track_ended" | "track_error" | "playback_started" | "paused" | "resumed" | "position";
 
 const PORT = Number(Bun.env.PORT ?? 3010);
 const HOST = Bun.env.HOST ?? "0.0.0.0";
@@ -22,6 +39,8 @@ const SAMPLE_RATE = 48_000;
 const CHANNELS = 2;
 const FRAME_SAMPLES_PER_CHANNEL = 960;
 const FRAME_BYTES = FRAME_SAMPLES_PER_CHANNEL * CHANNELS * 2;
+const FRAME_MS = (FRAME_SAMPLES_PER_CHANNEL / SAMPLE_RATE) * 1000;
+const POSITION_HEARTBEAT_MS = 2_500;
 
 /** Dokploy/Railpack sometimes ship a PATH without /usr/bin — prefer absolute paths. */
 async function resolveBinary(candidates: string[]) {
@@ -92,6 +111,7 @@ function ytDlpBaseArgs() {
 }
 
 const activeJobs = new Map<string, PlaybackState>();
+const audioUrlCache = new Map<string, string>();
 const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<Record<string, any>>;
 
 function json(body: unknown, status = 200) {
@@ -116,10 +136,10 @@ async function readJson<T>(request: Request) {
 
 function isPlayJob(value: unknown): value is PlayJob {
   const body = value as Partial<PlayJob>;
-  return Boolean(body?.sessionId && body.roomId && body.livekitRoomName && body.videoId && body.botIdentity);
+  return Boolean(body?.sessionId && body.roomId && body.livekitRoomName && body.videoId && body.botIdentity && typeof body.generation === "number");
 }
 
-async function postWorkerEvent(sessionId: string, event: "track_ended" | "track_error", errorMessage?: string) {
+async function postWorkerEvent(sessionId: string, event: WorkerEvent, details?: { generation?: number; positionMs?: number; errorMessage?: string }) {
   if (!SECRET) return;
 
   await fetch(`${ZEO_APP_URL}/api/internal/listening/worker-event`, {
@@ -128,13 +148,20 @@ async function postWorkerEvent(sessionId: string, event: "track_ended" | "track_
       Authorization: `Bearer ${SECRET}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ sessionId, event, errorMessage }),
+    body: JSON.stringify({
+      sessionId,
+      event,
+      generation: details?.generation,
+      positionMs: details?.positionMs,
+      at: new Date().toISOString(),
+      errorMessage: details?.errorMessage,
+    }),
   }).catch((cause) => {
     console.warn("Failed to post listening worker event", cause);
   });
 }
 
-async function fetchBotToken(job: PlayJob) {
+async function fetchBotToken(job: Pick<PlayJob, "roomId">) {
   const response = await fetch(`${ZEO_APP_URL}/api/internal/listening/bot-token`, {
     method: "POST",
     headers: {
@@ -156,6 +183,9 @@ async function fetchBotToken(job: PlayJob) {
 }
 
 async function resolveAudioUrl(videoId: string) {
+  const cached = audioUrlCache.get(videoId);
+  if (cached) return cached;
+
   if (!YT_DLP_BIN) throw new Error("yt-dlp not found on PATH");
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const base = ytDlpBaseArgs();
@@ -179,7 +209,10 @@ async function resolveAudioUrl(videoId: string) {
         .split("\n")
         .map((line) => line.trim())
         .find(Boolean);
-      if (audioUrl) return audioUrl;
+      if (audioUrl) {
+        audioUrlCache.set(videoId, audioUrl);
+        return audioUrl;
+      }
       lastError = "yt-dlp did not return an audio URL";
       continue;
     }
@@ -196,7 +229,13 @@ async function resolveAudioUrl(videoId: string) {
   throw new Error(lastError);
 }
 
-async function connectRtc(job: PlayJob) {
+function canReuseRtc(state: PlaybackState, existing?: RtcSession | null) {
+  return Boolean(
+    existing && existing.roomId === state.roomId && existing.livekitRoomName === state.livekitRoomName && existing.botIdentity === state.botIdentity
+  );
+}
+
+async function connectRtc(job: PlayJob): Promise<RtcSession> {
   const rtc = await dynamicImport("@livekit/rtc-node");
   const bot = await fetchBotToken(job);
   const room = new rtc.Room();
@@ -210,15 +249,51 @@ async function connectRtc(job: PlayJob) {
   const sourceGrant = rtc.TrackSource?.SOURCE_MICROPHONE ?? rtc.TrackSource?.MICROPHONE ?? "microphone";
   await room.localParticipant.publishTrack(track, { source: sourceGrant });
 
-  return { rtc, room, source };
+  return {
+    rtc,
+    room,
+    source,
+    track,
+    roomId: job.roomId,
+    livekitRoomName: job.livekitRoomName,
+    botIdentity: job.botIdentity,
+  };
+}
+
+async function ensureRtc(state: PlaybackState) {
+  if (canReuseRtc(state, state.rtcSession)) {
+    return state.rtcSession!;
+  }
+
+  if (state.rtcSession) {
+    await state.rtcSession.room.disconnect?.();
+    state.rtcSession = undefined;
+  }
+
+  const session = await connectRtc(state);
+  state.rtcSession = session;
+  return session;
+}
+
+async function stopFfmpeg(state: PlaybackState) {
+  state.pumpToken += 1;
+  const ffmpeg = state.ffmpeg;
+  state.ffmpeg = undefined;
+  if (!ffmpeg) return;
+  try {
+    ffmpeg.kill();
+  } catch {
+    // already exited
+  }
+  await ffmpeg.exited.catch(() => undefined);
 }
 
 async function pumpFfmpegToLiveKit(state: PlaybackState, audioUrl: string) {
   if (!FFMPEG_BIN) throw new Error("ffmpeg not found on PATH");
-  const { rtc, room, source } = await connectRtc(state);
-  state.room = room;
+  const { rtc, source } = await ensureRtc(state);
+  const pumpToken = state.pumpToken;
 
-  const seekSeconds = Math.max(0, Math.floor((state.positionMs ?? 0) / 1000));
+  const seekSeconds = Math.max(0, (state.positionMs ?? 0) / 1000);
   const args = [
     "-hide_banner",
     "-loglevel",
@@ -244,27 +319,50 @@ async function pumpFfmpegToLiveKit(state: PlaybackState, audioUrl: string) {
 
   const reader = ffmpeg.stdout.getReader();
   let pending = new Uint8Array(0);
+  let lastHeartbeatAt = 0;
 
-  while (!state.stopped) {
+  while (!state.stopped && state.pumpToken === pumpToken) {
     const { value, done } = await reader.read();
     if (done) break;
     pending = concatBytes(pending, value);
 
-    while (pending.byteLength >= FRAME_BYTES && !state.stopped) {
-      while (state.paused && !state.stopped) {
+    while (pending.byteLength >= FRAME_BYTES && !state.stopped && state.pumpToken === pumpToken) {
+      while (state.paused && !state.stopped && state.pumpToken === pumpToken) {
         await Bun.sleep(50);
       }
+      if (state.stopped || state.pumpToken !== pumpToken) break;
 
       const frameBytes = pending.slice(0, FRAME_BYTES);
       pending = pending.slice(FRAME_BYTES);
       const samples = new Int16Array(frameBytes.buffer, frameBytes.byteOffset, frameBytes.byteLength / 2);
       const frame = new rtc.AudioFrame(samples, SAMPLE_RATE, CHANNELS, FRAME_SAMPLES_PER_CHANNEL);
       await source.captureFrame(frame);
+
+      state.positionMs = Math.max(0, Math.round(state.positionMs + FRAME_MS));
+
+      if (!state.started) {
+        state.started = true;
+        await postWorkerEvent(state.sessionId, "playback_started", {
+          generation: state.generation,
+          positionMs: state.positionMs,
+        });
+        lastHeartbeatAt = Date.now();
+      } else if (Date.now() - lastHeartbeatAt >= POSITION_HEARTBEAT_MS) {
+        lastHeartbeatAt = Date.now();
+        void postWorkerEvent(state.sessionId, "position", {
+          generation: state.generation,
+          positionMs: state.positionMs,
+        });
+      }
     }
   }
 
   const exitCode = await ffmpeg.exited;
-  if (!state.stopped && exitCode !== 0) {
+  if (state.ffmpeg === ffmpeg) {
+    state.ffmpeg = undefined;
+  }
+
+  if (!state.stopped && state.pumpToken === pumpToken && exitCode !== 0) {
     const stderr = await new Response(ffmpeg.stderr).text();
     throw new Error(stderr.trim() || "ffmpeg failed");
   }
@@ -277,40 +375,76 @@ function concatBytes(left: Uint8Array, right: Uint8Array) {
   return merged;
 }
 
-async function stopJob(sessionId: string, notify = false) {
+async function stopJob(sessionId: string, options?: { keepRtc?: boolean }) {
   const existing = activeJobs.get(sessionId);
-  if (!existing) return;
+  if (!existing) return null;
 
   existing.stopped = true;
-  existing.ffmpeg?.kill();
-  await existing.room?.disconnect?.();
-  activeJobs.delete(sessionId);
+  await stopFfmpeg(existing);
 
-  if (notify) {
-    await postWorkerEvent(sessionId, "track_ended");
+  const rtcSession = existing.rtcSession;
+  if (!options?.keepRtc) {
+    await rtcSession?.room.disconnect?.();
+    existing.rtcSession = undefined;
   }
+
+  activeJobs.delete(sessionId);
+  return { rtcSession: options?.keepRtc ? rtcSession : undefined, audioUrl: existing.audioUrl, videoId: existing.videoId };
 }
 
-async function startPlay(job: PlayJob) {
-  await stopJob(job.sessionId);
-  const state: PlaybackState = { ...job, stopped: false, paused: false };
+async function startPlay(job: PlayJob, reused?: { rtcSession?: RtcSession; audioUrl?: string }) {
+  const prior = await stopJob(job.sessionId, { keepRtc: Boolean(reused?.rtcSession) });
+  const rtcSession = reused?.rtcSession ?? prior?.rtcSession;
+  const state: PlaybackState = {
+    ...job,
+    positionMs: Math.max(0, job.positionMs ?? 0),
+    stopped: false,
+    paused: false,
+    started: false,
+    pumpToken: 0,
+    rtcSession: canReuseRtc({ ...job, stopped: false, paused: false, started: false, positionMs: 0, pumpToken: 0 }, rtcSession)
+      ? rtcSession
+      : undefined,
+    audioUrl: reused?.audioUrl,
+  };
   activeJobs.set(job.sessionId, state);
 
   try {
-    const audioUrl = await resolveAudioUrl(job.videoId);
+    const audioUrl = state.audioUrl && state.videoId === job.videoId ? state.audioUrl : await resolveAudioUrl(job.videoId);
+    state.audioUrl = audioUrl;
     await pumpFfmpegToLiveKit(state, audioUrl);
-    activeJobs.delete(job.sessionId);
-    if (!state.stopped) {
-      await postWorkerEvent(job.sessionId, "track_ended");
+
+    const current = activeJobs.get(job.sessionId);
+    if (current === state) {
+      activeJobs.delete(job.sessionId);
+      if (!state.stopped) {
+        await postWorkerEvent(job.sessionId, "track_ended", {
+          generation: state.generation,
+          positionMs: state.positionMs,
+        });
+      }
     }
   } catch (cause) {
-    activeJobs.delete(job.sessionId);
+    const current = activeJobs.get(job.sessionId);
+    if (current === state) {
+      activeJobs.delete(job.sessionId);
+    }
     if (!state.stopped) {
       const message = cause instanceof Error ? cause.message : "Playback failed";
-      await postWorkerEvent(job.sessionId, "track_error", message);
+      await postWorkerEvent(job.sessionId, "track_error", {
+        generation: state.generation,
+        positionMs: state.positionMs,
+        errorMessage: message,
+      });
     }
   } finally {
-    await state.room?.disconnect?.();
+    const current = activeJobs.get(job.sessionId);
+    if (current !== state) {
+      // A newer job owns the RTC session.
+      return;
+    }
+    await state.rtcSession?.room.disconnect?.();
+    state.rtcSession = undefined;
   }
 }
 
@@ -326,24 +460,55 @@ async function handleJob(request: Request, path: string) {
     return json({ ok: true });
   }
 
-  const body = (await readJson<{ sessionId?: string; positionMs?: number }>(request)) ?? {};
+  const body = (await readJson<{ sessionId?: string; positionMs?: number; generation?: number }>(request)) ?? {};
   if (!body.sessionId) return json({ error: "sessionId is required" }, 400);
   const state = activeJobs.get(body.sessionId);
 
   if (path === "/jobs/pause") {
-    if (state) state.paused = true;
+    if (state) {
+      if (typeof body.generation === "number" && body.generation < state.generation) {
+        return json({ ok: true, ignored: "stale_generation" });
+      }
+      state.paused = true;
+      await postWorkerEvent(state.sessionId, "paused", {
+        generation: typeof body.generation === "number" ? body.generation : state.generation,
+        positionMs: Math.round(state.positionMs),
+      });
+    }
     return json({ ok: true });
   }
 
   if (path === "/jobs/resume") {
-    if (state) state.paused = false;
+    if (state) {
+      if (typeof body.generation === "number") {
+        state.generation = body.generation;
+      }
+      state.paused = false;
+      // Only ack resume once frames are already flowing; otherwise wait for playback_started.
+      if (state.started) {
+        await postWorkerEvent(state.sessionId, "resumed", {
+          generation: state.generation,
+          positionMs: Math.round(state.positionMs),
+        });
+      }
+    }
     return json({ ok: true });
   }
 
   if (path === "/jobs/seek") {
     if (!state) return json({ ok: true });
-    const restarted: PlayJob = { ...state, positionMs: Math.max(0, body.positionMs ?? 0) };
-    void startPlay(restarted);
+    const generation = typeof body.generation === "number" ? body.generation : state.generation;
+    const restarted: PlayJob = {
+      sessionId: state.sessionId,
+      roomId: state.roomId,
+      livekitRoomName: state.livekitRoomName,
+      videoId: state.videoId,
+      botIdentity: state.botIdentity,
+      generation,
+      positionMs: Math.max(0, body.positionMs ?? 0),
+    };
+    const kept = await stopJob(state.sessionId, { keepRtc: true });
+    void startPlay(restarted, { rtcSession: kept?.rtcSession, audioUrl: kept?.audioUrl ?? state.audioUrl });
     return json({ ok: true });
   }
 

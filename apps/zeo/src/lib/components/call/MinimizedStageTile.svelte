@@ -4,7 +4,7 @@
   import { tileColorForParticipant, type ParticipantColor } from "$lib/participant-colors";
 
   type Props = {
-    kind: "participant" | "screen-share" | "listening";
+    kind: "participant" | "screen-share" | "listening" | "demo";
     participant: LocalParticipant | RemoteParticipant;
     displayName: string;
     localIdentity: string;

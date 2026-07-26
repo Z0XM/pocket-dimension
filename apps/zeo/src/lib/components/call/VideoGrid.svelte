@@ -1,21 +1,22 @@
 <script lang="ts">
   import type { Room } from "livekit-client";
-  import { buildStageTiles, filterStageTiles, type StageTileEntry } from "$lib/call/stage-tiles";
+  import { appendDemoStageTiles, buildStageTiles, filterStageTiles, type StageTileEntry } from "$lib/call/stage-tiles";
   import { computeAutoLayoutFrames, type AutoLayoutPreset } from "$lib/call/auto-layout";
   import { computeGameLayoutFrames, teamColorByUserId } from "$lib/call/game-layout";
   import type { GameSnapshotTeam } from "$lib/server/game/types";
   import type { ListeningSnapshot } from "$lib/server/listening/types";
   import { gridPlacementsKey, readStored, writeStored } from "$lib/browser-storage";
   import { displayNameForParticipant } from "$lib/livekit/screen-share";
-  import { tileColorForParticipant, type ParticipantColor } from "$lib/participant-colors";
+  import { initialsForName } from "$lib/livekit/types";
+  import { PARTICIPANT_COLORS, tileColorForParticipant, type ParticipantColor } from "$lib/participant-colors";
   import {
     applySoftGridSnap,
     clampTilePixelSize,
     computeParticipantGrid,
+    findCenteredPlacement,
     maxTilePixelSizeAtPlacement,
     placementFromPixelOffset,
     placementFromTilePosition,
-    placementsOverlap,
     snapSizeToGrid,
     tilePosition,
     tilePositionFromPlacement,
@@ -49,9 +50,9 @@
     hideNonVideoTiles?: boolean;
     disableSpeakingGlows?: boolean;
     slug?: string;
-    galleryDensity?: number;
     sidebarSplitRatio?: number;
-    pinnedTileKey?: string | null;
+    speakerMainRatio?: number;
+    pinnedTileKeys?: string[];
     minimizedTileKeys?: string[];
     hiddenVideoTileKeys?: string[];
     tileVolumes?: Record<string, number>;
@@ -80,6 +81,9 @@
     onListeningSkip?: () => void;
     onListeningPrevious?: () => void;
     onListeningSeek?: (positionMs: number) => void;
+    onListeningSnapshot?: (snapshot: ListeningSnapshot | null) => void;
+    /** Dev-only placeholder tiles for layout testing. */
+    demoTileCount?: number;
   };
 
   const {
@@ -90,16 +94,16 @@
     mediaRevision = 0,
     gridLayout = null,
     layoutMode = "grid",
-    autoLayoutPreset = "dynamic",
+    autoLayoutPreset = "gallery",
     localMicEnabled,
     localTileColor,
     hideParticipantVideos = false,
     hideNonVideoTiles = false,
     disableSpeakingGlows = false,
     slug = "",
-    galleryDensity = 5,
     sidebarSplitRatio = 0.72,
-    pinnedTileKey = null,
+    speakerMainRatio = 0.72,
+    pinnedTileKeys = [],
     minimizedTileKeys = [],
     hiddenVideoTileKeys = [],
     tileVolumes = {},
@@ -128,6 +132,8 @@
     onListeningSkip,
     onListeningPrevious,
     onListeningSeek,
+    onListeningSnapshot,
+    demoTileCount = 0,
   }: Props = $props();
 
   const isManualGrid = $derived(layoutMode === "grid");
@@ -136,13 +142,15 @@
 
   const gridTiles = $derived.by((): StageTileEntry[] => {
     mediaRevision;
-    return filterStageTiles(
+    demoTileCount;
+    const realTiles = filterStageTiles(
       buildStageTiles(room, {
         listeningActive,
         listeningBotIdentity: listeningSnapshot?.session?.botIdentity ?? null,
       }),
       { hideNonVideo: hideNonVideoTiles }
     );
+    return appendDemoStageTiles(realTiles, room, demoTileCount);
   });
 
   const stageTiles = $derived.by(() => {
@@ -150,14 +158,13 @@
     return gridTiles.filter((tile) => !minimized.has(tile.key));
   });
 
-  const tileLayoutSignature = $derived(gridTiles.map((tile) => tile.key).join("|"));
-
   let gridRoot = $state<HTMLElement | null>(null);
   let tilePlacements = $state<Record<string, GridCellPlacement>>({});
   let customTileSizes = $state<Record<string, { width: number; height: number }>>({});
   let previewSize = $state<{ key: string; width: number; height: number } | null>(null);
   let isResizing = $state(false);
-  let layoutSignature = $state("");
+  /** Sorted stage-tile key set last synced for manual grid (join/leave incremental). */
+  let layoutKeysSignature = $state("");
   let dragState = $state<{
     key: string;
     startPlacement: GridCellPlacement;
@@ -168,54 +175,40 @@
 
   const baseParticipantGrid = $derived.by(() => {
     if (!gridLayout || !isManualGrid) return null;
+    // Packing for the *current* count — only used for cold-start layout / default size hints.
     return computeParticipantGrid(stageTiles.length, gridLayout);
   });
 
+  const singleTileGrid = $derived.by(() => {
+    if (!gridLayout || !isManualGrid) return null;
+    return computeParticipantGrid(1, gridLayout);
+  });
+
   const autoLayoutFrames = $derived.by(() => {
-    if (isManualGrid || !gridLayout) return null;
+    if (isManualGrid || !gridLayout || stageTiles.length === 0) return null;
     mediaRevision;
     return computeAutoLayoutFrames(stageTiles, gridLayout, autoLayoutPreset, activeSpeakerIdentity, {
-      galleryDensity,
       sidebarSplitRatio,
-      pinnedTileKey,
+      speakerMainRatio,
+      pinnedTileKeys,
     });
   });
 
   const gameLayoutFrames = $derived.by(() => {
-    if (!isGameLayout || !gridLayout) return null;
+    if (!isGameLayout || !gridLayout || stageTiles.length === 0) return null;
     mediaRevision;
     return computeGameLayoutFrames(stageTiles, gridLayout, gameTeams, autoLayoutPreset, activeSpeakerIdentity, {
-      galleryDensity,
       sidebarSplitRatio,
-      pinnedTileKey,
+      speakerMainRatio,
+      pinnedTileKeys,
     });
   });
+
+  const pinControlsEnabled = $derived(layoutMode === "auto" && (autoLayoutPreset === "speaker" || autoLayoutPreset === "sidebar"));
 
   const gameTeamColors = $derived(teamColorByUserId(gameTeams));
 
   const canRenderTiles = $derived(Boolean(gridLayout && (isGameLayout ? gameLayoutFrames : isManualGrid ? baseParticipantGrid : autoLayoutFrames)));
-
-  $effect(() => {
-    if (!isManualGrid) {
-      isResizing = false;
-      previewSize = null;
-      dragState = null;
-      customTileSizes = {};
-      resetPlacements();
-    }
-  });
-
-  $effect(() => {
-    const signature = tileLayoutSignature;
-    if (signature !== layoutSignature) {
-      layoutSignature = signature;
-      customTileSizes = {};
-      previewSize = null;
-      isResizing = false;
-      dragState = null;
-      resetPlacements();
-    }
-  });
 
   function readSavedPlacements() {
     if (!slug) return null;
@@ -230,25 +223,150 @@
     }
   }
 
-  function resetPlacements() {
+  function packingSizeAt(index: number) {
+    if (!baseParticipantGrid) return null;
+    const position = tilePosition(baseParticipantGrid, index);
+    return { width: position.width, height: position.height };
+  }
+
+  function defaultNewTileSize(sizes: Record<string, { width: number; height: number }>) {
+    const existing = Object.values(sizes);
+    if (existing.length > 0) {
+      return { ...existing[existing.length - 1] };
+    }
+    if (singleTileGrid) {
+      const position = tilePosition(singleTileGrid, 0);
+      return { width: position.width, height: position.height };
+    }
+    if (!gridLayout) return { width: 160, height: 90 };
+    return { width: gridLayout.cellSize * 4, height: gridLayout.cellSize * 3 };
+  }
+
+  function initializeManualGridPlacements() {
     if (!baseParticipantGrid || !gridLayout) {
       tilePlacements = {};
+      customTileSizes = {};
       return;
     }
 
     const saved = readSavedPlacements();
-    const next: Record<string, GridCellPlacement> = {};
+    const nextPlacements: Record<string, GridCellPlacement> = {};
+    const nextSizes: Record<string, { width: number; height: number }> = {};
 
     for (const [index, tile] of stageTiles.entries()) {
+      const packedSize = packingSizeAt(index) ?? defaultNewTileSize(nextSizes);
+      nextSizes[tile.key] = packedSize;
+
       if (saved?.[tile.key]) {
-        next[tile.key] = saved[tile.key];
+        nextPlacements[tile.key] = saved[tile.key];
       } else {
-        next[tile.key] = placementFromTilePosition(tilePosition(baseParticipantGrid, index), gridLayout);
+        nextPlacements[tile.key] = placementFromTilePosition(tilePosition(baseParticipantGrid, index), gridLayout);
       }
     }
 
-    tilePlacements = next;
+    tilePlacements = nextPlacements;
+    customTileSizes = nextSizes;
   }
+
+  function syncManualGridPlacements() {
+    if (!baseParticipantGrid || !gridLayout) return;
+
+    // Membership follows grid tiles (including minimized) so minimize/restore
+    // keeps the previous placement instead of treating restore as a newcomer.
+    const memberKeys = gridTiles.map((tile) => tile.key);
+    const memberKeySet = new Set(memberKeys);
+    const existingKeys = Object.keys(tilePlacements);
+
+    // Cold start / returning to grid mode with empty state.
+    if (existingKeys.length === 0) {
+      initializeManualGridPlacements();
+      return;
+    }
+
+    let nextPlacements = { ...tilePlacements };
+    let nextSizes = { ...customTileSizes };
+    let changed = false;
+
+    for (const key of existingKeys) {
+      if (!memberKeySet.has(key)) {
+        delete nextPlacements[key];
+        delete nextSizes[key];
+        changed = true;
+      }
+    }
+
+    for (const key of Object.keys(nextSizes)) {
+      if (!memberKeySet.has(key)) {
+        delete nextSizes[key];
+        changed = true;
+      }
+    }
+
+    // Snapshot sizes for existing tiles that somehow lack a stored size.
+    for (const [index, tile] of stageTiles.entries()) {
+      if (nextPlacements[tile.key] && !nextSizes[tile.key]) {
+        nextSizes[tile.key] = packingSizeAt(index) ?? defaultNewTileSize(nextSizes);
+        changed = true;
+      }
+    }
+
+    // Only place visible tiles that don't already have a spot.
+    const newcomers = stageTiles.filter((tile) => !nextPlacements[tile.key]);
+    if (newcomers.length > 0) {
+      for (const tile of newcomers) {
+        const size = defaultNewTileSize(nextSizes);
+        // Avoid overlapping other visible tiles (minimized placements can be reused).
+        const occupied = stageTiles
+          .filter((other) => other.key !== tile.key && nextPlacements[other.key])
+          .map((other) => ({
+            placement: nextPlacements[other.key],
+            size: nextSizes[other.key] ?? size,
+          }));
+        nextPlacements[tile.key] = findCenteredPlacement(gridLayout, size, occupied);
+        nextSizes[tile.key] = size;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      tilePlacements = nextPlacements;
+      customTileSizes = nextSizes;
+    }
+  }
+
+  $effect(() => {
+    if (!isManualGrid) {
+      layoutKeysSignature = "";
+      isResizing = false;
+      previewSize = null;
+      dragState = null;
+      customTileSizes = {};
+      tilePlacements = {};
+      return;
+    }
+
+    if (!gridLayout) return;
+    if (stageTiles.length === 0) {
+      layoutKeysSignature = "";
+      tilePlacements = {};
+      customTileSizes = {};
+      return;
+    }
+    if (!baseParticipantGrid) return;
+
+    const memberKeys = gridTiles.map((tile) => tile.key);
+    const signature = [...memberKeys].sort().join("|");
+    const visibleMissing = stageTiles.some((tile) => !tilePlacements[tile.key]);
+    const extras = Object.keys(tilePlacements).some((key) => !memberKeys.includes(key));
+
+    if (signature === layoutKeysSignature && !visibleMissing && !extras) return;
+
+    layoutKeysSignature = signature;
+    previewSize = null;
+    isResizing = false;
+    dragState = null;
+    syncManualGridPlacements();
+  });
 
   $effect(() => {
     if (!isManualGrid || !slug || Object.keys(tilePlacements).length === 0) return;
@@ -261,18 +379,23 @@
     }
 
     if (customTileSizes[key]) return customTileSizes[key];
-    if (!baseParticipantGrid) return null;
 
-    const position = tilePosition(baseParticipantGrid, index);
-    return { width: position.width, height: position.height };
+    const packed = packingSizeAt(index);
+    if (packed) return packed;
+
+    if (singleTileGrid) {
+      const position = tilePosition(singleTileGrid, 0);
+      return { width: position.width, height: position.height };
+    }
+
+    return null;
   }
 
-  function getPlacement(key: string, index: number): GridCellPlacement | null {
-    if (!gridLayout || !baseParticipantGrid) return null;
+  function getPlacement(key: string, _index: number): GridCellPlacement | null {
+    if (!gridLayout) return null;
     if (dragState?.key === key) return dragState.preview;
     if (tilePlacements[key]) return tilePlacements[key];
-
-    return placementFromTilePosition(tilePosition(baseParticipantGrid, index), gridLayout);
+    return null;
   }
 
   function tileFrame(key: string, index: number) {
@@ -307,6 +430,10 @@
   function displayNameFor(identity: string, name?: string) {
     if (identity === room.localParticipant.identity) return localDisplayName;
     return name || "Participant";
+  }
+
+  function demoTileColor(index: number) {
+    return PARTICIPANT_COLORS[index % PARTICIPANT_COLORS.length];
   }
 
   function tileVideoHidden(key: string) {
@@ -423,21 +550,7 @@
     }
 
     const finalPlacement = placementFromPixelOffset(frame.left, frame.top, size.width, size.height, gridLayout, { softSnap: false });
-
-    const overlapsOther = stageTiles.some((tile, otherIndex) => {
-      if (tile.key === key) return false;
-
-      const otherPlacement = tilePlacements[tile.key] ?? getPlacement(tile.key, otherIndex);
-      const otherSize = defaultTileSize(tile.key, otherIndex);
-      if (!otherPlacement || !otherSize) return false;
-
-      return placementsOverlap(finalPlacement, size, otherPlacement, otherSize, gridLayout.cellSize);
-    });
-
-    if (!overlapsOther) {
-      tilePlacements = { ...tilePlacements, [key]: finalPlacement };
-    }
-
+    tilePlacements = { ...tilePlacements, [key]: finalPlacement };
     dragState = null;
   }
 </script>
@@ -470,8 +583,8 @@
               <TileActionBar
                 videoHidden={tileVideoHidden(tile.key)}
                 fullscreen={fullscreenTileKey === tile.key}
-                pinned={pinnedTileKey === tile.key}
-                showPin={!isManualGrid}
+                pinned={pinnedTileKeys.includes(tile.key)}
+                showPin={pinControlsEnabled}
                 showAudioMute={tile.participant.identity !== room.localParticipant.identity}
                 audioMuted={isTileListenMuted(tileVolumes, tile.key)}
                 onMinimize={() => onMinimizeTile?.(tile.key)}
@@ -482,9 +595,25 @@
               />
             {/snippet}
 
-            {#if tile.kind === "listening"}
+            {#if tile.kind === "demo"}
+              {@const color = demoTileColor(index)}
+              {@const name = tile.label ?? `Demo ${index + 1}`}
+              <div class="relative flex size-full items-center justify-center overflow-hidden rounded-[inherit]" style="background: {color}22;">
+                <div
+                  class="flex size-[min(42%,5.5rem)] items-center justify-center rounded-full text-lg font-semibold text-white shadow-sm sm:text-xl"
+                  style="background: {color};"
+                >
+                  {initialsForName(name)}
+                </div>
+                <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pb-2 pt-6">
+                  <p class="truncate text-xs font-medium text-white sm:text-sm">{name}</p>
+                  <p class="text-[10px] text-white/70">Temporary tile</p>
+                </div>
+              </div>
+            {:else if tile.kind === "listening"}
               <ListeningTile
                 snapshot={listeningSnapshot}
+                {slug}
                 isDj={listeningIsDj}
                 busy={listeningBusy}
                 audioLevel={audioLevels[tile.participant.identity] ?? audioLevels[tile.key] ?? 0}
@@ -495,6 +624,7 @@
                 onSkip={onListeningSkip}
                 onPrevious={onListeningPrevious}
                 onSeek={onListeningSeek}
+                onSnapshot={onListeningSnapshot}
                 onListenVolumeChange={(volume) => onTileVolumeChange?.(tile.key, volume)}
               />
             {:else if tile.kind === "screen-share"}

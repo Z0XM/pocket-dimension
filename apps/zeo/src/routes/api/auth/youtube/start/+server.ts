@@ -16,7 +16,8 @@ export const GET: RequestHandler = async ({ locals, url, cookies }) => {
 
   const state = randomBytes(24).toString("base64url");
   const returnTo = safeReturnTo(url.searchParams.get("returnTo"));
-  cookies.set(STATE_COOKIE, JSON.stringify({ state, returnTo }), {
+  const popup = url.searchParams.get("popup") === "1";
+  cookies.set(STATE_COOKIE, JSON.stringify({ state, returnTo, popup }), {
     path: "/",
     httpOnly: true,
     sameSite: "lax",

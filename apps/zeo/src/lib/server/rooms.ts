@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { db, schema } from "@pocket-dimension/db";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { isListeningBotIdentity } from "$lib/listening/bot-identity";
 import { DEFAULT_MAX_PARTICIPANTS_PER_ROOM } from "./constants";
 import { generateRoomSlug } from "./identity";
 import { countLiveKitParticipants, deleteLiveKitRoom } from "./livekit-room";
@@ -185,6 +186,9 @@ export async function markRoomStale(room: typeof schema.rooms.$inferSelect) {
 
   clearLiveParticipantCount(room.id);
 
+  const { endListeningSessionsForRoom } = await import("$lib/server/listening/sessions");
+  await endListeningSessionsForRoom(room.id);
+
   try {
     await deleteLiveKitRoom(room.livekitRoomName);
   } catch {
@@ -214,6 +218,9 @@ export async function endRoom(
     .where(eq(schema.rooms.id, room.id));
 
   clearLiveParticipantCount(room.id);
+
+  const { endListeningSessionsForRoom } = await import("$lib/server/listening/sessions");
+  await endListeningSessionsForRoom(room.id);
 
   if (!options?.skipLiveKit) {
     try {
@@ -248,6 +255,11 @@ export async function endRoomById(roomId: string, options?: { reason?: string; s
 }
 
 export async function recordParticipantJoined(options: { roomId: string; identity: string; displayName?: string }) {
+  // Listening bots keep music playing; they must not count as human occupancy.
+  if (isListeningBotIdentity(options.identity)) {
+    return;
+  }
+
   const existing = await db.query.roomParticipants.findFirst({
     where: and(
       eq(schema.roomParticipants.roomId, options.roomId),
@@ -273,6 +285,10 @@ export async function recordParticipantJoined(options: { roomId: string; identit
 }
 
 export async function recordParticipantLeft(options: { roomId: string; identity: string }) {
+  if (isListeningBotIdentity(options.identity)) {
+    return;
+  }
+
   const openRow = await db.query.roomParticipants.findFirst({
     where: and(
       eq(schema.roomParticipants.roomId, options.roomId),
@@ -312,7 +328,7 @@ export async function countActiveParticipantsFromDb(roomId: string) {
   const rows = await db.query.roomParticipants.findMany({
     where: and(eq(schema.roomParticipants.roomId, roomId), isNull(schema.roomParticipants.leftAt)),
   });
-  return rows.length;
+  return rows.filter((row) => !isListeningBotIdentity(row.participantIdentity)).length;
 }
 
 export function isRoomFull(participantCount: number, maxParticipants = DEFAULT_MAX_PARTICIPANTS_PER_ROOM) {

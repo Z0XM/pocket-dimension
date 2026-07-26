@@ -225,6 +225,13 @@
       "when": 1785000000000,
       "tag": "0031_zeo_shared_listening",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1785001000000,
+      "tag": "0032_zeo_listening_playback_clock",
+      "breakpoints": true
     }
   ]
 }

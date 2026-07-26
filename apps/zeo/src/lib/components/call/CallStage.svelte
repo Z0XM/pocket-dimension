@@ -28,9 +28,9 @@
     disableSpeakingGlows?: boolean;
     layoutMode?: StageLayoutMode;
     autoLayoutPreset?: AutoLayoutPreset;
-    galleryDensity?: number;
     sidebarSplitRatio?: number;
-    pinnedTileKey?: string | null;
+    speakerMainRatio?: number;
+    pinnedTileKeys?: string[];
     bottomInset?: number;
     minimizedTileKeys?: string[];
     hiddenVideoTileKeys?: string[];
@@ -53,8 +53,8 @@
     onLayoutModeChange?: (mode: StageLayoutMode) => void;
     onAutoLayoutPresetChange?: (preset: AutoLayoutPreset) => void;
     onHideNonVideoTilesChange?: (value: boolean) => void;
-    onGalleryDensityChange?: (value: number) => void;
     onSidebarSplitRatioChange?: (value: number) => void;
+    onSpeakerMainRatioChange?: (value: number) => void;
     onHideSelfView?: () => void;
     onCloseGridSettings?: () => void;
     layoutLocked?: boolean;
@@ -67,11 +67,14 @@
     onListeningSkip?: () => void;
     onListeningPrevious?: () => void;
     onListeningSeek?: (positionMs: number) => void;
+    onListeningSnapshot?: (snapshot: ListeningSnapshot | null) => void;
     stageRef?: HTMLElement | null;
     trackingOverlayVisible?: boolean;
     handLandmarks?: HandLandmark[] | null;
     handGesture?: DetectedGesture;
     handGestureHoldProgress?: number;
+    /** Dev-only placeholder tiles for layout testing. */
+    demoTileCount?: number;
   };
 
   let {
@@ -87,10 +90,10 @@
     hideNonVideoTiles = false,
     disableSpeakingGlows = false,
     layoutMode = "grid",
-    autoLayoutPreset = "dynamic",
-    galleryDensity = 5,
+    autoLayoutPreset = "gallery",
     sidebarSplitRatio = 0.72,
-    pinnedTileKey = null,
+    speakerMainRatio = 0.72,
+    pinnedTileKeys = [],
     bottomInset = 0,
     minimizedTileKeys = [],
     hiddenVideoTileKeys = [],
@@ -113,8 +116,8 @@
     onLayoutModeChange,
     onAutoLayoutPresetChange,
     onHideNonVideoTilesChange,
-    onGalleryDensityChange,
     onSidebarSplitRatioChange,
+    onSpeakerMainRatioChange,
     onHideSelfView,
     onCloseGridSettings,
     layoutLocked = false,
@@ -127,11 +130,13 @@
     onListeningSkip,
     onListeningPrevious,
     onListeningSeek,
+    onListeningSnapshot,
     stageRef = $bindable(null),
     trackingOverlayVisible = false,
     handLandmarks = null,
     handGesture = "none",
     handGestureHoldProgress = 0,
+    demoTileCount = 0,
   }: Props = $props();
 
   let stageEl = $state<HTMLElement | null>(null);
@@ -184,9 +189,9 @@
         gridLayout={layout}
         {layoutMode}
         {autoLayoutPreset}
-        {galleryDensity}
         {sidebarSplitRatio}
-        {pinnedTileKey}
+        {speakerMainRatio}
+        {pinnedTileKeys}
         {localMicEnabled}
         {localTileColor}
         {hideParticipantVideos}
@@ -220,6 +225,8 @@
         {onListeningSkip}
         {onListeningPrevious}
         {onListeningSeek}
+        {onListeningSnapshot}
+        {demoTileCount}
       />
     {/snippet}
   </StageGridArea>
@@ -230,15 +237,15 @@
       {autoLayoutPreset}
       bottomInset={stageFullscreen ? 0 : bottomInset}
       {hideNonVideoTiles}
-      {galleryDensity}
       {sidebarSplitRatio}
+      {speakerMainRatio}
       {selfViewHidden}
       {layoutLocked}
       {onLayoutModeChange}
       {onAutoLayoutPresetChange}
       {onHideNonVideoTilesChange}
-      {onGalleryDensityChange}
       {onSidebarSplitRatioChange}
+      {onSpeakerMainRatioChange}
       {onHideSelfView}
       onClose={onCloseGridSettings}
     />
