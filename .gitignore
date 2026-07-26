@@ -66,3 +66,6 @@ next-env.d.ts
 
 # chhan-chhan local data (bank statements, imports, etc.)
 apps/chhan-chhan/data/
+
+# cookies
+cookies.txt
