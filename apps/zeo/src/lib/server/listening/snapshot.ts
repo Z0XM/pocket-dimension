@@ -1,6 +1,7 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { displayNameForUser } from "$lib/server/authz";
+import { isListeningMediaReady, listListeningMediaReady } from "./media-ready";
 import type { ListeningSnapshot, ListeningSnapshotQueueItem, ListeningSnapshotSession } from "./types";
 
 export function emptyListeningSnapshot(): ListeningSnapshot {
@@ -10,6 +11,7 @@ export function emptyListeningSnapshot(): ListeningSnapshot {
     session: null,
     currentItem: null,
     queue: [],
+    prefetchedVideoIds: [],
   };
 }
 
@@ -56,6 +58,7 @@ function serializeQueueItem(item: typeof schema.listeningQueueItems.$inferSelect
     addedByUserId: item.addedByUserId,
     addedByDisplayName: userNames.get(item.addedByUserId) ?? "Listener",
     createdAt: item.createdAt.toISOString(),
+    prefetched: isListeningMediaReady(item.videoId),
   };
 }
 
@@ -79,6 +82,7 @@ export async function buildListeningSnapshot(sessionId: string): Promise<Listeni
     session: serializeSession(session),
     currentItem: queue.find((item) => item.id === session.currentQueueItemId) ?? null,
     queue,
+    prefetchedVideoIds: listListeningMediaReady(),
   };
 }
 

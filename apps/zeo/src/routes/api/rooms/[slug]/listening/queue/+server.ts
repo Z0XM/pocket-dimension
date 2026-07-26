@@ -23,6 +23,7 @@ const addQueueItemSchema = z
     thumbnailUrl: z.string().url().nullable().optional(),
     durationMs: z.number().int().nonnegative().nullable().optional(),
     source: z.enum(["library_yt", "library_ytm", "search", "url"]).optional(),
+    placement: z.enum(["next", "last"]).optional(),
   })
   .refine((value) => value.videoId || value.url, "videoId or url is required");
 
@@ -76,6 +77,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
         thumbnailUrl: body.thumbnailUrl ?? metadata?.thumbnailUrl ?? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
         durationMs: body.durationMs ?? metadata?.durationMs ?? null,
         source: body.source ?? (body.url ? "url" : "search"),
+        placement: body.placement ?? "last",
       })
     );
   } catch (cause) {

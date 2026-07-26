@@ -46,7 +46,7 @@ export const POST: RequestHandler = async ({ locals, params }) => {
   await requireRoomMember(room, user.id);
 
   try {
-    return json(await startListeningSession({ roomId: room.id, userId: user.id }));
+    return json(await startListeningSession({ roomId: room.id, userId: user.id, livekitRoomName: room.livekitRoomName }));
   } catch (cause) {
     handleListeningError(cause);
   }

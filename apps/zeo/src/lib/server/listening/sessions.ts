@@ -1,5 +1,5 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, isNull, lt, sql } from "drizzle-orm";
 import { listOpenParticipants } from "$lib/server/rooms";
 import { listeningEventBus } from "./event-bus";
 import { buildListeningSnapshot, buildListeningSnapshotForRoom } from "./snapshot";
@@ -52,7 +52,7 @@ async function requireYouTubeLink(userId: string) {
   return link;
 }
 
-export async function startListeningSession(input: { roomId: string; userId: string }) {
+export async function startListeningSession(input: { roomId: string; userId: string; livekitRoomName: string }) {
   await requireYouTubeLink(input.userId);
 
   const existing = await findActiveListeningSession(input.roomId);
@@ -61,6 +61,7 @@ export async function startListeningSession(input: { roomId: string; userId: str
   }
 
   const now = new Date();
+  const botIdentity = `listening-bot:${input.roomId}`;
   const [session] = await db
     .insert(schema.listeningSessions)
     .values({
@@ -73,10 +74,18 @@ export async function startListeningSession(input: { roomId: string; userId: str
       positionUpdatedAt: now,
       playbackGeneration: 0,
       errorMessage: null,
-      botIdentity: `listening-bot:${input.roomId}`,
+      botIdentity,
       createdAt: now,
     })
     .returning();
+
+  // Connect the LiveKit bot immediately so the first play skips RTC join latency.
+  void listeningWorkerBridge.prepare({
+    sessionId: session.id,
+    roomId: input.roomId,
+    livekitRoomName: input.livekitRoomName,
+    botIdentity,
+  });
 
   const snapshot = await publishListeningSnapshot(session.id);
   return snapshot!;
@@ -98,7 +107,7 @@ export async function endListeningSession(input: { roomId: string; sessionId: st
     .set({ playbackState: "idle", endedAt: new Date(), errorMessage: null })
     .where(and(eq(schema.listeningSessions.id, input.sessionId), eq(schema.listeningSessions.roomId, input.roomId)));
 
-  await listeningWorkerBridge.stop(input.sessionId);
+  await listeningWorkerBridge.stop(input.sessionId, { teardown: true });
 
   const snapshot = await buildListeningSnapshot(input.sessionId);
   if (snapshot) {
@@ -144,6 +153,27 @@ async function currentQueueCount(sessionId: string) {
   return rows[0]?.count ?? 0;
 }
 
+function scheduleWarmForVideo(sessionId: string, videoId: string) {
+  void listeningWorkerBridge.prefetch([videoId]);
+  void listeningWorkerBridge.warm({ sessionId, videoId });
+}
+
+async function scheduleWarmNext(session: ListeningSession) {
+  const next = await nextQueueItem(session);
+  if (next) {
+    scheduleWarmForVideo(session.id, next.videoId);
+    return;
+  }
+
+  // Idle / nothing current: warm the first queued track so Play is snappy.
+  if (!session.currentQueueItemId || session.playbackState === "idle") {
+    const first = await firstQueueItem(session.id);
+    if (first) {
+      scheduleWarmForVideo(session.id, first.videoId);
+    }
+  }
+}
+
 export async function enqueueListeningItem(input: {
   roomId: string;
   addedByUserId: string;
@@ -153,6 +183,8 @@ export async function enqueueListeningItem(input: {
   thumbnailUrl?: string | null;
   durationMs?: number | null;
   source: ListeningQueueSource;
+  /** `next` inserts immediately after the current track (or at the front if idle). `last` appends. */
+  placement?: "next" | "last";
 }) {
   const session = await activeSessionOrThrow(input.roomId);
   const count = await currentQueueCount(session.id);
@@ -160,23 +192,57 @@ export async function enqueueListeningItem(input: {
     throw codedError("queue_limit_reached");
   }
 
-  const [{ position }] = await db
-    .select({ position: sql<number>`coalesce(max(${schema.listeningQueueItems.position}), -1) + 1` })
-    .from(schema.listeningQueueItems)
-    .where(eq(schema.listeningQueueItems.sessionId, session.id));
+  const placement = input.placement ?? "last";
+  const isActivelyPlaying = Boolean(session.currentQueueItemId) && session.playbackState !== "idle";
+  const current = isActivelyPlaying && session.currentQueueItemId ? await queueItemById(session.id, session.currentQueueItemId) : null;
 
-  await db.insert(schema.listeningQueueItems).values({
-    sessionId: session.id,
-    position,
-    videoId: input.videoId,
-    title: input.title?.trim() || input.videoId,
-    channelTitle: input.channelTitle ?? null,
-    thumbnailUrl: input.thumbnailUrl ?? null,
-    durationMs: input.durationMs ?? null,
-    source: input.source,
-    addedByUserId: input.addedByUserId,
-    createdAt: new Date(),
+  await db.transaction(async (tx) => {
+    let position: number;
+    if (placement === "next") {
+      position = current ? current.position + 1 : 0;
+      // Shift high → low to avoid (session_id, position) unique collisions.
+      const toShift = await tx.query.listeningQueueItems.findMany({
+        where: and(eq(schema.listeningQueueItems.sessionId, session.id), gte(schema.listeningQueueItems.position, position)),
+        orderBy: [desc(schema.listeningQueueItems.position)],
+      });
+      for (const item of toShift) {
+        await tx
+          .update(schema.listeningQueueItems)
+          .set({ position: item.position + 1 })
+          .where(eq(schema.listeningQueueItems.id, item.id));
+      }
+    } else {
+      const [{ nextPosition }] = await tx
+        .select({ nextPosition: sql<number>`coalesce(max(${schema.listeningQueueItems.position}), -1) + 1` })
+        .from(schema.listeningQueueItems)
+        .where(eq(schema.listeningQueueItems.sessionId, session.id));
+      position = nextPosition;
+    }
+
+    await tx.insert(schema.listeningQueueItems).values({
+      sessionId: session.id,
+      position,
+      videoId: input.videoId,
+      title: input.title?.trim() || input.videoId,
+      channelTitle: input.channelTitle ?? null,
+      thumbnailUrl: input.thumbnailUrl ?? null,
+      durationMs: input.durationMs ?? null,
+      source: input.source,
+      addedByUserId: input.addedByUserId,
+      createdAt: new Date(),
+    });
   });
+
+  // Always resolve the URL into the worker cache; warm PCM when this is about to play next.
+  void listeningWorkerBridge.prefetch([input.videoId]);
+  if (placement === "next" || !isActivelyPlaying) {
+    scheduleWarmForVideo(session.id, input.videoId);
+  } else {
+    const next = await nextQueueItem(session);
+    if (!next || next.videoId === input.videoId) {
+      scheduleWarmForVideo(session.id, input.videoId);
+    }
+  }
 
   return publishListeningSnapshot(session.id);
 }
@@ -281,6 +347,9 @@ async function playQueueItem(room: RoomLike, session: ListeningSession, item: ty
     botIdentity: session.botIdentity,
   });
 
+  // Warm the following track while this one loads/plays.
+  void scheduleWarmNext({ ...session, currentQueueItemId: item.id, playbackState: "loading" });
+
   return publishListeningSnapshot(session.id);
 }
 
@@ -309,22 +378,47 @@ export async function playListening(room: RoomLike) {
   return playQueueItem(room, session, item, session.currentQueueItemId === item.id ? session.positionMs : 0);
 }
 
+export async function playListeningQueueItem(room: RoomLike, itemId: string) {
+  const session = await activeSessionOrThrow(room.id);
+  const item = await queueItemById(session.id, itemId);
+  if (!item) {
+    throw codedError("queue_item_not_found");
+  }
+  return playQueueItem(room, session, item, 0);
+}
+
 export async function pauseListening(roomId: string) {
   const session = await activeSessionOrThrow(roomId);
   const now = new Date();
   const positionMs = estimatedPositionMs(session, now);
+  const generation = session.playbackGeneration + 1;
+
+  // Surface loading immediately so every client can show a spinner while the worker acks.
+  // Bump generation so a late playback_started from the prior play cannot clear this.
+  await db
+    .update(schema.listeningSessions)
+    .set({
+      playbackState: "loading",
+      positionMs,
+      positionUpdatedAt: now,
+      playbackGeneration: generation,
+      errorMessage: null,
+    })
+    .where(eq(schema.listeningSessions.id, session.id));
+  void publishListeningSnapshot(session.id);
+
+  await listeningWorkerBridge.pause(session.id, generation);
 
   await db
     .update(schema.listeningSessions)
     .set({
       playbackState: "paused",
       positionMs,
-      positionUpdatedAt: now,
+      positionUpdatedAt: new Date(),
       errorMessage: null,
     })
     .where(eq(schema.listeningSessions.id, session.id));
 
-  await listeningWorkerBridge.pause(session.id, session.playbackGeneration);
   return publishListeningSnapshot(session.id);
 }
 
@@ -509,6 +603,11 @@ export async function handleListeningWorkerEvent(input: ListeningWorkerEventInpu
         errorMessage: null,
       })
       .where(eq(schema.listeningSessions.id, session.id));
+
+    if (input.event === "playback_started") {
+      void scheduleWarmNext({ ...session, playbackState: "playing" });
+    }
+
     return publishListeningSnapshot(session.id);
   }
 

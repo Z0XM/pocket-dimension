@@ -359,7 +359,7 @@
       const response = await fetch(`/api/rooms/${slug}/listening/seek`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ positionMs }),
+        body: JSON.stringify({ positionMs: Math.round(positionMs) }),
       });
       if (!response.ok) return;
       const next = (await response.json()) as ListeningSnapshot;

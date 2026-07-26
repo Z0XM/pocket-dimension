@@ -99,6 +99,36 @@ function durationToMs(duration: string | undefined) {
   return Number(days) * 24 * 60 * 60 * 1000 + Number(hours) * 60 * 60 * 1000 + Number(minutes) * 60 * 1000 + Number(seconds) * 1000;
 }
 
+/** YouTube Data API snippet titles often include HTML entities (e.g. `&quot;`). */
+const HTML_NAMED_ENTITIES: Record<string, string> = {
+  quot: '"',
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  apos: "'",
+  nbsp: " ",
+};
+
+function decodeHtmlEntities(value: string): string {
+  return value.replace(/&(#(?:x[0-9a-fA-F]+|\d+)|[a-zA-Z]+);/g, (match, entity: string) => {
+    if (entity[0] === "#") {
+      const code = entity[1] === "x" || entity[1] === "X" ? Number.parseInt(entity.slice(2), 16) : Number.parseInt(entity.slice(1), 10);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+    }
+    return HTML_NAMED_ENTITIES[entity] ?? match;
+  });
+}
+
+function youtubeText(value: string | null | undefined, fallback: string): string {
+  const trimmed = value?.trim();
+  return trimmed ? decodeHtmlEntities(trimmed) : fallback;
+}
+
+function youtubeTextOrNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? decodeHtmlEntities(trimmed) : null;
+}
+
 function bestThumbnail(thumbnails: unknown) {
   if (!thumbnails || typeof thumbnails !== "object") return null;
   const values = Object.values(thumbnails as Record<string, { url?: string; width?: number }>);
@@ -156,7 +186,7 @@ export async function listYouTubePlaylists(userId: string): Promise<YouTubePlayl
     { id: "LL", title: "Liked videos", thumbnailUrl: null, itemCount: null, source: "library_yt" },
     ...(body.items ?? []).map((item) => ({
       id: item.id,
-      title: item.snippet?.title ?? "Untitled playlist",
+      title: youtubeText(item.snippet?.title, "Untitled playlist"),
       thumbnailUrl: bestThumbnail(item.snippet?.thumbnails),
       itemCount: item.contentDetails?.itemCount ?? null,
       source: "library_yt" as const,
@@ -190,8 +220,8 @@ export async function listYouTubePlaylistItems(userId: string, playlistId: strin
     const details = metadata.get(videoId);
     results.push({
       videoId,
-      title: item.snippet?.title ?? details?.title ?? "Untitled video",
-      channelTitle: item.snippet?.channelTitle ?? details?.channelTitle ?? null,
+      title: youtubeText(item.snippet?.title ?? details?.title, "Untitled video"),
+      channelTitle: youtubeTextOrNull(item.snippet?.channelTitle ?? details?.channelTitle),
       thumbnailUrl: bestThumbnail(item.snippet?.thumbnails) ?? details?.thumbnailUrl ?? null,
       durationMs: details?.durationMs ?? null,
       source: "library_yt",
@@ -220,8 +250,8 @@ export async function searchYouTubeVideos(query: string, accessToken?: string): 
     const details = metadata.get(videoId);
     results.push({
       videoId,
-      title: item.snippet?.title ?? details?.title ?? "Untitled video",
-      channelTitle: item.snippet?.channelTitle ?? details?.channelTitle ?? null,
+      title: youtubeText(item.snippet?.title ?? details?.title, "Untitled video"),
+      channelTitle: youtubeTextOrNull(item.snippet?.channelTitle ?? details?.channelTitle),
       thumbnailUrl: bestThumbnail(item.snippet?.thumbnails) ?? details?.thumbnailUrl ?? null,
       durationMs: details?.durationMs ?? null,
       source: "search",
@@ -241,8 +271,8 @@ async function resolveYouTubeVideoViaOEmbed(videoId: string): Promise<YouTubeVid
     const body = (await response.json()) as { title?: string; author_name?: string; thumbnail_url?: string };
     return {
       videoId,
-      title: body.title?.trim() || videoId,
-      channelTitle: body.author_name?.trim() || null,
+      title: youtubeText(body.title, videoId),
+      channelTitle: youtubeTextOrNull(body.author_name),
       thumbnailUrl: body.thumbnail_url?.trim() || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
       durationMs: null,
       source: "url",
@@ -292,8 +322,8 @@ async function videoMetadataMap(videoIds: string[], accessToken?: string) {
       item.id,
       {
         videoId: item.id,
-        title: item.snippet?.title ?? "Untitled video",
-        channelTitle: item.snippet?.channelTitle ?? null,
+        title: youtubeText(item.snippet?.title, "Untitled video"),
+        channelTitle: youtubeTextOrNull(item.snippet?.channelTitle),
         thumbnailUrl: bestThumbnail(item.snippet?.thumbnails),
         durationMs: durationToMs(item.contentDetails?.duration),
         source: "search" as const,

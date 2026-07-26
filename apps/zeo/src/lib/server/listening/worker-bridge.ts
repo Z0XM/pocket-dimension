@@ -1,13 +1,16 @@
 import { env } from "$lib/server/env";
 
-type WorkerPlayJob = {
+type WorkerSessionJob = {
   sessionId: string;
   roomId: string;
   livekitRoomName: string;
+  botIdentity: string;
+};
+
+type WorkerPlayJob = WorkerSessionJob & {
   videoId: string;
   positionMs?: number;
   generation: number;
-  botIdentity: string;
 };
 
 function workerBaseUrl() {
@@ -42,6 +45,20 @@ async function postWorkerJob(path: string, body: unknown) {
 }
 
 export const listeningWorkerBridge = {
+  /** Connect the LiveKit listening bot early and keep it for the session. */
+  prepare(job: WorkerSessionJob) {
+    return postWorkerJob("/jobs/prepare", job);
+  },
+  /** Resolve yt-dlp audio URLs into the worker cache (fire-and-forget). */
+  prefetch(videoIds: string[]) {
+    const ids = [...new Set(videoIds.filter(Boolean))];
+    if (ids.length === 0) return;
+    return postWorkerJob("/jobs/prefetch", { videoIds: ids });
+  },
+  /** Prefetch URL + prebuffer PCM for the likely next track. */
+  warm(input: { sessionId: string; videoId: string }) {
+    return postWorkerJob("/jobs/warm", input);
+  },
   play(job: WorkerPlayJob) {
     return postWorkerJob("/jobs/play", job);
   },
@@ -57,7 +74,8 @@ export const listeningWorkerBridge = {
   skip(sessionId: string) {
     return postWorkerJob("/jobs/skip", { sessionId });
   },
-  stop(sessionId: string) {
-    return postWorkerJob("/jobs/stop", { sessionId });
+  /** Stop current playback. Pass teardown to also disconnect the session bot. */
+  stop(sessionId: string, options?: { teardown?: boolean }) {
+    return postWorkerJob("/jobs/stop", { sessionId, teardown: Boolean(options?.teardown) });
   },
 };

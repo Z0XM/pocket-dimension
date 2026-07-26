@@ -7,7 +7,12 @@ import { findActiveListeningSession, requireListeningDj, seekListening } from "$
 import { findRoomBySlug } from "$lib/server/rooms";
 import type { RequestHandler } from "./$types";
 
-const seekSchema = z.object({ positionMs: z.number().int().nonnegative() });
+const seekSchema = z.object({
+  positionMs: z
+    .number()
+    .nonnegative()
+    .transform((ms) => Math.round(ms)),
+});
 
 export const POST: RequestHandler = async ({ locals, params, request }) => {
   const user = requireUser(locals);

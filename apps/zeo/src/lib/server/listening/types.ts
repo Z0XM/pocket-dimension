@@ -30,6 +30,8 @@ export type ListeningSnapshotQueueItem = {
   addedByUserId: string;
   addedByDisplayName: string;
   createdAt: string;
+  /** True when the music worker has already resolved this video's audio URL. */
+  prefetched: boolean;
 };
 
 export type ListeningSnapshot = {
@@ -38,4 +40,6 @@ export type ListeningSnapshot = {
   session: ListeningSnapshotSession | null;
   currentItem: ListeningSnapshotQueueItem | null;
   queue: ListeningSnapshotQueueItem[];
+  /** Video IDs known ready in the worker (for search results, etc.). */
+  prefetchedVideoIds: string[];
 };

@@ -1,14 +1,18 @@
 <script lang="ts">
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import Loader2Icon from "@lucide/svelte/icons/loader-2";
   import Music2Icon from "@lucide/svelte/icons/music-2";
-  import PlusIcon from "@lucide/svelte/icons/plus";
   import SearchIcon from "@lucide/svelte/icons/search";
   import XIcon from "@lucide/svelte/icons/x";
   import ChevronLeftIcon from "@lucide/svelte/icons/chevron-left";
   import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+  import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
+  import ListStartIcon from "@lucide/svelte/icons/list-start";
+  import ListEndIcon from "@lucide/svelte/icons/list-end";
   import AudioLevelIndicator from "$lib/components/call/AudioLevelIndicator.svelte";
   import TileVolumeSlider from "$lib/components/call/TileVolumeSlider.svelte";
+  import { Tooltip, TooltipContent, TooltipTrigger } from "$lib/components/ui/tooltip";
   import type { ListeningSnapshot, ListeningSnapshotQueueItem } from "$lib/server/listening/types";
 
   type SearchResult = {
@@ -53,8 +57,25 @@
     onSnapshot,
   }: Props = $props();
 
+  let rootEl = $state<HTMLElement | null>(null);
+  let seekTrackEl = $state<HTMLElement | null>(null);
+  let seekTrackWidth = $state(180);
+  /** Wide tiles use left/right; tall tiles use top/bottom. */
+  let isRowLayout = $state(false);
+
+  const WAVE_CYCLES = 10;
+  const WAVE_AMP = 5.5;
+  const WAVE_PAD_X = 8;
+  const WAVE_HEIGHT = 22;
+  /** How fast the wave pattern drifts while playing (cycles per second). */
+  const WAVE_FLOW_HZ = 0.7;
+  const seekClipId = `listening-seek-clip-${Math.random().toString(36).slice(2, 9)}`;
+  let wavePhase = $state(0);
   let scrubMs = $state(0);
   let scrubbing = $state(false);
+  /** Ignore server clock until the seek response (or a newer generation) lands. */
+  let seekPending = $state(false);
+  let seekEpoch = 0;
   let positionAnchorMs = 0;
   let positionAnchorTime = 0;
   let lastPlaybackGeneration: number | null = null;
@@ -66,6 +87,12 @@
   let resolvingPaste = $state(false);
   let panelBusy = $state(false);
   let panelError = $state<string | null>(null);
+  /** Local pending for tile-initiated playback jumps (queue click) before snapshot flips to loading. */
+  let actionPending = $state(false);
+  /** Optimistic Up next order while dragging / until the snapshot catches up. */
+  let upNextOrderIds = $state<string[] | null>(null);
+  let draggingUpNextId = $state<string | null>(null);
+  let suppressUpNextClickUntil = 0;
 
   function looksLikeYouTubeUrl(text: string) {
     const value = text.trim();
@@ -87,9 +114,97 @@
   const playing = $derived(session?.playbackState === "playing");
   const loading = $derived(session?.playbackState === "loading");
   const durationMs = $derived(item?.durationMs ?? 0);
-  const controlsBusy = $derived(busy || panelBusy);
+  const controlsBusy = $derived(busy || panelBusy || actionPending);
+  /** Visible when server is loading, parent transport is in-flight, or a local queue jump is pending. */
+  const showPlaybackLoading = $derived(loading || busy || actionPending);
   const artUrl = $derived(item?.thumbnailUrl ?? null);
   const seekProgress = $derived(durationMs > 0 ? Math.min(100, Math.max(0, (scrubMs / durationMs) * 100)) : 0);
+  const prefetchedVideoIds = $derived(new Set(snapshot?.prefetchedVideoIds ?? []));
+
+  $effect(() => {
+    const el = rootEl;
+    if (!el) return;
+
+    const update = () => {
+      const { width, height } = el.getBoundingClientRect();
+      isRowLayout = width > height;
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
+
+  $effect(() => {
+    const el = seekTrackEl;
+    if (!el) return;
+
+    const update = () => {
+      seekTrackWidth = Math.max(48, el.clientWidth);
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
+
+  function waveY(t: number, phase = wavePhase) {
+    return WAVE_HEIGHT / 2 + WAVE_AMP * Math.sin((t * WAVE_CYCLES - phase) * Math.PI * 2);
+  }
+
+  function buildWavePath(width: number, phase: number) {
+    const inner = Math.max(1, width - WAVE_PAD_X * 2);
+    const steps = Math.max(48, Math.floor(inner / 2));
+    let d = "";
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = WAVE_PAD_X + t * inner;
+      const y = waveY(t, phase);
+      d += i === 0 ? `M ${x.toFixed(2)} ${y.toFixed(2)}` : ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
+    }
+    return d;
+  }
+
+  const seekWavePath = $derived(buildWavePath(seekTrackWidth, wavePhase));
+  const seekThumbT = $derived(Math.min(1, Math.max(0, seekProgress / 100)));
+  const seekThumbX = $derived(WAVE_PAD_X + seekThumbT * Math.max(1, seekTrackWidth - WAVE_PAD_X * 2));
+  const seekThumbY = $derived(waveY(seekThumbT, wavePhase));
+  const canSeek = $derived(isDj && Boolean(item && onSeek) && !controlsBusy);
+
+  function scrubFromClientX(clientX: number) {
+    const el = seekTrackEl;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const inner = Math.max(1, rect.width - WAVE_PAD_X * 2);
+    const t = Math.min(1, Math.max(0, (clientX - rect.left - WAVE_PAD_X) / inner));
+    const max = durationMs || Math.max(scrubMs, 1);
+    scrubMs = clampScrub(t * max);
+  }
+
+  function onSeekPointerDown(event: PointerEvent) {
+    if (!canSeek) return;
+    event.preventDefault();
+    scrubbing = true;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    scrubFromClientX(event.clientX);
+  }
+
+  function onSeekPointerMove(event: PointerEvent) {
+    if (!scrubbing || !canSeek) return;
+    scrubFromClientX(event.clientX);
+  }
+
+  function onSeekPointerUp(event: PointerEvent) {
+    if (!scrubbing) return;
+    try {
+      (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+    } catch {
+      // already released
+    }
+    commitSeek();
+  }
 
   const queueSections = $derived.by(() => {
     const currentId = session?.currentQueueItemId ?? null;
@@ -104,6 +219,28 @@
     const current = queue[index] ?? item;
     const upNext = queue.slice(index + 1);
     return { previous, current, upNext };
+  });
+
+  const displayedUpNext = $derived.by(() => {
+    const items = queueSections.upNext;
+    if (!upNextOrderIds) return items;
+    const byId = new Map(items.map((entry) => [entry.id, entry]));
+    const ordered = upNextOrderIds.map((id) => byId.get(id)).filter((entry): entry is ListeningSnapshotQueueItem => Boolean(entry));
+    // Include any newly arrived up-next items that aren't in the local order yet.
+    for (const entry of items) {
+      if (!upNextOrderIds.includes(entry.id)) ordered.push(entry);
+    }
+    return ordered;
+  });
+
+  $effect(() => {
+    // Clear optimistic order once the snapshot matches (or up-next is empty).
+    const serverIds = queueSections.upNext.map((entry) => entry.id);
+    if (!upNextOrderIds) return;
+    if (draggingUpNextId) return;
+    if (serverIds.length === upNextOrderIds.length && serverIds.every((id, index) => id === upNextOrderIds![index])) {
+      upNextOrderIds = null;
+    }
   });
 
   function clampScrub(ms: number) {
@@ -122,11 +259,21 @@
     const serverElapsed = state === "playing" ? Math.max(0, serverNow - updatedAtMs) : 0;
     const next = clampScrub(pos + serverElapsed);
 
-    positionAnchorMs = next;
-    positionAnchorTime = performance.now();
     lastPlaybackGeneration = generation;
     lastPositionUpdatedAt = updatedAt;
     lastPlaybackState = state;
+
+    if (seekPending) {
+      if (generation > seekEpoch) {
+        seekPending = false;
+      } else {
+        // Stale position while our seek is in flight — keep local scrub.
+        return;
+      }
+    }
+
+    positionAnchorMs = next;
+    positionAnchorTime = performance.now();
     if (!scrubbing) scrubMs = next;
   }
 
@@ -135,6 +282,7 @@
       lastPlaybackGeneration = null;
       lastPositionUpdatedAt = null;
       lastPlaybackState = null;
+      seekPending = false;
       if (!scrubbing) scrubMs = 0;
       return;
     }
@@ -149,13 +297,41 @@
     }
   });
 
+  // If the seek request finishes without a generation bump (failed API), drop the hold.
   $effect(() => {
-    if (!playing || scrubbing || loading) return;
+    if (!seekPending || busy) return;
+    const generation = session?.playbackGeneration ?? 0;
+    if (generation <= seekEpoch) {
+      seekPending = false;
+      applyServerClock();
+    }
+  });
+
+  $effect(() => {
+    if (!playing || scrubbing || loading || seekPending) return;
 
     let frame = 0;
     const tick = () => {
       const elapsed = performance.now() - positionAnchorTime;
       scrubMs = clampScrub(positionAnchorMs + elapsed);
+      frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  });
+
+  $effect(() => {
+    if (!playing) return;
+
+    let frame = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      wavePhase = (wavePhase - dt * WAVE_FLOW_HZ + 1) % 1;
       frame = requestAnimationFrame(tick);
     };
 
@@ -173,8 +349,10 @@
   }
 
   function commitSeek() {
-    const target = clampScrub(scrubMs);
+    const target = Math.round(clampScrub(scrubMs));
     scrubbing = false;
+    seekPending = true;
+    seekEpoch = session?.playbackGeneration ?? lastPlaybackGeneration ?? 0;
     positionAnchorMs = target;
     positionAnchorTime = performance.now();
     scrubMs = target;
@@ -268,7 +446,10 @@
     void resolvePastedYouTubeUrl(text);
   }
 
-  function enqueueVideo(entry: { videoId: string; title: string; channelTitle?: string | null; thumbnailUrl?: string | null; source?: string }) {
+  function enqueueVideo(
+    entry: { videoId: string; title: string; channelTitle?: string | null; thumbnailUrl?: string | null; source?: string },
+    placement: "next" | "last"
+  ) {
     void runQueueAction(() =>
       fetch(`/api/rooms/${slug}/listening/queue`, {
         method: "POST",
@@ -279,26 +460,8 @@
           channelTitle: entry.channelTitle ?? null,
           thumbnailUrl: entry.thumbnailUrl ?? null,
           source: entry.source ?? "search",
+          placement,
         }),
-      })
-    ).then((ok) => {
-      if (!ok) return;
-      clearSearch();
-    });
-  }
-
-  function enqueueUrl() {
-    if (pastedLink) {
-      enqueueVideo(pastedLink);
-      return;
-    }
-    const q = searchQuery.trim();
-    if (!q) return;
-    void runQueueAction(() =>
-      fetch(`/api/rooms/${slug}/listening/queue`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: q }),
       })
     ).then((ok) => {
       if (!ok) return;
@@ -316,6 +479,106 @@
     );
   }
 
+  function reorderUpNext(nextUpNextIds: string[]) {
+    if (!isDj || controlsBusy) return;
+    const previousIds = queueSections.previous.map((entry) => entry.id);
+    const currentId = queueSections.current?.id;
+    const orderedIds = [...previousIds, ...(currentId ? [currentId] : []), ...nextUpNextIds];
+
+    void runQueueAction(() =>
+      fetch(`/api/rooms/${slug}/listening/queue`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reorder", orderedIds }),
+      })
+    ).then((ok) => {
+      if (!ok) {
+        upNextOrderIds = null;
+      }
+    });
+  }
+
+  function onUpNextDragStart(entryId: string, event: DragEvent) {
+    if (!isDj || controlsBusy) {
+      event.preventDefault();
+      return;
+    }
+    draggingUpNextId = entryId;
+    upNextOrderIds = displayedUpNext.map((entry) => entry.id);
+    event.dataTransfer?.setData("text/plain", entryId);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+    }
+  }
+
+  function onUpNextDragOver(overId: string, event: DragEvent) {
+    if (!isDj || !draggingUpNextId) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    if (draggingUpNextId === overId) return;
+
+    const order = upNextOrderIds ?? displayedUpNext.map((entry) => entry.id);
+    const from = order.indexOf(draggingUpNextId);
+    const to = order.indexOf(overId);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...order];
+    next.splice(from, 1);
+    next.splice(to, 0, draggingUpNextId);
+    upNextOrderIds = next;
+  }
+
+  function onUpNextDrop(event: DragEvent) {
+    event.preventDefault();
+    if (!draggingUpNextId || !upNextOrderIds) return;
+    const nextIds = [...upNextOrderIds];
+    draggingUpNextId = null;
+    suppressUpNextClickUntil = Date.now() + 250;
+    reorderUpNext(nextIds);
+  }
+
+  function onUpNextDragEnd() {
+    suppressUpNextClickUntil = Date.now() + 250;
+    if (draggingUpNextId && upNextOrderIds) {
+      const nextIds = [...upNextOrderIds];
+      draggingUpNextId = null;
+      reorderUpNext(nextIds);
+      return;
+    }
+    draggingUpNextId = null;
+  }
+
+  function playQueueItem(id: string) {
+    if (!isDj || controlsBusy) return;
+    actionPending = true;
+    void runQueueAction(() =>
+      fetch(`/api/rooms/${slug}/listening/play`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: id }),
+      })
+    ).finally(() => {
+      actionPending = false;
+    });
+  }
+
+  function requestPlay() {
+    if (showPlaybackLoading || !onPlay) return;
+    onPlay();
+  }
+
+  function requestPause() {
+    if (!onPause || actionPending) return;
+    onPause();
+  }
+
+  function togglePlayback() {
+    if (playing || loading) {
+      requestPause();
+      return;
+    }
+    requestPlay();
+  }
+
   function clearSearch() {
     searchQuery = "";
     searchResults = [];
@@ -326,44 +589,155 @@
 
 {#snippet seekBar()}
   <div
-    class="listening-seek flex items-center gap-2.5 rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-[10px] text-white/80 shadow-sm backdrop-blur-md"
-    style:--seek-progress="{seekProgress}%"
+    class="listening-seek flex items-center gap-2.5 rounded-full border border-white/10 bg-black/45 px-3 py-1 text-[10px] text-white/80 shadow-sm backdrop-blur-md"
   >
     <span class="w-8 shrink-0 tabular-nums text-white/70">{formatTime(scrubMs)}</span>
-    <input
-      type="range"
-      class="listening-seek-range min-w-0 flex-1 disabled:opacity-50"
-      min="0"
-      max={durationMs || Math.max(scrubMs, 1)}
-      step="500"
-      bind:value={scrubMs}
-      disabled={!isDj || !item || !onSeek || controlsBusy}
-      onpointerdown={() => (scrubbing = true)}
-      onpointerup={commitSeek}
-      onkeyup={(event) => {
-        if (event.key === "Enter" || event.key === " ") commitSeek();
-      }}
+    <div
+      bind:this={seekTrackEl}
+      class="relative min-w-0 flex-1 {canSeek ? 'cursor-pointer' : 'cursor-default opacity-80'}"
+      style:height="{WAVE_HEIGHT}px"
+      role="slider"
+      tabindex={canSeek ? 0 : -1}
       aria-label="Seek"
-    />
+      aria-valuemin={0}
+      aria-valuemax={durationMs || Math.max(scrubMs, 1)}
+      aria-valuenow={Math.round(scrubMs)}
+      aria-valuetext={formatTime(scrubMs)}
+      aria-disabled={!canSeek}
+      onpointerdown={onSeekPointerDown}
+      onpointermove={onSeekPointerMove}
+      onpointerup={onSeekPointerUp}
+      onpointercancel={onSeekPointerUp}
+      onkeydown={(event) => {
+        if (!canSeek) return;
+        const max = durationMs || Math.max(scrubMs, 1);
+        const step = Math.max(500, Math.round(max / 50));
+        if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+          event.preventDefault();
+          scrubbing = true;
+          scrubMs = clampScrub(scrubMs + step);
+          commitSeek();
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+          event.preventDefault();
+          scrubbing = true;
+          scrubMs = clampScrub(scrubMs - step);
+          commitSeek();
+        } else if (event.key === "Home") {
+          event.preventDefault();
+          scrubbing = true;
+          scrubMs = 0;
+          commitSeek();
+        } else if (event.key === "End") {
+          event.preventDefault();
+          scrubbing = true;
+          scrubMs = max;
+          commitSeek();
+        }
+      }}
+    >
+      <svg
+        class="pointer-events-none absolute inset-0 overflow-visible"
+        width="100%"
+        height={WAVE_HEIGHT}
+        viewBox={`0 0 ${seekTrackWidth} ${WAVE_HEIGHT}`}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        <defs>
+          <clipPath id={seekClipId}>
+            <rect x="0" y="0" width={Math.max(0, seekThumbX + 1)} height={WAVE_HEIGHT} />
+          </clipPath>
+        </defs>
+        <path d={seekWavePath} fill="none" stroke="rgb(255 255 255 / 0.22)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <path
+          d={seekWavePath}
+          fill="none"
+          stroke="color-mix(in srgb, var(--participant-orange) 92%, white)"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          clip-path={`url(#${seekClipId})`}
+        />
+        <circle
+          cx={seekThumbX}
+          cy={seekThumbY}
+          r="5"
+          fill="color-mix(in srgb, var(--participant-orange) 92%, white)"
+          stroke="color-mix(in srgb, var(--participant-orange) 70%, black)"
+          stroke-width="1.5"
+        />
+      </svg>
+    </div>
     <span class="w-8 shrink-0 text-right tabular-nums text-white/70">{durationMs ? formatTime(durationMs) : "—"}</span>
   </div>
 {/snippet}
 
 {#snippet queueRow(entry: ListeningSnapshotQueueItem, kind: "previous" | "current" | "next")}
+  {@const canJump = isDj && kind !== "current"}
+  {@const canReorder = isDj && kind === "next"}
   <div
     class="flex items-center gap-2 rounded-lg px-2 py-1.5 {kind === 'current'
       ? 'bg-black/60 ring-1 ring-participant-orange/50'
       : kind === 'previous'
         ? 'bg-black/40 opacity-55'
-        : 'bg-black/45'}"
+        : 'bg-black/45'} {canJump ? 'cursor-pointer transition-colors hover:bg-black/70 hover:opacity-100' : ''} {draggingUpNextId === entry.id
+      ? 'opacity-60 ring-1 ring-participant-orange/40'
+      : ''}"
+    role={canJump ? "button" : undefined}
+    tabindex={canJump ? 0 : undefined}
+    aria-label={canJump ? `Play ${entry.title}` : undefined}
+    aria-grabbed={canReorder && draggingUpNextId === entry.id ? "true" : undefined}
+    ondragover={canReorder
+      ? (event) => {
+          onUpNextDragOver(entry.id, event);
+        }
+      : undefined}
+    ondrop={canReorder ? onUpNextDrop : undefined}
+    onclick={() => {
+      if (!canJump || draggingUpNextId || Date.now() < suppressUpNextClickUntil) return;
+      playQueueItem(entry.id);
+    }}
+    onkeydown={(event) => {
+      if (!canJump) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        playQueueItem(entry.id);
+      }
+    }}
   >
-    {#if entry.thumbnailUrl}
-      <img src={entry.thumbnailUrl} alt="" class="size-8 shrink-0 rounded object-cover {kind === 'previous' ? 'grayscale' : ''}" />
-    {:else}
-      <div class="flex size-8 shrink-0 items-center justify-center rounded bg-white/10">
-        <Music2Icon class="size-3.5 text-white/45" />
-      </div>
+    {#if canReorder}
+      <button
+        type="button"
+        class="inline-flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70 active:cursor-grabbing disabled:opacity-40"
+        draggable="true"
+        disabled={controlsBusy}
+        aria-label="Drag to reorder"
+        title="Drag to reorder"
+        onclick={(event) => event.stopPropagation()}
+        ondragstart={(event) => {
+          event.stopPropagation();
+          onUpNextDragStart(entry.id, event);
+        }}
+        ondragend={onUpNextDragEnd}
+      >
+        <GripVerticalIcon class="size-3.5" />
+      </button>
     {/if}
+    <div class="relative size-8 shrink-0">
+      {#if entry.thumbnailUrl}
+        <img src={entry.thumbnailUrl} alt="" draggable="false" class="size-8 rounded object-cover {kind === 'previous' ? 'grayscale' : ''}" />
+      {:else}
+        <div class="flex size-8 items-center justify-center rounded bg-white/10">
+          <Music2Icon class="size-3.5 text-white/45" />
+        </div>
+      {/if}
+      {#if entry.prefetched || prefetchedVideoIds.has(entry.videoId)}
+        <span
+          class="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-participant-orange shadow-[0_0_0_1.5px_rgba(0,0,0,0.65)]"
+          title="Ready to play"
+          aria-label="Ready to play"
+        ></span>
+      {/if}
+    </div>
     <div class="min-w-0 flex-1">
       <p class="truncate text-[11px] font-medium text-white">{entry.title}</p>
       <p class="truncate text-[10px] text-white/55">
@@ -385,7 +759,10 @@
         class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-red-400 hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
         disabled={controlsBusy}
         aria-label="Remove from queue"
-        onclick={() => removeQueueItem(entry.id)}
+        onclick={(event) => {
+          event.stopPropagation();
+          removeQueueItem(entry.id);
+        }}
       >
         <XIcon class="size-3.5" />
       </button>
@@ -393,7 +770,7 @@
   </div>
 {/snippet}
 
-<div class="listening-tile relative flex h-full min-h-0 flex-col overflow-hidden text-white">
+<div bind:this={rootEl} class="listening-tile relative flex h-full min-h-0 flex-col overflow-hidden text-white">
   <div class="pointer-events-none absolute inset-0">
     {#if artUrl}
       <img src={artUrl} alt="" class="size-full scale-125 object-cover blur-xl brightness-110 saturate-150 opacity-95" />
@@ -414,190 +791,233 @@
       <p class="mb-2 shrink-0 rounded-md bg-destructive/80 px-2 py-1 text-[11px] text-white">{session.errorMessage}</p>
     {/if}
 
-    <div class="group/cover relative mb-2 flex min-h-0 flex-[0.95] flex-col overflow-hidden rounded-xl">
-      {#if artUrl}
-        <img src={artUrl} alt="" class="absolute inset-0 size-full object-cover" />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/25"></div>
-      {:else}
-        <div class="absolute inset-0 bg-gradient-to-br from-accent/30 to-black"></div>
-      {/if}
+    <div class="flex min-h-0 flex-1 {isRowLayout ? 'flex-row gap-2.5' : 'flex-col'}">
+      <div class="group/cover relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl {isRowLayout ? 'h-full flex-1' : 'mb-2 flex-[0.95]'}">
+        {#if artUrl}
+          <img src={artUrl} alt="" class="absolute inset-0 size-full object-cover" />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/25"></div>
+        {:else}
+          <div class="absolute inset-0 bg-gradient-to-br from-accent/30 to-black"></div>
+        {/if}
 
-      <div class="relative z-10 flex min-h-0 flex-1 flex-col">
-        <div class="flex items-start justify-between gap-2 px-3 pt-3">
-          <div class="min-w-0 flex-1 text-left sm:text-center">
-            <p class="truncate text-base font-semibold tracking-tight drop-shadow">{item?.title ?? "Nothing playing"}</p>
-            <p class="truncate text-xs text-white/75 drop-shadow">{item?.channelTitle ?? "Shared Listening"}</p>
+        <div class="relative z-10 flex min-h-0 flex-1 flex-col">
+          <div class="flex items-start justify-between gap-2 px-3 pt-3">
+            <div class="min-w-0 flex-1 text-left sm:text-center">
+              <p class="truncate text-base font-semibold tracking-tight drop-shadow">{item?.title ?? "Nothing playing"}</p>
+              <p class="truncate text-xs text-white/75 drop-shadow">{item?.channelTitle ?? "Shared Listening"}</p>
+            </div>
+            <div class="flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-black/45 px-2.5 py-1.5 shadow-sm backdrop-blur-md">
+              <AudioLevelIndicator level={audioLevel} class="!h-2 !min-w-12 w-12" />
+              {#if onListenVolumeChange}
+                <TileVolumeSlider value={listenVolume} disabled={!speakersEnabled} label="Listening volume" onChange={onListenVolumeChange} />
+              {/if}
+            </div>
           </div>
-          <div class="flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-black/45 px-2.5 py-1.5 shadow-sm backdrop-blur-md">
-            <AudioLevelIndicator level={audioLevel} class="!h-2 !min-w-12 w-12" />
-            {#if onListenVolumeChange}
-              <TileVolumeSlider value={listenVolume} disabled={!speakersEnabled} label="Listening volume" onChange={onListenVolumeChange} />
-            {/if}
-          </div>
-        </div>
 
-        <div class="relative flex min-h-0 flex-1 items-center justify-center px-2">
-          {#if isDj}
-            <div
-              class="listening-transport pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover/cover:pointer-events-auto group-hover/cover:opacity-100 group-focus-within/cover:pointer-events-auto group-focus-within/cover:opacity-100"
-            >
-              <button
-                type="button"
-                class="absolute left-2 inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white shadow-md backdrop-blur-md hover:bg-black/65 disabled:opacity-40 sm:left-3 sm:size-12"
-                aria-label="Previous"
-                disabled={controlsBusy || !onPrevious}
-                onclick={onPrevious}
+          <div class="relative flex min-h-0 flex-1 items-center justify-center px-2">
+            {#if isDj}
+              <div
+                class="listening-transport absolute inset-0 flex items-center justify-center transition-opacity duration-200 {showPlaybackLoading
+                  ? 'pointer-events-auto opacity-100'
+                  : 'pointer-events-none opacity-0 group-hover/cover:pointer-events-auto group-hover/cover:opacity-100 group-focus-within/cover:pointer-events-auto group-focus-within/cover:opacity-100'}"
               >
-                <ChevronLeftIcon class="size-7" />
-              </button>
-              <button
-                type="button"
-                class="inline-flex size-16 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-lg backdrop-blur-md hover:bg-black/70 disabled:opacity-40 sm:size-[4.5rem]"
-                aria-label={playing || loading ? "Pause" : "Play"}
-                disabled={controlsBusy || (!onPlay && !onPause)}
-                onclick={() => (playing || loading ? onPause?.() : onPlay?.())}
+                <button
+                  type="button"
+                  class="absolute left-2 inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white shadow-md backdrop-blur-md hover:bg-black/65 disabled:opacity-40 sm:left-3 sm:size-12"
+                  aria-label="Previous"
+                  disabled={controlsBusy || !onPrevious}
+                  onclick={onPrevious}
+                >
+                  <ChevronLeftIcon class="size-7" />
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex size-16 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-lg backdrop-blur-md hover:bg-black/70 disabled:opacity-40 sm:size-[4.5rem]"
+                  aria-label={showPlaybackLoading ? "Loading" : playing || loading ? "Pause" : "Play"}
+                  aria-busy={showPlaybackLoading}
+                  disabled={(!onPlay && !onPause) || (showPlaybackLoading && !onPause)}
+                  onclick={togglePlayback}
+                >
+                  {#if showPlaybackLoading}
+                    <Loader2Icon class="size-8 animate-spin text-participant-orange" aria-hidden="true" />
+                  {:else if playing}
+                    <PauseIcon class="size-8 text-participant-orange" />
+                  {:else}
+                    <PlayIcon class="size-8 translate-x-0.5 text-participant-orange" />
+                  {/if}
+                </button>
+                <button
+                  type="button"
+                  class="absolute right-2 inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white shadow-md backdrop-blur-md hover:bg-black/65 disabled:opacity-40 sm:right-3 sm:size-12"
+                  aria-label="Next"
+                  disabled={controlsBusy || !onSkip}
+                  onclick={onSkip}
+                >
+                  <ChevronRightIcon class="size-7" />
+                </button>
+              </div>
+            {:else}
+              <div
+                class="inline-flex size-16 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-lg backdrop-blur-md transition-opacity duration-200 sm:size-[4.5rem] {showPlaybackLoading
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover/cover:opacity-100'}"
+                role="status"
+                aria-label={showPlaybackLoading ? "Loading" : playing ? "Playing" : "Paused"}
+                aria-busy={showPlaybackLoading}
               >
-                {#if playing || loading}
+                {#if showPlaybackLoading}
+                  <Loader2Icon class="size-8 animate-spin text-participant-orange" aria-hidden="true" />
+                {:else if playing}
                   <PauseIcon class="size-8 text-participant-orange" />
                 {:else}
                   <PlayIcon class="size-8 translate-x-0.5 text-participant-orange" />
                 {/if}
-              </button>
-              <button
-                type="button"
-                class="absolute right-2 inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white shadow-md backdrop-blur-md hover:bg-black/65 disabled:opacity-40 sm:right-3 sm:size-12"
-                aria-label="Next"
-                disabled={controlsBusy || !onSkip}
-                onclick={onSkip}
-              >
-                <ChevronRightIcon class="size-7" />
-              </button>
-            </div>
-          {:else}
-            <span
-              class="rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-xs text-white/80 opacity-0 backdrop-blur-md transition-opacity duration-200 group-hover/cover:opacity-100"
-            >
-              {loading ? "Loading" : playing ? "Playing" : "Paused"}
-            </span>
-          {/if}
-        </div>
+              </div>
+            {/if}
+          </div>
 
-        <div class="px-3 pb-3 pt-1">
-          {@render seekBar()}
+          <div class="px-3 pb-3 pt-1">
+            {@render seekBar()}
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="shrink-0 space-y-2 rounded-t-2xl border border-white/15 bg-black/60 p-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.45)] backdrop-blur-xl">
       <div
-        class="relative rounded-xl border border-white/15 bg-black/55 transition-[border-color,box-shadow] focus-within:border-white/30 focus-within:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+        class="flex min-h-0 min-w-0 flex-col space-y-2 rounded-2xl border border-white/15 bg-black/60 p-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.45)] backdrop-blur-xl {isRowLayout
+          ? 'h-full flex-1'
+          : 'shrink-0'}"
       >
-        <div class="flex items-center gap-1.5 px-2 py-1.5">
-          <SearchIcon class="size-3.5 shrink-0 text-white/55" aria-hidden="true" />
-          {#if pastedLink}
-            <a
-              class="min-w-0 flex-1 truncate text-xs font-medium text-participant-orange underline-offset-2 hover:underline"
-              href={pastedLink.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={pastedLink.url}
-            >
-              {pastedLink.title}
-            </a>
-          {:else if resolvingPaste}
-            <span class="min-w-0 flex-1 truncate text-xs text-white/55">Resolving link…</span>
-          {:else}
-            <input
-              class="listening-search-input min-w-0 flex-1 border-0 bg-transparent text-xs text-white shadow-none placeholder:text-white/45 outline-none ring-0 focus:border-0 focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
-              placeholder="Search or paste YouTube URL"
-              bind:value={searchQuery}
-              onpaste={onSearchPaste}
-              onkeydown={(event) => {
-                if (event.key === "Enter") void runSearch();
-              }}
-            />
+        <div
+          class="relative shrink-0 rounded-xl border border-white/15 bg-black/55 transition-[border-color,box-shadow] focus-within:border-white/30 focus-within:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+        >
+          <div class="flex items-center gap-1.5 px-2 py-1.5">
+            <SearchIcon class="size-3.5 shrink-0 text-white/55" aria-hidden="true" />
+            {#if pastedLink}
+              <a
+                class="min-w-0 flex-1 truncate text-xs font-medium text-participant-orange underline-offset-2 hover:underline"
+                href={pastedLink.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={pastedLink.url}
+              >
+                {pastedLink.title}
+              </a>
+            {:else if resolvingPaste}
+              <span class="min-w-0 flex-1 truncate text-xs text-white/55">Resolving link…</span>
+            {:else}
+              <input
+                class="listening-search-input min-w-0 flex-1 border-0 bg-transparent text-xs text-white shadow-none placeholder:text-white/45 outline-none ring-0 focus:border-0 focus:shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                placeholder="Search or paste YouTube URL"
+                bind:value={searchQuery}
+                onpaste={onSearchPaste}
+                onkeydown={(event) => {
+                  if (event.key === "Enter") void runSearch();
+                }}
+              />
+            {/if}
+            {#if searchQuery || pastedLink || resolvingPaste}
+              <button type="button" class="rounded p-1 text-white/50 hover:text-white" aria-label="Clear search" onclick={clearSearch}>
+                <XIcon class="size-3.5" />
+              </button>
+            {/if}
+          </div>
+
+          {#if searchResults.length}
+            <ul class="max-h-28 space-y-0.5 overflow-y-auto border-t border-white/10 p-1.5">
+              {#each searchResults as result (result.videoId)}
+                <li class="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-white/10">
+                  <div class="relative size-7 shrink-0">
+                    {#if result.thumbnailUrl}
+                      <img src={result.thumbnailUrl} alt="" class="size-7 rounded object-cover" />
+                    {:else}
+                      <div class="flex size-7 items-center justify-center rounded bg-white/10">
+                        <Music2Icon class="size-3.5 text-white/50" />
+                      </div>
+                    {/if}
+                    {#if prefetchedVideoIds.has(result.videoId)}
+                      <span
+                        class="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-participant-orange shadow-[0_0_0_1.5px_rgba(0,0,0,0.65)]"
+                        title="Ready to play"
+                        aria-label="Ready to play"
+                      ></span>
+                    {/if}
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-[11px] font-medium text-white">{result.title}</p>
+                    <p class="truncate text-[10px] text-white/50">{result.channelTitle}</p>
+                  </div>
+                  <div class="flex shrink-0 items-center gap-0.5">
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <button
+                          type="button"
+                          class="inline-flex size-7 items-center justify-center rounded-md text-participant-orange hover:bg-white/10 disabled:opacity-50"
+                          disabled={controlsBusy}
+                          aria-label="Play next"
+                          onclick={() => enqueueVideo(result, "next")}
+                        >
+                          <ListStartIcon class="size-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Play next</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <button
+                          type="button"
+                          class="inline-flex size-7 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-50"
+                          disabled={controlsBusy}
+                          aria-label="Play last"
+                          onclick={() => enqueueVideo(result, "last")}
+                        >
+                          <ListEndIcon class="size-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Play last</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </li>
+              {/each}
+            </ul>
           {/if}
-          {#if searchQuery || pastedLink || resolvingPaste}
-            <button type="button" class="rounded p-1 text-white/50 hover:text-white" aria-label="Clear search" onclick={clearSearch}>
-              <XIcon class="size-3.5" />
-            </button>
-          {/if}
-          <button
-            type="button"
-            class="inline-flex size-8 items-center justify-center rounded-md bg-participant-orange/90 text-white hover:bg-participant-orange disabled:opacity-50"
-            disabled={controlsBusy}
-            aria-label="Add URL to queue"
-            onclick={enqueueUrl}
-          >
-            <PlusIcon class="size-4" />
-          </button>
         </div>
 
-        {#if searchResults.length}
-          <ul class="max-h-28 space-y-0.5 overflow-y-auto border-t border-white/10 p-1.5">
-            {#each searchResults as result (result.videoId)}
-              <li class="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-white/10">
-                {#if result.thumbnailUrl}
-                  <img src={result.thumbnailUrl} alt="" class="size-7 shrink-0 rounded object-cover" />
-                {:else}
-                  <div class="flex size-7 shrink-0 items-center justify-center rounded bg-white/10">
-                    <Music2Icon class="size-3.5 text-white/50" />
-                  </div>
-                {/if}
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-[11px] font-medium text-white">{result.title}</p>
-                  <p class="truncate text-[10px] text-white/50">{result.channelTitle}</p>
-                </div>
-                <button
-                  type="button"
-                  class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-participant-orange hover:bg-white/10 disabled:opacity-50"
-                  disabled={controlsBusy}
-                  aria-label="Add to queue"
-                  onclick={() => enqueueVideo(result)}
-                >
-                  <PlusIcon class="size-3.5" />
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
-
-      <div class="max-h-36 min-h-0 space-y-2 overflow-y-auto pr-0.5">
-        {#if queueSections.previous.length}
-          <div class="space-y-1">
-            <p class="px-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">Played</p>
+        <div class="min-h-0 space-y-2 overflow-y-auto pr-0.5 {isRowLayout ? 'flex-1' : 'max-h-44'}">
+          {#if queueSections.previous.length}
             <div class="space-y-1">
-              {#each queueSections.previous as entry (entry.id)}
-                {@render queueRow(entry, "previous")}
-              {/each}
+              <p class="px-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">Played</p>
+              <div class="space-y-1">
+                {#each queueSections.previous as entry (entry.id)}
+                  {@render queueRow(entry, "previous")}
+                {/each}
+              </div>
             </div>
-          </div>
-        {/if}
+          {/if}
 
-        {#if queueSections.current}
-          <div class="space-y-1">
-            <p class="px-1 text-[10px] font-semibold uppercase tracking-wider text-participant-orange/80">Now</p>
+          {#if queueSections.current}
             <div class="space-y-1">
-              {@render queueRow(queueSections.current, "current")}
+              <p class="px-1 text-[10px] font-semibold uppercase tracking-wider text-participant-orange/80">Now</p>
+              <div class="space-y-1">
+                {@render queueRow(queueSections.current, "current")}
+              </div>
             </div>
-          </div>
-        {:else if queue.length === 0}
-          <p class="px-1 text-xs text-white/50">Nothing in the queue yet — search or paste a link above.</p>
-        {:else}
-          <p class="px-1 text-xs text-white/50">Nothing playing — add a song or press play.</p>
-        {/if}
+          {:else if queue.length === 0}
+            <p class="px-1 text-xs text-white/50">Nothing in the queue yet — search or paste a link above.</p>
+          {:else}
+            <p class="px-1 text-xs text-white/50">Nothing playing — add a song or press play.</p>
+          {/if}
 
-        {#if queueSections.upNext.length}
-          <div class="space-y-1">
-            <p class="px-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">Up next</p>
+          {#if displayedUpNext.length}
             <div class="space-y-1">
-              {#each queueSections.upNext as entry (entry.id)}
-                {@render queueRow(entry, "next")}
-              {/each}
+              <p class="px-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">Up next</p>
+              <div class="space-y-1" role={isDj ? "list" : undefined} aria-label={isDj ? "Up next queue, drag to reorder" : undefined}>
+                {#each displayedUpNext as entry (entry.id)}
+                  {@render queueRow(entry, "next")}
+                {/each}
+              </div>
             </div>
-          </div>
-        {/if}
+          {/if}
+        </div>
       </div>
     </div>
   </div>
@@ -611,48 +1031,10 @@
     }
   }
 
-  .listening-seek-range {
-    -webkit-appearance: none;
-    appearance: none;
-    height: 0.25rem;
+  .listening-seek [role="slider"]:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--participant-orange) 70%, white);
+    outline-offset: 2px;
     border-radius: 9999px;
-    background: linear-gradient(
-      to right,
-      color-mix(in srgb, var(--participant-orange) 92%, white) var(--seek-progress),
-      rgb(255 255 255 / 0.22) var(--seek-progress)
-    );
-    outline: none;
-    cursor: pointer;
-  }
-
-  .listening-seek-range:disabled {
-    cursor: not-allowed;
-  }
-
-  .listening-seek-range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 0.75rem;
-    height: 0.75rem;
-    border-radius: 9999px;
-    background: #fff;
-    border: 2px solid color-mix(in srgb, var(--participant-orange) 80%, white);
-    box-shadow: 0 1px 4px rgb(0 0 0 / 0.45);
-  }
-
-  .listening-seek-range::-moz-range-thumb {
-    width: 0.75rem;
-    height: 0.75rem;
-    border-radius: 9999px;
-    background: #fff;
-    border: 2px solid color-mix(in srgb, var(--participant-orange) 80%, white);
-    box-shadow: 0 1px 4px rgb(0 0 0 / 0.45);
-  }
-
-  .listening-seek-range::-moz-range-track {
-    height: 0.25rem;
-    border-radius: 9999px;
-    background: transparent;
   }
 
   /* Kill @tailwindcss/forms / browser default blue focus ring on the search field */

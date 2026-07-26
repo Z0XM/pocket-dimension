@@ -2,6 +2,12 @@
 
 Discord-style Shared Listening worker: `yt-dlp` → `ffmpeg` → LiveKit bot audio.
 
+Startup latency mitigations:
+
+1. **`/jobs/prepare`** — join the LiveKit bot when a listening session starts; keep it connected across tracks (teardown only on session end).
+2. **`/jobs/prefetch`** — resolve yt-dlp audio URLs into an in-memory cache when songs are queued.
+3. **`/jobs/warm`** — prefetch URL + prebuffer ~2.5s of PCM for the next track so play/skip can start immediately.
+
 ## Local
 
 Needs `yt-dlp`, `ffmpeg`, and a JS runtime (`deno` preferred) on `PATH`:
