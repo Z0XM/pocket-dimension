@@ -1,7 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { onDestroy, onMount } from "svelte";
-  import XIcon from "@lucide/svelte/icons/x";
   import {
     RoomEvent,
     Track,
@@ -75,12 +74,10 @@
   import GamePanel from "$lib/components/call/GamePanel.svelte";
   import GamePhaseBanner from "$lib/components/call/GamePhaseBanner.svelte";
   import ConnectionQualityBadge from "$lib/components/call/ConnectionQualityBadge.svelte";
-  import DevicePicker from "$lib/components/call/DevicePicker.svelte";
-  import MediaQualitySettings from "$lib/components/call/MediaQualitySettings.svelte";
   import MicPreviewControls from "$lib/components/call/MicPreviewControls.svelte";
-  import TileColorPicker from "$lib/components/call/TileColorPicker.svelte";
   import HandGestureTracker from "$lib/components/call/HandGestureTracker.svelte";
   import GestureSettings from "$lib/components/call/GestureSettings.svelte";
+  import InCallSettingsPanel from "$lib/components/call/InCallSettingsPanel.svelte";
   import type { DetectedGesture, GestureAction, VideoTrackingFrame } from "$lib/gestures/gesture-types";
   import { disposeHandLandmarker } from "$lib/gestures/hand-tracker";
   import { isAutoLayoutPreset, type AutoLayoutPreset } from "$lib/call/auto-layout";
@@ -89,8 +86,6 @@
   import type { StageLayoutMode } from "$lib/stage-grid";
   import type { GameSnapshot } from "$lib/server/game/types";
   import type { ListeningSnapshot } from "$lib/server/listening/types";
-  import { Separator } from "$lib/components/ui/separator";
-  import { SettingToggle } from "$lib/components/ui/setting-toggle";
   import { PARTICIPANT_COLORS, resolveParticipantColor, type ParticipantColor } from "$lib/participant-colors";
   import {
     clearActiveCallSession,
@@ -185,6 +180,9 @@
   let micDeviceError = $state<string | null>(null);
   let previewStream = $state<MediaStream | null>(null);
   let previewReady = $state(false);
+  /** Bumped to invalidate in-flight getUserMedia / preview restarts after leave or unmount. */
+  let mediaSessionGen = 0;
+  let mediaDestroyed = false;
   let mediaDevices = $state<MediaDeviceLists>({ audioInputs: [], audioOutputs: [], videoInputs: [] });
   let audioDeviceId = $state("");
   let audioOutputDeviceId = $state("");
@@ -414,10 +412,16 @@
     });
   }
 
-  async function releasePreviewForJoin() {
-    micTestActive = false;
+  function releaseLocalMedia() {
+    stopInCallMicTestStream();
     stopMediaPreview(previewStream);
     previewStream = null;
+  }
+
+  async function releasePreviewForJoin() {
+    micTestActive = false;
+    mediaSessionGen += 1;
+    releaseLocalMedia();
     micGateProcessor = createFreshMicGateProcessor();
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }
@@ -635,7 +639,7 @@
     if (payload.status === "active") isStale = false;
     if (payload.isEnded && phase !== "ended") {
       setPhase("ended");
-      await teardownCall(false);
+      await teardownCall(true);
     }
   }
 
@@ -667,25 +671,33 @@
     }
   }
 
-  function applyPreviewResult(result: MediaPreviewResult) {
+  function applyPreviewResult(result: MediaPreviewResult, gen: number) {
+    if (mediaDestroyed || gen !== mediaSessionGen) {
+      stopMediaPreview(result.stream);
+      return false;
+    }
     previewStream = result.stream;
     permissionState = result.permission;
     cameraInUse = result.cameraInUse;
+    return true;
   }
 
   async function setupPreview() {
+    const gen = ++mediaSessionGen;
     const result = await startMediaPreview({
       audio: true,
       video: true,
       audioDeviceId: audioDeviceId || undefined,
       videoDeviceId: videoDeviceId || undefined,
     });
-    applyPreviewResult(result);
+    if (!applyPreviewResult(result, gen)) return;
     previewReady = true;
 
     if (result.permission === "granted") {
       await loadMediaDevices();
     }
+
+    if (mediaDestroyed || gen !== mediaSessionGen) return;
 
     if (result.permission === "denied") {
       micEnabled = false;
@@ -799,13 +811,14 @@
   async function changeAudioDevice(deviceId: string) {
     audioDeviceId = deviceId;
     if (phase === "lobby" || phase === "waiting_admission") {
+      const gen = ++mediaSessionGen;
       const result = await restartMediaPreview(previewStream, {
         audio: micEnabled,
         video: camEnabled,
         audioDeviceId: deviceId,
         videoDeviceId: videoDeviceId || undefined,
       });
-      applyPreviewResult(result);
+      applyPreviewResult(result, gen);
     } else if (livekitRoom) {
       if (!micTestActive && micEnabled) {
         try {
@@ -817,7 +830,12 @@
       if (micTestActive) {
         stopInCallMicTestStream();
         try {
-          inCallMicTestStream = await createInCallMicTestStream();
+          const stream = await createInCallMicTestStream();
+          if (!inCallPhase || !micTestActive) {
+            stopMediaPreview(stream);
+            return;
+          }
+          inCallMicTestStream = stream;
         } catch {
           micTestActive = false;
         }
@@ -978,13 +996,14 @@
   async function changeVideoDevice(deviceId: string) {
     videoDeviceId = deviceId;
     if (phase === "lobby" || phase === "waiting_admission") {
+      const gen = ++mediaSessionGen;
       const result = await restartMediaPreview(previewStream, {
         audio: micEnabled,
         video: camEnabled,
         audioDeviceId: audioDeviceId || undefined,
         videoDeviceId: deviceId,
       });
-      applyPreviewResult(result);
+      applyPreviewResult(result, gen);
     } else if (livekitRoom) {
       if (camEnabled) {
         try {
@@ -1062,6 +1081,9 @@
   }
 
   async function teardownCall(disconnectLiveKit: boolean) {
+    mediaSessionGen += 1;
+    // Stop local capture immediately so camera/mic release even if disconnect awaits.
+    releaseLocalMedia();
     stopPingPoll();
     stopTileStatsPoll();
     audioPlaybackBlocked = false;
@@ -1069,15 +1091,14 @@
     screenShareListenerCleanup = undefined;
     screenAudioShareEndedCleanup?.();
     screenAudioShareEndedCleanup = undefined;
-    if (disconnectLiveKit && callSession) {
-      await callSession.disconnect();
-    }
+    const session = callSession;
     callSession = null;
     livekitRoom = null;
     audioLevels = {};
     resetStageTileState();
-    stopMediaPreview(previewStream);
-    previewStream = null;
+    if (disconnectLiveKit && session) {
+      await session.disconnect();
+    }
   }
 
   function attachScreenShareListener(room: Room, gen: number) {
@@ -1654,13 +1675,14 @@
     }
 
     if (phase === "lobby" || phase === "waiting_admission") {
+      const gen = ++mediaSessionGen;
       const result = await restartMediaPreview(previewStream, {
         audio: micEnabled,
         video: true,
         audioDeviceId: audioDeviceId || undefined,
         videoDeviceId: videoDeviceId || undefined,
       });
-      applyPreviewResult(result);
+      if (!applyPreviewResult(result, gen)) return;
       if (cameraInUse) {
         showToast(CAMERA_IN_USE_MESSAGE);
       }
@@ -1875,13 +1897,22 @@
   });
 
   onDestroy(() => {
+    mediaDestroyed = true;
+    mediaSessionGen += 1;
+    // Synchronous release first — do not wait on LiveKit disconnect to free the camera.
+    releaseLocalMedia();
+    if (livekitRoom) {
+      for (const publication of livekitRoom.localParticipant.trackPublications.values()) {
+        publication.track?.stop();
+      }
+    }
     if (refreshTimer) clearInterval(refreshTimer);
     if (toastTimer) clearTimeout(toastTimer);
     stopWaitingPoll();
     stopHostWaitingPoll();
     gameState.disconnect();
     listeningState.disconnect();
-    teardownCall(true);
+    void teardownCall(true);
     disposeHandLandmarker();
   });
 </script>
@@ -1970,114 +2001,53 @@
 
       <div class="relative min-h-0 flex-1">
         {#if showInCallDevices}
-          <div
-            class="absolute inset-x-0 top-0 z-40 max-h-[min(88dvh,100%)] overflow-y-auto rounded-b-xl border border-border bg-card/95 p-4 shadow-lg backdrop-blur-sm safe-top safe-x sm:inset-x-auto sm:left-4 sm:top-4 sm:max-h-none sm:w-full sm:max-w-md sm:rounded-xl"
-          >
-            <div class="mb-3 flex items-center justify-between">
-              <p class="text-sm font-medium text-foreground">Settings</p>
-              <button
-                type="button"
-                class="action-btn-ghost-destructive size-11 sm:size-7"
-                aria-label="Close settings"
-                onclick={closeInCallDevicesPanel}
-              >
-                <XIcon class="size-4" aria-hidden="true" />
-              </button>
-            </div>
-            <div class="space-y-3">
-              {#if cameraInUse}
-                <div class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  <p>{CAMERA_IN_USE_MESSAGE}</p>
-                  <button type="button" class="mt-2 underline" onclick={retryCamera}>Retry camera</button>
-                </div>
-              {/if}
-              {#if micDeviceError}
-                <div class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  <p>{micDeviceError}</p>
-                  <button type="button" class="mt-2 underline" onclick={retryMicrophone}>Retry microphone</button>
-                </div>
-              {/if}
-              <DevicePicker
-                layout="stack"
-                devices={mediaDevices}
-                {audioDeviceId}
-                {audioOutputDeviceId}
-                {videoDeviceId}
-                showAudioOutput={showAudioOutputSelection}
-                micEnabled={micDisplayEnabled}
-                {speakerEnabled}
-                {camEnabled}
-                onToggleMic={toggleMic}
-                onToggleSpeaker={toggleSpeaker}
-                onToggleCam={toggleCam}
-                onAudioDeviceChange={changeAudioDevice}
-                onAudioOutputDeviceChange={handleInCallAudioOutputDeviceChange}
-                onVideoDeviceChange={changeVideoDevice}
-              />
-              <MicPreviewControls
-                bind:this={inCallMicPreviewControls}
-                layout="stack"
-                helpContext="incall"
-                bind:micTestActive
-                previewStream={micMonitorStream}
-                {micEnabled}
-                {speakerEnabled}
-                {audioOutputDeviceId}
-                {micGateProcessor}
-                permissionGranted={permissionState === "granted"}
-              />
-              <TileColorPicker compact value={tileColor} onChange={setTileColor} />
-              <GestureSettings
-                {gesturesEnabled}
-                overlayVisible={gestureOverlayVisible}
-                cameraAvailable={gestureCameraAvailable}
-                onGesturesEnabledChange={setGesturesEnabled}
-                onOverlayVisibleChange={setGestureOverlayVisible}
-              />
-              <MediaQualitySettings
-                {videoQuality}
-                {audioQuality}
-                onVideoQualityChange={setVideoQualityPreference}
-                onAudioQualityChange={setAudioQualityPreference}
-              />
-              <div class="rounded-lg border border-border px-3">
-                <SettingToggle
-                  id="hide-participant-videos"
-                  label="Hide participant videos"
-                  tooltip="Show colored initials instead of camera feeds for everyone in the grid."
-                  checked={hideParticipantVideos}
-                  onCheckedChange={setHideParticipantVideos}
-                />
-                <Separator />
-                <SettingToggle
-                  id="disable-speaking-glows"
-                  label="Hide speaking glows"
-                  tooltip="Turn off the outer glow when someone speaks. The colored outline still appears."
-                  checked={disableSpeakingGlows}
-                  onCheckedChange={setDisableSpeakingGlows}
-                />
-                <Separator />
-                <SettingToggle
-                  id="show-tile-stats"
-                  label="Show tile stats"
-                  tooltip="Ping, video/audio quality, and fps on every tile."
-                  checked={showTileStats}
-                  onCheckedChange={setShowTileStats}
-                />
-                {#if isHost}
-                  <Separator />
-                  <SettingToggle
-                    id="room-lock"
-                    label="Lock room"
-                    tooltip="Block new participants from joining while the room stays active."
-                    checked={roomIsLocked}
-                    disabled={updatingRoomLock}
-                    onCheckedChange={updateRoomLock}
-                  />
-                {/if}
-              </div>
-            </div>
-          </div>
+          <InCallSettingsPanel
+            {cameraInUse}
+            {micDeviceError}
+            devices={mediaDevices}
+            {audioDeviceId}
+            {audioOutputDeviceId}
+            {videoDeviceId}
+            showAudioOutput={showAudioOutputSelection}
+            micEnabled={micDisplayEnabled}
+            {speakerEnabled}
+            {camEnabled}
+            bind:micTestActive
+            {micMonitorStream}
+            {micGateProcessor}
+            permissionGranted={permissionState === "granted"}
+            {tileColor}
+            {gesturesEnabled}
+            {gestureOverlayVisible}
+            {gestureCameraAvailable}
+            {videoQuality}
+            {audioQuality}
+            {hideParticipantVideos}
+            {disableSpeakingGlows}
+            {showTileStats}
+            {isHost}
+            {roomIsLocked}
+            {updatingRoomLock}
+            bind:micPreviewControls={inCallMicPreviewControls}
+            onClose={closeInCallDevicesPanel}
+            onRetryCamera={retryCamera}
+            onRetryMicrophone={retryMicrophone}
+            onToggleMic={toggleMic}
+            onToggleSpeaker={toggleSpeaker}
+            onToggleCam={toggleCam}
+            onAudioDeviceChange={changeAudioDevice}
+            onAudioOutputDeviceChange={handleInCallAudioOutputDeviceChange}
+            onVideoDeviceChange={changeVideoDevice}
+            onTileColorChange={setTileColor}
+            onGesturesEnabledChange={setGesturesEnabled}
+            onOverlayVisibleChange={setGestureOverlayVisible}
+            onVideoQualityChange={setVideoQualityPreference}
+            onAudioQualityChange={setAudioQualityPreference}
+            onHideParticipantVideosChange={setHideParticipantVideos}
+            onDisableSpeakingGlowsChange={setDisableSpeakingGlows}
+            onShowTileStatsChange={setShowTileStats}
+            onRoomLockChange={updateRoomLock}
+          />
         {/if}
 
         <CallStage

@@ -6,15 +6,26 @@
     gesturesEnabled?: boolean;
     overlayVisible?: boolean;
     cameraAvailable?: boolean;
+    /** Skip outer frame/title when nested in another section. */
+    embedded?: boolean;
     onGesturesEnabledChange?: (enabled: boolean) => void;
     onOverlayVisibleChange?: (visible: boolean) => void;
   };
 
-  let { gesturesEnabled = false, overlayVisible = false, cameraAvailable = true, onGesturesEnabledChange, onOverlayVisibleChange }: Props = $props();
+  let {
+    gesturesEnabled = false,
+    overlayVisible = false,
+    cameraAvailable = true,
+    embedded = false,
+    onGesturesEnabledChange,
+    onOverlayVisibleChange,
+  }: Props = $props();
 </script>
 
-<div class="rounded-lg border border-border px-3">
-  <p class="px-2 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Hand gestures</p>
+<div class={embedded ? "" : "rounded-lg border border-border px-3"}>
+  {#if !embedded}
+    <p class="px-2 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Hand gestures</p>
+  {/if}
   <SettingToggle
     id="gestures-enabled"
     label="Enable hand gestures"

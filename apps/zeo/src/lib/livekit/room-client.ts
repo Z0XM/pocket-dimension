@@ -337,6 +337,20 @@ export function createCallRoom(
   async function disconnect() {
     stopAudioLevelPolling();
     detachAllRemoteAudioTracks(room);
+    // Release capture devices promptly (camera indicator) before/while disconnect settles.
+    try {
+      await room.localParticipant.setCameraEnabled(false);
+    } catch {
+      // Best-effort — disconnect below still tears down the room.
+    }
+    try {
+      await room.localParticipant.setMicrophoneEnabled(false);
+    } catch {
+      // Best-effort.
+    }
+    for (const publication of room.localParticipant.trackPublications.values()) {
+      publication.track?.stop();
+    }
     if (room.state !== "disconnected") {
       await room.disconnect();
     }

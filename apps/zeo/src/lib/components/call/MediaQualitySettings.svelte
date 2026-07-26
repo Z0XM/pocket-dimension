@@ -10,11 +10,13 @@
   type Props = {
     videoQuality: VideoQualityOption;
     audioQuality: AudioQualityOption;
+    /** Skip outer frame when nested in another section. */
+    embedded?: boolean;
     onVideoQualityChange: (value: VideoQualityOption) => void;
     onAudioQualityChange: (value: AudioQualityOption) => void;
   };
 
-  const { videoQuality, audioQuality, onVideoQualityChange, onAudioQualityChange }: Props = $props();
+  const { videoQuality, audioQuality, embedded = false, onVideoQualityChange, onAudioQualityChange }: Props = $props();
 
   const chipClass =
     "rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -22,7 +24,7 @@
   const idleClass = "border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground";
 </script>
 
-<div class="space-y-3 rounded-lg border border-border px-3 py-3">
+<div class="space-y-3 {embedded ? '' : 'rounded-lg border border-border px-3 py-3'}">
   <div class="space-y-2">
     <p class="text-sm font-medium text-foreground">Video quality</p>
     <div class="flex flex-wrap gap-1.5" role="group" aria-label="Video quality">

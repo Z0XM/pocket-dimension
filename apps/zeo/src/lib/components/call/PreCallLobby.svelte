@@ -115,10 +115,18 @@
   }
 
   $effect(() => {
-    if (previewEl && previewStream) {
+    if (!previewEl) return;
+
+    if (previewStream) {
       previewEl.srcObject = previewStream;
       syncPreviewTracks(previewStream, { audio: micEnabled, video: camEnabled });
+    } else {
+      previewEl.srcObject = null;
     }
+
+    return () => {
+      if (previewEl) previewEl.srcObject = null;
+    };
   });
 </script>
 
