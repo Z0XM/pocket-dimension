@@ -212,3 +212,90 @@ export async function sendResetPasswordEmail({ email, name, url }: ResetPassword
     html,
   });
 }
+
+interface MagicLinkEmailParams {
+  email: string;
+  url: string;
+}
+
+export async function sendMagicLinkEmail({ email, url }: MagicLinkEmailParams) {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sign in to your account</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+          }
+          .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 40px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          }
+          h1 {
+            color: #1a1a1a;
+            font-size: 24px;
+            margin-bottom: 20px;
+          }
+          p {
+            margin-bottom: 16px;
+            color: #555;
+          }
+          .button {
+            display: inline-block;
+            background-color: #6366f1;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 14px 28px;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+          }
+          .button:hover {
+            background-color: #5558e3;
+          }
+          .link {
+            color: #6366f1;
+            word-break: break-all;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+            color: #888;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Sign in with one tap</h1>
+          <p>Click the button below to sign in to your account. No password needed.</p>
+          <a href="${url}" class="button">Sign in</a>
+          <p>Or copy and paste this link into your browser:</p>
+          <p class="link">${url}</p>
+          <p>This link will expire in 15 minutes and can only be used once.</p>
+          <div class="footer">
+            <p>If you didn't request this email, you can safely ignore it.</p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: email,
+    subject: "Your sign-in link",
+    html,
+  });
+}

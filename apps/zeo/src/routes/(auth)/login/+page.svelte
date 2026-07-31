@@ -10,8 +10,10 @@
 
   const redirectTo = $derived(page.url.searchParams.get("redirect") ?? "/");
   const signUpHref = $derived(redirectTo === "/" ? "/sign-up" : `/sign-up?redirect=${encodeURIComponent(redirectTo)}`);
+  const magicLinkError = $derived(page.url.searchParams.get("error"));
 
   let loginBy = $state<"email" | "username">("email");
+  let emailMethod = $state<"password" | "magic-link">("password");
   let email = $state("");
   let username = $state("");
   let password = $state("");
@@ -20,6 +22,26 @@
   let emailNotVerified = $state(false);
   let resendingVerification = $state(false);
 
+  const magicLinkErrorMessage = $derived.by(() => {
+    if (!magicLinkError) return null;
+
+    const code = page.url.searchParams.get("error");
+    const messages: Record<string, string> = {
+      INVALID_TOKEN: "This sign-in link is invalid or has already been used. Request a new one.",
+      failed_to_create_user: "We couldn't create your account. Please try again.",
+      new_user_signup_disabled: "Sign up with magic link is not available. Create an account first.",
+      failed_to_create_session: "We couldn't sign you in. Please try again.",
+      magic_link: "Sign-in link failed. Please request a new one.",
+    };
+
+    return messages[code ?? ""] ?? "Sign-in link failed. Please request a new one.";
+  });
+
+  function callbackUrl() {
+    const path = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
+    return `${window.location.origin}${path}`;
+  }
+
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
     error = null;
@@ -27,6 +49,23 @@
     loading = true;
 
     try {
+      if (loginBy === "email" && emailMethod === "magic-link") {
+        const result = await authClient.signIn.magicLink({
+          email,
+          callbackURL: callbackUrl(),
+          errorCallbackURL: `${window.location.origin}/login?error=magic_link&redirect=${encodeURIComponent(redirectTo)}`,
+        });
+
+        if (result.error) {
+          error = result.error.message ?? "Unable to send sign-in link";
+          loading = false;
+          return;
+        }
+
+        await goto(`/check-email?type=magic-link&email=${encodeURIComponent(email)}`);
+        return;
+      }
+
       const result =
         loginBy === "email"
           ? await authClient.signIn.email({
@@ -98,6 +137,10 @@
 </script>
 
 <form class="auth-form" onsubmit={handleSubmit}>
+  {#if magicLinkErrorMessage}
+    <div class="auth-error">{magicLinkErrorMessage}</div>
+  {/if}
+
   {#if error}
     <div class="auth-error">{error}</div>
   {/if}
@@ -152,17 +195,45 @@
       {/if}
     </div>
 
-    <div class="grid gap-2">
-      <div class="flex items-center gap-2">
-        <Label for="password-{id}">Password</Label>
-        <a href="/forgot-password" class="link-accent ms-auto text-sm">Forgot password?</a>
+    {#if loginBy === "email"}
+      <div class="flex items-center gap-3 text-sm">
+        <button
+          type="button"
+          class="segment-btn {emailMethod === 'password' ? 'text-primary' : 'text-muted-foreground'}"
+          onclick={() => (emailMethod = "password")}
+        >
+          Password
+        </button>
+        <span class="text-muted-foreground">·</span>
+        <button
+          type="button"
+          class="segment-btn {emailMethod === 'magic-link' ? 'text-primary' : 'text-muted-foreground'}"
+          onclick={() => (emailMethod = "magic-link")}
+        >
+          Magic link
+        </button>
       </div>
-      <Input id="password-{id}" type="password" bind:value={password} required disabled={loading} />
-    </div>
+    {/if}
+
+    {#if loginBy !== "email" || emailMethod === "password"}
+      <div class="grid gap-2">
+        <div class="flex items-center gap-2">
+          <Label for="password-{id}">Password</Label>
+          <a href="/forgot-password" class="link-accent ms-auto text-sm">Forgot password?</a>
+        </div>
+        <Input id="password-{id}" type="password" bind:value={password} required disabled={loading} />
+      </div>
+    {:else}
+      <p class="text-sm text-muted-foreground">
+        We'll email you a one-tap sign-in link. No password needed.
+      </p>
+    {/if}
 
     <Button type="submit" disabled={loading} class="w-full">
       {#if loading}
         Please wait…
+      {:else if loginBy === "email" && emailMethod === "magic-link"}
+        Send sign-in link
       {:else}
         Log in
       {/if}

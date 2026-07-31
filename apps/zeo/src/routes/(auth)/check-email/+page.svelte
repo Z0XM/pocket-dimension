@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import { authClient } from "$lib/auth-client";
   import { PUBLIC_BASE_AUTH_URL } from "$env/static/public";
 
   const type = $derived(page.url.searchParams.get("type") ?? "signup");
@@ -15,6 +16,7 @@
     if (type === "signup") return "Check your email";
     if (type === "resend") return "Verification email sent";
     if (type === "forgot") return "Check your email";
+    if (type === "magic-link") return "Check your email";
     return "Check your email";
   });
 
@@ -31,10 +33,13 @@
     if (type === "forgot") {
       return `If an account exists for ${email || "that email"}, we sent a password reset link.`;
     }
+    if (type === "magic-link") {
+      return `We sent a sign-in link to ${email || "your email"}. Tap it to log in — no password needed.`;
+    }
     return "Check your inbox for the email we sent.";
   });
 
-  async function handleResendVerification() {
+  async function handleResend() {
     if (!email) {
       resendError = "No email address provided.";
       return;
@@ -45,6 +50,21 @@
     resendSuccess = false;
 
     try {
+      if (type === "magic-link") {
+        const result = await authClient.signIn.magicLink({
+          email,
+          callbackURL: `${window.location.origin}/`,
+          errorCallbackURL: `${window.location.origin}/login?error=magic_link`,
+        });
+
+        if (result.error) {
+          resendError = result.error.message ?? "Failed to send sign-in link.";
+        } else {
+          resendSuccess = true;
+        }
+        return;
+      }
+
       const response = await fetch(`${PUBLIC_BASE_AUTH_URL}/send-verification-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,7 +82,7 @@
       }
     } catch (err) {
       console.error(err);
-      resendError = "Failed to send verification email.";
+      resendError = type === "magic-link" ? "Failed to send sign-in link." : "Failed to send verification email.";
     } finally {
       resending = false;
     }
@@ -78,7 +98,7 @@
 
     {#if resendSuccess}
       <div class="w-full rounded-md border border-(--success)/40 bg-[color-mix(in_srgb,var(--success)_12%,transparent)] p-3 text-sm text-(--success)">
-        Verification email sent.
+        {type === "magic-link" ? "Sign-in link sent." : "Verification email sent."}
       </div>
     {/if}
 
@@ -90,8 +110,14 @@
 
     <div class="flex w-full flex-col gap-3">
       {#if type !== "forgot" && email}
-        <button type="button" class="auth-btn-secondary" onclick={handleResendVerification} disabled={resending}>
-          {resending ? "Sending…" : "Resend verification email"}
+        <button type="button" class="auth-btn-secondary" onclick={handleResend} disabled={resending}>
+          {#if resending}
+            Sending…
+          {:else if type === "magic-link"}
+            Resend sign-in link
+          {:else}
+            Resend verification email
+          {/if}
         </button>
       {/if}
 

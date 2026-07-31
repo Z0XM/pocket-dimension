@@ -1,8 +1,8 @@
 import { db } from "@pocket-dimension/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { username } from "better-auth/plugins";
-import { sendResetPasswordEmail, sendVerificationEmail } from "./lib/emails";
+import { magicLink, username } from "better-auth/plugins";
+import { sendMagicLinkEmail, sendResetPasswordEmail, sendVerificationEmail } from "./lib/emails";
 import { env } from "./lib/env";
 
 export const auth = betterAuth({
@@ -82,6 +82,13 @@ export const auth = betterAuth({
     useSecureCookies: true,
   },
   plugins: [
+    magicLink({
+      expiresIn: 60 * 15, // 15 minutes
+      disableSignUp: false,
+      sendMagicLink: async ({ email, url }) => {
+        void sendMagicLinkEmail({ email, url });
+      },
+    }),
     username({
       minUsernameLength: 3,
       maxUsernameLength: 20,
