@@ -590,30 +590,26 @@
   let debounceTimer: ReturnType<typeof setTimeout> | null = $state(null);
   let isUserTyping = $state(false);
   let pendingQuery = $state<string | null>(null);
+  let searchGeneration = $state(0);
   let searchInputRef: HTMLInputElement | null = $state(null);
 
-  // Initialize and sync search value from URL (only when user is not typing or pending query matches)
+  // Sync input from URL only for external navigation (back/forward, shared links).
+  // While typing, local input is authoritative — never overwrite ahead of the URL.
   $effect(() => {
     const urlQuery = page.url.searchParams.get("q") ?? "";
 
-    // If we have a pending query, check if URL matches it - if so, clear the flag
     if (pendingQuery !== null) {
       if (urlQuery === pendingQuery) {
         pendingQuery = null;
-        isUserTyping = false;
-        // Sync searchValue to match URL now that it's updated
-        if (urlQuery !== searchValue) {
-          searchValue = urlQuery;
+        if (searchValue === urlQuery) {
+          isUserTyping = false;
         }
         return;
-      } else {
-        // URL hasn't updated yet, don't sync
-        return;
       }
+      return;
     }
 
-    // Normal sync when not typing and no pending query
-    if (isUserTyping) {
+    if (isUserTyping || debounceTimer !== null) {
       return;
     }
 
@@ -622,30 +618,50 @@
     }
   });
 
-  // Debounced function to update URL query param
-  function updateSearchQuery(query: string) {
-    // Clear existing timer
+  function scheduleSearchUrlUpdate(query: string) {
+    searchGeneration++;
+    const generation = searchGeneration;
+
     if (debounceTimer) {
       clearTimeout(debounceTimer);
     }
 
-    // Set new timer
     debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+
+      if (generation !== searchGeneration) {
+        return;
+      }
+
       const url = new URL(page.url);
-      // Only trim when checking if query is empty, but preserve spaces in the actual query
       const trimmedQuery = query.trim();
       if (trimmedQuery) {
-        // Store the full query with spaces preserved
         url.searchParams.set("q", query);
       } else {
         url.searchParams.delete("q");
       }
       const newQuery = trimmedQuery ? query : null;
 
-      // Set pending query BEFORE calling goto - this prevents sync effect from running with old URL
       pendingQuery = newQuery;
-      goto(url.toString(), { keepFocus: true, invalidateAll: false });
+      goto(url.toString(), { keepFocus: true, invalidateAll: false, replaceState: true });
     }, 300);
+  }
+
+  function applySearchQuery(query: string, source: "typing" | "programmatic" = "typing") {
+    if (source === "programmatic") {
+      searchValue = query;
+      isUserTyping = false;
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
+    }
+    scheduleSearchUrlUpdate(query);
+  }
+
+  // Debounced URL update for programmatic search (e.g. clicking a title word)
+  function updateSearchQuery(query: string) {
+    applySearchQuery(query, "programmatic");
   }
 
   // Cleanup timer on component destroy
@@ -661,7 +677,7 @@
     const target = e.currentTarget as HTMLInputElement;
     isUserTyping = true;
     searchValue = target.value;
-    updateSearchQuery(target.value);
+    scheduleSearchUrlUpdate(target.value);
   }
 
   // Keyboard shortcut: Ctrl+Q to focus search input, Ctrl+S to save in edit mode, Escape to cancel
