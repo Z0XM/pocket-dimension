@@ -61,6 +61,10 @@ Better Auth is configured with `secure: true` / `sameSite: "none"` cookies (`sha
 
 **zeo requires login** to join any room (`/room/[slug]` redirects unauthenticated users to sign-in). Guest join without an account is not supported.
 
+### Deployment (Railpack / Dokploy)
+
+Apps with `@pocket-dimension/*` workspace deps **must** deploy from the **repository root** (`/`), not `apps/<app>`. See root [`DEPLOY.md`](./DEPLOY.md). Each app has `railpack.json` + `scripts/deploy-build.sh` under `apps/<app>/`.
+
 ### markitdown (optional, standalone)
 
 Needs a Python venv plus `ffmpeg` + `exiftool` (both installed in the snapshot): `cd apps/markitdown && bun run setup:python`. Defaults to port 3006 — conflicts with `me-via-you`; run only one or change `PORT`.

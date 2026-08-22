@@ -74,8 +74,25 @@ Deploy `auth-service` as a separate Dokploy **Application** (if not already runn
 
 | Setting | Value |
 |---------|-------|
+| Root directory | **`/`** (monorepo root — required for workspace deps) |
+| Build type | **Railpack** |
 | Domain | `auth.z0xm.com` |
 | Port | `5001` |
+
+Railpack env:
+
+```env
+RAILPACK_CONFIG_FILE=apps/auth-service/railpack.json
+```
+
+Or inline:
+
+```env
+RAILPACK_BUILD_CMD=./apps/auth-service/scripts/deploy-build.sh
+RAILPACK_START_CMD=cd apps/auth-service && bun run start
+```
+
+Full guide: [apps/auth-service/DEPLOY.md](../../../auth-service/DEPLOY.md).
 
 Required env (must match zeo):
 

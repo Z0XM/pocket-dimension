@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "packages": {
+    "bun": "1.3.5"
+  },
+  "steps": {
+    "build": {
+      "commands": ["./apps/chhan-chhan/scripts/deploy-build.sh"],
+      "deployOutputs": [
+        {
+          "include": ["apps/chhan-chhan/build"]
+        }
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "cd apps/chhan-chhan && bun run start",
+    "variables": {
+      "NODE_ENV": "production"
+    }
+  }
+}

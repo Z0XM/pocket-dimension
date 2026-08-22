@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "packages": {
+    "bun": "1.3.5"
+  },
+  "steps": {
+    "build": {
+      "commands": ["./apps/auth-service/scripts/deploy-build.sh"],
+      "deployOutputs": [
+        {
+          "include": ["apps/auth-service", "shared/auth/dist", "shared/db/dist", "shared/utils/dist"]
+        }
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "cd apps/auth-service && bun run start",
+    "variables": {
+      "NODE_ENV": "production"
+    }
+  }
+}

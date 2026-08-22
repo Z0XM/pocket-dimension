@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "packages": {
+    "bun": "1.3.5"
+  },
+  "steps": {
+    "build": {
+      "commands": ["./apps/watchlist/scripts/deploy-build.sh"],
+      "deployOutputs": [
+        {
+          "include": ["apps/watchlist/build"]
+        }
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "cd apps/watchlist && bun run start",
+    "variables": {
+      "NODE_ENV": "production"
+    }
+  }
+}

@@ -4,6 +4,8 @@ Deploys as a Bun + SvelteKit app (svelte-adapter-bun) from the monorepo root via
 
 ## Prerequisites
 
+- **Root directory:** **`/`** (repository root — required for workspace deps). See [DEPLOY.md](../../DEPLOY.md).
+
 - **PostgreSQL** — same database as auth-service (shared `@pocket-dimension/db` schema).
 - **Auth service** — running at `PUBLIC_BASE_AUTH_URL` with matching `BETTER_AUTH_*` config.
 - **Resend** — for verification and password-reset emails.
@@ -13,6 +15,7 @@ Deploys as a Bun + SvelteKit app (svelte-adapter-bun) from the monorepo root via
 Set on the Chhan Chhan service:
 
 ```env
+RAILPACK_CONFIG_FILE=apps/chhan-chhan/railpack.json
 RAILPACK_BUILD_CMD=./apps/chhan-chhan/scripts/deploy-build.sh
 RAILPACK_START_CMD=cd apps/chhan-chhan && bun run start
 ```
