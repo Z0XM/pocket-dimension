@@ -11,7 +11,8 @@ COPY scripts ./scripts
 COPY shared ./shared
 COPY apps ./apps
 
-RUN bun install --frozen-lockfile
+ENV CI=true HUSKY=0
+RUN bun install --frozen-lockfile --ignore-scripts --filter '@pocket-dimension/zeo'
 
 RUN bun run build:shared:utils \
  && bun run build:shared:db \
