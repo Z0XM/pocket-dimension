@@ -1,11 +1,30 @@
-import { realpathSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 
-const repoRoot = fileURLToPath(new URL(".", import.meta.url));
-const require = createRequire(realpathSync(path.join(repoRoot, "node_modules/better-auth/package.json")));
+function createKyselyRequire(): NodeRequire {
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  while (true) {
+    const pkgJson = path.join(dir, "package.json");
+    if (existsSync(pkgJson)) {
+      try {
+        const req = createRequire(pkgJson);
+        req.resolve("kysely");
+        return req;
+      } catch {
+        // walk up to the monorepo root (or any ancestor with kysely installed)
+      }
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error("vite-kysely-compat: could not resolve kysely — add it as a devDependency");
+}
+
+const require = createKyselyRequire();
 const kyselyEntry = require.resolve("kysely");
 const kyselyMigration = path.join(path.dirname(kyselyEntry), "migration/migrator.js");
 const virtualId = "\0kysely-compat";

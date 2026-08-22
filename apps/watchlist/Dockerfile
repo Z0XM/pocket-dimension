@@ -10,7 +10,9 @@ COPY shared ./shared
 COPY apps ./apps
 
 ENV CI=true HUSKY=0
-RUN bun install --frozen-lockfile --ignore-scripts --filter '@pocket-dimension/watchlist'
+RUN bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@pocket-dimension/watchlist'
+
+RUN cd apps/watchlist && bun run prepare
 
 RUN bun run build:shared:utils \
  && bun run build:shared:db \
