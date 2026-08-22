@@ -3,6 +3,7 @@ import type { BankImporter, ImportRow, StatementInput } from "$lib/importers/typ
 import { parseCsvRows, rowsToObjects } from "$lib/server/csv-parse";
 import { kotakImporter } from "$lib/importers/kotak";
 import { iciciImporter } from "$lib/importers/icici";
+import { hdfcImporter } from "$lib/importers/hdfc";
 
 export const genericImporter: BankImporter = {
   id: "generic",
@@ -31,6 +32,7 @@ export const genericImporter: BankImporter = {
 const importers: Record<string, BankImporter> = {
   [kotakImporter.id]: kotakImporter,
   [iciciImporter.id]: iciciImporter,
+  [hdfcImporter.id]: hdfcImporter,
   [genericImporter.id]: genericImporter,
 };
 

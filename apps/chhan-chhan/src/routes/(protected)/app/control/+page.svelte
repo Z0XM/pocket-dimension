@@ -112,7 +112,7 @@
   <section class="panel">
     <h2>Import</h2>
     <p class="panel-copy dim">
-      Upload a Kotak bank statement as CSV or PDF. Generic CSV is also supported. Imports use
+      Upload a bank statement as CSV or PDF (Kotak, ICICI, HDFC, or Generic CSV). Imports use
       <strong>{data.account.currencyCode}</strong>.
     </p>
     <form class="import-form" enctype="multipart/form-data" onsubmit={submitImport}>

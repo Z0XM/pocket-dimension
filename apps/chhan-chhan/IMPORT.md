@@ -111,6 +111,32 @@ console.log('parsed', rows.length, 'serials', rows.map(r => r.sortOrder).join(',
 
 ---
 
+## HDFC PDF import
+
+**Files:**
+- `src/lib/importers/hdfc-pdf.ts` — row parser.
+- `src/lib/importers/hdfc-shared.ts` — dates (`DD/MM/YY`), UPI/ACH merchants, refs, footer stripping, metadata.
+- `src/lib/importers/hdfc.ts` — `BankImporter` (PDF only).
+
+**Strategy:** Transaction starts are `DD/MM/YY` followed by a letter (value dates are followed by amounts). Chunk until next start, strip page footers / `STATEMENT SUMMARY`, match trailing `ref + value date + amount + balance` (one of Withdrawal/Deposit is empty in the PDF text). Type from balance delta vs opening balance (from summary) / prior row. Refs are numeric Chq./Ref.No. values. UPI narrations use hyphens (`UPI-MERCHANT-vpa@bank`).
+
+**Tests:** `src/lib/importers/hdfc-pdf.test.ts`
+
+**Local parse check:**
+
+```bash
+bun -e "
+import { readFileSync } from 'fs';
+import { extractPdfText } from './src/lib/server/pdf-text.ts';
+import { parseHdfcPdf } from './src/lib/importers/hdfc-pdf.ts';
+const bytes = readFileSync('./data/hdfc.pdf');
+const { rows, metadata } = parseHdfcPdf(await extractPdfText(new Uint8Array(bytes)));
+console.log('parsed', rows.length, metadata);
+"
+```
+
+---
+
 ## Merchant & reference parsing
 
 **UPI:** `UPI/MERCHANT NAME/...` → merchant = second segment (may be **truncated** by Kotak).

@@ -45,6 +45,7 @@ Backend or UI scaffolding exists; these are mostly wiring and polish.
 ## Import and data hygiene
 
 - [ ] **Scheduled Excel sync** — Background job or “Sync now” in Control using existing conservative merge logic.
+- [x] **HDFC Bank PDF importer** — NetBanking account statement PDFs (Withdrawal/Deposit columns).
 - [ ] **More bank importers** — Same pipeline as Kotak for additional banks.
 - [ ] **Import history** — Which file, when, how many rows added/skipped; optional rollback of last import.
 
