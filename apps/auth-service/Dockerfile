@@ -1,8 +1,5 @@
-# auth-service production image — build from monorepo root:
-#   docker build -f apps/auth-service/Dockerfile -t auth-service .
-#
-# Dokploy: Build type Dockerfile, Dockerfile path apps/auth-service/Dockerfile,
-#          build context / (repo root). Root directory setting is ignored.
+# Deploy from monorepo root. Dokploy: Build Path /, Context Path . (or Context / if Build Path is apps/auth-service).
+# Local: docker build -f apps/auth-service/Dockerfile -t auth-service .
 
 FROM oven/bun:1.3.5 AS builder
 WORKDIR /app
@@ -10,7 +7,7 @@ WORKDIR /app
 COPY package.json bun.lock turbo.json ./
 COPY scripts ./scripts
 COPY shared ./shared
-COPY apps/auth-service ./apps/auth-service
+COPY apps ./apps
 
 RUN bun install --frozen-lockfile
 

@@ -4,13 +4,35 @@ Elysia + Better Auth API. Depends on built workspace packages in `shared/`.
 
 ## Recommended: Dockerfile (Dokploy)
 
-Most reliable — does not depend on Railpack root-directory settings.
+The Dockerfile copies `shared/`, `package.json`, etc. from the **repository root**. In Dokploy, **Docker Context Path `.` is relative to Build Path**, not the git repo — so `.` only works when Build Path is also the repo root.
 
-| Setting | Value |
-|---------|-------|
+### Option A (simplest)
+
+| Dokploy field | Value |
+|---------------|-------|
 | Build type | **Dockerfile** |
-| Dockerfile path | `apps/auth-service/Dockerfile` |
-| Build context | **`/`** (repo root) |
+| **Build Path** | **`/`** (repo root — leave empty if that means root) |
+| **Docker Context Path** | `.` |
+| **Dockerfile Path** | `apps/auth-service/Dockerfile` |
+| Port | `5001` |
+
+Equivalent local command:
+
+```bash
+docker build -f apps/auth-service/Dockerfile -t auth-service .
+#                                                          ^ context = repo root
+```
+
+### Option B (app folder as Build Path)
+
+Use this if Build Path must stay `apps/auth-service`:
+
+| Dokploy field | Value |
+|---------------|-------|
+| Build type | **Dockerfile** |
+| **Build Path** | `apps/auth-service` |
+| **Docker Context Path** | **`/`** (repo root — **not** `.`) |
+| **Dockerfile Path** | `Dockerfile` |
 | Port | `5001` |
 
 No `RAILPACK_*` env vars needed.
@@ -67,6 +89,10 @@ docker run --rm -p 5001:5001 --env-file apps/auth-service/.env auth-service
 ```
 
 ## Troubleshooting
+
+**`"/shared": not found` / `"/turbo.json": not found` during Docker build**
+
+Build Path is `apps/auth-service` but Docker Context Path is `.` — so Docker only sees the app folder. Fix with **Option A** (Build Path `/`, Context `.`) or **Option B** (Build Path `apps/auth-service`, Context **`/`**).
 
 **`Workspace dependency "@pocket-dimension/auth" not found`**
 

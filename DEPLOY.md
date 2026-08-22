@@ -18,11 +18,17 @@ Works regardless of the Railpack “root directory” setting. Use for **auth-se
 | zeo | `apps/zeo/Dockerfile` | `/` (repo root) | 3008 |
 | zeo-music-worker | `apps/zeo-music-worker/Dockerfile` | `/` (repo root) | 3010 |
 
-Dokploy settings:
+Dokploy has three separate fields — **Build Path**, **Docker Context Path**, and **Dockerfile Path**:
 
-1. **Build type:** Dockerfile (not Railpack)
-2. **Dockerfile path:** `apps/<app>/Dockerfile`
-3. **Build context:** `/` (repository root)
+| Dokploy field | auth-service (Option A) | auth-service (Option B) |
+|---------------|-------------------------|-------------------------|
+| Build Path | **`/`** | `apps/auth-service` |
+| Docker Context Path | `.` | **`/`** (not `.`) |
+| Dockerfile Path | `apps/auth-service/Dockerfile` | `Dockerfile` |
+
+**Do not** use Build Path `apps/auth-service` with Context Path `.` — that limits Docker to the app folder and `COPY shared/` fails.
+
+Equivalent CLI: `docker build -f apps/auth-service/Dockerfile -t auth-service .` (context is always repo root).
 
 ## Alternative: Railpack
 

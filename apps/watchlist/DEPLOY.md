@@ -4,16 +4,26 @@ SvelteKit app (svelte-adapter-bun) with shared auth and database packages.
 
 ## Recommended: Dockerfile (Dokploy)
 
-Most reliable — does not depend on Railpack root-directory settings.
+Same monorepo context rules as auth-service — see [DEPLOY.md](../../DEPLOY.md).
 
-| Setting | Value |
-|---------|-------|
+### Option A (simplest)
+
+| Dokploy field | Value |
+|---------------|-------|
 | Build type | **Dockerfile** |
-| Dockerfile path | `apps/watchlist/Dockerfile` |
-| Build context | **`/`** (repo root) |
+| **Build Path** | **`/`** |
+| **Docker Context Path** | `.` |
+| **Dockerfile Path** | `apps/watchlist/Dockerfile` |
 | Port | `3002` |
 
-No `RAILPACK_*` env vars needed.
+### Option B (app folder as Build Path)
+
+| Dokploy field | Value |
+|---------------|-------|
+| Build Path | `apps/watchlist` |
+| **Docker Context Path** | **`/`** (not `.`) |
+| Dockerfile Path | `Dockerfile` |
+| Port | `3002` |
 
 ## Alternative: Railpack
 
@@ -69,6 +79,10 @@ docker run --rm -p 3002:3002 --env-file apps/watchlist/.env watchlist
 ```
 
 ## Troubleshooting
+
+**`"/shared": not found` / `"/turbo.json": not found` during Docker build**
+
+Build Path is `apps/watchlist` but Docker Context Path is `.`. Use Option A or set Context Path to **`/`**.
 
 **`Workspace dependency "@pocket-dimension/db" not found`**
 

@@ -1,16 +1,19 @@
-# Used when building from monorepo root (zeo / music-worker Dockerfiles).
-# Keep every workspace package.json so `bun install --frozen-lockfile` can
-# resolve the lockfile graph even when app sources are omitted.
+# Monorepo Docker builds (context = repo root).
+# Stub non-deployed apps (package.json only) so bun.lock resolves.
+# Deployed apps (auth-service, watchlist, zeo, zeo-music-worker) are copied in full.
+
 node_modules
 **/.git
 **/.turbo
 **/.svelte-kit
+**/.astro
+**/node_modules
+**/dist
+**/build
+**/coverage
 _bmad-output
 .agents
 
-# Omit bulky app sources; re-include package.json for workspace resolution.
-apps/auth-service/**
-!apps/auth-service/package.json
 apps/chhan-chhan/**
 !apps/chhan-chhan/package.json
 apps/howwasyourday/**
@@ -23,5 +26,3 @@ apps/pocket/**
 !apps/pocket/package.json
 apps/rhymes/**
 !apps/rhymes/package.json
-apps/watchlist/**
-!apps/watchlist/package.json
