@@ -35,5 +35,6 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
   }
 
-  return svelteKitHandler({ event, resolve, auth, building });
+  // better-auth types can diverge when multiple @better-auth/core copies are hoisted in the monorepo
+  return svelteKitHandler({ event, resolve, auth: auth as never, building });
 };

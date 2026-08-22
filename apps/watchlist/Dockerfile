@@ -13,6 +13,9 @@ COPY apps ./apps
 ENV CI=true HUSKY=0
 RUN bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@pocket-dimension/watchlist'
 
+# Hoisted filter install leaves broken symlinks under apps/*/node_modules; use root node_modules only.
+RUN find apps shared -type d -name node_modules -prune -exec rm -rf {} +
+
 # Fail fast if Dokploy/Docker reused a stale apps/ layer (old vite.config used ../../vite-kysely-compat).
 RUN test -f apps/watchlist/vite-kysely-compat.ts \
  && grep -q './vite-kysely-compat' apps/watchlist/vite.config.ts

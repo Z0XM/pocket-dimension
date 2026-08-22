@@ -18,6 +18,7 @@ fi
 
 echo "Installing Bun workspace dependencies..."
 bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@pocket-dimension/auth-service'
+find apps shared -type d -name node_modules -prune -exec rm -rf {} +
 
 echo "Building shared packages for auth-service..."
 TURBO_FORCE=1 bun run build:shared:utils
