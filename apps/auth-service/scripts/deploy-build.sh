@@ -10,9 +10,9 @@ cd "$ROOT_DIR"
 if [[ ! -f shared/auth/package.json ]]; then
   echo "ERROR: Monorepo shared packages not found at $ROOT_DIR/shared/auth."
   echo ""
-  echo "Workspace deps (@pocket-dimension/auth, db, utils) require the full repo."
-  echo "Set Dokploy/Railway Root Directory to / (repository root), not apps/auth-service."
-  echo "Then set RAILPACK_CONFIG_FILE=apps/auth-service/railpack.json"
+  echo "Workspace deps require the full repo at build time."
+  echo "Use Dockerfile build (recommended): apps/auth-service/Dockerfile with context /"
+  echo "Or Railpack with root directory apps/auth-service or / (see DEPLOY.md)."
   exit 1
 fi
 

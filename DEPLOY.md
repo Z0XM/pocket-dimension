@@ -1,46 +1,67 @@
 # Deploying Pocket Dimension (monorepo)
 
-Apps that depend on `@pocket-dimension/auth`, `@pocket-dimension/db`, or `@pocket-dimension/utils` **must deploy from the repository root**. If the platform root directory is set to `apps/<app>`, `bun install` cannot resolve workspace packages and the build fails with:
+Apps that depend on `@pocket-dimension/auth`, `@pocket-dimension/db`, or `@pocket-dimension/utils` **must include the full monorepo** at build time. If Railpack runs `bun install` inside `apps/<app>` only, the build fails with:
 
 ```text
 error: Workspace dependency "@pocket-dimension/auth" not found
 Searched in "./*"
 ```
 
-## Required platform settings
+## Recommended: Dockerfile (Dokploy)
 
-For every auth-backed app on Dokploy, Railway, or Railpack:
+Works regardless of the Railpack “root directory” setting. Use for **auth-service** and **watchlist** if Railpack keeps failing.
+
+| App | Dockerfile | Build context | Port |
+|-----|------------|---------------|------|
+| auth-service | `apps/auth-service/Dockerfile` | `/` (repo root) | 5001 |
+| watchlist | `apps/watchlist/Dockerfile` | `/` (repo root) | 3002 |
+| zeo | `apps/zeo/Dockerfile` | `/` (repo root) | 3008 |
+| zeo-music-worker | `apps/zeo-music-worker/Dockerfile` | `/` (repo root) | 3010 |
+
+Dokploy settings:
+
+1. **Build type:** Dockerfile (not Railpack)
+2. **Dockerfile path:** `apps/<app>/Dockerfile`
+3. **Build context:** `/` (repository root)
+
+## Alternative: Railpack
+
+Railpack auto-runs `bun install` before custom build scripts. Each app’s `railpack.json` skips that step (`install: true`) and runs `scripts/deploy-build.sh` instead, which installs from the monorepo root.
 
 | Setting | Value |
 |---------|-------|
-| **Root directory** | `/` (repository root — **not** `apps/<app>`) |
+| **Root directory** | `apps/<app>` **or** `/` — both work with updated `railpack.json` |
 | **Build type** | Railpack |
-| **Config file** | `RAILPACK_CONFIG_FILE=apps/<app>/railpack.json` |
 
-Alternative to `railpack.json`: set `RAILPACK_BUILD_CMD` and `RAILPACK_START_CMD` in the service env (see each app's `.env.example`).
+If root directory is `/`, set in Dokploy env (not just `.env.example`):
+
+```env
+RAILPACK_CONFIG_FILE=apps/auth-service/railpack.json
+```
+
+If root directory is `apps/auth-service`, `railpack.json` is picked up automatically — no `RAILPACK_CONFIG_FILE` needed.
+
+**Important:** env vars in `.env.example` are not loaded by Dokploy. Copy them into the Dokploy service **Environment** panel.
 
 ## Per-app guides
 
-| App | Port | Railpack config | Details |
-|-----|------|-----------------|---------|
-| auth-service | 5001 | `apps/auth-service/railpack.json` | [apps/auth-service/DEPLOY.md](./apps/auth-service/DEPLOY.md) |
-| watchlist | 3002 | `apps/watchlist/railpack.json` | [apps/watchlist/DEPLOY.md](./apps/watchlist/DEPLOY.md) |
-| chhan-chhan | 3005 | env vars | [apps/chhan-chhan/DEPLOY.md](./apps/chhan-chhan/DEPLOY.md) |
-| zeo | 3008 | env vars | [apps/zeo/deploy/dokploy/README.md](./apps/zeo/deploy/dokploy/README.md) |
-| markitdown | 3006 | `apps/markitdown/railpack.json` | [apps/markitdown/railpack.json](./apps/markitdown/railpack.json) |
-| zeo-music-worker | 3010 | Dockerfile | [apps/zeo-music-worker/README.md](./apps/zeo-music-worker/README.md) |
+| App | Port | Details |
+|-----|------|---------|
+| auth-service | 5001 | [apps/auth-service/DEPLOY.md](./apps/auth-service/DEPLOY.md) |
+| watchlist | 3002 | [apps/watchlist/DEPLOY.md](./apps/watchlist/DEPLOY.md) |
+| chhan-chhan | 3005 | [apps/chhan-chhan/DEPLOY.md](./apps/chhan-chhan/DEPLOY.md) |
+| zeo | 3008 | [apps/zeo/deploy/dokploy/README.md](./apps/zeo/deploy/dokploy/README.md) |
+| markitdown | 3006 | [apps/markitdown/railpack.json](./apps/markitdown/railpack.json) |
 
-Standalone apps (`rhymes`, `pocket`) have no workspace deps and may use app-level root directories.
+Standalone apps (`rhymes`, `pocket`) have no workspace deps.
 
 ## Database
 
-PostgreSQL **18+** is required (`uuidv7()` in migrations). Run migrations once per deploy environment:
+PostgreSQL **18+** is required (`uuidv7()` in migrations):
 
 ```bash
 DATABASE_URL=postgresql://... bun run db:migrate
 ```
-
-Some deploy scripts run migrations automatically when `DATABASE_URL` is set at build time.
 
 ## Shared env
 

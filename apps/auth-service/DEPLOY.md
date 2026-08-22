@@ -2,34 +2,42 @@
 
 Elysia + Better Auth API. Depends on built workspace packages in `shared/`.
 
-## Dokploy / Railpack
+## Recommended: Dockerfile (Dokploy)
+
+Most reliable — does not depend on Railpack root-directory settings.
 
 | Setting | Value |
 |---------|-------|
-| Root directory | **`/`** (monorepo root) |
+| Build type | **Dockerfile** |
+| Dockerfile path | `apps/auth-service/Dockerfile` |
+| Build context | **`/`** (repo root) |
+| Port | `5001` |
+
+No `RAILPACK_*` env vars needed.
+
+## Alternative: Railpack
+
+| Setting | Value |
+|---------|-------|
+| Root directory | `apps/auth-service` **or** `/` |
 | Build type | Railpack |
 | Port | `5001` |
 
-Required env on the service:
+If root is `/`, add to Dokploy **Environment** (required — not read from `.env.example`):
 
 ```env
 RAILPACK_CONFIG_FILE=apps/auth-service/railpack.json
-NODE_ENV=production
-PORT=5001
 ```
 
-Or without `railpack.json`:
-
-```env
-RAILPACK_BUILD_CMD=./apps/auth-service/scripts/deploy-build.sh
-RAILPACK_START_CMD=cd apps/auth-service && bun run start
-```
+If root is `apps/auth-service`, `railpack.json` is auto-detected.
 
 ### Application env
 
 Copy from [`.env.example`](./.env.example). Minimum for production:
 
 ```env
+NODE_ENV=production
+PORT=5001
 DATABASE_URL=postgresql://...
 BETTER_AUTH_SECRET=<same secret as all frontend apps>
 BETTER_AUTH_URL=https://auth.example.com
@@ -51,12 +59,19 @@ cd apps/auth-service && bun run start
 curl http://localhost:5001/health
 ```
 
+Or Docker:
+
+```bash
+docker build -f apps/auth-service/Dockerfile -t auth-service .
+docker run --rm -p 5001:5001 --env-file apps/auth-service/.env auth-service
+```
+
 ## Troubleshooting
 
 **`Workspace dependency "@pocket-dimension/auth" not found`**
 
-Root directory is set to `apps/auth-service` instead of `/`. Change it to the repository root and set `RAILPACK_CONFIG_FILE=apps/auth-service/railpack.json`.
+Railpack ran auto `bun install` before the custom build. Switch to **Dockerfile** build (recommended), or redeploy with the updated `railpack.json` from this repo.
 
 **`lockfile is frozen`**
 
-Set `RAILPACK_INSTALL_CMD=bun install` or ensure `bun.lock` is committed and up to date.
+Ensure `bun.lock` is committed, or set `RAILPACK_INSTALL_CMD=bun install`.

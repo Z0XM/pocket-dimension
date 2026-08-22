@@ -2,34 +2,42 @@
 
 SvelteKit app (svelte-adapter-bun) with shared auth and database packages.
 
-## Dokploy / Railpack
+## Recommended: Dockerfile (Dokploy)
+
+Most reliable — does not depend on Railpack root-directory settings.
 
 | Setting | Value |
 |---------|-------|
-| Root directory | **`/`** (monorepo root) |
+| Build type | **Dockerfile** |
+| Dockerfile path | `apps/watchlist/Dockerfile` |
+| Build context | **`/`** (repo root) |
+| Port | `3002` |
+
+No `RAILPACK_*` env vars needed.
+
+## Alternative: Railpack
+
+| Setting | Value |
+|---------|-------|
+| Root directory | `apps/watchlist` **or** `/` |
 | Build type | Railpack |
 | Port | `3002` |
 
-Required env on the service:
+If root is `/`, add to Dokploy **Environment**:
 
 ```env
 RAILPACK_CONFIG_FILE=apps/watchlist/railpack.json
-NODE_ENV=production
-ORIGIN=https://watchlist.example.com
 ```
 
-Or without `railpack.json`:
-
-```env
-RAILPACK_BUILD_CMD=./apps/watchlist/scripts/deploy-build.sh
-RAILPACK_START_CMD=cd apps/watchlist && bun run start
-```
+If root is `apps/watchlist`, `railpack.json` is auto-detected.
 
 ### Application env
 
 Copy from [`.env.example`](./.env.example). Minimum for production:
 
 ```env
+NODE_ENV=production
+ORIGIN=https://watchlist.example.com
 DATABASE_URL=postgresql://...
 PUBLIC_BASE_AUTH_URL=https://auth.example.com
 PUBLIC_BASE_AUTH_PATH=/
@@ -40,7 +48,6 @@ BETTER_AUTH_TRUSTED_ORIGINS=https://auth.example.com,https://watchlist.example.c
 BETTER_AUTH_COOKIE_DOMAIN=.example.com
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=noreply@example.com
-ORIGIN=https://watchlist.example.com
 ```
 
 Both services must be served over HTTPS for session cookies (`sameSite: none`, `secure: true`).
@@ -54,12 +61,19 @@ From monorepo root:
 cd apps/watchlist && bun run start
 ```
 
+Or Docker:
+
+```bash
+docker build -f apps/watchlist/Dockerfile -t watchlist .
+docker run --rm -p 3002:3002 --env-file apps/watchlist/.env watchlist
+```
+
 ## Troubleshooting
 
 **`Workspace dependency "@pocket-dimension/db" not found`**
 
-Root directory is set to `apps/watchlist` instead of `/`. Change it to the repository root and set `RAILPACK_CONFIG_FILE=apps/watchlist/railpack.json`.
+Railpack ran auto `bun install` before the custom build. Switch to **Dockerfile** build (recommended), or redeploy with the updated `railpack.json` from this repo.
 
 **`lockfile is frozen`**
 
-Set `RAILPACK_INSTALL_CMD=bun install` or ensure `bun.lock` is committed and up to date.
+Ensure `bun.lock` is committed, or set `RAILPACK_INSTALL_CMD=bun install`.
