@@ -27,6 +27,7 @@
   let savingGroupId = $state<string | null>(null);
   let deletingGroupId = $state<string | null>(null);
   let savingCurrency = $state(false);
+  let clearingTransactions = $state(false);
 
   function downloadImportReport(csv: string) {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -179,6 +180,35 @@
     <h2>Export</h2>
     <p class="panel-copy dim">Download all transactions for this account as CSV.</p>
     <a class="add export-link" href="/api/accounts/{data.account.id}/transactions/export">EXPORT CSV</a>
+  </section>
+
+  <section class="panel danger-panel">
+    <h2>Danger zone</h2>
+    <p class="panel-copy dim">
+      Permanently delete every transaction for this account ({data.transactionCount.toLocaleString()} now). Categories, tags, and groups are kept. Account
+      balance is cleared.
+    </p>
+    <form
+      method="POST"
+      action="?/clearAllTransactions"
+      use:enhance={() => {
+        return async ({ cancel, update }) => {
+          const countLabel = data.transactionCount.toLocaleString();
+          if (!confirm(`Delete all ${countLabel} transactions? This cannot be undone. Tag, group, and refund links on those rows will be removed.`)) {
+            cancel();
+            return;
+          }
+          clearingTransactions = true;
+          await update();
+          clearingTransactions = false;
+          await invalidateAll();
+        };
+      }}
+    >
+      <button class="add danger" type="submit" disabled={clearingTransactions || data.transactionCount === 0}>
+        {clearingTransactions ? "DELETING…" : "CLEAR ALL TRANSACTIONS"}
+      </button>
+    </form>
   </section>
 
   <section class="panel span-all">
@@ -535,6 +565,27 @@
     outline: none;
     border-color: var(--hi-focus);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
+  }
+
+  .danger-panel {
+    border-color: color-mix(in srgb, var(--danger) 35%, var(--chrome-line));
+  }
+
+  .add.danger {
+    background: transparent;
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 45%, var(--chrome-line));
+    box-shadow: 3px 3px 0 color-mix(in srgb, var(--danger) 25%, var(--chrome-line));
+  }
+
+  .add.danger:hover:not(:disabled) {
+    border-color: var(--danger);
+    box-shadow: 3px 3px 0 var(--danger);
+  }
+
+  .add.danger:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   .export-link {

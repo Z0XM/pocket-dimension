@@ -7,6 +7,7 @@ import {
   deleteCategory as removeCategory,
   deleteGroup as removeGroup,
   deleteTag as removeTag,
+  countAccountTransactions,
   getAccountCurrency,
   getOrCreateDefaultAccount,
   listCategories,
@@ -18,7 +19,7 @@ import {
   updateTag as saveTag,
 } from "$lib/server/finance";
 import { SUPPORTED_CURRENCIES } from "$lib/finance/currencies";
-import { importTransactionRows } from "$lib/server/import";
+import { importTransactionRows, resetAccountTransactions } from "$lib/server/import";
 import { getImporter, listImporters } from "$lib/importers";
 import {
   createCategorySchema,
@@ -38,10 +39,16 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
   if (!locals.user?.id) redirect(307, "/login");
 
   const { account } = await parent();
-  const [categories, tags, groups] = await Promise.all([listCategories(account.id), listTags(account.id), listGroups(account.id)]);
+  const [categories, tags, groups, transactionCount] = await Promise.all([
+    listCategories(account.id),
+    listTags(account.id),
+    listGroups(account.id),
+    countAccountTransactions(account.id),
+  ]);
 
   return {
     account,
+    transactionCount,
     categories,
     tags,
     groups,
@@ -336,5 +343,22 @@ export const actions: Actions = {
         message: cause instanceof Error ? cause.message : "Failed to import statement",
       });
     }
+  },
+
+  clearAllTransactions: async ({ locals }) => {
+    const user = requireUser(locals);
+    const account = await getOrCreateDefaultAccount(user.id);
+    const membership = await getMembershipOrThrow(user.id, account.id);
+    if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
+
+    const removed = await resetAccountTransactions(account.id);
+    if (removed === 0) {
+      return { success: true, message: "No transactions to delete" };
+    }
+
+    return {
+      success: true,
+      message: `Deleted ${removed} transaction${removed === 1 ? "" : "s"}`,
+    };
   },
 };

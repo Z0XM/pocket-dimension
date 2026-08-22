@@ -1336,6 +1336,11 @@ export async function upsertGoal(userId: string, accountId: string, payload: Goa
   return updated ?? null;
 }
 
+export async function countAccountTransactions(accountId: string): Promise<number> {
+  const [row] = await db.select({ total: count() }).from(schema.financeTransactions).where(eq(schema.financeTransactions.accountId, accountId));
+  return Number(row?.total ?? 0);
+}
+
 export async function getCurrentBalance(accountId: string) {
   const [[latestTxnDate], account, [txnBalance], [transactionCountRow]] = await Promise.all([
     db
