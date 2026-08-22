@@ -9,16 +9,20 @@ import {
   deleteTag as removeTag,
   countAccountTransactions,
   getAccountCurrency,
+  getAccountOpeningBalance,
+  getFirstTransactionDate,
   getOrCreateDefaultAccount,
   listCategories,
   listGroups,
   listTags,
   updateAccountCurrency,
+  updateAccountOpeningBalance,
   updateCategory as saveCategory,
   updateGroup as saveGroup,
   updateTag as saveTag,
 } from "$lib/server/finance";
 import { SUPPORTED_CURRENCIES } from "$lib/finance/currencies";
+import { parseIndianAmount } from "$lib/finance/money";
 import { importTransactionRows, resetAccountTransactions } from "$lib/server/import";
 import { getImporter, listImporters } from "$lib/importers";
 import {
@@ -29,6 +33,8 @@ import {
   deleteGroupSchema,
   deleteTagSchema,
   updateAccountCurrencySchema,
+  updateAccountOpeningBalanceSchema,
+  clearAccountOpeningBalanceSchema,
   updateCategorySchema,
   updateGroupSchema,
   updateTagSchema,
@@ -39,16 +45,20 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
   if (!locals.user?.id) redirect(307, "/login");
 
   const { account } = await parent();
-  const [categories, tags, groups, transactionCount] = await Promise.all([
+  const [categories, tags, groups, transactionCount, firstTransactionOn, openingBalance] = await Promise.all([
     listCategories(account.id),
     listTags(account.id),
     listGroups(account.id),
     countAccountTransactions(account.id),
+    getFirstTransactionDate(account.id),
+    getAccountOpeningBalance(account.id),
   ]);
 
   return {
     account,
     transactionCount,
+    firstTransactionOn,
+    openingBalance,
     categories,
     tags,
     groups,
@@ -298,6 +308,48 @@ export const actions: Actions = {
     }
 
     return { success: true, message: `Currency set to ${updated.currencyCode}` };
+  },
+
+  updateOpeningBalance: async ({ request, locals }) => {
+    const user = requireUser(locals);
+    const account = await getOrCreateDefaultAccount(user.id);
+    const membership = await getMembershipOrThrow(user.id, account.id);
+    if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
+
+    const form = await request.formData();
+    const clearParsed = clearAccountOpeningBalanceSchema.safeParse({ clear: form.get("clear") });
+    if (clearParsed.success) {
+      await updateAccountOpeningBalance(user.id, account.id, null);
+      return { success: true, message: "Opening balance cleared" };
+    }
+
+    const parsed = updateAccountOpeningBalanceSchema.safeParse({
+      balanceAsOf: form.get("balanceAsOf"),
+      amount: form.get("amount"),
+    });
+    if (!parsed.success) {
+      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid opening balance" });
+    }
+
+    let balanceMinor: number;
+    try {
+      balanceMinor = parseIndianAmount(parsed.data.amount);
+    } catch {
+      return fail(400, { message: "Invalid amount" });
+    }
+    if (balanceMinor < 0) {
+      return fail(400, { message: "Amount must be zero or positive" });
+    }
+
+    const updated = await updateAccountOpeningBalance(user.id, account.id, {
+      balanceMinor,
+      balanceAsOf: parsed.data.balanceAsOf,
+    });
+    if (!updated) {
+      return fail(404, { message: "Account not found" });
+    }
+
+    return { success: true, message: "Opening balance saved" };
   },
 
   importStatement: async ({ request, locals }) => {

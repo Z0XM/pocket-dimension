@@ -460,6 +460,50 @@ export async function updateAccountCurrency(userId: string, accountId: string, c
   return updated ?? null;
 }
 
+export async function getFirstTransactionDate(accountId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ occurredOn: schema.financeTransactions.occurredOn })
+    .from(schema.financeTransactions)
+    .where(eq(schema.financeTransactions.accountId, accountId))
+    .orderBy(asc(schema.financeTransactions.occurredOn), asc(schema.financeTransactions.sortOrder), asc(schema.financeTransactions.createdAt))
+    .limit(1);
+  return row?.occurredOn ?? null;
+}
+
+export async function getAccountOpeningBalance(accountId: string): Promise<{ balanceMinor: number; balanceAsOf: string } | null> {
+  const account = await db.query.financeAccounts.findFirst({
+    where: eq(schema.financeAccounts.id, accountId),
+    columns: { balanceMinor: true, balanceAsOf: true },
+  });
+  if (account?.balanceMinor == null || !account.balanceAsOf) return null;
+  return { balanceMinor: account.balanceMinor, balanceAsOf: account.balanceAsOf };
+}
+
+export async function updateAccountOpeningBalance(userId: string, accountId: string, payload: { balanceMinor: number; balanceAsOf: string } | null) {
+  const [updated] = await db
+    .update(schema.financeAccounts)
+    .set(
+      payload
+        ? {
+            balanceMinor: payload.balanceMinor,
+            balanceAsOf: payload.balanceAsOf,
+            updatedById: userId,
+          }
+        : {
+            balanceMinor: null,
+            balanceAsOf: null,
+            updatedById: userId,
+          }
+    )
+    .where(eq(schema.financeAccounts.id, accountId))
+    .returning({
+      balanceMinor: schema.financeAccounts.balanceMinor,
+      balanceAsOf: schema.financeAccounts.balanceAsOf,
+      currencyCode: schema.financeAccounts.currencyCode,
+    });
+  return updated ?? null;
+}
+
 export async function listCategories(accountId: string) {
   return db.query.financeCategories.findMany({
     where: eq(schema.financeCategories.accountId, accountId),

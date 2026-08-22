@@ -3,6 +3,7 @@
   import { enhance } from "$app/forms";
   import { importProgressLabel, importProgressPercent, importStatementWithProgress, type ImportStreamEvent } from "$lib/import-stream";
   import AppSettings from "$lib/components/app-settings.svelte";
+  import { formatMoney } from "$lib/finance/money";
   import { SquarePen, Tag, Trash2, Layers } from "@lucide/svelte";
   import type { PageData, ActionData } from "./$types";
 
@@ -27,7 +28,21 @@
   let savingGroupId = $state<string | null>(null);
   let deletingGroupId = $state<string | null>(null);
   let savingCurrency = $state(false);
+  let savingOpeningBalance = $state(false);
+  let clearingOpeningBalance = $state(false);
   let clearingTransactions = $state(false);
+
+  function formatDisplayDate(iso: string): string {
+    const [year, month, day] = iso.split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  const openingBalanceAsOfDefault = $derived(data.openingBalance?.balanceAsOf ?? data.firstTransactionOn ?? new Date().toISOString().slice(0, 10));
+  const openingBalanceAmountDefault = $derived(data.openingBalance?.balanceMinor != null ? (data.openingBalance.balanceMinor / 100).toFixed(2) : "");
 
   function downloadImportReport(csv: string) {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -145,6 +160,10 @@
 
   <section class="panel">
     <h2>Account</h2>
+    <p class="panel-copy dim">
+      First recorded transaction:
+      <strong>{data.firstTransactionOn ? formatDisplayDate(data.firstTransactionOn) : "None yet"}</strong>
+    </p>
     <p class="panel-copy dim">Default currency for imports and amount display.</p>
     <form
       method="POST"
@@ -174,6 +193,75 @@
         {savingCurrency ? "SAVING…" : "SAVE CURRENCY"}
       </button>
     </form>
+
+    <div class="opening-balance">
+      <h3>Opening balance</h3>
+      <p class="panel-copy dim">
+        {#if data.openingBalance}
+          Current:
+          <strong>{formatMoney(data.openingBalance.balanceMinor, data.account.currencyCode)}</strong>
+          as of {formatDisplayDate(data.openingBalance.balanceAsOf)}. Used when statement imports need a starting balance.
+        {:else}
+          Set the account balance as of a date—typically the day before your first transaction or your statement opening balance.
+        {/if}
+      </p>
+      <form
+        method="POST"
+        action="?/updateOpeningBalance"
+        use:enhance={() => {
+          savingOpeningBalance = true;
+          return async ({ update }) => {
+            savingOpeningBalance = false;
+            await update();
+            await invalidateAll();
+          };
+        }}
+      >
+        <label class="field">
+          <span>As of date</span>
+          <input name="balanceAsOf" type="date" value={openingBalanceAsOfDefault} required disabled={savingOpeningBalance} />
+        </label>
+        <label class="field">
+          <span>Amount</span>
+          <input
+            name="amount"
+            type="text"
+            inputmode="decimal"
+            placeholder="0.00"
+            value={openingBalanceAmountDefault}
+            required
+            disabled={savingOpeningBalance}
+          />
+        </label>
+        <button class="add" type="submit" disabled={savingOpeningBalance}>
+          {savingOpeningBalance ? "SAVING…" : "SAVE OPENING BALANCE"}
+        </button>
+      </form>
+      {#if data.openingBalance}
+        <form
+          class="clear-opening-form"
+          method="POST"
+          action="?/updateOpeningBalance"
+          use:enhance={() => {
+            return async ({ cancel, update }) => {
+              if (!confirm("Clear the opening balance for this account?")) {
+                cancel();
+                return;
+              }
+              clearingOpeningBalance = true;
+              await update();
+              clearingOpeningBalance = false;
+              await invalidateAll();
+            };
+          }}
+        >
+          <input type="hidden" name="clear" value="1" />
+          <button class="ghost danger" type="submit" disabled={clearingOpeningBalance || savingOpeningBalance}>
+            {clearingOpeningBalance ? "CLEARING…" : "CLEAR OPENING BALANCE"}
+          </button>
+        </form>
+      {/if}
+    </div>
   </section>
 
   <section class="panel">
@@ -549,7 +637,9 @@
   }
 
   .field select,
-  .field input[type="file"] {
+  .field input[type="file"],
+  .field input[type="date"],
+  .field input[type="text"] {
     background: var(--surface2);
     border: 2px solid var(--chrome-line);
     color: var(--main-text);
@@ -561,10 +651,35 @@
   }
 
   .field select:focus,
-  .field input[type="file"]:focus-visible {
+  .field input[type="file"]:focus-visible,
+  .field input[type="date"]:focus-visible,
+  .field input[type="text"]:focus-visible {
     outline: none;
     border-color: var(--hi-focus);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
+  }
+
+  .opening-balance {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--chrome-line);
+  }
+
+  .opening-balance h3 {
+    margin: 0 0 0.35rem;
+    font-family: "Archivo Black", sans-serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .clear-opening-form {
+    margin-top: 0.65rem;
+  }
+
+  .clear-opening-form .ghost {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
   }
 
   .danger-panel {

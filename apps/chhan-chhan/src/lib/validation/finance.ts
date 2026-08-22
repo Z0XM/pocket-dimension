@@ -55,6 +55,15 @@ export const updateAccountCurrencySchema = z.object({
     .transform((value) => value.toUpperCase()),
 });
 
+export const updateAccountOpeningBalanceSchema = z.object({
+  balanceAsOf: z.string().date(),
+  amount: z.string().trim().min(1),
+});
+
+export const clearAccountOpeningBalanceSchema = z.object({
+  clear: z.literal("1"),
+});
+
 export const createCategorySchema = z.object({
   name: z.string().trim().min(1).max(80),
   kind: z.enum(["expense", "income", "transfer"]).default("expense"),
