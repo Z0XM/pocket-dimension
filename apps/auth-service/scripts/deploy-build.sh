@@ -17,11 +17,11 @@ if [[ ! -f shared/auth/package.json ]]; then
 fi
 
 echo "Installing Bun workspace dependencies..."
-bun install --frozen-lockfile
+bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@pocket-dimension/auth-service'
 
 echo "Building shared packages for auth-service..."
-bun run build:shared:utils
-bun run build:shared:db
-bun run build:shared:auth
+TURBO_FORCE=1 bun run build:shared:utils
+TURBO_FORCE=1 bun run build:shared:db
+TURBO_FORCE=1 bun run build:shared:auth
 
 echo "Auth service deploy build complete."

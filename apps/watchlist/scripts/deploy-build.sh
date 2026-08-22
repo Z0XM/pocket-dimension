@@ -17,10 +17,16 @@ if [[ ! -f shared/auth/package.json ]]; then
 fi
 
 echo "Installing Bun workspace dependencies..."
-bun install --frozen-lockfile
+bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@pocket-dimension/watchlist'
+
+echo "Preparing SvelteKit (svelte-kit sync)..."
+(cd apps/watchlist && bun run prepare)
 
 echo "Building @pocket-dimension/watchlist..."
-bun build:app:watchlist
+TURBO_FORCE=1 bun run build:shared:utils
+TURBO_FORCE=1 bun run build:shared:db
+TURBO_FORCE=1 bun run build:shared:auth
+TURBO_FORCE=1 bun run build:app:watchlist
 
 if [[ -n "${DATABASE_URL:-}" ]]; then
   echo "Running database migrations..."

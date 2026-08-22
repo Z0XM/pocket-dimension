@@ -80,6 +80,10 @@ docker run --rm -p 3002:3002 --env-file apps/watchlist/.env watchlist
 
 ## Troubleshooting
 
+**`Could not resolve "../../vite-kysely-compat"` / missing `.svelte-kit/tsconfig.json`**
+
+The build is using **stale source** (pre-`6e028bb`). In Dokploy: confirm the service tracks **`main`**, redeploy, and enable **clear build cache** / rebuild without cache. The watchlist Dockerfile includes a guard that fails early if `vite.config.ts` still imports `../../vite-kysely-compat`.
+
 **`"/shared": not found` / `"/turbo.json": not found` during Docker build**
 
 Build Path is `apps/watchlist` but Docker Context Path is `.`. Use Option A or set Context Path to **`/`**.

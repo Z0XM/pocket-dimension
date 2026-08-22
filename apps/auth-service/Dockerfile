@@ -10,8 +10,9 @@ COPY shared ./shared
 COPY apps ./apps
 
 ENV CI=true HUSKY=0
-RUN bun install --frozen-lockfile --ignore-scripts --filter '@pocket-dimension/auth-service'
+RUN bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@pocket-dimension/auth-service'
 
+ENV TURBO_FORCE=1
 RUN bun run build:shared:utils \
  && bun run build:shared:db \
  && bun run build:shared:auth
