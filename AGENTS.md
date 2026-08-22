@@ -63,7 +63,7 @@ Better Auth is configured with `secure: true` / `sameSite: "none"` cookies (`sha
 
 ### Deployment (Railpack / Dokploy)
 
-Apps with `@pocket-dimension/*` workspace deps **must** deploy from the **repository root** (`/`), not `apps/<app>`. See root [`DEPLOY.md`](./DEPLOY.md). Each app has `railpack.json` + `scripts/deploy-build.sh` under `apps/<app>/`.
+Apps with `@pocket-dimension/*` workspace deps **must** deploy from the **repository root** (`/`), not `apps/<app>`. See root [`DEPLOY.md`](./DEPLOY.md). Each app has `Dockerfile`, `railpack.json`, and `scripts/deploy-build.sh` under `apps/<app>/` (except markitdown / zeo-music-worker / imposter-art, which keep their existing setup).
 
 ### markitdown (optional, standalone)
 

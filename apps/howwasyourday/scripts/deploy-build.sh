@@ -11,23 +11,23 @@ if [[ ! -f shared/auth/package.json ]]; then
   echo "ERROR: Monorepo shared packages not found at $ROOT_DIR/shared/auth."
   echo ""
   echo "Workspace deps require the full repo at build time."
-  echo "Use Dockerfile build (recommended): apps/chhan-chhan/Dockerfile with context /"
-  echo "Or Railpack with root directory apps/chhan-chhan or / (see DEPLOY.md)."
+  echo "Use Dockerfile build (recommended): apps/howwasyourday/Dockerfile with context /"
+  echo "Or Railpack with root directory apps/howwasyourday or / (see DEPLOY.md)."
   exit 1
 fi
 
 echo "Installing Bun workspace dependencies..."
-bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@pocket-dimension/chhan-chhan'
+bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@pocket-dimension/howwasyourday'
 find apps shared -type d -name node_modules -prune -exec rm -rf {} +
 
 echo "Preparing SvelteKit (svelte-kit sync)..."
-(cd apps/chhan-chhan && bun run prepare)
+(cd apps/howwasyourday && bun run prepare)
 
-echo "Building @pocket-dimension/chhan-chhan..."
+echo "Building @pocket-dimension/howwasyourday..."
 TURBO_FORCE=1 bun run build:shared:utils
 TURBO_FORCE=1 bun run build:shared:db
 TURBO_FORCE=1 bun run build:shared:auth
-TURBO_FORCE=1 bun run build:app:chhan-chhan
+TURBO_FORCE=1 bun run build:app:howwasyourday
 
 if [[ -n "${DATABASE_URL:-}" ]]; then
   echo "Running database migrations..."
@@ -37,4 +37,4 @@ else
   echo "Run migrations manually before serving traffic."
 fi
 
-echo "Chhan Chhan deploy build complete."
+echo "How Was Your Day deploy build complete."

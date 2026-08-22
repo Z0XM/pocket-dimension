@@ -7,7 +7,8 @@
     "dev": "bun --bun vite dev",
     "build": "bun --bun vite build",
     "preview": "bun --bun vite preview",
-    "start": "bun --env-file=.env ./build/index.js",
+    "start": "bun ./build/index.js",
+    "start:local": "bun --env-file=.env ./build/index.js",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
@@ -34,7 +35,8 @@
     "@types/node-cron": "^3.0.11",
     "@types/web-push": "^3.6.4",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6"
+    "vite": "^7.2.6",
+    "kysely": "0.28.17"
   },
   "dependencies": {
     "@pocket-dimension/auth": "workspace:*",

@@ -9,12 +9,17 @@ Searched in "./*"
 
 ## Recommended: Dockerfile (Dokploy)
 
-Works regardless of the Railpack “root directory” setting. Use for **auth-service** and **watchlist** if Railpack keeps failing.
+Works regardless of the Railpack “root directory” setting.
 
 | App | Dockerfile | Build context | Port |
 |-----|------------|---------------|------|
 | auth-service | `apps/auth-service/Dockerfile` | `/` (repo root) | 5001 |
 | watchlist | `apps/watchlist/Dockerfile` | `/` (repo root) | 3002 |
+| rhymes | `apps/rhymes/Dockerfile` | `/` (repo root) | 3003 |
+| howwasyourday | `apps/howwasyourday/Dockerfile` | `/` (repo root) | 3004 |
+| chhan-chhan | `apps/chhan-chhan/Dockerfile` | `/` (repo root) | 3005 |
+| me-via-you | `apps/me-via-you/Dockerfile` | `/` (repo root) | 3006 |
+| pocket | `apps/pocket/Dockerfile` | `/` (repo root) | 3007 |
 | zeo | `apps/zeo/Dockerfile` | `/` (repo root) | 3008 |
 | zeo-music-worker | `apps/zeo-music-worker/Dockerfile` | `/` (repo root) | 3010 |
 
@@ -55,11 +60,13 @@ If root directory is `apps/auth-service`, `railpack.json` is picked up automatic
 |-----|------|---------|
 | auth-service | 5001 | [apps/auth-service/DEPLOY.md](./apps/auth-service/DEPLOY.md) |
 | watchlist | 3002 | [apps/watchlist/DEPLOY.md](./apps/watchlist/DEPLOY.md) |
+| rhymes | 3003 | [apps/rhymes/DEPLOY.md](./apps/rhymes/DEPLOY.md) |
+| howwasyourday | 3004 | [apps/howwasyourday/DEPLOY.md](./apps/howwasyourday/DEPLOY.md) |
 | chhan-chhan | 3005 | [apps/chhan-chhan/DEPLOY.md](./apps/chhan-chhan/DEPLOY.md) |
-| zeo | 3008 | [apps/zeo/deploy/dokploy/README.md](./apps/zeo/deploy/dokploy/README.md) |
+| me-via-you | 3006 | [apps/me-via-you/DEPLOY.md](./apps/me-via-you/DEPLOY.md) |
+| pocket | 3007 | [apps/pocket/DEPLOY.md](./apps/pocket/DEPLOY.md) |
+| zeo | 3008 | [apps/zeo/DEPLOY.md](./apps/zeo/DEPLOY.md) · [dokploy runbook](./apps/zeo/deploy/dokploy/README.md) |
 | markitdown | 3006 | [apps/markitdown/railpack.json](./apps/markitdown/railpack.json) |
-
-Standalone apps (`rhymes`, `pocket`) have no workspace deps.
 
 ## Database
 

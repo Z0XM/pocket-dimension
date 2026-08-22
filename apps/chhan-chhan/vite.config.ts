@@ -1,4 +1,4 @@
-import { kyselyCompat } from "../../vite-kysely-compat";
+import { kyselyCompat } from "./vite-kysely-compat";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
@@ -6,7 +6,7 @@ import { defineConfig } from "vite";
 // Accessed via globalThis so tooling (e.g. svelte-check) can load this config
 // under Node, where the `Bun` global is not defined.
 const bunEnv = (globalThis as { Bun?: { env: Record<string, string | undefined> } }).Bun?.env;
-const port = bunEnv?.PORT ? Number(bunEnv.PORT) : undefined;
+const port = bunEnv?.PORT ? Number(bunEnv.PORT) : 3005;
 
 export default defineConfig({
   server: { port },

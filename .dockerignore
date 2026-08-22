@@ -1,7 +1,8 @@
 # Monorepo Docker builds (context = repo root).
-# Stub apps to package.json only for bun.lock workspace resolution.
-# auth-service, watchlist, zeo ship full source (not listed below).
+# Stub apps without Dockerfiles to package.json only for bun.lock workspace resolution.
+# Apps with Dockerfiles ship full source (not listed below).
 # zeo-music-worker is stub-only here — it depends on @livekit/rtc-node (native).
+# markitdown / imposter-art are skipped from this deploy rollout.
 
 node_modules
 **/.git
@@ -16,17 +17,7 @@ _bmad-output
 .agents
 apps/imposter-art
 
-apps/chhan-chhan/**
-!apps/chhan-chhan/package.json
-apps/howwasyourday/**
-!apps/howwasyourday/package.json
 apps/markitdown/**
 !apps/markitdown/package.json
-apps/me-via-you/**
-!apps/me-via-you/package.json
-apps/pocket/**
-!apps/pocket/package.json
-apps/rhymes/**
-!apps/rhymes/package.json
 apps/zeo-music-worker/**
 !apps/zeo-music-worker/package.json

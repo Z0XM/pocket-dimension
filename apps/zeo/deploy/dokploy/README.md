@@ -105,20 +105,34 @@ DATABASE_URL=postgresql://...
 RESEND_API_KEY=...
 ```
 
-## 5. Deploy zeo (Railpack)
+## 5. Deploy zeo (Dockerfile recommended)
 
-Same pattern as **watchlist** — inline build command, monorepo root.
+Same pattern as **watchlist** — monorepo root context. Full field table: [apps/zeo/DEPLOY.md](../../DEPLOY.md).
 
 1. Dokploy → **Applications** → **Create**
 2. **Source:** Git → `pocket-dimension`, branch `main`
-3. **Build type:** **Railpack**
-4. **Root directory:** `/` (monorepo root)
+3. **Build type:** **Dockerfile**
+4. **Build Path:** `/` · **Docker Context Path:** `.` · **Dockerfile Path:** `apps/zeo/Dockerfile`
 5. **Port:** `3008`
 
-Railpack env (copy from `apps/zeo/.env.example`):
+### Alternative: Railpack
+
+| Setting | Value |
+|---------|-------|
+| Root directory | `/` or `apps/zeo` |
+| Build type | Railpack |
+| Port | `3008` |
+
+If root is `/`:
 
 ```env
-RAILPACK_BUILD_CMD=bun install --frozen-lockfile && bun build:app:zeo
+RAILPACK_CONFIG_FILE=apps/zeo/railpack.json
+```
+
+Or inline:
+
+```env
+RAILPACK_BUILD_CMD=./apps/zeo/scripts/deploy-build.sh
 RAILPACK_START_CMD=cd apps/zeo && bun run start
 ```
 

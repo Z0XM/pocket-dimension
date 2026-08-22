@@ -11,30 +11,23 @@ if [[ ! -f shared/auth/package.json ]]; then
   echo "ERROR: Monorepo shared packages not found at $ROOT_DIR/shared/auth."
   echo ""
   echo "Workspace deps require the full repo at build time."
-  echo "Use Dockerfile build (recommended): apps/chhan-chhan/Dockerfile with context /"
-  echo "Or Railpack with root directory apps/chhan-chhan or / (see DEPLOY.md)."
+  echo "Use Dockerfile build (recommended): apps/zeo/Dockerfile with context /"
+  echo "Or Railpack with root directory apps/zeo or / (see DEPLOY.md / deploy/dokploy/README.md)."
   exit 1
 fi
 
 echo "Installing Bun workspace dependencies..."
-bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@pocket-dimension/chhan-chhan'
+bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@pocket-dimension/zeo'
 find apps shared -type d -name node_modules -prune -exec rm -rf {} +
 
 echo "Preparing SvelteKit (svelte-kit sync)..."
-(cd apps/chhan-chhan && bun run prepare)
+(cd apps/zeo && bun run prepare)
 
-echo "Building @pocket-dimension/chhan-chhan..."
+echo "Building @pocket-dimension/zeo..."
 TURBO_FORCE=1 bun run build:shared:utils
 TURBO_FORCE=1 bun run build:shared:db
 TURBO_FORCE=1 bun run build:shared:auth
-TURBO_FORCE=1 bun run build:app:chhan-chhan
+TURBO_FORCE=1 bun run build:app:zeo
 
-if [[ -n "${DATABASE_URL:-}" ]]; then
-  echo "Running database migrations..."
-  bun db:migrate
-else
-  echo "Skipping db:migrate — DATABASE_URL is not set at build time."
-  echo "Run migrations manually before serving traffic."
-fi
-
-echo "Chhan Chhan deploy build complete."
+echo "zeo deploy build complete."
+echo "Migrations run at container start when DATABASE_URL is set (scripts/start.sh)."
