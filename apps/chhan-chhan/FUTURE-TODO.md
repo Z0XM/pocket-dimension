@@ -8,6 +8,8 @@ Living backlog of feature ideas. Not committed scope — reorder and cut as need
 
 Backend or UI scaffolding exists; these are mostly wiring and polish.
 
+- [x] **Clear all transactions** — Control Danger zone; uses `resetAccountTransactions` (balance cleared; categories/tags/groups kept).
+- [x] **First transaction date + opening balance** — Control Account panel; opening balance writes `finance_accounts.balance_minor` / `balance_as_of`.
 - [ ] **Budgets in Control** — Create, edit, delete budgets (category-linked or overall caps, date range). Dashboard already shows usage.
 - [ ] **Goals in Control** — Create, edit, delete savings goals; manual or rule-based progress updates. Dashboard already lists goals.
 - [ ] **Group-aware dashboards** — Net/spend by group; compare groups side-by-side. Builds on transaction group filter.
@@ -27,7 +29,7 @@ Backend or UI scaffolding exists; these are mostly wiring and polish.
 
 ## Search and navigation
 
-- [ ] **Rich table filters** — Category, tag, amount range, has-note, uncategorized — combinable with month/year/group filters.
+- [ ] **Richer table filters** — Amount range, has-note, and other combinators beyond today’s category / tag / search / group / period / type filters.
 - [ ] **Saved views** — e.g. “Uncategorized this month”, “Trip group”, pinned as quick links.
 - [ ] **Merchant normalization** — Merge variants (“AMZN*123”, “Amazon Pay”) into one merchant for cleaner reports.
 
@@ -38,7 +40,8 @@ Backend or UI scaffolding exists; these are mostly wiring and polish.
 - [ ] **Month-over-month / year-over-year** — Trend arrows on summary stats.
 - [ ] **Cashflow timeline** — Daily or weekly net balance chart for the selected period.
 - [ ] **Top merchants & category drill-down** — Click a category bar → filtered transaction list.
-- [ ] **Export** — CSV/Excel for the current filter (outbound mirror of Excel sync).
+- [x] **Account CSV export** — Control “Export CSV” for the whole account (`/api/accounts/.../transactions/export`).
+- [ ] **Filtered export** — CSV/Excel for the current transaction-table filter (outbound mirror of Excel sync).
 
 ---
 

@@ -1,0 +1,15 @@
+{
+  "project": "chhan-chhan",
+  "workflow": "document-project",
+  "mode": "initial_scan",
+  "scan_level": "deep",
+  "last_updated": "2026-08-23T01:40:00+05:30",
+  "scope": "apps/chhan-chhan + shared/db schema chhanchhan",
+  "output_root": "_bmad-output/chhan-chhan",
+  "completed_steps": ["classify", "overview", "source-tree", "architecture", "api", "data-models", "components", "development-guide", "index"],
+  "project_classification": {
+    "repository_type": "monorepo-app",
+    "project_type_id": "sveltekit-fullstack",
+    "primary_languages": ["typescript", "svelte"]
+  }
+}

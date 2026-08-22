@@ -8,7 +8,7 @@ Reference for Kotak (and future bank) imports in Chhan Chhan. Updated from real 
 
 ```
 Statement file (CSV / PDF)
-  → Bank importer (`src/lib/importers/kotak.ts`)
+  → Bank importer (`getImporter(id)` in `src/lib/importers/index.ts`)
   → Parse rows (`ImportRow[]`)
   → `importTransactionRows()` (`src/lib/server/import.ts`)
   → `finance_transactions` + account balance sync
@@ -19,6 +19,16 @@ Statement file (CSV / PDF)
 | UI (Control) | Upload → `POST /api/accounts/[id]/transactions/import` or `/import/stream` |
 | CLI backfill / reset | `bun --env-file=.env scripts/dedupe-transactions.ts <account-id> [file.pdf] [--reset]` |
 | Excel legacy sync | `scripts/sync-from-excel.ts` (separate; category mapping only) |
+| Control clear-all | `?/clearAllTransactions` → `resetAccountTransactions()` |
+
+### Supported importers
+
+| ID | Label | Formats |
+|----|--------|---------|
+| `kotak` | Kotak Mahindra Bank | `.csv`, `.pdf` |
+| `icici` | ICICI Bank | `.pdf` |
+| `hdfc` | HDFC Bank | `.pdf` |
+| `generic` | Generic CSV | `.csv` (pre-normalized `ImportRow` columns) |
 
 ### `ImportRow` fields stored on each transaction
 
@@ -122,6 +132,8 @@ console.log('parsed', rows.length, 'serials', rows.map(r => r.sortOrder).join(',
 
 **Tests:** `src/lib/importers/hdfc-pdf.test.ts`
 
+**Deferred parser hardening:** `_bmad-output/chhan-chhan/implementation-artifacts/deferred-work.md`
+
 **Local parse check:**
 
 ```bash
@@ -134,6 +146,29 @@ const { rows, metadata } = parseHdfcPdf(await extractPdfText(new Uint8Array(byte
 console.log('parsed', rows.length, metadata);
 "
 ```
+
+---
+
+## Generic CSV import
+
+**File:** `src/lib/importers/index.ts` → `genericImporter`
+
+**Strategy:** Expects CSV columns matching `ImportRow` / `csvImportRowSchema` (`occurredOn`, `amountMinor`, `type`, optional `merchant`, `notes`, `externalRef`). Validates every row with Zod. Use when converting statements outside the bank parsers.
+
+---
+
+## Account opening balance (Control)
+
+Control → **Account** shows the earliest transaction date and lets editors set/clear an opening-balance snapshot on `finance_accounts` (`balance_minor`, `balance_as_of`).
+
+| Action | Effect |
+|--------|--------|
+| Save opening balance | Writes account-level snapshot (used by `getCurrentBalance` and as a starting point when imports sync balances) |
+| Clear opening balance | Nulls account snapshot |
+| Clear all transactions | Deletes all txns (cascades links) **and** nulls account balance snapshot |
+| Statement import | May advance account snapshot to the newest balance row in that file if newer than current |
+
+Account balance in the UI may differ from the sum of filtered transactions — it is account-wide, not period-filtered. See balance sync section below.
 
 ---
 
@@ -359,5 +394,6 @@ Account balance in UI may differ from sum of visible filtered transactions — i
 - Import history + rollback per file
 - Duplicate review queue before commit
 - Generic footer stripping (not hardcoded account name)
-- CSV export from bank as alternative verification path
+- Filtered CSV export from the transaction table
 - Additional bank importers using same `BankImporter` interface
+- HDFC/ICICI/Kotak parser edge cases listed in `_bmad-output/chhan-chhan/implementation-artifacts/deferred-work.md`
