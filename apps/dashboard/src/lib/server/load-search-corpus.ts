@@ -2,6 +2,7 @@ import { encodePathSegments } from "$lib/docs-path";
 import { loadFeaturesForTree } from "$lib/server/load-features";
 import { resolveArtifactPath } from "$lib/server/read-artifact";
 import { loadTreeSnapshot } from "$lib/server/read-tree";
+import { loadTestsCatalog } from "$lib/server/tests-catalog";
 import type { ArtifactKind, SearchCorpusEntry, SearchHitKind, TreeId } from "$lib/types";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -156,5 +157,20 @@ export function loadSearchCorpus(trees: TreeId[]): SearchCorpusEntry[] {
     pushFeatureEntries(tree, snapshot, entries);
   }
 
+  pushTestEntries(entries);
+
   return entries;
+}
+
+function pushTestEntries(entries: SearchCorpusEntry[]): void {
+  for (const entry of loadTestsCatalog()) {
+    entries.push({
+      kind: "test",
+      id: entry.id,
+      title: entry.name,
+      tree: entry.treeHint ?? "pocket-dimension",
+      text: entry.sourcePath,
+      href: entry.href,
+    });
+  }
 }

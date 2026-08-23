@@ -1,6 +1,7 @@
 import { listCurrentTrees } from "$lib/server/bmad-root";
 import { loadSearchCorpus } from "$lib/server/load-search-corpus";
 import { loadTreeSnapshot } from "$lib/server/read-tree";
+import { loadTestsCatalog } from "$lib/server/tests-catalog";
 import type { TreeId, TreeSnapshot } from "$lib/types";
 import type { LayoutServerLoad } from "./$types";
 
@@ -33,5 +34,6 @@ export const load: LayoutServerLoad = async ({ url }) => {
     snapshot,
     snapshotError,
     searchCorpus: loadSearchCorpus(trees),
+    tests: loadTestsCatalog(),
   };
 };

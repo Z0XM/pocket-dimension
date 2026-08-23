@@ -29,6 +29,10 @@ describe("experience-copy", () => {
     expect(EXPERIENCE_COPY.deliveryEmpty.title).toBe("No Epics in this Tree.");
   });
 
+  it("uses literal Tests empty title from EXPERIENCE", () => {
+    expect(EXPERIENCE_COPY.testsEmpty.title).toBe("No tests found.");
+  });
+
   it("uses Unreadable Artifact. title exactly", () => {
     expect(EXPERIENCE_COPY.unreadableArtifact.title).toBe("Unreadable Artifact.");
   });

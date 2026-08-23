@@ -25,6 +25,9 @@ export const EXPERIENCE_COPY = {
     title: "No Epics in this Tree.",
     reason: "No Epic or Story Artifacts were found in this Tree.",
   },
+  testsEmpty: {
+    title: "No tests found.",
+  },
 } as const;
 
 export function docsEmptyKindCopy(kindLabel: string): { title: string; reason: string } {

@@ -43,6 +43,16 @@ export type SearchHit = {
   tree: TreeId;
 };
 
+/** One on-disk test file from apps/** (layout `tests` field). */
+export type TestCatalogEntry = {
+  id: string;
+  name: string;
+  sourcePath: string;
+  treeHint: TreeId | null;
+  relatedStoryHref?: string | null;
+  href: string;
+};
+
 export type LayoutTreeData = {
   trees: TreeId[];
   tree: TreeId | null;
@@ -50,6 +60,7 @@ export type LayoutTreeData = {
   snapshot: TreeSnapshot | null;
   snapshotError?: string | null;
   searchCorpus: SearchCorpusEntry[];
+  tests: TestCatalogEntry[];
 };
 
 export type FeatureRow = {
