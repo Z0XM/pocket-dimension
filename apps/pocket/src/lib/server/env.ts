@@ -11,6 +11,7 @@ const envSchema = z.object({
   POCKET_APP_CHHAN_CHAN_URL: z.string().url().optional(),
   POCKET_APP_ME_VIA_YOU_URL: z.string().url().optional(),
   POCKET_APP_MARKITDOWN_URL: z.string().url().optional(),
+  POCKET_APP_ZEO_URL: z.string().url().optional(),
 });
 
 export const env = validateEnv("pocket", envSchema, Bun.env);

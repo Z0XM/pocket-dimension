@@ -2,7 +2,7 @@ import { validateEnv } from "@pocket-dimension/utils";
 import { z } from "zod";
 
 const envSchema = z.object({
-  PORT: z.coerce.number().default(3006),
+  PORT: z.coerce.number().default(3009),
   HOST: z.string().default("0.0.0.0"),
   PYTHON_PATH: z.string().default("python3"),
   PYTHON_PACKAGES_DIR: z.string().optional(),

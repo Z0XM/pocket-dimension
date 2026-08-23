@@ -84,7 +84,7 @@ Load `_bmad-output/chhan-chhan/project-context.md` first.
 - **Import / banks:** `IMPORT.md` + `src/lib/importers/`
 - **Control / balance:** `architecture.md`, Control routes, `finance.ts` / `import.ts`
 - **Schema:** `data-models.md` + `shared/db/src/schema/chhanchhan.ts`
-- **Never** write chhan-chhan BMAD specs under `_bmad-output/rhymes/` — see `_bmad-output/README.md`
+- **Never** write chhan-chhan BMAD specs under `_bmad-output/pocket-dimension/` — see `_bmad-output/README.md`
 
 ---
 

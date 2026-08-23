@@ -1,10 +1,4 @@
-export type AppId =
-  | "watchlist"
-  | "rhymes"
-  | "howwasyourday"
-  | "chhan-chhan"
-  | "me-via-you"
-  | "markitdown";
+export type AppId = "watchlist" | "rhymes" | "howwasyourday" | "chhan-chhan" | "me-via-you" | "markitdown" | "zeo";
 
 export type AppEntry = {
   id: AppId;
@@ -49,6 +43,12 @@ export const appCatalog: AppEntry[] = [
     name: "MarkItDown",
     description: "Convert documents and media to Markdown.",
     envKey: "POCKET_APP_MARKITDOWN_URL",
+  },
+  {
+    id: "zeo",
+    name: "Zeo",
+    description: "Group video calls, games, and shared listening.",
+    envKey: "POCKET_APP_ZEO_URL",
   },
 ];
 

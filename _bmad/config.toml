@@ -11,14 +11,14 @@
 # ─────────────────────────────────────────────────────────────────
 
 [core]
-output_folder = "_bmad-output/rhymes"
-project_name = "rhymes"
+output_folder = "_bmad-output/pocket-dimension"
+project_name = "pocket-dimension"
 document_output_language = "English"
 
 [modules.bmm]
-planning_artifacts = "{project-root}/_bmad-output/rhymes/planning-artifacts"
-implementation_artifacts = "{project-root}/_bmad-output/rhymes/implementation-artifacts"
-project_knowledge = "docs"
+planning_artifacts = "{project-root}/_bmad-output/pocket-dimension/planning-artifacts"
+implementation_artifacts = "{project-root}/_bmad-output/pocket-dimension/implementation-artifacts"
+project_knowledge = "{project-root}/_bmad-output/pocket-dimension"
 
 [agents.bmad-agent-analyst]
 module = "bmm"

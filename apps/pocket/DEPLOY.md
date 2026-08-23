@@ -55,6 +55,8 @@ POCKET_APP_RHYMES_URL=https://rhymes.example.com
 POCKET_APP_HOWWASYOURDAY_URL=https://howwasyourday.example.com
 POCKET_APP_CHHAN_CHAN_URL=https://chhan.example.com
 POCKET_APP_ME_VIA_YOU_URL=https://me-via-you.example.com
+POCKET_APP_MARKITDOWN_URL=https://markitdown.example.com
+POCKET_APP_ZEO_URL=https://zeo.example.com
 ```
 
 Only apps with a URL set appear on the hub.

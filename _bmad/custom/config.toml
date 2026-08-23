@@ -1,7 +1,11 @@
-# Team / enterprise overrides for _bmad/config.toml.
-# Committed to the repo — applies to every developer on the project.
-# Tables deep-merge over base config; keyed entries merge by key.
-# Example: override an agent descriptor, or add a new agent.
-#
-# [agents.bmad-agent-pm]
-# description = "Prefers short, bulleted PRDs over narrative drafts."
+# Team overrides — Pocket Dimension is the default BMAD project.
+# Installer-managed _bmad/config.toml may reset on reinstall; this file is not touched.
+
+[core]
+output_folder = "_bmad-output/pocket-dimension"
+project_name = "pocket-dimension"
+
+[modules.bmm]
+planning_artifacts = "{project-root}/_bmad-output/pocket-dimension/planning-artifacts"
+implementation_artifacts = "{project-root}/_bmad-output/pocket-dimension/implementation-artifacts"
+project_knowledge = "{project-root}/_bmad-output/pocket-dimension"

@@ -10,13 +10,14 @@ This is the **Pocket Dimension** Bun + Turbo monorepo. Standard commands live in
 | --- | --- | --- | --- |
 | `auth-service` (Elysia) | 5001 | owns auth, uses DB | `bun run dev:app:auth` |
 | `watchlist` (SvelteKit) | 3002 | yes | `bun run dev:app:watchlist` |
-| `rhymes` (Astro) | 3003 | no (standalone) | `bun run dev:app:rhymes` |
+| `rhymes` (SvelteKit) | 3003 | no (standalone) | `bun run dev:app:rhymes` |
 | `howwasyourday` (SvelteKit) | 3004 | yes | `bun run dev:app:howwasyourday` |
 | `chhan-chhan` (SvelteKit) | 3005 | yes | `bun run dev:app:chhan-chhan` |
 | `me-via-you` (SvelteKit) | 3006 | yes | `bun run dev:app:me-via-you` |
-| `markitdown` (SvelteKit) | 3006 | no (needs Python) | `bun run dev:app:markitdown` |
+| `markitdown` (SvelteKit) | 3009 | no (needs Python) | `bun run dev:app:markitdown` |
 | `pocket` (SvelteKit) | 3007 | no (hub app) | `bun run dev:app:pocket` |
-| `zeo` (SvelteKit) | 3008 | yes (Phase 1+) | `bun run dev:app:zeo` |
+| `zeo` (SvelteKit) | 3008 | yes | `bun run dev:app:zeo` |
+| `zeo-music-worker` | 3010 | worker (internal) | `bun run dev:app:zeo-music-worker` |
 
 The auth-backed apps need PostgreSQL **and** the `auth-service` running. `rhymes`, `markitdown`, and `pocket` are standalone.
 
@@ -46,12 +47,16 @@ Apps import the **built** `dist/` of `@pocket-dimension/{auth,db,utils}`. Run `b
 ### Lint / format caveats (pre-existing)
 
 - `bun run lint` runs `prettier --check .` per package; in a subdir Prettier does **not** read the root `.prettierignore`, so it flags built `dist/` files after a build. This is a pre-existing config quirk, not a real failure.
-- `bun run format:check` (root prettier, respects `.prettierignore`) flags a few **pre-existing** committed files (`apps/chhan-chhan/*.md`, `apps/rhymes/src/pages/index.astro`) and generated `apps/rhymes/.astro/*` files. Unrelated to local setup.
-- `bun run typecheck` (5 packages have the script) passes.
+- `bun run format:check` (root prettier, respects `.prettierignore`) may flag a few committed markdown files. Unrelated to local setup.
+- `bun run typecheck` (packages that define the script) passes.
 
 ### Tests
 
-Only `auth-service` defines a `test` script and it runs with `--passWithNoTests`. `bun run test` passes with no real test files.
+`auth-service` has `vitest --passWithNoTests` and no test files. Real tests live in `apps/zeo` (`bun test src`) and `apps/chhan-chhan` importers (`bun test src/lib/importers/`).
+
+### BMAD
+
+Default artifacts and brownfield docs: `_bmad-output/pocket-dimension/` (start at `index.md`). Existing app-only trees: `_bmad-output/zeo/`, `_bmad-output/chhan-chhan/`. Do not write knowledge to a repo-root `docs/` folder.
 
 ### Auth session caveat (local browser)
 
@@ -67,4 +72,4 @@ Apps with `@pocket-dimension/*` workspace deps **must** deploy from the **reposi
 
 ### markitdown (optional, standalone)
 
-Needs a Python venv plus `ffmpeg` + `exiftool` (both installed in the snapshot): `cd apps/markitdown && bun run setup:python`. Defaults to port 3006 — conflicts with `me-via-you`; run only one or change `PORT`.
+Needs a Python venv plus `ffmpeg` + `exiftool` (both installed in the snapshot): `cd apps/markitdown && bun run setup:python`. Defaults to port **3009**.

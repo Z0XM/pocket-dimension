@@ -66,7 +66,7 @@ If root directory is `apps/auth-service`, `railpack.json` is picked up automatic
 | me-via-you | 3006 | [apps/me-via-you/DEPLOY.md](./apps/me-via-you/DEPLOY.md) |
 | pocket | 3007 | [apps/pocket/DEPLOY.md](./apps/pocket/DEPLOY.md) |
 | zeo | 3008 | [apps/zeo/DEPLOY.md](./apps/zeo/DEPLOY.md) · [dokploy runbook](./apps/zeo/deploy/dokploy/README.md) |
-| markitdown | 3006 | [apps/markitdown/railpack.json](./apps/markitdown/railpack.json) |
+| markitdown | 3009 | [apps/markitdown/railpack.json](./apps/markitdown/railpack.json) |
 
 ## Database
 

@@ -17,7 +17,7 @@
 - PostgreSQL **18+** required (`uuidv7`).
 - Money is always **minor units** (paise); use `parseIndianAmount` / `formatMoney`.
 - Mutations: `requireUser` → `getMembershipOrThrow` → `canEdit` (owner/editor).
-- BMAD artifacts for this app live only under `_bmad-output/chhan-chhan/` — never under `rhymes/` or `zeo/`. See `_bmad-output/README.md`.
+- BMAD artifacts for this app live only under `_bmad-output/chhan-chhan/` — never under `pocket-dimension/` or `zeo/`. See `_bmad-output/README.md`.
 
 ## Auth / session caveat
 
@@ -77,4 +77,4 @@ Until shipped, UI still uses `getOrCreateDefaultAccount()` (first membership by 
 ## Out of scope for agents unless asked
 
 - Full PRD/epic planning (not started for this app)
-- Changing default `_bmad/bmm/config.yaml` away from rhymes without an explicit switch
+- Changing default `_bmad/bmm/config.yaml` away from pocket-dimension without an explicit switch

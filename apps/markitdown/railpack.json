@@ -20,6 +20,7 @@
     "startCommand": "cd apps/markitdown && bun run start",
     "variables": {
       "NODE_ENV": "production",
+      "PORT": "3009",
       "HOST": "0.0.0.0",
       "PYTHON_PATH": "python3",
       "PYTHON_PACKAGES_DIR": "python-packages",

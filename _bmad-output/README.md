@@ -1,36 +1,34 @@
-# BMAD output (multi-app monorepo)
+# BMAD output
 
-Pocket Dimension hosts several apps. Each app that uses BMAD Method gets its **own** tree under `_bmad-output/<app>/`. Do not mix artifacts across apps.
+Default BMAD project is the **Pocket Dimension monorepo**. All new planning, stories, and brownfield documentation go under `_bmad-output/pocket-dimension/` unless you are working in an existing app-specific tree.
+
+## Layout
+
+```
+_bmad-output/
+  pocket-dimension/                 # default — monorepo + rhymes rework
+    project-context.md
+    planning-artifacts/             # PRDs, architecture, UX, epics
+    implementation-artifacts/       # stories, sprint-status
+  zeo/                              # existing zeo-only artifacts
+  chhan-chhan/                      # existing chhan-chhan-only artifacts
+```
+
+Do **not** write BMAD artifacts to a repo-root `docs/` folder.
 
 ## App map
 
-| App | Code path | BMAD output root | Default in `_bmad/bmm/config.yaml`? |
-| --- | --- | --- | --- |
-| rhymes | `apps/rhymes` | `_bmad-output/rhymes/` | **Yes** (`project_name: rhymes`) |
-| zeo | `apps/zeo` | `_bmad-output/zeo/` | No |
-| chhan-chhan | `apps/chhan-chhan` | `_bmad-output/chhan-chhan/` | No |
+| App | Code path | Where its BMAD artifacts live |
+| --- | --- | --- |
+| monorepo / rhymes rework | repo root, `apps/rhymes` | `_bmad-output/pocket-dimension/` (default) |
+| zeo | `apps/zeo` | `_bmad-output/zeo/` |
+| chhan-chhan | `apps/chhan-chhan` | `_bmad-output/chhan-chhan/` |
 
-Typical layout per app:
+When implementing **zeo** or **chhan-chhan** features, load that app’s `project-context.md` and keep new specs in that app’s tree. Do not drop those specs into `pocket-dimension/` unless the work is actually monorepo-wide.
 
-```
-_bmad-output/<app>/
-  project-context.md              # AI rules for this app
-  planning-artifacts/             # PRD, architecture, UX, brownfield docs, …
-  implementation-artifacts/       # specs, stories, deferred-work, sprint-status
-```
+## Switching away from the default
 
-## Switching the active BMAD project
-
-[`_bmad/bmm/config.yaml`](../_bmad/bmm/config.yaml) currently defaults to **rhymes**. When working on another app, temporarily point these keys at that app (then restore rhymes when done):
-
-- `project_name`
-- `output_folder` → `_bmad-output/<app>`
-- `planning_artifacts` → `{project-root}/_bmad-output/<app>/planning-artifacts`
-- `implementation_artifacts` → `{project-root}/_bmad-output/<app>/implementation-artifacts`
-
-Prefer a personal override file (e.g. `_bmad/bmm/config.user.yaml` if used) over committing a permanent switch of the shared default.
-
-**Rule:** Never write app-specific specs, deferred-work, or sprint status into another app’s folder. Quick-dev / one-shot specs for chhan-chhan belong under `_bmad-output/chhan-chhan/implementation-artifacts/`.
+[`_bmad/bmm/config.yaml`](../_bmad/bmm/config.yaml) and [`_bmad/custom/config.toml`](../_bmad/custom/config.toml) default to **pocket-dimension**. For a one-off app-only workflow, temporarily point `planning_artifacts` / `implementation_artifacts` at `_bmad-output/<app>/`, then restore the default.
 
 ## Chhan Chhan agents
 

@@ -135,9 +135,9 @@ sudo systemctl status postgresql
 This is a monorepo containing:
 
 - **Apps**:
-  - `auth-service`: Elysia-based authentication service
-  - `watchlist`: SvelteKit frontend application
-  - `rhymes`: Astro frontend application
+  - `auth-service`: Elysia-based authentication service (port 5001)
+  - `watchlist`, `rhymes`, `howwasyourday`, `chhan-chhan`, `me-via-you`, `markitdown`, `pocket`, `zeo`: SvelteKit apps
+  - `zeo-music-worker`: LiveKit audio worker for zeo shared listening
 
 - **Shared Packages**:
   - `@pocket-dimension/auth`: Better Auth configuration
@@ -170,13 +170,13 @@ Create a `.env` file in the required projects as needed. Follow the `env.example
 DATABASE_URL=postgresql://user:password@localhost:5432/pocket_dimension
 
 # Auth Service
-PORT=3001
+PORT=5001
 
 # Better Auth Configuration
 BETTER_AUTH_SECRET=your-secret-key-here
-BETTER_AUTH_URL=http://localhost:3001
-BETTER_AUTH_PATH=/api/auth
-BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:3002,http://localhost:3003
+BETTER_AUTH_URL=http://localhost:5001
+BETTER_AUTH_PATH=/
+BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008
 BETTER_AUTH_COOKIE_DOMAIN=localhost
 
 # Email (Resend)
@@ -304,10 +304,10 @@ Then start individual services as needed.
 3. **Run migrations**: `bun run db:migrate`
 4. **Start development servers**: `bun run dev` or run individual apps
 5. **Access applications** (ports are configurable via `PORT` env variable):
-   - Auth Service: `http://localhost:3001` (configured via `PORT` env var)
-     - Swagger API docs: `http://localhost:3001/swagger`
-   - Watchlist: `http://localhost:3000` (default Vite port, configurable via `PORT` env var)
-   - Rhymes: `http://localhost:3003` (configured in package.json)
+   - Auth Service: `http://localhost:5001` — Swagger at `/swagger`
+   - Watchlist: `http://localhost:3002`
+   - Rhymes: `http://localhost:3003`
+   - See `AGENTS.md` for the full port map
 
 ## Database Management
 
@@ -355,10 +355,10 @@ If you encounter port conflicts, check which ports are in use and update your en
 - **Monorepo**: Turbo
 - **Language**: TypeScript
 - **Backend**: Elysia
-- **Frontend**: SvelteKit, Astro
-- **Database**: PostgreSQL with Drizzle ORM
+- **Frontend**: SvelteKit
+- **Database**: PostgreSQL 18+ with Drizzle ORM
 - **Authentication**: Better Auth
-- **Linting/Formatting**: Biome
+- **Linting/Formatting**: Prettier
 - **Testing**: Vitest
 
 ## Contributing
