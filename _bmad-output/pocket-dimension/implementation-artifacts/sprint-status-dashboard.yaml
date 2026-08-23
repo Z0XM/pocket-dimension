@@ -1,5 +1,5 @@
 # generated: 2026-08-23
-# last_updated: 2026-08-23 (story 2-3 done; epic-2 in-progress)
+# last_updated: 2026-08-23 (story 2-4 done; epic-2 done)
 # project: dashboard
 # project_key: NOKEY
 # tracking_system: file-system
@@ -38,7 +38,7 @@
 # - First story: 1-1-run-dashboard-from-the-pocket-sibling-starter
 
 generated: 2026-08-23
-last_updated: 2026-08-23 (story 2-3 ready-for-dev; epic-2 in-progress)
+last_updated: 2026-08-23 (story 2-4 done; epic-2 done)
 project: dashboard
 project_key: NOKEY
 tracking_system: file-system
@@ -52,11 +52,11 @@ development_status:
   1-4-land-on-overview-for-the-selected-tree: done
   epic-1-retrospective: optional
 
-  epic-2: in-progress
+  epic-2: done
   2-1-browse-docs-grouped-by-artifact-kind: done
   2-2-read-an-artifact-as-structured-markdown: done
   2-3-follow-in-root-links-and-mark-unresolved-ones: done
-  2-4-show-honest-empty-and-missing-states-including-dashboards-own-files: backlog
+  2-4-show-honest-empty-and-missing-states-including-dashboards-own-files: done
   epic-2-retrospective: optional
 
   epic-3: backlog

@@ -20,6 +20,7 @@ export type LayoutTreeData = {
   tree: TreeId | null;
   bmadRootError: string | null;
   snapshot: TreeSnapshot | null;
+  snapshotError?: string | null;
 };
 
 export type ArtifactSibling = {

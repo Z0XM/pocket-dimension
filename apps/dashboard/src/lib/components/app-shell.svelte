@@ -1,7 +1,9 @@
 <script lang="ts">
   import PanelLeftIcon from "@lucide/svelte/icons/panel-left";
+  import HonestState from "$lib/components/honest-state.svelte";
   import SectionNav from "$lib/components/section-nav.svelte";
   import TreeSwitcher from "$lib/components/tree-switcher.svelte";
+  import { EXPERIENCE_COPY } from "$lib/experience-copy";
   import { Button } from "$lib/components/ui/button/index.js";
   import * as Sheet from "$lib/components/ui/sheet/index.js";
   import type { TreeId } from "$lib/types";
@@ -63,11 +65,11 @@
 
     <main class="min-w-0 flex-1 p-4">
       {#if bmadRootError || trees.length === 0}
-        <div class="mb-4 space-y-2 border-b border-border pb-4">
-          <p class="text-display text-foreground">BMAD Root unavailable.</p>
-          <p class="text-muted-foreground">
-            {bmadRootError ?? "No Current BMAD Trees were found on disk."}
-          </p>
+        <div class="mb-4 border-b border-border pb-4">
+          <HonestState
+            title={EXPERIENCE_COPY.bmadRootUnavailable.title}
+            reason={bmadRootError ?? EXPERIENCE_COPY.bmadRootUnavailable.reasonFallback}
+          />
         </div>
       {/if}
       {@render children()}

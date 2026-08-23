@@ -16,9 +16,13 @@ export const load: LayoutServerLoad = async ({ url }) => {
   }
 
   let snapshot: TreeSnapshot | null = null;
+  let snapshotError: string | null = null;
   if (tree) {
     const result = loadTreeSnapshot(tree);
     snapshot = { tree: result.tree, artifacts: result.artifacts };
+    if ("error" in result && result.error) {
+      snapshotError = result.error;
+    }
   }
 
   return {
@@ -26,5 +30,6 @@ export const load: LayoutServerLoad = async ({ url }) => {
     tree,
     bmadRootError: bmadRootError ?? null,
     snapshot,
+    snapshotError,
   };
 };

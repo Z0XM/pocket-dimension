@@ -1,6 +1,8 @@
 <script lang="ts">
+  import HonestState from "$lib/components/honest-state.svelte";
   import MarkdownReader from "$lib/components/markdown-reader.svelte";
   import { encodePathSegments } from "$lib/docs-path";
+  import { EXPERIENCE_COPY } from "$lib/experience-copy";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -60,9 +62,7 @@
     <pre class="overflow-x-auto border border-border p-4 font-mono text-sm whitespace-pre-wrap">{artifact.text}</pre>
   </article>
 {:else}
-  <div class="max-w-[48rem] space-y-2 text-foreground">
-    <h1 class="text-display">Unreadable Artifact.</h1>
-    <p class="text-muted-foreground">{artifact.reason}</p>
-    <p class="font-mono text-xs text-muted-foreground">{artifact.sourcePath}</p>
+  <div class="max-w-[48rem]">
+    <HonestState title={EXPERIENCE_COPY.unreadableArtifact.title} reason={artifact.reason} meta={artifact.sourcePath} />
   </div>
 {/if}
