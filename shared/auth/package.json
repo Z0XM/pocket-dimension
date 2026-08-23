@@ -21,6 +21,7 @@
   "dependencies": {
     "@pocket-dimension/db": "workspace:*",
     "@pocket-dimension/utils": "workspace:*",
+    "better-auth": "^1.4.10",
     "resend": "^6.7.0",
     "zod": "^4.3.4"
   },
