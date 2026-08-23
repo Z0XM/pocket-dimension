@@ -32,7 +32,11 @@ export function mapStatusLabel(raw: string): { status: StoryStatus; statusLabel:
     return { status: "done", statusLabel };
   }
 
-  if (normalized === "ready-for-dev" || normalized === "in-progress" || normalized === "review" || normalized === "contexted") {
+  if (normalized === "in-progress") {
+    return { status: "in-progress", statusLabel };
+  }
+
+  if (normalized === "ready-for-dev" || normalized === "review" || normalized === "contexted" || normalized === "optional") {
     return { status: "unknown", statusLabel };
   }
 

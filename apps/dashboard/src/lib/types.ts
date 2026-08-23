@@ -4,6 +4,8 @@ export type ArtifactKind = "epic" | "story" | "doc" | "prd" | "ux" | "architectu
 
 export type StoryStatus = "backlog" | "in-progress" | "done" | "unknown";
 
+export type { DeliveryItem, DeliveryView } from "$lib/catalog/delivery";
+
 export type ArtifactRef = {
   id: string;
   title: string;

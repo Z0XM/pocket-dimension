@@ -44,11 +44,15 @@ describe("mapStatusLabel", () => {
     expect(mapStatusLabel("completed")).toEqual({ status: "done", statusLabel: "completed" });
   });
 
-  it("maps board-adjacent labels to unknown with label kept", () => {
+  it("maps in-progress to board column", () => {
+    expect(mapStatusLabel("in-progress")).toEqual({ status: "in-progress", statusLabel: "in-progress" });
+  });
+
+  it("maps extra sprint-status labels to unknown with label kept", () => {
     expect(mapStatusLabel("ready-for-dev")).toEqual({ status: "unknown", statusLabel: "ready-for-dev" });
-    expect(mapStatusLabel("in-progress")).toEqual({ status: "unknown", statusLabel: "in-progress" });
     expect(mapStatusLabel("review")).toEqual({ status: "unknown", statusLabel: "review" });
     expect(mapStatusLabel("contexted")).toEqual({ status: "unknown", statusLabel: "contexted" });
+    expect(mapStatusLabel("optional")).toEqual({ status: "unknown", statusLabel: "optional" });
   });
 
   it("maps unknown labels with raw statusLabel preserved", () => {

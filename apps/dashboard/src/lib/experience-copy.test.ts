@@ -25,6 +25,10 @@ describe("experience-copy", () => {
     expect(EXPERIENCE_COPY.featuresEmpty.title).toBe("No Features in this Tree.");
   });
 
+  it("uses literal Delivery empty title from EXPERIENCE", () => {
+    expect(EXPERIENCE_COPY.deliveryEmpty.title).toBe("No Epics in this Tree.");
+  });
+
   it("uses Unreadable Artifact. title exactly", () => {
     expect(EXPERIENCE_COPY.unreadableArtifact.title).toBe("Unreadable Artifact.");
   });

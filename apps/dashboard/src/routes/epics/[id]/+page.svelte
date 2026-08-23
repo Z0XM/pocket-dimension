@@ -27,7 +27,9 @@
 
 <div class="space-y-4">
   <nav class="text-sm">
-    <a href={sectionHref("/docs", tree)} class="text-muted-foreground hover:text-foreground">← Docs</a>
+    <a href={sectionHref("/delivery", tree)} class="text-muted-foreground hover:text-foreground">← Epics &amp; Stories</a>
+    <span class="text-muted-foreground mx-2">·</span>
+    <a href={sectionHref("/docs", tree)} class="text-muted-foreground hover:text-foreground">Docs</a>
   </nav>
 
   {#if artifact.kind === "markdown"}
