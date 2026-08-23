@@ -190,6 +190,71 @@ describe("groupDeliveryForTimeline", () => {
     const groups = groupDeliveryForTimeline(items);
     expect(groups[0]?.epicNumber).toBe(1);
     expect(groups[1]?.epicNumber).toBe(2);
-    expect(groups.at(-1)?.epicNumber).toBeNull();
+    expect(groups[1]?.epics.map((epic) => epic.sourcePath)).toEqual(["planning-artifacts/epics-dashboard.md"]);
+    expect(groups.some((group) => group.epicNumber === null)).toBe(false);
+  });
+
+  it("nests numbered stories under pack epic milestones when no per-number epic files exist", () => {
+    const packDashboard = epicRef({
+      sourcePath: "planning-artifacts/epics-dashboard.md",
+      title: "Dashboard Epics",
+    });
+    const packRhymes = epicRef({
+      sourcePath: "planning-artifacts/epics.md",
+      title: "Rhymes Epics",
+    });
+
+    const items = projectDelivery(
+      [
+        packDashboard,
+        packRhymes,
+        storyRef({ sourcePath: "implementation-artifacts/1-1-run-dashboard-from-the-pocket-sibling-starter.md", title: "1.1 Dashboard" }),
+        storyRef({ sourcePath: "implementation-artifacts/2-1-browse-docs-grouped-by-artifact-kind.md", title: "2.1 Docs" }),
+        storyRef({
+          sourcePath: "implementation-artifacts/1-1-migrate-the-existing-rhymes-library-into-the-new-content-model.md",
+          title: "1.1 Rhymes",
+        }),
+      ],
+      null
+    );
+
+    const groups = groupDeliveryForTimeline(items);
+    const epic1 = groups.find((group) => group.epicNumber === 1);
+    const epic2 = groups.find((group) => group.epicNumber === 2);
+
+    expect(epic1?.epics.map((epic) => epic.sourcePath)).toEqual(["planning-artifacts/epics-dashboard.md", "planning-artifacts/epics.md"]);
+    expect(epic1?.stories).toHaveLength(2);
+    expect(epic2?.epics.map((epic) => epic.sourcePath)).toEqual(["planning-artifacts/epics-dashboard.md", "planning-artifacts/epics.md"]);
+    expect(epic2?.stories).toHaveLength(1);
+    expect(groups.some((group) => group.epicNumber === null)).toBe(false);
+  });
+
+  it("keeps numbered epic files as milestones and does not duplicate pack epics into Other", () => {
+    const items = projectDelivery(
+      [
+        epicRef({ sourcePath: "implementation-artifacts/9-epic-remove-guest-mode.md", title: "Epic 9" }),
+        epicRef({ sourcePath: "planning-artifacts/epics.md", title: "Pack" }),
+        storyRef({ sourcePath: "implementation-artifacts/1-1-create-zeo-sveltekit-app-workspace.md", title: "1.1" }),
+      ],
+      null
+    );
+
+    const groups = groupDeliveryForTimeline(items);
+    const epic9 = groups.find((group) => group.epicNumber === 9);
+    const epic1 = groups.find((group) => group.epicNumber === 1);
+
+    expect(epic9?.epics.map((epic) => epic.sourcePath)).toEqual(["implementation-artifacts/9-epic-remove-guest-mode.md"]);
+    expect(epic1?.epics.map((epic) => epic.sourcePath)).toEqual(["planning-artifacts/epics.md"]);
+    expect(epic1?.stories).toHaveLength(1);
+    expect(groups.some((group) => group.epicNumber === null)).toBe(false);
+  });
+
+  it("leaves pack epics in Other when no numbered story groups exist", () => {
+    const items = projectDelivery([epicRef({ sourcePath: "planning-artifacts/epics-dashboard.md", title: "Pack" })], null);
+
+    const groups = groupDeliveryForTimeline(items);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.epicNumber).toBeNull();
+    expect(groups[0]?.epics).toHaveLength(1);
   });
 });

@@ -130,11 +130,22 @@ export function parseDeliveryView(raw: string | null): DeliveryView {
 /** Board column order for Delivery views. */
 export const DELIVERY_BOARD_COLUMNS: readonly StoryStatus[] = ["backlog", "in-progress", "done", "unknown"] as const;
 
+/** Whether an epic Artifact is a pack file (epics.md / epics-*.md) with no per-number file. */
+export function isPackEpicSourcePath(sourcePath: string): boolean {
+  return PACK_EPIC_BASENAME.test(basenameFromPath(sourcePath));
+}
+
 /** Group items for Timeline: numbered epics first, then unnumbered. */
 export function groupDeliveryForTimeline(items: DeliveryItem[]): DeliveryTimelineGroup[] {
   const byNumber = new Map<number | "other", DeliveryTimelineGroup>();
+  const packEpics: DeliveryItem[] = [];
 
   for (const item of items) {
+    if (item.kind === "epic" && item.epicNumber === null && isPackEpicSourcePath(item.sourcePath)) {
+      packEpics.push(item);
+      continue;
+    }
+
     const key = item.epicNumber ?? "other";
     let group = byNumber.get(key);
     if (!group) {
@@ -149,9 +160,15 @@ export function groupDeliveryForTimeline(items: DeliveryItem[]): DeliveryTimelin
     }
   }
 
+  packEpics.sort((a, b) => a.sourcePath.localeCompare(b.sourcePath));
+
   for (const group of byNumber.values()) {
     group.epics.sort((a, b) => a.sourcePath.localeCompare(b.sourcePath));
     group.stories.sort((a, b) => a.sourcePath.localeCompare(b.sourcePath));
+
+    if (group.epicNumber !== null && group.stories.length > 0 && group.epics.length === 0 && packEpics.length > 0) {
+      group.epics.push(...packEpics);
+    }
   }
 
   const numbered = [...byNumber.entries()]
@@ -162,6 +179,8 @@ export function groupDeliveryForTimeline(items: DeliveryItem[]): DeliveryTimelin
   const other = byNumber.get("other");
   if (other && (other.epics.length > 0 || other.stories.length > 0)) {
     numbered.push(other);
+  } else if (packEpics.length > 0 && numbered.length === 0) {
+    numbered.push({ epicNumber: null, epics: packEpics, stories: [] });
   }
 
   return numbered;

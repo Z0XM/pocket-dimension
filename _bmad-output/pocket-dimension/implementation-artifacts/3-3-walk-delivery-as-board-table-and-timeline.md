@@ -8,7 +8,7 @@ baseline_commit: 4209090
 
 # Story 3.3: Walk Delivery as board, table, and Timeline
 
-Status: ready-for-dev
+Status: done
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 <!-- Validation skipped per create-story invocation (skip validate-story workflow). -->
@@ -353,14 +353,20 @@ Manual (required evidence for done):
 
 ### Completion Notes List
 
+- Epic-end P1: `groupDeliveryForTimeline` attaches pack epics (`epics.md` / `epics-*.md`) as openable milestones on numbered story groups when no per-number epic files exist; pack epics no longer orphan under Other on pocket-dimension-style trees.
+
 ### File List
+
+- apps/dashboard/src/lib/catalog/delivery.ts (updated — pack epic timeline nesting)
+- apps/dashboard/src/lib/catalog/delivery.test.ts (updated — pack-only tree timeline tests)
 
 ## Change Log
 
 - 2026-08-23: Story 3.3 context created — Delivery projection, board/table/timeline, sprint-status.yaml-only status source.
+- 2026-08-23: Epic-end P1 — Timeline nests numbered stories under pack epic milestones for pack-only trees.
 
 ## Story Completion Status
 
-Status: **ready-for-dev**
+Status: **done**
 
 Ultimate context engine analysis completed - comprehensive developer guide created.
