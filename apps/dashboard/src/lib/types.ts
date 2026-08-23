@@ -23,6 +23,15 @@ export type LayoutTreeData = {
   snapshotError?: string | null;
 };
 
+export type FeatureRow = {
+  id: string;
+  name: string;
+  sourcePath: string;
+  sourceTitle: string;
+  headingSlug: string;
+  kind: "fr" | "feature";
+};
+
 export type ArtifactSibling = {
   title: string;
   sourcePath: string;

@@ -17,6 +17,10 @@ export const EXPERIENCE_COPY = {
     title: "Select an Artifact.",
     reason: "Choose a row in the Catalog.",
   },
+  featuresEmpty: {
+    title: "No Features in this Tree.",
+    reason: "No Feature or FR sections were found in planning PRDs for this Tree.",
+  },
 } as const;
 
 export function docsEmptyKindCopy(kindLabel: string): { title: string; reason: string } {

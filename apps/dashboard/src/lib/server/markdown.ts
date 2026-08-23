@@ -1,3 +1,4 @@
+import { slugifyHeading } from "$lib/catalog/heading-slug";
 import { resolveLink } from "$lib/catalog/resolve-link";
 import type { TreeId } from "$lib/types";
 import type { Element, Root } from "hast";
@@ -14,16 +15,6 @@ export type SanitizeMarkdownContext = {
   tree: TreeId;
   exists?: (normalizedTreeRelativePath: string) => boolean;
 };
-
-function slugifyHeading(text: string): string {
-  return text
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 function hastToPlainText(node: unknown): string {
   if (!node || typeof node !== "object") {
