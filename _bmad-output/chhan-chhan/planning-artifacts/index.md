@@ -35,6 +35,12 @@ Personal finance ledger for importing Indian bank statements, organizing transac
 - [`../implementation-artifacts/deferred-work.md`](../implementation-artifacts/deferred-work.md)
 - [`../project-context.md`](../project-context.md) — AI agent rules
 
+### Multi-account MVP (draft planning)
+
+- [PRD](./prds/prd-chhan-multi-account-2026-08-23/prd.md)
+- [UX DESIGN](./ux-designs/ux-chhan-multi-account-2026-08-23/DESIGN.md) / [EXPERIENCE](./ux-designs/ux-chhan-multi-account-2026-08-23/EXPERIENCE.md)
+- [Architecture](./architecture-multi-account.md)
+
 ## Existing Documentation (in-app)
 
 - [IMPORT.md](../../../apps/chhan-chhan/IMPORT.md) — statement import strategies

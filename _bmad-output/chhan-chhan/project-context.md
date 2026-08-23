@@ -58,6 +58,16 @@ When adding a bank: `{bank}.ts` + `{bank}-pdf.ts` + `{bank}-shared.ts` + tests +
 | `/app/dashboards` | Widgetized analytics (budgets/goals display; Control CRUD still backlog) |
 | `/app/control` | Import/export/metadata/opening balance/clear-all |
 
+## Multi-account (planned)
+
+MVP planning (PRD + UX + Architecture) is in draft — **not implemented yet**:
+
+- PRD: `planning-artifacts/prds/prd-chhan-multi-account-2026-08-23/`
+- UX: `planning-artifacts/ux-designs/ux-chhan-multi-account-2026-08-23/`
+- Architecture: `planning-artifacts/architecture-multi-account.md`
+
+Until shipped, UI still uses `getOrCreateDefaultAccount()` (first membership by name). DB/API already support multiple accounts.
+
 ## Living docs
 
 - Backlog: `apps/chhan-chhan/FUTURE-TODO.md`
