@@ -36,7 +36,6 @@
     "vite": "^7.2.6"
   },
   "dependencies": {
-    "@fontsource-variable/nunito-sans": "^5.2.7",
-    "@fontsource/fira-mono": "^5.2.7"
+    "@fontsource/fira-code": "^5.2.7"
   }
 }
