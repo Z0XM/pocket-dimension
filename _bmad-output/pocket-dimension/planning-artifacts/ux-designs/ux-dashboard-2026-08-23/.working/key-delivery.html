@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>dashboard — Delivery Timeline</title>
+    <style>
+      /* DESIGN.md; EXPERIENCE.md Delivery + Timeline rail + Flow 6 */
+      :root {
+        --bg: #0a0a0a;
+        --surface: #111111;
+        --fg: #f5f5f5;
+        --muted: #a3a3a3;
+        --border: #262626;
+        --accent: #8b5cf6;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #1a1a1a;
+        color: var(--fg);
+        font-family: "Fira Code", ui-monospace, monospace;
+        font-size: 14px;
+      }
+      .browser {
+        max-width: 1100px;
+        margin: 24px auto;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        min-height: 640px;
+        display: flex;
+        flex-direction: column;
+      }
+      .chrome { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; }
+      .app { display: flex; flex: 1; }
+      aside { width: 280px; border-right: 1px solid var(--border); padding: 16px 12px; }
+      .brand { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; }
+      .tree { margin: 8px 0 16px; }
+      nav a { display: block; padding: 8px 10px; color: var(--muted); text-decoration: none; border-left: 2px solid transparent; }
+      nav a.active { color: var(--fg); background: var(--surface); border-left-color: var(--accent); }
+      main { flex: 1; padding: 16px 24px; }
+      h1 { font-size: 20px; font-weight: 500; margin: 0 0 12px; }
+      .chips span { margin-right: 8px; color: var(--muted); font-size: 12px; border: 1px solid var(--border); padding: 2px 8px; }
+      .chips .on { color: var(--fg); border-color: var(--accent); }
+      .rail { margin-top: 20px; border-left: 1px solid var(--border); padding-left: 16px; }
+      .epic { margin-bottom: 20px; }
+      .epic h2 { font-size: 14px; font-weight: 500; margin: 0 0 8px; }
+      .story { color: var(--muted); font-size: 12px; margin: 4px 0; }
+      .story current { color: var(--fg); }
+      .dot { display: inline-block; width: 8px; height: 8px; background: var(--accent); border-radius: 9999px; margin-right: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="browser">
+      <div class="chrome">
+        <span>localhost:3011 · Epics &amp; Stories</span>
+        <span>Search ⌘K</span>
+      </div>
+      <div class="app">
+        <aside>
+          <div class="brand">dashboard</div>
+          <div class="tree">pocket-dimension</div>
+          <nav>
+            <a href="#">Overview</a>
+            <a href="#">Features</a>
+            <a class="active" href="#">Epics &amp; Stories</a>
+            <a href="#">Tests</a>
+            <a href="#">Docs</a>
+          </nav>
+        </aside>
+        <main>
+          <h1>Epics &amp; Stories</h1>
+          <div class="chips">
+            <span>Board</span>
+            <span>Table</span>
+            <span class="on">Timeline</span>
+          </div>
+          <div class="rail">
+            <div class="epic">
+              <h2>Epic 1 · Showcase shell</h2>
+              <div class="story"><span class="dot"></span>1.1 Create dashboard app workspace</div>
+              <div class="story"><span class="dot"></span>1.2 Parse Current BMAD Trees</div>
+            </div>
+            <div class="epic">
+              <h2>Epic 2 · Delivery</h2>
+              <div class="story"><span class="dot"></span>2.1 Features catalog</div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

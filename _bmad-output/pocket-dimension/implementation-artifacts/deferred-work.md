@@ -23,3 +23,19 @@
 - Cookie policy stays `secure` / `sameSite: none`. Local `http://localhost` session caveat still applies.
 - `RESEND_API_KEY` must be a real key for delivery; placeholders only boot the process.
 - Trusted origins must already list each frontend (`BETTER_AUTH_TRUSTED_ORIGINS`).
+
+## dashboard — SIS follow-on surfaces
+
+**Status:** backlog (wanted; not v1)  
+**Source:** PRD `prd-dashboard-2026-08-23` §6.3. Ubuntu 2026-08-23: keep these, defer for now.
+
+When picked up (after v1 Showcase ships):
+
+1. **Blockers** — nav + page for blocked Stories and named blockers.
+2. **Questions** — nav + page for open questions in planning Artifacts.
+3. **Deferred** — nav + page for deferred-work items (including this file).
+4. **Test runner** — run tests from the Tests surface (v1 is catalog-only).
+5. **API docs** — nav when an API catalog exists.
+6. **Pocket hub tile** — list **dashboard** on pocket.
+
+Do **not** add Sample World / sample-data.

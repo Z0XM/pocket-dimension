@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>dashboard — Search</title>
+    <style>
+      /* DESIGN.md Search hit; EXPERIENCE.md Search palette + Flow 4 */
+      :root {
+        --bg: #0a0a0a;
+        --surface: #111111;
+        --fg: #f5f5f5;
+        --muted: #a3a3a3;
+        --border: #262626;
+        --accent: #8b5cf6;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #1a1a1a;
+        font-family: "Fira Code", ui-monospace, monospace;
+        color: var(--fg);
+      }
+      .browser {
+        max-width: 1100px;
+        margin: 24px auto;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        min-height: 640px;
+        position: relative;
+      }
+      .dim { position: absolute; inset: 0; background: rgba(0,0,0,0.55); }
+      .palette {
+        position: absolute;
+        top: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(36rem, 90%);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px;
+      }
+      input {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--fg);
+        font: inherit;
+        padding: 8px 10px;
+        outline: 1px solid var(--accent);
+      }
+      .hit { padding: 8px 10px; color: var(--muted); font-size: 13px; }
+      .hit.active { background: var(--bg); color: var(--fg); border-left: 2px solid var(--accent); }
+      .hit em { color: var(--accent); font-style: normal; text-decoration: underline; }
+      .meta { font-size: 11px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <div class="browser">
+      <div class="dim"></div>
+      <div class="palette">
+        <input value="FR-12" readonly />
+        <div class="hit active">
+          <div>Search Artifact content · <em>FR-12</em></div>
+          <div class="meta">Feature · pocket-dimension · PRD</div>
+        </div>
+        <div class="hit">
+          <div>Full-text Search</div>
+          <div class="meta">PRD · pocket-dimension</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
