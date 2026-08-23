@@ -1,5 +1,6 @@
 import { listCurrentTrees } from "$lib/server/bmad-root";
-import type { TreeId } from "$lib/types";
+import { loadTreeSnapshot } from "$lib/server/read-tree";
+import type { TreeId, TreeSnapshot } from "$lib/types";
 import type { LayoutServerLoad } from "./$types";
 
 export const load: LayoutServerLoad = async ({ url }) => {
@@ -14,9 +15,16 @@ export const load: LayoutServerLoad = async ({ url }) => {
     tree = trees[0] ?? null;
   }
 
+  let snapshot: TreeSnapshot | null = null;
+  if (tree) {
+    const result = loadTreeSnapshot(tree);
+    snapshot = { tree: result.tree, artifacts: result.artifacts };
+  }
+
   return {
     trees,
     tree,
     bmadRootError: bmadRootError ?? null,
+    snapshot,
   };
 };
