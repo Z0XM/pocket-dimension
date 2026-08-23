@@ -1,12 +1,11 @@
 <script lang="ts">
   import PanelLeftIcon from "@lucide/svelte/icons/panel-left";
+  import SectionNav from "$lib/components/section-nav.svelte";
   import TreeSwitcher from "$lib/components/tree-switcher.svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import * as Sheet from "$lib/components/ui/sheet/index.js";
   import type { TreeId } from "$lib/types";
   import type { Snippet } from "svelte";
-
-  const sections = ["Overview", "Features", "Epics & Stories", "Tests", "Docs"] as const;
 
   let {
     children,
@@ -21,6 +20,10 @@
   } = $props();
 
   let sheetOpen = $state(false);
+
+  function closeSheet() {
+    sheetOpen = false;
+  }
 </script>
 
 <div class="flex min-h-screen flex-col bg-background">
@@ -42,20 +45,7 @@
           <TreeSwitcher {trees} {tree} />
         </div>
         <nav aria-label="Sections" class="border-t border-border px-2 py-3">
-          <ul class="space-y-0.5">
-            {#each sections as section, index (section)}
-              <li>
-                <span
-                  class="text-label block border-l-2 px-2.5 py-2 {index === 0
-                    ? 'border-accent bg-card text-foreground'
-                    : 'border-transparent text-muted-foreground'}"
-                  aria-current={index === 0 ? "page" : undefined}
-                >
-                  {section}
-                </span>
-              </li>
-            {/each}
-          </ul>
+          <SectionNav {tree} onNavigate={closeSheet} />
         </nav>
       </Sheet.Content>
     </Sheet.Root>
@@ -67,20 +57,7 @@
       <p class="text-label tracking-widest text-muted-foreground uppercase">dashboard</p>
       <TreeSwitcher {trees} {tree} />
       <nav aria-label="Sections" class="mt-4 border-t border-border pt-4">
-        <ul class="space-y-0.5">
-          {#each sections as section, index (section)}
-            <li>
-              <span
-                class="text-label block border-l-2 px-2.5 py-2 {index === 0
-                  ? 'border-accent bg-card text-foreground'
-                  : 'border-transparent text-muted-foreground'}"
-                aria-current={index === 0 ? "page" : undefined}
-              >
-                {section}
-              </span>
-            </li>
-          {/each}
-        </ul>
+        <SectionNav {tree} />
       </nav>
     </aside>
 

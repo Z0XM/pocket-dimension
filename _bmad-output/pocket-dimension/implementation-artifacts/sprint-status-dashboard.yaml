@@ -1,5 +1,5 @@
 # generated: 2026-08-23
-# last_updated: 2026-08-23 (story 1-3 done)
+# last_updated: 2026-08-23 (story 1-4 done; epic-1 done)
 # project: dashboard
 # project_key: NOKEY
 # tracking_system: file-system
@@ -38,18 +38,18 @@
 # - First story: 1-1-run-dashboard-from-the-pocket-sibling-starter
 
 generated: 2026-08-23
-last_updated: 2026-08-23 (story 1-3 done)
+last_updated: 2026-08-23 (story 1-4 done; epic-1 done)
 project: dashboard
 project_key: NOKEY
 tracking_system: file-system
 story_location: /home/z0xm/pocket-dimension/_bmad-output/pocket-dimension/implementation-artifacts
 
 development_status:
-  epic-1: in-progress
+  epic-1: done
   1-1-run-dashboard-from-the-pocket-sibling-starter: done
   1-2-show-quiet-dark-chrome-that-does-not-compete-with-content: done
   1-3-switch-among-current-bmad-trees-only: done
-  1-4-land-on-overview-for-the-selected-tree: backlog
+  1-4-land-on-overview-for-the-selected-tree: done
   epic-1-retrospective: optional
 
   epic-2: backlog
