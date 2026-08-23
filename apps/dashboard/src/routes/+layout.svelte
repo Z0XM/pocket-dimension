@@ -1,10 +1,10 @@
 <script lang="ts">
   import AppShell from "$lib/components/app-shell.svelte";
-  import "../app.css";
+  import type { LayoutTreeData } from "$lib/types";
 
-  const { children } = $props();
+  let { children, data }: { children: import("svelte").Snippet; data: LayoutTreeData } = $props();
 </script>
 
-<AppShell>
+<AppShell trees={data.trees} tree={data.tree} bmadRootError={data.bmadRootError}>
   {@render children()}
 </AppShell>

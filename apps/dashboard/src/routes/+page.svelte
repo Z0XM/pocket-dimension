@@ -1,3 +1,9 @@
+<script lang="ts">
+  import type { LayoutTreeData } from "$lib/types";
+
+  let { data }: { data: LayoutTreeData } = $props();
+</script>
+
 <svelte:head>
   <title>dashboard</title>
   <meta name="description" content="BMAD Showcase dashboard for the Pocket Dimension monorepo." />
@@ -6,11 +12,19 @@
 <div class="space-y-4">
   <header class="space-y-2">
     <h1 class="text-display text-foreground">dashboard</h1>
-    <p class="max-w-prose text-muted-foreground">BMAD Showcase shell. Overview, docs, and delivery views arrive in later stories.</p>
+    {#if data.tree}
+      <p class="max-w-prose text-muted-foreground">
+        Selected tree: <span class="text-foreground">{data.tree}</span>. Overview and section routes arrive in Story 1.4.
+      </p>
+    {:else if !data.bmadRootError}
+      <p class="max-w-prose text-muted-foreground">No Current BMAD Tree is selected.</p>
+    {/if}
   </header>
 
-  <section class="space-y-2 border-t border-border pt-4">
-    <p class="text-label text-foreground">Showcase placeholder</p>
-    <p class="text-muted-foreground">This app is not the Pocket hub. Content wiring comes next.</p>
-  </section>
+  {#if data.tree}
+    <section class="space-y-2 border-t border-border pt-4">
+      <p class="text-label text-foreground">{data.tree}</p>
+      <p class="text-muted-foreground">Tree context is wired. Content catalog and Overview counts come in later stories.</p>
+    </section>
+  {/if}
 </div>

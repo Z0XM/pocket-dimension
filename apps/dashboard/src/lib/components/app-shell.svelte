@@ -1,12 +1,25 @@
 <script lang="ts">
   import PanelLeftIcon from "@lucide/svelte/icons/panel-left";
+  import TreeSwitcher from "$lib/components/tree-switcher.svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import * as Sheet from "$lib/components/ui/sheet/index.js";
+  import type { TreeId } from "$lib/types";
   import type { Snippet } from "svelte";
 
   const sections = ["Overview", "Features", "Epics & Stories", "Tests", "Docs"] as const;
 
-  let { children }: { children: Snippet } = $props();
+  let {
+    children,
+    trees = [],
+    tree = null,
+    bmadRootError = null,
+  }: {
+    children: Snippet;
+    trees?: TreeId[];
+    tree?: TreeId | null;
+    bmadRootError?: string | null;
+  } = $props();
+
   let sheetOpen = $state(false);
 </script>
 
@@ -25,7 +38,10 @@
         <Sheet.Header class="border-b border-border px-3 py-4 text-left">
           <Sheet.Title class="text-label tracking-widest text-muted-foreground uppercase">dashboard</Sheet.Title>
         </Sheet.Header>
-        <nav aria-label="Sections" class="px-2 py-3">
+        <div class="px-3 pb-3">
+          <TreeSwitcher {trees} {tree} />
+        </div>
+        <nav aria-label="Sections" class="border-t border-border px-2 py-3">
           <ul class="space-y-0.5">
             {#each sections as section, index (section)}
               <li>
@@ -49,7 +65,8 @@
   <div class="flex min-h-0 flex-1">
     <aside class="hidden w-[280px] shrink-0 border-r border-border bg-background px-3 py-4 lg:block" aria-label="Application navigation">
       <p class="text-label tracking-widest text-muted-foreground uppercase">dashboard</p>
-      <nav aria-label="Sections" class="mt-4">
+      <TreeSwitcher {trees} {tree} />
+      <nav aria-label="Sections" class="mt-4 border-t border-border pt-4">
         <ul class="space-y-0.5">
           {#each sections as section, index (section)}
             <li>
@@ -68,6 +85,14 @@
     </aside>
 
     <main class="min-w-0 flex-1 p-4">
+      {#if bmadRootError || trees.length === 0}
+        <div class="mb-4 space-y-2 border-b border-border pb-4">
+          <p class="text-display text-foreground">BMAD Root unavailable.</p>
+          <p class="text-muted-foreground">
+            {bmadRootError ?? "No Current BMAD Trees were found on disk."}
+          </p>
+        </div>
+      {/if}
       {@render children()}
     </main>
   </div>
