@@ -1,0 +1,71 @@
+# generated: 2026-08-23
+# last_updated: 2026-08-23 (story 1-1 done)
+# project: dashboard
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: /home/z0xm/pocket-dimension/_bmad-output/pocket-dimension/implementation-artifacts
+# epics_file: /home/z0xm/pocket-dimension/_bmad-output/pocket-dimension/planning-artifacts/epics-dashboard.md
+# note: Separate from sprint-status.yaml (rhymes). Do not overwrite that file.
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - First story: 1-1-run-dashboard-from-the-pocket-sibling-starter
+
+generated: 2026-08-23
+last_updated: 2026-08-23
+project: dashboard
+project_key: NOKEY
+tracking_system: file-system
+story_location: /home/z0xm/pocket-dimension/_bmad-output/pocket-dimension/implementation-artifacts
+
+development_status:
+  epic-1: in-progress
+  1-1-run-dashboard-from-the-pocket-sibling-starter: done
+  1-2-show-quiet-dark-chrome-that-does-not-compete-with-content: backlog
+  1-3-switch-among-current-bmad-trees-only: backlog
+  1-4-land-on-overview-for-the-selected-tree: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-browse-docs-grouped-by-artifact-kind: backlog
+  2-2-read-an-artifact-as-structured-markdown: backlog
+  2-3-follow-in-root-links-and-mark-unresolved-ones: backlog
+  2-4-show-honest-empty-and-missing-states-including-dashboards-own-files: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-browse-features-extracted-from-planning-artifacts: backlog
+  3-2-open-epics-and-stories-with-optional-status: backlog
+  3-3-walk-delivery-as-board-table-and-timeline: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-search-artifact-content-and-open-a-hit: backlog
+  4-2-catalog-tests-that-exist-on-disk: backlog
+  epic-4-retrospective: optional
