@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+
   let {
     html,
     title,
@@ -10,6 +12,16 @@
     sourcePath?: string;
     kindLabel?: string;
   } = $props();
+
+  onMount(() => {
+    const hash = window.location.hash;
+    if (!hash || hash.length <= 1) {
+      return;
+    }
+    const id = decodeURIComponent(hash.slice(1));
+    const target = document.getElementById(id);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 </script>
 
 <article class="max-w-[48rem] text-foreground">
@@ -24,7 +36,7 @@
   </header>
 
   <div
-    class="prose prose-invert prose-neutral max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-a:text-foreground prose-strong:text-foreground prose-code:font-mono prose-pre:border prose-pre:border-border prose-pre:bg-transparent prose-th:border-border prose-td:border-border"
+    class="markdown-reader-body prose prose-invert prose-neutral max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-a:text-foreground prose-strong:text-foreground prose-code:font-mono prose-pre:border prose-pre:border-border prose-pre:bg-transparent prose-th:border-border prose-td:border-border"
   >
     {@html html}
   </div>

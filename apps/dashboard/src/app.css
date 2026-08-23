@@ -87,4 +87,9 @@
     font-weight: var(--text-display-weight);
     line-height: var(--text-display-leading);
   }
+
+  .markdown-reader-body.prose a[data-unresolved="true"],
+  .markdown-reader-body.prose a.unresolved-link {
+    @apply text-destructive underline underline-offset-2 cursor-not-allowed;
+  }
 }

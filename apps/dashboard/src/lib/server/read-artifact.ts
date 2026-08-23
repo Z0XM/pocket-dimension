@@ -51,12 +51,12 @@ export function loadArtifact(tree: TreeId, sourcePath: string): ArtifactPageData
   }
 
   if (resolved.isDirectory) {
-    return loadRunFolder(sourcePath, resolved.path);
+    return loadRunFolder(tree, sourcePath, resolved.path);
   }
 
   const ext = extension(sourcePath);
   if (ext === ".md") {
-    return loadMarkdownFile(sourcePath, resolved.path);
+    return loadMarkdownFile(tree, sourcePath, resolved.path);
   }
 
   if (ext === ".yaml" || ext === ".yml") {
@@ -67,10 +67,14 @@ export function loadArtifact(tree: TreeId, sourcePath: string): ArtifactPageData
   return { kind: "error", sourcePath, reason: "Unsupported artifact type." };
 }
 
-function loadMarkdownFile(sourcePath: string, fullPath: string): ArtifactPageData {
+function loadMarkdownFile(tree: TreeId, sourcePath: string, fullPath: string): ArtifactPageData {
   try {
     const raw = readFileSync(fullPath, "utf8");
-    const html = sanitizeMarkdown(raw);
+    const html = sanitizeMarkdown(raw, {
+      sourcePath,
+      tree,
+      exists: (path) => resolveArtifactPath(tree, path).ok,
+    });
     const title = extractTitle(raw, sourcePath);
 
     return {
@@ -102,14 +106,14 @@ function loadTextFile(sourcePath: string, fullPath: string): ArtifactPageData {
   }
 }
 
-function loadRunFolder(sourcePath: string, fullPath: string): ArtifactPageData {
+function loadRunFolder(tree: TreeId, sourcePath: string, fullPath: string): ArtifactPageData {
   const siblings = listCataloguableChildren(fullPath, sourcePath);
   const title = folderTitle(fullPath, sourcePath);
 
   const prdPath = join(fullPath, "prd.md");
   if (existsSync(prdPath)) {
     const primarySourcePath = `${sourcePath}/prd.md`;
-    const primary = loadMarkdownFile(primarySourcePath, prdPath);
+    const primary = loadMarkdownFile(tree, primarySourcePath, prdPath);
     if (primary.kind === "markdown") {
       return {
         kind: "run-folder",
