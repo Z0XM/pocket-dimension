@@ -5,6 +5,6 @@
   let { children, data }: { children: import("svelte").Snippet; data: LayoutTreeData } = $props();
 </script>
 
-<AppShell trees={data.trees} tree={data.tree} bmadRootError={data.bmadRootError}>
+<AppShell trees={data.trees} tree={data.tree} bmadRootError={data.bmadRootError} searchCorpus={data.searchCorpus}>
   {@render children()}
 </AppShell>

@@ -39,6 +39,12 @@ export function docsEmptyReason(snapshotError?: string | null): string {
   return snapshotError?.trim() || EXPERIENCE_COPY.docsEmptyTree.reason;
 }
 
+export function searchNoMatches(query: string): { title: string; reason?: string } {
+  return {
+    title: `No matches for ${query}.`,
+  };
+}
+
 /** True when Docs should show the empty-Tree honest state (not the Select prompt). */
 export function isDocsTreeEmpty(data: Pick<LayoutTreeData, "tree" | "snapshot" | "snapshotError">): boolean {
   if (!data.tree || !data.snapshot) {

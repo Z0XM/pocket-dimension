@@ -21,12 +21,35 @@ export type TreeSnapshot = {
   artifacts: ArtifactRef[];
 };
 
+export type SearchHitKind = "feature" | "epic" | "story" | "test" | "docs";
+
+/** Preloaded text document for in-memory search (layout payload). */
+export type SearchCorpusEntry = {
+  kind: SearchHitKind;
+  id: string;
+  title: string;
+  tree: TreeId;
+  text: string;
+  href: string;
+};
+
+/** Result row after query — architecture hit shape. */
+export type SearchHit = {
+  kind: SearchHitKind;
+  id: string;
+  title: string;
+  snippet: string;
+  href: string;
+  tree: TreeId;
+};
+
 export type LayoutTreeData = {
   trees: TreeId[];
   tree: TreeId | null;
   bmadRootError: string | null;
   snapshot: TreeSnapshot | null;
   snapshotError?: string | null;
+  searchCorpus: SearchCorpusEntry[];
 };
 
 export type FeatureRow = {

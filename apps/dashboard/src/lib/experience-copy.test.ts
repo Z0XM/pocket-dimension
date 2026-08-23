@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { docsEmptyKindCopy, docsEmptyReason, EXPERIENCE_COPY, isDocsTreeEmpty } from "./experience-copy";
+import { docsEmptyKindCopy, docsEmptyReason, EXPERIENCE_COPY, isDocsTreeEmpty, searchNoMatches } from "./experience-copy";
 import type { LayoutTreeData, TreeSnapshot } from "$lib/types";
 
 const emptySnapshot: TreeSnapshot = { tree: "pocket-dimension", artifacts: [] };
@@ -43,6 +43,10 @@ describe("experience-copy", () => {
       title: "No PRD in this Tree.",
       reason: "Nothing classified as PRD was found.",
     });
+  });
+
+  it("builds search miss copy exactly", () => {
+    expect(searchNoMatches("FR-99")).toEqual({ title: "No matches for FR-99." });
   });
 
   it("treats missing tree, snapshot error, and zero artifacts as empty Docs", () => {
