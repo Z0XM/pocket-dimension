@@ -3,27 +3,34 @@ import { slugFromSourcePath } from "$lib/catalog/slug";
 import { resolveTreePath } from "$lib/server/bmad-root";
 import { buildDirectoryArtifact, isRunFolderDirectory } from "$lib/server/read-artifact";
 import type { ArtifactRef, TreeId, TreeSnapshot } from "$lib/types";
-import { closeSync, openSync, readSync, readdirSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { closeSync, openSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, join, relative, sep } from "node:path";
 
 const CATALOG_EXTENSIONS = new Set([".md", ".yaml", ".yml"]);
 const SKIP_DIRS = new Set([".git", "node_modules"]);
 const HEAD_BYTES = 8192;
 
-export function loadTreeSnapshot(tree: TreeId): TreeSnapshot | { tree: TreeId; artifacts: []; error?: string } {
-  const resolved = resolveTreePath(tree);
+export function loadTreeSnapshot(tree: TreeId, bmadRoot?: string): TreeSnapshot | { tree: TreeId; artifacts: []; error?: string } {
+  const resolved = resolveTreePath(tree, bmadRoot);
   if (!resolved.ok) {
     return { tree, artifacts: [], error: resolved.reason };
   }
 
+  let resolvedTreeRoot: string;
+  try {
+    resolvedTreeRoot = realpathSync(resolved.path);
+  } catch {
+    return { tree, artifacts: [], error: `Could not resolve path for tree "${tree}".` };
+  }
+
   const artifacts: ArtifactRef[] = [];
-  walkTree(resolved.path, resolved.path, artifacts);
+  walkTree(resolvedTreeRoot, resolved.path, resolved.path, artifacts);
   artifacts.sort((a, b) => a.sourcePath.localeCompare(b.sourcePath));
 
   return { tree, artifacts };
 }
 
-function walkTree(rootPath: string, currentPath: string, artifacts: ArtifactRef[]): void {
+function walkTree(resolvedTreeRoot: string, rootPath: string, currentPath: string, artifacts: ArtifactRef[]): void {
   let entries: string[];
 
   try {
@@ -50,12 +57,16 @@ function walkTree(rootPath: string, currentPath: string, artifacts: ArtifactRef[
       continue;
     }
 
+    if (!isContainedInTree(resolvedTreeRoot, rootPath, fullPath)) {
+      continue;
+    }
+
     if (stat.isDirectory()) {
       const sourcePath = toRelativePath(rootPath, fullPath);
       if (isRunFolderDirectory(sourcePath, fullPath)) {
         artifacts.push(buildDirectoryArtifact(sourcePath, fullPath));
       }
-      walkTree(rootPath, fullPath, artifacts);
+      walkTree(resolvedTreeRoot, rootPath, fullPath, artifacts);
       continue;
     }
 
@@ -70,6 +81,26 @@ function walkTree(rootPath: string, currentPath: string, artifacts: ArtifactRef[
 
     const sourcePath = toRelativePath(rootPath, fullPath);
     artifacts.push(buildArtifact(sourcePath, fullPath));
+  }
+}
+
+/** Returns true when fullPath realpath stays inside resolvedTreeRoot; logs and rejects escapes. */
+export function isContainedInTree(resolvedTreeRoot: string, rootPath: string, fullPath: string): boolean {
+  const relPath = toRelativePath(rootPath, fullPath);
+
+  try {
+    const resolved = realpathSync(fullPath);
+    const rel = relative(resolvedTreeRoot, resolved);
+
+    if (rel.startsWith("..") || isAbsolute(rel)) {
+      console.warn(`read-tree: skipping path outside tree ${relPath}`);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn(`read-tree: could not resolve ${relPath}: ${error instanceof Error ? error.message : "unknown"}`);
+    return false;
   }
 }
 
