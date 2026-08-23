@@ -1,5 +1,5 @@
 # generated: 2026-08-23
-# last_updated: 2026-08-23 (story 3-1 done; epic-3 in-progress)
+# last_updated: 2026-08-23 (story 3-2 done; epic-3 in-progress)
 # project: dashboard
 # project_key: NOKEY
 # tracking_system: file-system
@@ -38,7 +38,7 @@
 # - First story: 1-1-run-dashboard-from-the-pocket-sibling-starter
 
 generated: 2026-08-23
-last_updated: 2026-08-23 (story 3-1 done; epic-3 in-progress)
+last_updated: 2026-08-23 (story 3-2 done; epic-3 in-progress)
 project: dashboard
 project_key: NOKEY
 tracking_system: file-system
@@ -61,7 +61,7 @@ development_status:
 
   epic-3: in-progress
   3-1-browse-features-extracted-from-planning-artifacts: done
-  3-2-open-epics-and-stories-with-optional-status: backlog
+  3-2-open-epics-and-stories-with-optional-status: done
   3-3-walk-delivery-as-board-table-and-timeline: backlog
   epic-3-retrospective: optional
 

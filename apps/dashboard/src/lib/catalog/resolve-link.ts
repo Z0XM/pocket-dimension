@@ -1,4 +1,6 @@
+import { classifyArtifact } from "$lib/catalog/classify";
 import { encodePathSegments } from "$lib/docs-path";
+import { slugFromSourcePath } from "$lib/catalog/slug";
 import type { TreeId } from "$lib/types";
 
 export type ResolveLinkInput = {
@@ -76,8 +78,19 @@ function decodePathSegments(path: string): string {
 }
 
 function buildReaderHref(tree: TreeId, targetPath: string, query: string, hash: string): string {
-  const encoded = encodePathSegments(targetPath);
-  const url = new URL(`http://local/docs/${encoded}`);
+  const kind = classifyArtifact(targetPath);
+  let pathname: string;
+
+  if (kind === "epic") {
+    pathname = `/epics/${slugFromSourcePath(targetPath)}`;
+  } else if (kind === "story") {
+    pathname = `/stories/${slugFromSourcePath(targetPath)}`;
+  } else {
+    const encoded = encodePathSegments(targetPath);
+    pathname = `/docs/${encoded}`;
+  }
+
+  const url = new URL(`http://local${pathname}`);
   url.searchParams.set("tree", tree);
   if (query) {
     const params = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);

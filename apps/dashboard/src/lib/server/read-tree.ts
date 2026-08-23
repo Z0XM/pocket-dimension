@@ -1,4 +1,5 @@
 import { classifyArtifact } from "$lib/catalog/classify";
+import { extractStatusLine, mapStatusLabel } from "$lib/catalog/status";
 import { slugFromSourcePath } from "$lib/catalog/slug";
 import { resolveTreePath } from "$lib/server/bmad-root";
 import { buildDirectoryArtifact, isRunFolderDirectory } from "$lib/server/read-artifact";
@@ -110,12 +111,23 @@ function buildArtifact(sourcePath: string, fullPath: string): ArtifactRef {
     const artifactKind = classifyArtifact(sourcePath, head);
     const title = extractTitle(head, sourcePath);
 
-    return {
+    const ref: ArtifactRef = {
       id: slugFromSourcePath(sourcePath),
       title,
       artifactKind,
       sourcePath,
     };
+
+    if (artifactKind === "story" || artifactKind === "epic") {
+      const statusRaw = extractStatusLine(head);
+      if (statusRaw) {
+        const mapped = mapStatusLabel(statusRaw);
+        ref.status = mapped.status;
+        ref.statusLabel = mapped.statusLabel;
+      }
+    }
+
+    return ref;
   } catch (error) {
     console.warn(`read-tree: could not read ${sourcePath}: ${error instanceof Error ? error.message : "unknown"}`);
     return {

@@ -15,9 +15,15 @@
 
   const groups = $derived(groupArtifactsByKind(artifacts));
 
-  function rowHref(sourcePath: string): string {
-    const encoded = encodePathSegments(sourcePath);
-    const url = new URL(`/docs/${encoded}`, "http://local");
+  function rowHref(item: ArtifactRef): string {
+    const url = new URL("http://local");
+    if (item.artifactKind === "epic") {
+      url.pathname = `/epics/${item.id}`;
+    } else if (item.artifactKind === "story") {
+      url.pathname = `/stories/${item.id}`;
+    } else {
+      url.pathname = `/docs/${encodePathSegments(item.sourcePath)}`;
+    }
     if (tree) {
       url.searchParams.set("tree", tree);
     }
@@ -34,13 +40,16 @@
           {@const active = activePath === item.sourcePath}
           <li>
             <a
-              href={rowHref(item.sourcePath)}
+              href={rowHref(item)}
               class="text-label block border-l-2 px-2.5 py-2 {active
                 ? 'border-accent bg-card text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'}"
               aria-current={active ? "true" : undefined}
             >
               <span class="block text-foreground">{item.title}</span>
+              {#if item.statusLabel}
+                <span class="font-mono text-xs text-muted-foreground">{item.statusLabel}</span>
+              {/if}
               <span class="font-mono text-xs text-muted-foreground">{item.sourcePath}</span>
             </a>
           </li>

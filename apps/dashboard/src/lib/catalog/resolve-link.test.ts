@@ -31,7 +31,7 @@ describe("resolveLink", () => {
     });
   });
 
-  it("resolves ../ within tree", () => {
+  it("resolves ../ within tree to epic slug route", () => {
     const result = resolveLink({
       href: "../../epics-dashboard.md",
       sourcePath: "planning-artifacts/prds/foo/prd.md",
@@ -39,7 +39,7 @@ describe("resolveLink", () => {
     });
     expect(result).toEqual({
       kind: "reader",
-      href: "/docs/planning-artifacts/epics-dashboard.md?tree=pocket-dimension",
+      href: "/epics/planning-artifacts--epics-dashboard?tree=pocket-dimension",
     });
   });
 
@@ -119,6 +119,30 @@ describe("resolveLink", () => {
     expect(result).toEqual({
       kind: "reader",
       href: "/docs/planning-artifacts/architecture-dashboard.md?tree=pocket-dimension&ref=1#intro",
+    });
+  });
+
+  it("routes epic links to /epics slug URL", () => {
+    const result = resolveLink({
+      href: "../../epics-dashboard.md",
+      sourcePath: "planning-artifacts/prds/foo/prd.md",
+      tree: TREE,
+    });
+    expect(result).toEqual({
+      kind: "reader",
+      href: "/epics/planning-artifacts--epics-dashboard?tree=pocket-dimension",
+    });
+  });
+
+  it("routes story links to /stories slug URL", () => {
+    const result = resolveLink({
+      href: "../implementation-artifacts/3-1-browse-features-extracted-from-planning-artifacts.md",
+      sourcePath: "planning-artifacts/epics-dashboard.md",
+      tree: TREE,
+    });
+    expect(result).toEqual({
+      kind: "reader",
+      href: "/stories/implementation-artifacts--3-1-browse-features-extracted-from-planning-artifacts?tree=pocket-dimension",
     });
   });
 

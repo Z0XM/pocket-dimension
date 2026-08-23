@@ -6,11 +6,13 @@
     title,
     sourcePath = undefined,
     kindLabel = undefined,
+    statusLabel = undefined,
   }: {
     html: string;
     title: string;
     sourcePath?: string;
     kindLabel?: string;
+    statusLabel?: string;
   } = $props();
 
   onMount(() => {
@@ -29,6 +31,9 @@
     <h1 class="text-display text-foreground">{title}</h1>
     {#if kindLabel}
       <p class="text-label text-muted-foreground uppercase tracking-widest">{kindLabel}</p>
+    {/if}
+    {#if statusLabel}
+      <p class="font-mono text-xs text-muted-foreground">{statusLabel}</p>
     {/if}
     {#if sourcePath}
       <p class="font-mono text-xs text-muted-foreground">{sourcePath}</p>

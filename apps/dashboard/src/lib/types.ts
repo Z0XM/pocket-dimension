@@ -2,11 +2,15 @@ export type TreeId = "pocket-dimension" | "zeo" | "chhan-chhan";
 
 export type ArtifactKind = "epic" | "story" | "doc" | "prd" | "ux" | "architecture" | "unclassified";
 
+export type StoryStatus = "backlog" | "in-progress" | "done" | "unknown";
+
 export type ArtifactRef = {
   id: string;
   title: string;
   artifactKind: ArtifactKind;
   sourcePath: string;
+  status?: StoryStatus;
+  statusLabel?: string;
   error?: string;
 };
 
