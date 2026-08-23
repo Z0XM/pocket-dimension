@@ -21,3 +21,26 @@ export type LayoutTreeData = {
   bmadRootError: string | null;
   snapshot: TreeSnapshot | null;
 };
+
+export type ArtifactSibling = {
+  title: string;
+  sourcePath: string;
+};
+
+export type ArtifactPrimary = {
+  title: string;
+  sourcePath: string;
+  html: string;
+};
+
+export type ArtifactPageData =
+  | { kind: "markdown"; title: string; sourcePath: string; html: string }
+  | {
+      kind: "run-folder";
+      title: string;
+      sourcePath: string;
+      primary?: ArtifactPrimary;
+      siblings: ArtifactSibling[];
+    }
+  | { kind: "text"; title: string; sourcePath: string; text: string }
+  | { kind: "error"; title?: string; sourcePath: string; reason: string };

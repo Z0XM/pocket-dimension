@@ -1,0 +1,31 @@
+<script lang="ts">
+  let {
+    html,
+    title,
+    sourcePath = undefined,
+    kindLabel = undefined,
+  }: {
+    html: string;
+    title: string;
+    sourcePath?: string;
+    kindLabel?: string;
+  } = $props();
+</script>
+
+<article class="max-w-[48rem] text-foreground">
+  <header class="mb-6 space-y-1">
+    <h1 class="text-display text-foreground">{title}</h1>
+    {#if kindLabel}
+      <p class="text-label text-muted-foreground uppercase tracking-widest">{kindLabel}</p>
+    {/if}
+    {#if sourcePath}
+      <p class="font-mono text-xs text-muted-foreground">{sourcePath}</p>
+    {/if}
+  </header>
+
+  <div
+    class="prose prose-invert prose-neutral max-w-none prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-a:text-foreground prose-strong:text-foreground prose-code:font-mono prose-pre:border prose-pre:border-border prose-pre:bg-transparent prose-th:border-border prose-td:border-border"
+  >
+    {@html html}
+  </div>
+</article>

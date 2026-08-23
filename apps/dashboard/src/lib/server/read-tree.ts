@@ -1,6 +1,7 @@
 import { classifyArtifact } from "$lib/catalog/classify";
 import { slugFromSourcePath } from "$lib/catalog/slug";
 import { resolveTreePath } from "$lib/server/bmad-root";
+import { buildDirectoryArtifact, isRunFolderDirectory } from "$lib/server/read-artifact";
 import type { ArtifactRef, TreeId, TreeSnapshot } from "$lib/types";
 import { closeSync, openSync, readSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -50,6 +51,10 @@ function walkTree(rootPath: string, currentPath: string, artifacts: ArtifactRef[
     }
 
     if (stat.isDirectory()) {
+      const sourcePath = toRelativePath(rootPath, fullPath);
+      if (isRunFolderDirectory(sourcePath, fullPath)) {
+        artifacts.push(buildDirectoryArtifact(sourcePath, fullPath));
+      }
       walkTree(rootPath, fullPath, artifacts);
       continue;
     }
