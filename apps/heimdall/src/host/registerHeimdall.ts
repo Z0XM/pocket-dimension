@@ -242,7 +242,7 @@ export async function registerHeimdall(
   }
 
   if (!existsSync(path.join(distDir, "index.html"))) {
-    app.log.warn({ distDir }, "Heimdall dist/ missing — run `bun run build` in shared/heimdall, or set HEIMDALL_VITE_PROXY=1");
+    app.log.warn({ distDir }, "Heimdall dist/ missing — run `bun run build` in apps/heimdall, or set HEIMDALL_VITE_PROXY=1");
   }
 
   const fastifyStatic = (await import("@fastify/static")).default;

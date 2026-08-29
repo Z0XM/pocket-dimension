@@ -6,7 +6,7 @@ import { defineConfig } from "../src/config/schema.js";
 import { listEnabledModules, resolveModules } from "../src/config/resolveModules.js";
 import { loadDashboard } from "./loadDashboard.js";
 
-/** Pocket Dimension monorepo root (shared/heimdall/server → ../../..) */
+/** Pocket Dimension monorepo root (apps/heimdall/server → ../../..) */
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
 describe("pocket-dimension root Heimdall entrypoint", () => {
@@ -21,7 +21,9 @@ describe("pocket-dimension root Heimdall entrypoint", () => {
     };
 
     expect(pkg.private).toBe(true);
-    expect(pkg.scripts?.heimdall).toBe("node ./shared/heimdall/bin/heimdall.cjs");
+    expect(pkg.scripts?.heimdall).toBe("node ./apps/heimdall/bin/heimdall.cjs");
+    expect(pkg.scripts?.["dev:app:heimdall"]).toContain("@pocket-dimension/heimdall");
+    expect(pkg.scripts?.["build:app:heimdall"]).toContain("@pocket-dimension/heimdall");
     expect(pkg.workspaces).toEqual(expect.arrayContaining(["apps/**", "shared/**", "scripts/**"]));
   });
 });

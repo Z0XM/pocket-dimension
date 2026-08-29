@@ -25,7 +25,7 @@ bun run heimdall dev       # start API + Vite War Room
 
 **Embed (Fastify):** use `registerHeimdall` from `@pocket-dimension/heimdall/host` with your mount and effective public base — see package `README.md`.
 
-> **Pocket Dimension dogfood:** monorepo root scripts `bun run heimdall doctor` / `bun run heimdall dev` call `shared/heimdall/bin/heimdall.cjs`. Alternate: `cd shared/heimdall && node ./bin/heimdall.cjs doctor` / `dev`.
+> **Pocket Dimension dogfood:** monorepo root scripts `bun run heimdall doctor` / `bun run heimdall dev` call `apps/heimdall/bin/heimdall.cjs`. Alternate: `cd apps/heimdall && node ./bin/heimdall.cjs doctor` / `dev` (or `bun run dev:app:heimdall`).
 
 ---
 

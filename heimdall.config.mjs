@@ -24,7 +24,7 @@ export default {
       "_bmad-output/heimdall/implementation-artifacts/heimdall/sprint-status.yaml",
     ],
     implementationDir: "_bmad-output/pocket-dimension/implementation-artifacts",
-    testRoots: ["shared/heimdall/src", "shared/heimdall/server", "apps/zeo/src"],
+    testRoots: ["apps/heimdall/src", "apps/heimdall/server", "apps/zeo/src"],
   },
   modules: [
     {
