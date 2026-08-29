@@ -28,6 +28,14 @@ bun run dev:app:heimdall
 bun run build:app:heimdall
 ```
 
+Production (after build):
+
+```bash
+cd apps/heimdall && bun run start   # PORT=3012, Fastify + dist/ui
+```
+
+Deploy artifacts: `Dockerfile`, `railpack.json`, `scripts/deploy-build.sh`, `DEPLOY.md`, `.env.example`.
+
 CLI `dev` / `build` resolve the Vite binary with `src/lib/resolveViteBin.ts` (nested `node_modules` **or** Node resolution) so workspace installs work. Vite also pre-bundles markdown/`style-to-js` deps and allows consumer `node_modules` in `server.fs.allow` for the same layouts.
 
 ## Rules (do not violate)
