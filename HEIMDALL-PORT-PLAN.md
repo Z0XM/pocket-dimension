@@ -15,26 +15,30 @@ Temporary plan — delete when the full port is done.
 
 Source (original port): `/home/work/compenly/packages/compenly-packages/heimdall`
 
-## Part 1 — Code port — DONE (as `shared/heimdall`)
+## Part 1 — Code port — DONE (originally as `shared/heimdall`)
 
 1. Copied sources into `shared/heimdall` (excluded node_modules, dist, pnpm lock/workspace, Azure .npmrc, version-up.bash)
 2. Renamed to `@pocket-dimension/heimdall`; Bun scripts; `private: true`; dropped Azure publish; TS7 + fastify (dev) for typecheck; rewritten package docs
-3. Root scripts (`heimdall`, `dev:heimdall`, `build:shared:heimdall`) + `heimdall.config.mjs` + AGENTS notes
+3. Root scripts + `heimdall.config.mjs` + AGENTS notes
 4. Verified: typecheck, 235 tests, build, `bun run heimdall doctor`
 
 Dogfood contract tests adapted from Compenly packages layout to Pocket Dimension (Soft-empty OK until BMAD SoR paths exist).
 
-## Part 1b — Relocate to app — NEXT
+## Part 1b — Relocate to app — DONE
 
-Move the working tree from `shared/heimdall` → `apps/heimdall` and rewire monorepo DX so Heimdall is an app peer of `dashboard` / `pocket` / etc.
+Moved the working tree from `shared/heimdall` → `apps/heimdall` and rewired monorepo DX so Heimdall is an app peer of `dashboard` / `pocket` / etc.
 
 Checklist:
 
-- [ ] `git mv shared/heimdall apps/heimdall` (preserve history)
-- [ ] Update root scripts: prefer `dev:app:heimdall` / `build:app:heimdall` (or keep `heimdall` / `dev:heimdall` pointing at `apps/heimdall`); drop `build:shared:heimdall`
-- [ ] Point `heimdall.config.mjs` + AGENTS / package README paths at `apps/heimdall`
-- [ ] Fix any hard-coded `shared/heimdall` paths (dogfood tests, `testRoots`, docs, PUBLISH notes)
-- [ ] Re-verify: typecheck, tests, build, `bun run heimdall doctor`, `bun run dev:heimdall` (or `dev:app:heimdall`)
+- [x] `git mv shared/heimdall apps/heimdall` (preserve history)
+- [x] Update root scripts: `dev:app:heimdall` / `build:app:heimdall`; keep `heimdall` / `dev:heimdall`; drop `build:shared:heimdall`
+- [x] Point `heimdall.config.mjs` + AGENTS / package README paths at `apps/heimdall`
+- [x] Fix hard-coded `shared/heimdall` paths (dogfood tests, `testRoots`, docs, PUBLISH notes)
+- [x] Re-verify: typecheck, tests (235), build, `bun run heimdall doctor`
+
+## Part 1b status: DONE
+
+Heimdall lives at `apps/heimdall`. Soft-empty MISSING BMAD paths remain until incremental Part 2.
 
 ## Part 2 — BMAD docs — INCREMENTAL (not full-repo)
 
