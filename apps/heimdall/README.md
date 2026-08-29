@@ -29,6 +29,15 @@ bun run dev
 
 Open the printed UI URL (default `http://127.0.0.1:5174/heimdall/`).
 
+## Production
+
+```bash
+bun run build:app:heimdall   # from monorepo root
+cd apps/heimdall && bun run start   # http://127.0.0.1:3012/heimdall/
+```
+
+Deploy (Dokploy Dockerfile / Railpack): see [DEPLOY.md](./DEPLOY.md). Env knobs: [.env.example](./.env.example).
+
 ## Authoring
 
 See [docs/AUTHORING.md](./docs/AUTHORING.md) for Soft-empty, doctor, Features/Delivery layout (flat and Modules modes), and theme config/toggle.

@@ -17,11 +17,11 @@ This is the **Pocket Dimension** Bun + Turbo monorepo. Standard commands live in
 | `markitdown` (SvelteKit) | 3009 | no (needs Python) | `bun run dev:app:markitdown` |
 | `pocket` (SvelteKit) | 3007 | no (hub app) | `bun run dev:app:pocket` |
 | `dashboard` (SvelteKit) | 3011 | no (standalone) | `bun run dev:app:dashboard` |
-| `heimdall` (Vite/React War Room) | 5174 UI / 5175 API | no (standalone) | `bun run dev:app:heimdall` |
+| `heimdall` (Vite/React War Room) | 5174/5175 dev · **3012** prod | no (standalone) | `bun run dev:app:heimdall` / `bun run start` in `apps/heimdall` |
 | `zeo` (SvelteKit) | 3008 | yes | `bun run dev:app:zeo` |
 | `zeo-music-worker` | 3010 | worker (internal) | `bun run dev:app:zeo-music-worker` |
 
-The auth-backed apps need PostgreSQL **and** the `auth-service` running. `rhymes`, `markitdown`, `pocket`, `dashboard`, and `heimdall` are standalone.
+The auth-backed apps need PostgreSQL **and** the `auth-service` running. `rhymes`, `markitdown`, `pocket`, `dashboard`, and `heimdall` are standalone. Heimdall deploy: [apps/heimdall/DEPLOY.md](./apps/heimdall/DEPLOY.md) (needs `_bmad-output` + root `heimdall.config.mjs` in the image).
 
 ### Database: PostgreSQL 18 is required (not 16)
 
