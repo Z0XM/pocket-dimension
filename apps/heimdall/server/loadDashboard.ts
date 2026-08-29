@@ -541,7 +541,11 @@ export function loadDashboard(repoRoot: string, config: HeimdallConfig, scope?: 
   const sprint = loadSharedSprint(repoRoot, config);
 
   const projectContextRaw = readOptional(join(repoRoot, config.paths.projectContext));
-  const projectContext = projectContextRaw ? parseProjectContext(projectContextRaw) : { moduleName: "Project", projectName: "Project" };
+  const parsed = projectContextRaw ? parseProjectContext(projectContextRaw) : { moduleName: "Project", projectName: "Project" };
+  // Prefer authored branding when project-context has no module_name / project_name frontmatter.
+  const brand = config.branding.subtitle?.trim();
+  const projectContext =
+    brand && parsed.moduleName === "Project" && parsed.projectName === "Project" ? { moduleName: brand, projectName: brand } : parsed;
 
   if (modulesToLoad.length === 0) {
     return buildEmptyDashboard(sprint, projectContext);
