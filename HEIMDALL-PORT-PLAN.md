@@ -24,9 +24,9 @@ Source (original port): `/home/work/compenly/packages/compenly-packages/heimdall
 
 Dogfood contract tests adapted from Compenly packages layout to Pocket Dimension (Soft-empty OK until BMAD SoR paths exist).
 
-## Part 1b — Relocate to app — IN PROGRESS
+## Part 1b — Relocate to app — DONE
 
-Move the working tree from `shared/heimdall` → `apps/heimdall` and rewire monorepo DX so Heimdall is an app peer of `dashboard` / `pocket` / etc.
+Moved the working tree from `shared/heimdall` → `apps/heimdall` and rewired monorepo DX so Heimdall is an app peer of `dashboard` / `pocket` / etc.
 
 Checklist:
 
@@ -34,7 +34,11 @@ Checklist:
 - [x] Update root scripts: `dev:app:heimdall` / `build:app:heimdall`; keep `heimdall` / `dev:heimdall`; drop `build:shared:heimdall`
 - [x] Point `heimdall.config.mjs` + AGENTS / package README paths at `apps/heimdall`
 - [x] Fix hard-coded `shared/heimdall` paths (dogfood tests, `testRoots`, docs, PUBLISH notes)
-- [ ] Re-verify: typecheck, tests, build, `bun run heimdall doctor`, `bun run dev:heimdall` / `dev:app:heimdall`
+- [x] Re-verify: typecheck, tests (235), build, `bun run heimdall doctor`
+
+## Part 1b status: DONE
+
+Heimdall lives at `apps/heimdall`. Soft-empty MISSING BMAD paths remain until incremental Part 2.
 
 ## Part 2 — BMAD docs — INCREMENTAL (not full-repo)
 
