@@ -13,7 +13,8 @@ node_modules
 **/dist
 **/build
 **/coverage
-_bmad-output
+# Needed by apps/heimdall image (BMAD War Room). Other Dockerfiles do not COPY it.
+# _bmad-output
 .agents
 apps/imposter-art
 
