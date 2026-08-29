@@ -1,5 +1,5 @@
 /**
- * Production entry: Fastify host + registerHeimdall (SPA + /heimdall/dev-api).
+ * Production entry: Fastify host + registerHeimdall (SPA + /dev-api at site root).
  *
  * Expected layout (Docker / Dokploy):
  *   /app/heimdall.config.mjs
@@ -38,14 +38,14 @@ const { mountPath, basePath } = await registerHeimdall(app, {
   cwd: repoRoot,
   distDir: path.join(appDir, "dist", "ui"),
   runners: null,
-  ...(mountOverride ? { mountPath: mountOverride } : {}),
-  ...(baseOverride ? { basePath: baseOverride } : {}),
+  ...(process.env.HEIMDALL_MOUNT_PATH != null ? { mountPath: mountOverride || "/" } : {}),
+  ...(process.env.HEIMDALL_BASE_PATH != null ? { basePath: baseOverride || "/" } : {}),
 });
 
-const uiHome = `${mountPath}/`;
-if (mountPath !== "" && mountPath !== "/") {
-  app.get("/", async (_req, reply) => reply.redirect(uiHome));
+// Non-root mounts still redirect `/` → `{mount}/` for convenience.
+if (mountPath) {
+  app.get("/", async (_req, reply) => reply.redirect(`${mountPath}/`));
 }
 
 await app.listen({ port, host });
-app.log.info({ port, host, mountPath, basePath, repoRoot }, "Heimdall listening");
+app.log.info({ port, host, mountPath: mountPath || "/", basePath: basePath || "/", repoRoot }, "Heimdall listening");

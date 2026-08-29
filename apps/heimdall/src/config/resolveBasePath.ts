@@ -6,11 +6,12 @@ import type { HeimdallConfig } from "./schema.js";
  * Priority: explicit override → config.runtime.basePath → env bridge → heimdallPath.
  *
  * Never hardcodes a host env name (e.g. APP_BASE_PATH).
+ * Empty string means site root (`/`).
  */
 export function resolveEffectiveBasePath(config: HeimdallConfig, options?: { basePath?: string; env?: NodeJS.ProcessEnv }): string {
   const env = options?.env ?? process.env;
 
-  if (options?.basePath != null && options.basePath !== "") {
+  if (options?.basePath != null) {
     return normalizeBase(options.basePath);
   }
 
@@ -18,21 +19,38 @@ export function resolveEffectiveBasePath(config: HeimdallConfig, options?: { bas
     return normalizeBase(config.runtime.basePath);
   }
 
-  const heimdallPath = normalizeBase(config.runtime.heimdallPath || "/heimdall");
+  const heimdallPath = normalizeBase(config.runtime.heimdallPath ?? "/heimdall");
   const envName = config.runtime.basePathFromEnv;
   if (envName) {
     const prefix = (env[envName] ?? "").replace(/\/$/, "");
     if (!prefix) return heimdallPath;
-    return normalizeBase(`${prefix}${heimdallPath}`);
+    return normalizeBase(`${prefix}${heimdallPath || ""}`);
   }
 
   return heimdallPath;
 }
 
-function normalizeBase(value: string): string {
-  if (!value || value === "/") return "";
-  const withSlash = value.startsWith("/") ? value : `/${value}`;
+/**
+ * Normalize a mount / public base.
+ * `"/"` and `""` → `""` (site root). Other values lose a trailing slash.
+ */
+export function normalizeBase(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "/") return "";
+  const withSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   return withSlash.replace(/\/$/, "") || "";
+}
+
+/** Fastify mount segment; same rules as {@link normalizeBase}. */
+export function normalizeMountPath(value: string | undefined | null, fallback = "/heimdall"): string {
+  if (value == null) return normalizeBase(fallback);
+  return normalizeBase(value);
+}
+
+export function joinPublicPath(base: string, suffix: string): string {
+  const b = normalizeBase(base);
+  const s = suffix.startsWith("/") ? suffix : `/${suffix}`;
+  return b ? `${b}${s}` : s;
 }
 
 export function resolveRepoRoot(config: HeimdallConfig, cwd = process.cwd(), configDir?: string): string {

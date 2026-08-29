@@ -62,7 +62,7 @@ Default artifacts and brownfield docs: `_bmad-output/pocket-dimension/` (start a
 
 ```bash
 bun run heimdall doctor   # Soft-empty warnings OK until BMAD paths exist
-bun run heimdall dev      # or: bun run dev:app:heimdall — UI default http://127.0.0.1:5174/heimdall/
+bun run heimdall dev      # or: bun run dev:app:heimdall — UI default http://127.0.0.1:5174/
 ```
 
 ### Auth session caveat (local browser)

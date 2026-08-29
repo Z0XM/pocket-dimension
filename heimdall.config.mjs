@@ -12,7 +12,7 @@ export default {
   repoRoot: ".",
   branding: { subtitle: "Pocket Dimension" },
   runtime: {
-    heimdallPath: "/heimdall",
+    heimdallPath: "/",
   },
   dev: { apiPort: 5175, uiPort: 5174 },
   synthesizeFeaturesWhenRegistryMissing: false,

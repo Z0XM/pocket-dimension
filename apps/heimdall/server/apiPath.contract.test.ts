@@ -13,6 +13,12 @@ describe("normalizeApiPath contract", () => {
     expect(normalizeApiPath("/heimdall/dev-api")).toBe("/");
   });
 
+  it("strips root-mount /dev-api", () => {
+    expect(normalizeApiPath("/dev-api/dashboard")).toBe("/dashboard");
+    expect(normalizeApiPath("/dev-api/health")).toBe("/health");
+    expect(normalizeApiPath("/dev-api")).toBe("/");
+  });
+
   it("strips host-joined basePath + /dev-api", () => {
     expect(normalizeApiPath("/my-app/heimdall/dev-api/dashboard", "/my-app/heimdall")).toBe("/dashboard");
   });

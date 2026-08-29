@@ -50,7 +50,7 @@ export const heimdallConfigSchema = z.object({
     .object({
       /** Explicit effective public base (wins over env bridge when set). */
       basePath: z.string().optional(),
-      /** Mount segment joined with env prefix when using basePathFromEnv. Default /heimdall */
+      /** Mount segment (`/` or `""` = site root). Default `/heimdall` for embeds. */
       heimdallPath: z.string().default("/heimdall"),
       /**
        * Consumer-chosen env var name whose value is an app prefix.

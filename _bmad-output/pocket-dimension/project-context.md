@@ -1,3 +1,8 @@
+---
+module_name: Pocket Dimension
+project_name: Pocket Dimension
+---
+
 # Pocket Dimension — Project Context (for AI agents)
 
 **Product:** Personal monorepo of apps sharing Better Auth, Drizzle/PostgreSQL 18, and Bun + Turbo.  

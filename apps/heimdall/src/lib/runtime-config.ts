@@ -32,14 +32,15 @@ function runtime(): HeimdallRuntimeConfig | undefined {
   return window.__HEIMDALL_RUNTIME__;
 }
 
-/** Effective public base (e.g. /heimdall or /my-app/heimdall). */
+/** Effective public base (`""` = site root `/`). */
 export function docsBasePath(): string {
   const configured = runtime()?.basePath;
-  if (configured != null && configured !== "") {
+  if (configured != null) {
     return configured === "/" ? "" : configured.replace(/\/$/, "");
   }
   const viteBase = import.meta.env.BASE_URL.replace(/\/$/, "");
-  return viteBase || "/heimdall";
+  if (viteBase && viteBase !== ".") return viteBase;
+  return "";
 }
 
 export function apiDocsPath(): string | null {
@@ -74,7 +75,10 @@ export function pagesTestLevels(): Set<ConfigTestLevel> {
 
 export function dashboardApiBase(): string {
   if (runtime()?.dashboardApiBase) return runtime()!.dashboardApiBase;
-  return import.meta.env.VITE_DASHBOARD_API_BASE ?? (import.meta.env.DEV ? "/api" : "/heimdall/dev-api");
+  if (import.meta.env.VITE_DASHBOARD_API_BASE) return import.meta.env.VITE_DASHBOARD_API_BASE;
+  if (import.meta.env.DEV) return "/api";
+  const base = docsBasePath();
+  return base ? `${base}/dev-api` : "/dev-api";
 }
 
 /** Prefix for browser storage keys (`${prefix}-sidebar-collapsed`, …). */
