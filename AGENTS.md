@@ -17,10 +17,11 @@ This is the **Pocket Dimension** Bun + Turbo monorepo. Standard commands live in
 | `markitdown` (SvelteKit) | 3009 | no (needs Python) | `bun run dev:app:markitdown` |
 | `pocket` (SvelteKit) | 3007 | no (hub app) | `bun run dev:app:pocket` |
 | `dashboard` (SvelteKit) | 3011 | no (standalone) | `bun run dev:app:dashboard` |
+| `heimdall` (Vite/React War Room) | 5174 UI / 5175 API | no (standalone) | `bun run dev:app:heimdall` |
 | `zeo` (SvelteKit) | 3008 | yes | `bun run dev:app:zeo` |
 | `zeo-music-worker` | 3010 | worker (internal) | `bun run dev:app:zeo-music-worker` |
 
-The auth-backed apps need PostgreSQL **and** the `auth-service` running. `rhymes`, `markitdown`, `pocket`, and `dashboard` are standalone.
+The auth-backed apps need PostgreSQL **and** the `auth-service` running. `rhymes`, `markitdown`, `pocket`, `dashboard`, and `heimdall` are standalone.
 
 ### Database: PostgreSQL 18 is required (not 16)
 
@@ -43,7 +44,7 @@ Each app/package reads a local `.env` (Bun auto-loads it from the cwd; Turbo run
 
 ### Build before running apps
 
-Apps import the **built** `dist/` of `@pocket-dimension/{auth,db,utils}`. Run `bun run build` (or the `build:shared:*` scripts) before starting an app or running tests. `auth-service` has no build step (Bun runs TS directly).
+Apps import the **built** `dist/` of `@pocket-dimension/{auth,db,utils}`. Run `bun run build` (or the `build:shared:*` scripts) before starting an app or running tests. `auth-service` has no build step (Bun runs TS directly). Heimdall (`apps/heimdall`) builds with its own Vite + esbuild pipeline (`bun run build:app:heimdall` or `cd apps/heimdall && bun run build`).
 
 ### Lint / format caveats (pre-existing)
 
@@ -57,7 +58,12 @@ Apps import the **built** `dist/` of `@pocket-dimension/{auth,db,utils}`. Run `b
 
 ### BMAD
 
-Default artifacts and brownfield docs: `_bmad-output/pocket-dimension/` (start at `index.md`). Existing app-only trees: `_bmad-output/zeo/`, `_bmad-output/chhan-chhan/`. Do not write knowledge to a repo-root `docs/` folder.
+Default artifacts and brownfield docs: `_bmad-output/pocket-dimension/` (start at `index.md`). Existing app-only trees: `_bmad-output/zeo/`, `_bmad-output/chhan-chhan/`. Heimdall War Room app: `apps/heimdall` (`@pocket-dimension/heimdall`); product SoR lands under `_bmad-output/heimdall/` incrementally (Part 2 of the port). Do not write knowledge to a repo-root `docs/` folder.
+
+```bash
+bun run heimdall doctor   # Soft-empty warnings OK until BMAD paths exist
+bun run heimdall dev      # or: bun run dev:app:heimdall — UI default http://127.0.0.1:5174/heimdall/
+```
 
 ### Auth session caveat (local browser)
 
