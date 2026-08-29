@@ -27,13 +27,13 @@ bun run heimdall doctor
 bun run dev
 ```
 
-Open the printed UI URL (default `http://127.0.0.1:5174/heimdall/`).
+Open the printed UI URL (default `http://127.0.0.1:5174/` — site root).
 
 ## Production
 
 ```bash
 bun run build:app:heimdall   # from monorepo root
-cd apps/heimdall && bun run start   # http://127.0.0.1:3012/heimdall/
+cd apps/heimdall && bun run start   # http://127.0.0.1:3012/
 ```
 
 Deploy (Dokploy Dockerfile / Railpack): see [DEPLOY.md](./DEPLOY.md). Env knobs: [.env.example](./.env.example).
@@ -46,8 +46,9 @@ See [docs/AUTHORING.md](./docs/AUTHORING.md) for Soft-empty, doctor, Features/De
 
 Product knobs live in `heimdall.config.mjs` at the monorepo root.
 
-- `runtime.heimdallPath` default `/heimdall`
+- `runtime.heimdallPath` — Pocket Dimension uses `"/"` (site root); package default for embeds is `/heimdall`
 - Modules map to `_bmad-output/<tree>/` paths
+- API under production: `/dev-api/*`
 
 ## v1 pages
 

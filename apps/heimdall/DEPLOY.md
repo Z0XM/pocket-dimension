@@ -25,7 +25,7 @@ Same monorepo context rules as other apps — see [DEPLOY.md](../../DEPLOY.md).
 | Dockerfile Path | `Dockerfile` |
 | Port | `3012` |
 
-War Room URL after deploy: `https://<host>/heimdall/` (root `/` redirects there).
+War Room URL after deploy: `https://<host>/` (site root — not `/heimdall`).
 
 ## Alternative: Railpack
 
@@ -54,13 +54,14 @@ HOST=0.0.0.0
 HEIMDALL_REPO_ROOT=/app
 ```
 
-Optional:
+Optional (only if you need a path prefix again):
 
 ```env
-# Override mount / public base when Traefik uses a path prefix
 HEIMDALL_MOUNT_PATH=/heimdall
 HEIMDALL_BASE_PATH=/heimdall
 ```
+
+Pocket Dimension defaults to site root via `heimdall.config.mjs` (`runtime.heimdallPath: "/"`). API lives at `/dev-api/*`.
 
 No `BETTER_AUTH_*`, `DATABASE_URL`, or `RESEND_API_KEY` — Heimdall is standalone docs UI.
 
@@ -71,7 +72,7 @@ From monorepo root:
 ```bash
 ./apps/heimdall/scripts/deploy-build.sh
 cd apps/heimdall && bun run start
-# open http://127.0.0.1:3012/heimdall/
+# open http://127.0.0.1:3012/
 ```
 
 Or Docker:

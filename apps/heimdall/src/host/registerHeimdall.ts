@@ -3,7 +3,7 @@ import { createReadStream, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { loadHeimdallConfig } from "../config/load.js";
-import { resolveEffectiveBasePath, resolveRepoRoot } from "../config/resolveBasePath.js";
+import { joinPublicPath, normalizeMountPath, resolveEffectiveBasePath, resolveRepoRoot } from "../config/resolveBasePath.js";
 import type { HeimdallConfig } from "../config/schema.js";
 import { packageRoot } from "../lib/packageRoot.js";
 import { handleApiRequest, preloadDashboard, preloadDocsAsync, rebuildDashboard } from "../../server/apiState.js";
@@ -12,12 +12,13 @@ import { setRunnerAdapter, type RunnerAdapter } from "../../server/runners.js";
 
 export type RegisterHeimdallOptions = {
   /**
-   * Browser-facing effective public base (e.g. `/my-app/heimdall`).
+   * Browser-facing effective public base (e.g. `/my-app/heimdall`, or `""` / `/` for site root).
    * When omitted, resolved from config (`basePath` / `basePathFromEnv` + `heimdallPath`).
    */
   basePath?: string;
   /**
-   * Fastify mount path (ingress-stripped). Defaults to config `heimdallPath` (`/heimdall`).
+   * Fastify mount path (ingress-stripped). Defaults to config `heimdallPath`.
+   * Use `"/"` or `""` to serve at site root.
    */
   mountPath?: string;
   /** Override cwd for config discovery. */
@@ -142,7 +143,8 @@ async function sendApi(request: FastifyRequest, reply: FastifyReply, apiPrefix: 
 }
 
 function isHeimdallUiPath(pathname: string, mountPath: string, apiPrefix: string): boolean {
-  if (pathname.startsWith(apiPrefix)) return false;
+  if (pathname === apiPrefix || pathname.startsWith(`${apiPrefix}/`)) return false;
+  if (!mountPath) return true;
   return pathname === mountPath || pathname.startsWith(`${mountPath}/`);
 }
 
@@ -150,6 +152,7 @@ function isHeimdallUiPath(pathname: string, mountPath: string, apiPrefix: string
  * Embed Heimdall War Room on a Fastify host.
  * Fastify routes use `mountPath` (no host deploy prefix). Browser SPA uses
  * resolved effective `basePath` (host may join its deploy prefix via config).
+ * Empty `mountPath` / `basePath` means site root (`/`).
  */
 export async function registerHeimdall(
   app: FastifyInstance,
@@ -158,9 +161,9 @@ export async function registerHeimdall(
   const cwd = options.cwd ?? process.cwd();
   const { config, configDir } = await loadHeimdallConfig(cwd);
   const repoRoot = resolveRepoRoot(config, cwd, configDir);
-  const mountPath = (options.mountPath ?? config.runtime.heimdallPath ?? "/heimdall").replace(/\/$/, "") || "/heimdall";
+  const mountPath = normalizeMountPath(options.mountPath ?? config.runtime.heimdallPath);
 
-  const basePath = options.basePath != null && options.basePath !== "" ? options.basePath.replace(/\/$/, "") : resolveEffectiveBasePath(config);
+  const basePath = options.basePath != null ? normalizeMountPath(options.basePath, "") : resolveEffectiveBasePath(config);
 
   // Ensure runtime uses the resolved repo root even if env was empty.
   process.env.HEIMDALL_REPO_ROOT = repoRoot;
@@ -175,14 +178,15 @@ export async function registerHeimdall(
   preloadDashboard();
   preloadDocsAsync();
 
-  const apiPrefix = `${mountPath}/dev-api`;
+  const publicBase = basePath || mountPath;
+  const apiPrefix = joinPublicPath(mountPath, "/dev-api");
   const viteProxy = options.viteProxy ?? process.env.HEIMDALL_VITE_PROXY === "1";
   const viteUrl = options.viteUrl ?? process.env.HEIMDALL_VITE_URL ?? "http://127.0.0.1:5176";
   const distDir = options.distDir ?? path.join(packageRoot(), "dist", "ui");
 
   const runtime = {
-    basePath: basePath || mountPath,
-    dashboardApiBase: `${basePath || mountPath}/dev-api`,
+    basePath: publicBase,
+    dashboardApiBase: joinPublicPath(publicBase, "/dev-api"),
     apiDocsPath: options.links?.apiDocs !== undefined ? options.links.apiDocs : config.links.apiDocs,
     samplePath: options.links?.sample !== undefined ? options.links.sample : config.links.sample,
     pages: {
@@ -195,7 +199,9 @@ export async function registerHeimdall(
 
   app.addHook("onRoute", (routeOptions) => {
     const url = routeOptions.url;
-    if (typeof url === "string" && (url === mountPath || url.startsWith(`${mountPath}/`))) {
+    if (typeof url !== "string") return;
+    const hide = !mountPath || url === mountPath || url.startsWith(`${mountPath}/`) || url === apiPrefix || url.startsWith(`${apiPrefix}/`);
+    if (hide) {
       routeOptions.schema = {
         ...(routeOptions.schema ?? {}),
         hide: true,
@@ -227,8 +233,8 @@ export async function registerHeimdall(
     const httpProxy = (await import("@fastify/http-proxy")).default;
     await app.register(httpProxy, {
       upstream: viteUrl,
-      prefix: mountPath,
-      rewritePrefix: mountPath,
+      prefix: mountPath || "/",
+      rewritePrefix: mountPath || "/",
       websocket: true,
       preValidation: async (request: FastifyRequest, reply: FastifyReply) => {
         const pathname = request.url.split("?")[0] ?? "";
@@ -237,7 +243,7 @@ export async function registerHeimdall(
         }
       },
     });
-    app.log.info({ upstream: viteUrl, mountPath }, "Heimdall proxied to Vite");
+    app.log.info({ upstream: viteUrl, mountPath: mountPath || "/" }, "Heimdall proxied to Vite");
     return { basePath: runtime.basePath, mountPath, config };
   }
 
@@ -252,12 +258,15 @@ export async function registerHeimdall(
     return reply.type("text/html; charset=utf-8").send(injectHeimdallIndexHtml(raw, runtime));
   }
 
-  app.get(mountPath, async (_req, reply) => reply.redirect(`${mountPath}/`));
+  const staticPrefix = mountPath ? `${mountPath}/` : "/";
+  if (mountPath) {
+    app.get(mountPath, async (_req, reply) => reply.redirect(`${mountPath}/`));
+  }
 
   await app.register(async (instance) => {
     await instance.register(fastifyStatic, {
       root: distDir,
-      prefix: `${mountPath}/`,
+      prefix: staticPrefix,
       decorateReply: false,
       index: false,
     });
@@ -274,10 +283,10 @@ export async function registerHeimdall(
     });
   });
 
-  // Explicit SPA index for `/heimdall/`
-  app.get(`${mountPath}/`, async (_req, reply) => sendIndex(reply));
+  // Explicit SPA index for mount root (`/` or `/heimdall/`)
+  app.get(mountPath ? `${mountPath}/` : "/", async (_req, reply) => sendIndex(reply));
 
-  app.log.info({ mountPath, basePath: runtime.basePath, distDir }, "Heimdall War Room registered");
+  app.log.info({ mountPath: mountPath || "/", basePath: runtime.basePath || "/", distDir }, "Heimdall War Room registered");
 
   return { basePath: runtime.basePath, mountPath, config };
 }
@@ -298,10 +307,10 @@ export function buildHeimdallRuntimeConfig(
   uiStoragePrefix: string;
   defaultTheme: "dark" | "light";
 } {
-  const base = basePath.replace(/\/$/, "") || "/heimdall";
+  const base = normalizeMountPath(basePath, "");
   return {
     basePath: base,
-    dashboardApiBase: `${base}/dev-api`,
+    dashboardApiBase: joinPublicPath(base, "/dev-api"),
     apiDocsPath: config.links.apiDocs,
     samplePath: config.links.sample,
     pages: {

@@ -33,14 +33,14 @@ export function getRepoRoot(): string {
 }
 
 export function getEffectiveBasePath(): string {
-  if (process.env.HEIMDALL_BASE_PATH != null && process.env.HEIMDALL_BASE_PATH !== "") {
-    return process.env.HEIMDALL_BASE_PATH.replace(/\/$/, "");
+  if (process.env.HEIMDALL_BASE_PATH != null) {
+    return process.env.HEIMDALL_BASE_PATH.replace(/\/$/, "") || "";
   }
   if (cachedBasePath != null) return cachedBasePath;
   if (cachedConfig) {
     return resolveEffectiveBasePath(cachedConfig, { basePath: explicitBasePath });
   }
-  return "/heimdall";
+  return "";
 }
 
 export function tryGetConfig(): HeimdallConfig | null {

@@ -31,7 +31,7 @@ bun run build:app:heimdall
 Production (after build):
 
 ```bash
-cd apps/heimdall && bun run start   # PORT=3012, Fastify + dist/ui
+cd apps/heimdall && bun run start   # PORT=3012, Fastify + dist/ui at /
 ```
 
 Deploy artifacts: `Dockerfile`, `railpack.json`, `scripts/deploy-build.sh`, `DEPLOY.md`, `.env.example`.
@@ -42,7 +42,7 @@ CLI `dev` / `build` resolve the Vite binary with `src/lib/resolveViteBin.ts` (ne
 
 - Product settings in repo-root `heimdall.config.ts` / `.mjs` — not Heimdall-specific env product APIs
 - **No hardcoded host env names** (e.g. `APP_BASE_PATH`) in this app; effective base via `runtime.basePath`, `registerHeimdall({ basePath })`, or optional consumer-named `runtime.basePathFromEnv`
-- Default mount segment `/heimdall`
+- Default mount segment `/heimdall` (package default); Pocket Dimension dogfood uses `heimdallPath: "/"` (site root)
 - Optional Tests page when `pages.tests` (RunnerAdapter for runs)
 - `pages.testLevels` gates which levels appear (omit = all; dogfood may use `["L1"]`)
 - Standalone `heimdall dev` wires a Vitest-only **dogfood** `RunnerAdapter` (`server/dogfoodVitestRunner.ts`). Omitting runners → `available: false`. L5/UI stays unavailable in dogfood.

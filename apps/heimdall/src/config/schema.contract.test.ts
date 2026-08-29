@@ -74,6 +74,11 @@ describe("heimdall config contract", () => {
     expect(resolveEffectiveBasePath(cfg, { env: {} })).toBe("/my-app/heimdall");
   });
 
+  it("resolveEffectiveBasePath treats heimdallPath / as site root", () => {
+    const cfg = defineConfig({ runtime: { heimdallPath: "/" } });
+    expect(resolveEffectiveBasePath(cfg)).toBe("");
+  });
+
   it("accepts modules[].idPrefix for display labels", () => {
     const cfg = defineConfig({
       modules: [
