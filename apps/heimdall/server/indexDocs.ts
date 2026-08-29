@@ -134,10 +134,18 @@ export function indexDocs(repoRoot: string, config: HeimdallConfig): DocCatalog 
     walkDocs(abs, abs, extra.replace(/\/$/, ""), docs, config.docs.ignoreGlobs);
   }
 
-  docs.sort((a, b) => a.path.localeCompare(b.path));
+  // docsRoot often nests under an extraRoot (e.g. _bmad-output/pocket-dimension + _bmad-output).
+  // Keep first occurrence so MiniSearch ids (paths) stay unique.
+  const seen = new Set<string>();
+  const unique = docs.filter((doc) => {
+    if (seen.has(doc.path)) return false;
+    seen.add(doc.path);
+    return true;
+  });
+  unique.sort((a, b) => a.path.localeCompare(b.path));
 
   return {
-    docs,
+    docs: unique,
     generatedAt: new Date().toISOString(),
   };
 }
