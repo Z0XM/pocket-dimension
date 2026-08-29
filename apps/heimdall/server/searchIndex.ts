@@ -28,7 +28,14 @@ export class DocSearchIndex {
 
   rebuild(documents: SearchDocument[]): void {
     this.index.removeAll();
-    this.index.addAll(documents);
+    const seen = new Set<string>();
+    const unique: SearchDocument[] = [];
+    for (const doc of documents) {
+      if (seen.has(doc.id)) continue;
+      seen.add(doc.id);
+      unique.push(doc);
+    }
+    this.index.addAll(unique);
   }
 
   search(query: string, limit = 30): SearchResult[] {

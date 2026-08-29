@@ -67,9 +67,16 @@ export function rebuildDocs(): DocCatalog {
 async function ensureDocsIndex(): Promise<void> {
   if (docsIndexReady && docCatalogCache) return;
   if (!docsIndexPromise) {
-    docsIndexPromise = Promise.resolve().then(() => {
-      rebuildDocs();
-    });
+    docsIndexPromise = Promise.resolve()
+      .then(() => {
+        rebuildDocs();
+      })
+      .catch((err) => {
+        // Allow a later request to retry after a transient index failure.
+        docsIndexPromise = null;
+        docsIndexReady = false;
+        throw err;
+      });
   }
   await docsIndexPromise;
 }
