@@ -83,7 +83,11 @@ docker run --rm -p 3012:3012 heimdall
 
 ## Troubleshooting
 
-**`"/_bmad-output": not found` / missing `heimdall.config.mjs` during Docker build**
+**`"/_bmad-output": not found` during Docker build**
+
+Root `.dockerignore` must **not** exclude `_bmad-output` (Heimdall ships BMAD trees in the image). Also ensure Build Path is `/` with Context `.` (or Context `/` if Build Path is `apps/heimdall`).
+
+**`"/shared": not found` / `"/turbo.json": not found` during Docker build**
 
 Build Path is `apps/heimdall` but Docker Context Path is `.`. Use Option A or set Context Path to **`/`**.
 
