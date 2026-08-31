@@ -95,9 +95,8 @@ export default {
       enabled: true,
       idPrefix: "CC",
       basePath: "_bmad-output/chhan-chhan",
-      paths: {
-        epics: [{ path: "planning-artifacts/epics.md", parser: "bmad-output" }],
-      },
+      // No epics.md yet — omit Delivery paths until authored
+      paths: {},
     },
   ],
   docs: {
