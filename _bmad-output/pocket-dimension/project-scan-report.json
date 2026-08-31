@@ -2,15 +2,21 @@
   "workflow_version": "1.2.0",
   "timestamps": {
     "started": "2026-08-31T19:12:18Z",
-    "last_updated": "2026-08-31T19:20:00Z"
+    "last_updated": "2026-08-31T19:55:44Z"
   },
-  "mode": "full_rescan",
-  "scan_level": "deep",
+  "mode": "deep_dive",
+  "scan_level": "exhaustive",
   "project_root": "/workspace",
   "project_knowledge": "/workspace/_bmad-output/pocket-dimension",
   "heimdall_modules_layout": true,
   "scope": {
-    "include": ["monorepo", "monorepo-tools", "shared-utils", "shared-db", "shared-auth"],
+    "include": [
+      "monorepo",
+      "monorepo-tools",
+      "shared-utils",
+      "shared-db",
+      "shared-auth"
+    ],
     "exclude_apps": true,
     "note": "Apps deferred; existing zeo/chhan-chhan trees untouched"
   },
@@ -32,14 +38,49 @@
       "status": "completed",
       "timestamp": "2026-08-31T19:20:00Z",
       "summary": "Wrote monorepo + tools docs under pocket-dimension; package docs under shared-*"
+    },
+    {
+      "step": "step_13a",
+      "status": "completed",
+      "timestamp": "2026-08-31T19:29:35Z",
+      "summary": "Selected deep-dive target apps/watchlist (user request: complete brownfield of watchlist via BMAD skills)"
+    },
+    {
+      "step": "step_13e_13f",
+      "status": "completed",
+      "timestamp": "2026-08-31T19:55:44Z",
+      "summary": "Wrote watchlist module docs + deep-dive; linked from pocket-dimension index; wired heimdall module"
     }
   ],
   "current_step": "complete",
   "project_types": [
-    { "part_id": "monorepo-tools", "project_type_id": "infra", "display_name": "Monorepo tooling", "root_path": "." },
-    { "part_id": "shared-utils", "project_type_id": "library", "display_name": "@pocket-dimension/utils", "root_path": "shared/utils", "bmad": "_bmad-output/shared-utils" },
-    { "part_id": "shared-db", "project_type_id": "library", "display_name": "@pocket-dimension/db", "root_path": "shared/db", "bmad": "_bmad-output/shared-db" },
-    { "part_id": "shared-auth", "project_type_id": "library", "display_name": "@pocket-dimension/auth", "root_path": "shared/auth", "bmad": "_bmad-output/shared-auth" }
+    {
+      "part_id": "monorepo-tools",
+      "project_type_id": "infra",
+      "display_name": "Monorepo tooling",
+      "root_path": "."
+    },
+    {
+      "part_id": "shared-utils",
+      "project_type_id": "library",
+      "display_name": "@pocket-dimension/utils",
+      "root_path": "shared/utils",
+      "bmad": "_bmad-output/shared-utils"
+    },
+    {
+      "part_id": "shared-db",
+      "project_type_id": "library",
+      "display_name": "@pocket-dimension/db",
+      "root_path": "shared/db",
+      "bmad": "_bmad-output/shared-db"
+    },
+    {
+      "part_id": "shared-auth",
+      "project_type_id": "library",
+      "display_name": "@pocket-dimension/auth",
+      "root_path": "shared/auth",
+      "bmad": "_bmad-output/shared-auth"
+    }
   ],
   "findings": {
     "repository_type": "monorepo",
@@ -62,7 +103,21 @@
     "project-parts.json",
     "../shared-utils/*",
     "../shared-db/*",
-    "../shared-auth/*"
+    "../shared-auth/*",
+    "../watchlist/index.md",
+    "../watchlist/deep-dive-watchlist.md",
+    "../watchlist/api-contracts.md",
+    "../watchlist/architecture.md"
   ],
-  "resume_instructions": "Scan complete for monorepo/tools/packages scope. Next: app deep-dives when requested."
+  "resume_instructions": "Watchlist deep-dive complete. Offer more deep-dives or finish.",
+  "deep_dive_targets": [
+    {
+      "target_name": "watchlist",
+      "target_path": "apps/watchlist",
+      "files_analyzed": "routes+helpers+feature+api+config (exhaustive)",
+      "output_file": "_bmad-output/watchlist/deep-dive-watchlist.md",
+      "module_docs": "_bmad-output/watchlist/",
+      "timestamp": "2026-08-31T19:55:44Z"
+    }
+  ]
 }

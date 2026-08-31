@@ -22,21 +22,28 @@ Cross-cutting SoR for the Bun + Turbo monorepo. Package knowledge lives in peer 
 | [project-parts.json](./project-parts.json) | Machine-readable part list |
 | [project-scan-report.json](./project-scan-report.json) | Scan state |
 
-## Peer modules documented this scan
+## Peer modules
 
 | Module folder | Scope |
 | --- | --- |
 | [`../shared-utils/`](../shared-utils/) | `@pocket-dimension/utils` — full library brownfield |
 | [`../shared-db/`](../shared-db/) | `@pocket-dimension/db` — schemas, migrations, client |
 | [`../shared-auth/`](../shared-auth/) | `@pocket-dimension/auth` — Better Auth config |
+| [`../watchlist/`](../watchlist/) | `apps/watchlist` — exhaustive deep-dive + brownfield (2026-08-31) |
 
-## Existing app trees (not rescanned here)
+## Existing app trees
 
 | Module | Notes |
 | --- | --- |
 | [`../zeo/`](../zeo/) | Product SoR kept |
 | [`../chhan-chhan/`](../chhan-chhan/) | Product SoR kept |
 | [`../heimdall/`](../heimdall/) | Product SoR incremental / Soft-empty |
+
+## Deep-Dive Documentation
+
+Detailed exhaustive analysis of specific areas:
+
+- [watchlist Deep-Dive](../watchlist/deep-dive-watchlist.md) — Comprehensive analysis of `apps/watchlist` (routes, APIs, data-table, feature UI) — Generated 2026-08-31
 
 ## Planning & delivery in this tree
 

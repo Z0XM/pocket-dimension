@@ -11,7 +11,7 @@
     { "part_id": "shared-db", "root_path": "shared/db", "project_type_id": "library", "bmad": "_bmad-output/shared-db" },
     { "part_id": "shared-auth", "root_path": "shared/auth", "project_type_id": "library", "bmad": "_bmad-output/shared-auth" },
     { "part_id": "auth-service", "root_path": "apps/auth-service", "project_type_id": "backend", "bmad": null },
-    { "part_id": "watchlist", "root_path": "apps/watchlist", "project_type_id": "web", "bmad": null },
+    { "part_id": "watchlist", "root_path": "apps/watchlist", "project_type_id": "web", "bmad": "_bmad-output/watchlist" },
     { "part_id": "rhymes", "root_path": "apps/rhymes", "project_type_id": "web", "bmad": null },
     { "part_id": "howwasyourday", "root_path": "apps/howwasyourday", "project_type_id": "web", "bmad": null },
     { "part_id": "chhan-chhan", "root_path": "apps/chhan-chhan", "project_type_id": "web", "bmad": "_bmad-output/chhan-chhan" },

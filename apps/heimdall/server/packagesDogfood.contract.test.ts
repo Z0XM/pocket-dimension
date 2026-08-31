@@ -47,6 +47,7 @@ describe("pocket-dimension Heimdall dogfood config", () => {
         "shared-utils",
         "shared-db",
         "shared-auth",
+        "watchlist",
         "heimdall",
         "zeo",
         "chhan-chhan",

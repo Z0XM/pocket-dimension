@@ -54,14 +54,18 @@ Layout contract: **Modules mode** — peer folders under `_bmad-output/` (monore
 4. Wired modules in `heimdall.config.mjs` (omit FR keys until SoT exists)
 5. Scan state: `_bmad-output/pocket-dimension/project-scan-report.json` (2026-08-31 deep, scoped)
 
-### Part 2b — Remaining (later)
+### Part 2b — Apps (incremental)
+
+- **watchlist** — DONE (2026-08-31): `_bmad-output/watchlist/` exhaustive deep-dive + full brownfield module docs; wired in `heimdall.config.mjs`
+
+### Part 2c — Remaining (later)
 
 1. Choose next app tree(s) / Heimdall product SoR
 2. Land under `_bmad-output/<tree>/`
 3. Wire `heimdall.config.mjs` as each tree becomes real
 4. Repeat
 
-Still open: `_bmad-output/heimdall/` product SoR, undocumented apps (watchlist, rhymes, …), optional FR files.
+Still open: `_bmad-output/heimdall/` product SoR, undocumented apps (rhymes, auth-service, …), optional FR files.
 
 ## Part 3 — Final sanity (after chosen BMAD slices + relocate)
 

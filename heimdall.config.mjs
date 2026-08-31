@@ -63,6 +63,15 @@ export default {
       paths: {},
     },
     {
+      id: "watchlist",
+      label: "watchlist",
+      enabled: true,
+      idPrefix: "WL",
+      basePath: "_bmad-output/watchlist",
+      // Brownfield complete; no FR/epics yet
+      paths: {},
+    },
+    {
       id: "heimdall",
       label: "Heimdall",
       enabled: true,
