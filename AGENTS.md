@@ -58,7 +58,16 @@ Apps import the **built** `dist/` of `@pocket-dimension/{auth,db,utils}`. Run `b
 
 ### BMAD
 
-Default artifacts and brownfield docs: `_bmad-output/pocket-dimension/` (start at `index.md`). Existing app-only trees: `_bmad-output/zeo/`, `_bmad-output/chhan-chhan/`. Heimdall War Room app: `apps/heimdall` (`@pocket-dimension/heimdall`); product SoR lands under `_bmad-output/heimdall/` incrementally (Part 2 of the port). Do not write knowledge to a repo-root `docs/` folder.
+Heimdall **Modules** layout — peer folders under `_bmad-output/` (see `_bmad-output/README.md`):
+
+| Folder | Scope |
+| --- | --- |
+| `pocket-dimension/` | Monorepo cross-cutting (start at `index.md`) |
+| `shared-utils/` · `shared-db/` · `shared-auth/` | Shared packages |
+| `zeo/` · `chhan-chhan/` | Existing app SoRs |
+| `heimdall/` | Heimdall product SoR (incremental) |
+
+War Room app: `apps/heimdall`. Do not write BMAD knowledge to a repo-root `docs/` folder.
 
 ```bash
 bun run heimdall doctor   # Soft-empty warnings OK until BMAD paths exist

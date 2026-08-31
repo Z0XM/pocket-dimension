@@ -44,14 +44,23 @@ Heimdall lives at `apps/heimdall`. Soft-empty MISSING BMAD paths remain until in
 
 Do **not** run a full `bmad-document-project` refresh of the entire monorepo in one go.
 
-Instead:
+Layout contract: **Modules mode** — peer folders under `_bmad-output/` (monorepo + packages + apps). See `_bmad-output/README.md` and `apps/heimdall/docs/AUTHORING.md`.
 
-1. Choose which module(s) / trees to document first (e.g. Heimdall SoR only, or one app like dashboard / zeo)
-2. Land that slice under the right `_bmad-output/<tree>/`
-3. Wire / Soft-empty via `heimdall.config.mjs` modules as each tree becomes real
-4. Repeat for the next chosen tree when ready
+### Part 2a — Base + monorepo + packages — DONE (this slice)
 
-Candidate trees (decide order later): `_bmad-output/heimdall/` (Heimdall product SoR), existing `pocket-dimension` / `zeo` / `chhan-chhan`, plus any not-yet-documented apps.
+1. Deleted disposable flat brownfield dumps under `pocket-dimension/` (kept real planning/implementation artifacts)
+2. Rewrote monorepo module docs (`_bmad-output/pocket-dimension/`)
+3. Added package modules: `shared-utils`, `shared-db`, `shared-auth`
+4. Wired modules in `heimdall.config.mjs` (omit FR keys until SoT exists)
+
+### Part 2b — Remaining (later)
+
+1. Choose next app tree(s) / Heimdall product SoR
+2. Land under `_bmad-output/<tree>/`
+3. Wire `heimdall.config.mjs` as each tree becomes real
+4. Repeat
+
+Still open: `_bmad-output/heimdall/` product SoR, undocumented apps (watchlist, rhymes, …), optional FR files.
 
 ## Part 3 — Final sanity (after chosen BMAD slices + relocate)
 

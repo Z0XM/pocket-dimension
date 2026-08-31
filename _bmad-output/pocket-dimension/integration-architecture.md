@@ -1,85 +1,41 @@
-# Integration Architecture
+# Integration Architecture — Pocket Dimension
 
-## Overview
-
-```
-Browser
-  ├─ SvelteKit apps (3002–3008)
-  │    ├─ hooks.server.ts → @pocket-dimension/auth (session cookies)
-  │    ├─ createAuthClient → PUBLIC_BASE_AUTH_URL (auth-service :5001)
-  │    └─ server loaders/actions → @pocket-dimension/db → PostgreSQL 18
-  ├─ rhymes / markitdown / pocket — no auth-service, no shared DB
-  └─ zeo browser also ↔ wss LiveKit SFU
-
-auth-service (:5001)
-  └─ @pocket-dimension/auth → Better Auth → @pocket-dimension/db → auth.*
-
-zeo (:3008)
-  ├─ LiveKit RoomService + webhooks
-  └─ MUSIC_WORKER_URL (:3010)  ↔  zeo-music-worker (yt-dlp / ffmpeg / rtc-node)
-```
+How monorepo parts talk. Package internals: `_bmad-output/shared-*`.
 
 ## Integration points
 
-| From | To | Type | Details |
+| From | To | Type | Notes |
 | --- | --- | --- | --- |
-| Any auth app (browser) | auth-service | REST + cookies | Sign-up/in, session, password reset, verification. `PUBLIC_BASE_AUTH_URL` + `PUBLIC_BASE_AUTH_PATH` |
-| Any auth app (SSR) | shared-auth | In-process | `auth.api.getSession` + `svelteKitHandler` in `hooks.server.ts` |
-| Any DB app | shared-db | In-process | Drizzle `db` + `schema` |
-| shared-auth | shared-db | In-process | `drizzleAdapter(db, { provider: "pg" })` |
-| shared-auth / auth-service | Resend | HTTPS | Verification, reset, magic-link emails (fire-and-forget) |
-| All DB tables | auth.user | FK | Cascade delete on user removal |
-| zeo | LiveKit | JWT + RoomService + webhooks | Token mint, occupancy, screen-share mute, room finished |
-| zeo | zeo-music-worker | REST + shared secret | `MUSIC_WORKER_SECRET`; bot token, play/pause/seek, worker events |
-| zeo-music-worker | zeo | REST + Bearer | `/api/internal/listening/*` |
-| zeo | Google / YouTube | OAuth + Data API | Shared listening linker account |
-| pocket | sibling apps | Links only | Env URLs; no API proxy |
-| markitdown | Python markitdown | `Bun.spawn` | `python/convert.py`; ffmpeg + exiftool |
-| howwasyourday | Web Push | VAPID | `node-cron` scheduler in hooks |
+| Auth-backed apps (browser) | auth-service | REST + cookies | `PUBLIC_BASE_AUTH_URL` (default `:5001`) |
+| Auth-backed apps (server) | `@pocket-dimension/auth` | in-process | `getSession` + `svelteKitHandler` |
+| Auth-backed apps | `@pocket-dimension/db` | in-process Drizzle | Named schemas per app |
+| auth-service | `@pocket-dimension/auth` + `db` | in-process | Owns HTTP auth surface |
+| shared-auth | shared-db | in-process | Drizzle adapter |
+| shared-db / auth | shared-utils | in-process | `validateEnv` |
+| zeo | LiveKit | JWT + RoomService + webhooks | Self-hosted SFU |
+| zeo | zeo-music-worker | REST + shared secret | Internal worker |
+| pocket | sibling apps | env URL links | Hub only |
+| Heimdall | `_bmad-output/` | filesystem parse | Soft-empty on missing paths |
 
-## Auth cookie contract
+## Auth flow (happy path)
 
-Better Auth cookies: prefix `better-auth`, `secure: true`, `httpOnly: true`, `sameSite: "none"`, optional `BETTER_AUTH_COOKIE_DOMAIN` for subdomains.
+1. Browser hits SvelteKit app; unauthenticated routes may redirect to sign-in.
+2. Client auth SDK talks to **auth-service**, not the SvelteKit origin, for credential/session APIs.
+3. Cookies: `secure` + `sameSite: "none"` + `cookiePrefix: "better-auth"` — localhost HTTP often drops them.
+4. Server hooks resolve session via shared `auth` against the same DB/session tables.
+5. App data queries use `db` / `schema` in the app’s named PostgreSQL schema; `auth.user` is shared.
 
-`BETTER_AUTH_SECRET` **must be identical** on auth-service and every frontend that imports `@pocket-dimension/auth`. `BETTER_AUTH_TRUSTED_ORIGINS` must list every frontend origin.
+## Data boundaries
 
-Local caveat: browsers often **will not persist** these cookies on plain `http://localhost`. Signup can work; a logged-in session may not stick.
+- One Postgres database; **no** dumping app tables into `public`.
+- FK-style references to `auth.user` via shared helpers (`actionsByUser` in `shared/db`).
+- Migrations owned solely by `@pocket-dimension/db` (`bun run db:migrate`).
 
-## Shared package build contract
+## Secrets that must align
 
-Apps import **built** `dist/` of `@pocket-dimension/{auth,db,utils}`. Order: utils → db → auth. `auth-service` itself has no compile step (Bun runs TS).
-
-## Capacity / policy (zeo)
-
-| Rule | Where enforced |
+| Variable | Where |
 | --- | --- |
-| Max 2 concurrent rooms (operator-configurable) | `apps/zeo/src/lib/server/rooms.ts` |
-| Max 6 humans / room (bots excluded) | `room-occupancy.ts` + LiveKit API |
-| One screen share | Client + `POST …/screen-share/stop-active` |
-| Join requires login | `room/[slug]/+page.server.ts` + token API `requireUser` |
-| Create room: contributor or admin | `apps/zeo/src/lib/server/authz.ts` |
-
-## Port map
-
-| Service | Port | Conflict |
-| --- | --- | --- |
-| auth-service | 5001 | — |
-| watchlist | 3002 | — |
-| rhymes | 3003 | — |
-| howwasyourday | 3004 | — |
-| chhan-chhan | 3005 | — |
-| me-via-you | 3006 | — |
-| markitdown | 3009 | — |
-| pocket | 3007 | — |
-| zeo | 3008 | — |
-| zeo-music-worker | 3010 | Internal; no public domain in prod |
-
-## Data flow examples
-
-**Sign in:** browser → auth-service `POST /sign-in/email` → Set-Cookie → later SSR `getSession` on the app.
-
-**Watchlist row:** `+page.server.ts` / `GET /api/watchlist` → Drizzle/Kysely against `watchlist.*`.
-
-**zeo join:** login → `POST /api/rooms/:slug/token` → LiveKit JWT → `livekit-client.connect(PUBLIC_LIVEKIT_URL)`.
-
-**Shared listening:** zeo starts session → worker `POST /jobs/play` → worker mints bot token from zeo → publishes audio track on LiveKit.
+| `DATABASE_URL` | db package, auth-service, auth-backed apps |
+| `BETTER_AUTH_SECRET` | auth package importers (must be identical) |
+| `RESEND_API_KEY` | non-empty anywhere auth package loads |
+| `PUBLIC_BASE_AUTH_URL` | frontend public env → auth-service |

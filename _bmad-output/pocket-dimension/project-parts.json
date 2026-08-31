@@ -1,28 +1,23 @@
 {
   "repository_type": "monorepo",
-  "scan_level": "deep",
-  "scanned": "2026-08-23",
+  "heimdall_modules_layout": true,
+  "refreshed": "2026-08-31",
+  "monorepo_module": "pocket-dimension",
   "parts": [
-    { "part_id": "shared-utils", "root_path": "shared/utils", "project_type_id": "library" },
-    { "part_id": "shared-db", "root_path": "shared/db", "project_type_id": "library" },
-    { "part_id": "shared-auth", "root_path": "shared/auth", "project_type_id": "library" },
-    { "part_id": "auth-service", "root_path": "apps/auth-service", "project_type_id": "backend" },
-    { "part_id": "watchlist", "root_path": "apps/watchlist", "project_type_id": "web" },
-    { "part_id": "rhymes", "root_path": "apps/rhymes", "project_type_id": "web" },
-    { "part_id": "howwasyourday", "root_path": "apps/howwasyourday", "project_type_id": "web" },
-    { "part_id": "chhan-chhan", "root_path": "apps/chhan-chhan", "project_type_id": "web" },
-    { "part_id": "me-via-you", "root_path": "apps/me-via-you", "project_type_id": "web" },
-    { "part_id": "markitdown", "root_path": "apps/markitdown", "project_type_id": "web" },
-    { "part_id": "pocket", "root_path": "apps/pocket", "project_type_id": "web" },
-    { "part_id": "zeo", "root_path": "apps/zeo", "project_type_id": "web" },
-    { "part_id": "zeo-music-worker", "root_path": "apps/zeo-music-worker", "project_type_id": "backend" }
-  ],
-  "integration_points": [
-    { "from": "auth-apps", "to": "auth-service", "type": "REST+cookies" },
-    { "from": "auth-apps", "to": "shared-auth", "type": "in-process session" },
-    { "from": "db-apps", "to": "shared-db", "type": "in-process Drizzle" },
-    { "from": "zeo", "to": "LiveKit", "type": "JWT+RoomService+webhooks" },
-    { "from": "zeo", "to": "zeo-music-worker", "type": "REST+shared-secret" },
-    { "from": "pocket", "to": "sibling-apps", "type": "env URL links" }
+    { "part_id": "shared-utils", "root_path": "shared/utils", "project_type_id": "library", "bmad": "_bmad-output/shared-utils" },
+    { "part_id": "shared-db", "root_path": "shared/db", "project_type_id": "library", "bmad": "_bmad-output/shared-db" },
+    { "part_id": "shared-auth", "root_path": "shared/auth", "project_type_id": "library", "bmad": "_bmad-output/shared-auth" },
+    { "part_id": "auth-service", "root_path": "apps/auth-service", "project_type_id": "backend", "bmad": null },
+    { "part_id": "watchlist", "root_path": "apps/watchlist", "project_type_id": "web", "bmad": null },
+    { "part_id": "rhymes", "root_path": "apps/rhymes", "project_type_id": "web", "bmad": null },
+    { "part_id": "howwasyourday", "root_path": "apps/howwasyourday", "project_type_id": "web", "bmad": null },
+    { "part_id": "chhan-chhan", "root_path": "apps/chhan-chhan", "project_type_id": "web", "bmad": "_bmad-output/chhan-chhan" },
+    { "part_id": "me-via-you", "root_path": "apps/me-via-you", "project_type_id": "web", "bmad": null },
+    { "part_id": "markitdown", "root_path": "apps/markitdown", "project_type_id": "web", "bmad": null },
+    { "part_id": "pocket", "root_path": "apps/pocket", "project_type_id": "web", "bmad": null },
+    { "part_id": "zeo", "root_path": "apps/zeo", "project_type_id": "web", "bmad": "_bmad-output/zeo" },
+    { "part_id": "zeo-music-worker", "root_path": "apps/zeo-music-worker", "project_type_id": "backend", "bmad": null },
+    { "part_id": "dashboard", "root_path": "apps/dashboard", "project_type_id": "web", "bmad": null },
+    { "part_id": "heimdall", "root_path": "apps/heimdall", "project_type_id": "web", "bmad": "_bmad-output/heimdall" }
   ]
 }

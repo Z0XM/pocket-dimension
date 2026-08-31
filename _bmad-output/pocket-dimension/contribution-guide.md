@@ -1,14 +1,28 @@
-# Contribution Guide
+# Contribution Guide — Pocket Dimension
 
-There is no root `CONTRIBUTING.md`. Conventions inferred from the repo:
+## Defaults
 
-- **Package manager:** Bun 1.3.5 workspaces + Turbo
-- **Format:** Prettier (root `format` / `format:check`; per-package `lint` is prettier-check)
-- **Types:** `bun run typecheck` where scripts exist
-- **Shared packages:** build `dist/` before running apps
-- **Schema changes:** only in `shared/db`, then generate + migrate
-- **Deploy:** from repo root; see `DEPLOY.md`
-- **BMAD:** default artifacts in `_bmad-output/pocket-dimension/`; do not put chhan-chhan or zeo-only specs here unless the work is monorepo-wide
-- **Secrets:** never commit `.env`
+- Match neighboring app patterns (SvelteKit hooks, env validation, named DB schemas).
+- Build shared packages before running or testing apps.
+- Prefer small, focused changes; do not invent parallel auth/DB stacks.
 
-Changesets exist (`.changeset/`) for versioning workspace packages.
+## BMAD placement
+
+| Change type | Artifact location |
+| --- | --- |
+| Monorepo-wide / rhymes–dashboard tracks already here | `_bmad-output/pocket-dimension/` |
+| Shared package | `_bmad-output/shared-{utils,db,auth}/` |
+| App-only | `_bmad-output/<app>/` |
+| Heimdall product | `_bmad-output/heimdall/` |
+
+Do not add competing Feature Registries under durable docs. Configure FR paths in `heimdall.config.mjs` only when real SoT files exist.
+
+## Versioning
+
+Changesets live in `.changeset/` for workspace package versioning when publishing matters.
+
+## Quality
+
+- `bun run typecheck` where defined
+- App tests: e.g. `apps/zeo` (`bun test src`), `apps/heimdall` (`bun run test`), chhan-chhan importers
+- Heimdall: Soft-empty missing BMAD paths — do not treat `heimdall doctor` MISSING warnings as ship-blockers
