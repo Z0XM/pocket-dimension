@@ -46,12 +46,13 @@ Do **not** run a full `bmad-document-project` refresh of the entire monorepo in 
 
 Layout contract: **Modules mode** — peer folders under `_bmad-output/` (monorepo + packages + apps). See `_bmad-output/README.md` and `apps/heimdall/docs/AUTHORING.md`.
 
-### Part 2a — Base + monorepo + packages — DONE (this slice)
+### Part 2a — Base + monorepo + packages — DONE
 
 1. Deleted disposable flat brownfield dumps under `pocket-dimension/` (kept real planning/implementation artifacts)
-2. Rewrote monorepo module docs (`_bmad-output/pocket-dimension/`)
-3. Added package modules: `shared-utils`, `shared-db`, `shared-auth`
+2. Rewrote monorepo module docs + deep brownfield for tools (`architecture-monorepo-tools.md`)
+3. Full package brownfield: `shared-utils`, `shared-db`, `shared-auth` (overview, architecture, data models, development guides, source trees)
 4. Wired modules in `heimdall.config.mjs` (omit FR keys until SoT exists)
+5. Scan state: `_bmad-output/pocket-dimension/project-scan-report.json` (2026-08-31 deep, scoped)
 
 ### Part 2b — Remaining (later)
 

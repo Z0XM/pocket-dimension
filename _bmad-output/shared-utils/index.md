@@ -2,11 +2,16 @@
 
 **Package:** `@pocket-dimension/utils`  
 **Code:** `shared/utils`  
-**Heimdall module id:** `shared-utils`
+**Heimdall module id:** `shared-utils`  
+**Scan:** Deep brownfield, 2026-08-31  
+**Type:** library
 
 | Doc | Use |
 | --- | --- |
 | [project-context.md](./project-context.md) | Agent rules |
-| [architecture.md](./architecture.md) | API and build |
+| [project-overview.md](./project-overview.md) | Purpose and consumers |
+| [architecture.md](./architecture.md) | Full public API |
+| [development-guide.md](./development-guide.md) | Build / typecheck / conventions |
+| [source-tree-analysis.md](./source-tree-analysis.md) | File layout |
 
-No Feature Registry or epics yet — omit those config keys (Soft-empty). Monorepo context: [`../pocket-dimension/`](../pocket-dimension/).
+No Feature Registry or epics — omit those config keys. Monorepo: [`../pocket-dimension/`](../pocket-dimension/).

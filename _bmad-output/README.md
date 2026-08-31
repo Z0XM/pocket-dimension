@@ -5,14 +5,16 @@ Heimdall runs in **Modules mode**. Each durable scope is a **peer folder** under
 ```
 _bmad-output/
   README.md                 # this file — layout contract
-  pocket-dimension/         # Monorepo module (cross-cutting SoR)
-  shared-utils/             # @pocket-dimension/utils
-  shared-db/                # @pocket-dimension/db
-  shared-auth/              # @pocket-dimension/auth
+  pocket-dimension/         # Monorepo module (cross-cutting + tools)
+  shared-utils/             # @pocket-dimension/utils (brownfield complete)
+  shared-db/                # @pocket-dimension/db (brownfield complete)
+  shared-auth/              # @pocket-dimension/auth (brownfield complete)
   zeo/                      # apps/zeo product SoR
   chhan-chhan/              # apps/chhan-chhan product SoR
   heimdall/                 # apps/heimdall product SoR (incremental)
 ```
+
+**Last deep scan (monorepo + tools + packages):** 2026-08-31 — see `pocket-dimension/project-scan-report.json`.
 
 Wire new scopes in root `heimdall.config.mjs` (`modules[].id` + `basePath`). Docs are indexed via `paths.docsRoot` + `docs.extraRoots: ["_bmad-output"]`.
 

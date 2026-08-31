@@ -1,46 +1,56 @@
 # Architecture — `@pocket-dimension/auth`
 
-## Purpose
-
-Shared Better Auth configuration used by auth-service (HTTP) and auth-backed app server hooks (session).
-
-## Stack
-
-| Item | Value |
-| --- | --- |
-| Library | better-auth |
-| Adapter | Drizzle → `@pocket-dimension/db` |
-| Email | Resend |
-| Plugins | `magicLink` (15m), `username` (3–20 alnum, lowercased) |
-
 ## Public API
 
-Only **`auth`** is exported from `shared/auth/src/index.ts`. Env and email helpers are internal.
+```ts
+import { auth } from "@pocket-dimension/auth";
+```
 
-## Config highlights
+Single export. `lib/env.ts` and `lib/emails.ts` are internal.
 
-- Email/password with verification required; reset token TTL 1h; auto sign-in after verify
-- Session: 30d `expiresIn`, 1d `updateAge`
-- Cookies: `secure`, `httpOnly`, `sameSite: "none"`, `useSecureCookies: true`, prefix `better-auth`, optional cross-subdomain via `BETTER_AUTH_COOKIE_DOMAIN`
-- Extra user field: `role` enum with default `user`
-- Eager env at import: secrets, trusted origins, Resend key/from
+## Better Auth config (`src/index.ts`)
+
+| Area | Setting |
+| --- | --- |
+| baseURL / basePath | from env |
+| trustedOrigins | comma-split `BETTER_AUTH_TRUSTED_ORIGINS` |
+| Database | `drizzleAdapter(db, { provider: "pg" })` |
+| generateId | `false` (DB uuidv7) |
+| User field `role` | enum, default `user`, not client-input, returned |
+| Email/password | enabled; require verification; reset TTL 1h |
+| Session | expiresIn 30d; updateAge 1d (sliding via get-session) |
+| Email verification | sendOnSignUp; TTL 1h; autoSignInAfterVerification |
+| Cookies | prefix `better-auth`; secure; httpOnly; sameSite none; useSecureCookies; cross-subdomain via COOKIE_DOMAIN |
+| Plugins | `magicLink` (15m, signup allowed); `username` (3–20 alnum, lowercased) |
+
+## Env (eager)
+
+Required: `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `BETTER_AUTH_PATH`, `BETTER_AUTH_TRUSTED_ORIGINS`, `BETTER_AUTH_COOKIE_DOMAIN`, `RESEND_API_KEY`.  
+Optional default: `RESEND_FROM_EMAIL` → `noreply@example.com`.  
+Plus `NODE_ENV` from utils base schema.
+
+## Emails (`lib/emails.ts`)
+
+- `new Resend(RESEND_API_KEY)` at module load → empty key crashes.
+- `sendVerificationEmail`, `sendResetPasswordEmail`, `sendMagicLinkEmail` — HTML templates.
+- Called with `void` from auth hooks (fire-and-forget). Delivery failures log + rethrow inside sendEmail, but callers do not await — signup still succeeds with placeholder keys.
 
 ## Consumer patterns
 
-| Role | Pattern |
-| --- | --- |
-| auth-service | Elysia routes → `auth.api.*` on :5001 |
-| SvelteKit server | `import { auth } from "@pocket-dimension/auth"` in `hooks.server.ts` |
-| SvelteKit browser | `better-auth/svelte` client → `PUBLIC_BASE_AUTH_URL` |
+### auth-service
 
-## Build / deps
+Elysia routes wrap `auth.api.*` (`sign-up/email`, `sign-in/email`, `sign-in/username`, session, reset, verify, forgot, sign-out, …). Macros: `auth`, `authVerified`. CORS credentials on. Port **5001**.
 
-```bash
-bun run build:shared:auth
+### SvelteKit hooks (canonical)
+
+```ts
+const session = await auth.api.getSession({ headers: event.request.headers });
+// populate event.locals.user / session
+return svelteKitHandler({ event, resolve, auth, building });
 ```
 
-Depends on `@pocket-dimension/db`, `@pocket-dimension/utils`, `better-auth`, `resend`.
+Route groups: `/(auth)/` and `/(protected)/` with verify-email allowlist for unverified users.
 
-## Local caveat
+## Local cookie caveat
 
-Over plain `http://localhost`, browsers may refuse the secure cross-site cookies — sessions often do not stick. Signup can still create users; verifying email may require flipping `email_verified` in DB when delivery is disabled.
+`secure` + `sameSite: none` unconditionally → browsers often refuse cookies on `http://localhost`. Signup API works; session stickiness and email verify usually need DB `email_verified` flips when Resend is placeholder.

@@ -1,0 +1,68 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {
+    "started": "2026-08-31T19:12:18Z",
+    "last_updated": "2026-08-31T19:20:00Z"
+  },
+  "mode": "full_rescan",
+  "scan_level": "deep",
+  "project_root": "/workspace",
+  "project_knowledge": "/workspace/_bmad-output/pocket-dimension",
+  "heimdall_modules_layout": true,
+  "scope": {
+    "include": ["monorepo", "monorepo-tools", "shared-utils", "shared-db", "shared-auth"],
+    "exclude_apps": true,
+    "note": "Apps deferred; existing zeo/chhan-chhan trees untouched"
+  },
+  "completed_steps": [
+    {
+      "step": "step_1",
+      "status": "completed",
+      "timestamp": "2026-08-31T19:12:18Z",
+      "summary": "Classified as monorepo; scoped parts: monorepo-tools + three shared libraries"
+    },
+    {
+      "step": "step_3",
+      "status": "completed",
+      "timestamp": "2026-08-31T19:15:00Z",
+      "summary": "Deep-scanned root tooling, scripts workspace, shared/{utils,db,auth} sources"
+    },
+    {
+      "step": "step_4_to_11",
+      "status": "completed",
+      "timestamp": "2026-08-31T19:20:00Z",
+      "summary": "Wrote monorepo + tools docs under pocket-dimension; package docs under shared-*"
+    }
+  ],
+  "current_step": "complete",
+  "project_types": [
+    { "part_id": "monorepo-tools", "project_type_id": "infra", "display_name": "Monorepo tooling", "root_path": "." },
+    { "part_id": "shared-utils", "project_type_id": "library", "display_name": "@pocket-dimension/utils", "root_path": "shared/utils", "bmad": "_bmad-output/shared-utils" },
+    { "part_id": "shared-db", "project_type_id": "library", "display_name": "@pocket-dimension/db", "root_path": "shared/db", "bmad": "_bmad-output/shared-db" },
+    { "part_id": "shared-auth", "project_type_id": "library", "display_name": "@pocket-dimension/auth", "root_path": "shared/auth", "bmad": "_bmad-output/shared-auth" }
+  ],
+  "findings": {
+    "repository_type": "monorepo",
+    "parts_count": 4,
+    "primary_tech": "Bun + Turbo + TypeScript",
+    "ci": "none at root; husky pre-commit only"
+  },
+  "outputs_generated": [
+    "project-scan-report.json",
+    "index.md",
+    "project-overview.md",
+    "project-context.md",
+    "source-tree-analysis.md",
+    "integration-architecture.md",
+    "development-guide.md",
+    "deployment-guide.md",
+    "contribution-guide.md",
+    "data-models.md",
+    "architecture-monorepo-tools.md",
+    "project-parts.json",
+    "../shared-utils/*",
+    "../shared-db/*",
+    "../shared-auth/*"
+  ],
+  "resume_instructions": "Scan complete for monorepo/tools/packages scope. Next: app deep-dives when requested."
+}

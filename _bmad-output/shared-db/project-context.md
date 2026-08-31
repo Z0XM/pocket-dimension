@@ -5,16 +5,18 @@
 
 ## Rules
 
-- **PostgreSQL 18+** required — primary keys default to `uuidv7()`.
-- One Drizzle client and one migrations folder for the whole monorepo. Do not add per-app ORMs or migration runners.
-- Put new tables in the correct **named schema** file under `src/schema/` (`auth`, `watchlist`, `howwasyourday`, `chhanchhan`, `meviayou`, `zeo`).
+- **PostgreSQL 18+** required — PKs default to `uuidv7()`.
+- One Drizzle client and one migrations folder for the whole monorepo.
+- Put new tables in the correct **named schema** file under `src/schema/`.
 - Reuse `id`, `timestamps`, and `actionsByUser` from `schema/common.ts`.
-- Apps import `{ db, schema }` only from `@pocket-dimension/db` after shared build.
-- `DATABASE_URL` lives in `shared/db/.env` (and consumers that need the pool).
-- Generate/migrate from repo root: `bun run db:generate` / `bun run db:migrate` / `bun run db:studio`.
+- Keep `casing: "snake_case"` in sync between `drizzle.config.ts` and `lib/db.ts`.
+- Apps import `{ db, schema }` only — `env` is internal.
+- `DATABASE_URL` in `shared/db/.env` (and consumers that open the pool).
+- Generate/migrate from root: `bun run db:generate` / `db:migrate` / `db:studio`.
 
 ## Anti-patterns
 
-- Creating tables in `public`
-- Calling `uuid_generate_v4()` / random UUIDs instead of `uuidv7()` without an explicit decision
-- Importing unbuilt TypeScript entry from apps in production paths (use workspace package → `dist/`)
+- Tables in `public`
+- Second ORM / migration runner in an app
+- Assuming `updatedAt` is set on insert (`$onUpdate` only)
+- Relying on `auth:generate` in this package (`./src/lib/auth.ts` is stale — use `shared/auth`)

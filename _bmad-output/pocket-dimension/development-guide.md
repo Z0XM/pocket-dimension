@@ -18,7 +18,7 @@ bun install
 # Copy each package/app `.env.example` → `.env`
 # RESEND_API_KEY=re_placeholder_local_dev_only  (must be non-empty)
 # BETTER_AUTH_SECRET=<same value everywhere>
-bun run build                 # shared dist/ required
+bun run build                 # shared dist/ required (^build)
 bun run db:migrate
 ```
 
@@ -29,28 +29,42 @@ bun run build:shared:utils && bun run build:shared:db && bun run build:shared:au
 # or: bun run build
 
 bun run dev:app:auth          # :5001 — needed for auth-backed apps
-bun run dev:app:<name>        # see AGENTS.md port table
+bun run dev:app:<name>        # see AGENTS.md / project-overview ports
 
-bun run typecheck
-bun run test                  # packages that define tests (e.g. zeo, heimdall)
+bun run typecheck             # turbo; shared uses tsgo; SvelteKit apps may use `check` only
+bun run test
+bun run format                # Prettier write (not Biome)
+bun run format:check
 bun run heimdall doctor
-bun run heimdall dev          # :5174 UI / :5175 API
+bun run heimdall dev          # needs apps/heimdall dist/cli.cjs or tsx
+```
+
+## Scripts / ETL
+
+```bash
+cd scripts
+# watchlist / rhymes importers under src/; need DATABASE_URL + built db package
 ```
 
 ## Env caveats
 
 - Bun loads `.env` from each package cwd (Turbo runs tasks in package dirs).
 - `shared/db/.env` only needs `DATABASE_URL`.
-- Empty `RESEND_API_KEY` crashes auth at module load.
-- Local session cookies may not persist over `http://localhost` — signup can still work; mark `email_verified` in DB if needed.
+- Importing `@pocket-dimension/auth` validates env **eagerly** — empty `RESEND_API_KEY` crashes.
+- Local session cookies may not persist over `http://localhost`.
 
-## Lint / format quirks
+## Lint quirks
 
-- Per-package `bun run lint` (Prettier) may flag `dist/` because subdirectory Prettier ignores root `.prettierignore`.
+- Per-package `bun run lint` may flag `dist/` (subdir Prettier ignores root `.prettierignore`).
 - Prefer root `bun run format:check` for whole-repo formatting signal.
+
+## Pre-commit
+
+Husky runs lint-staged → typecheck changed → build changed. Skip build with `SKIP_PRE_COMMIT_BUILD=1`.
 
 ## More detail
 
+- Tools architecture: [architecture-monorepo-tools.md](./architecture-monorepo-tools.md)
+- Deploy: [deployment-guide.md](./deployment-guide.md)
+- Packages: `_bmad-output/shared-*/development-guide.md`
 - Cloud agent caveats: root `AGENTS.md`
-- Deploy: [deployment-guide.md](./deployment-guide.md) and root `DEPLOY.md`
-- Package-specific: `_bmad-output/shared-*/`

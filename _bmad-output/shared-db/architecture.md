@@ -1,61 +1,48 @@
 # Architecture — `@pocket-dimension/db`
 
-## Purpose
-
-Central Drizzle ORM client, merged schema, and SQL migrations for every app schema in the monorepo.
-
-## Stack
-
-| Item | Value |
-| --- | --- |
-| ORM | Drizzle (`drizzle-orm` + `pg` Pool) |
-| Casing | `snake_case` |
-| Config | `shared/db/drizzle.config.ts` |
-| Migrations | `shared/db/migrations/` |
-
 ## Public API
-
-`shared/db/src/index.ts` exports:
-
-| Export | Role |
-| --- | --- |
-| `db` | Lazy Proxy → `NodePgDatabase` |
-| `schema` | Merged table/relation object |
 
 ```ts
 import { db, schema } from "@pocket-dimension/db";
 ```
 
-## Schema layout
+Only **`db`** and **`schema`** are exported. `env` is package-internal.
 
-| File | PG schema | Highlights |
-| --- | --- | --- |
-| `schema/common.ts` | — | `id` (`uuidv7()`), `timestamps`, `actionsByUser` |
-| `schema/auth.ts` | `auth` | `user`, `session`, `account`, `verification`, `user_role` |
-| `schema/watchlist.ts` | `watchlist` | items, tags, ratings, views, preferences |
-| `schema/howwasyourday.ts` | `howwasyourday` | day data, push subscriptions |
-| `schema/chhanchhan.ts` | `chhanchhan` | accounts, transactions, budgets, tags, refunds, … |
-| `schema/meviayou.ts` | `meviayou` | forms, answers |
-| `schema/zeo.ts` | `zeo` | rooms, participants, chat, waiting, game/listening tables, operator settings |
+## Client (`src/lib/db.ts`)
 
-Env: lazy `DATABASE_URL` validation via `@pocket-dimension/utils`.
+- Lazy singleton: first property access on `db` Proxy creates `pg.Pool({ connectionString })` + `drizzle(pool, { schema, casing: "snake_case" })`.
+- Defers env validation and pool open until first use (unlike auth’s eager import).
+- Default `pg.Pool` options (no custom SSL/size).
+- Functions are auto-bound through the Proxy.
 
-## Commands
+## Env (`src/lib/env.ts`)
 
-```bash
-bun run db:generate
-bun run db:migrate
-bun run db:studio
-```
+- Schema: `{ DATABASE_URL: z.url() }` + inherited `NODE_ENV`.
+- Lazy Proxy around `validateEnv("db", …)`.
 
-## Consumers
+## Drizzle kit (`drizzle.config.ts`)
 
-`shared/auth`, auth-service, watchlist, howwasyourday, chhan-chhan, me-via-you, zeo.
+| Key | Value |
+| --- | --- |
+| `out` | `./migrations` |
+| `schema` | auth, watchlist, howwasyourday, chhanchhan, meviayou, zeo (not `common.ts`) |
+| `dialect` | postgresql |
+| `casing` | snake_case |
+| credentials | `env.DATABASE_URL` |
+
+## Schema merge (`src/schema/index.ts`)
+
+Combines auth + watchlist + howwasyourday + chhanChhan + meViaYou + zeo namespaces into one `schema` object.
 
 ## Build
 
 ```bash
 bun run build:shared:db
+# externals: drizzle-orm, pg, zod, @pocket-dimension/utils, better-auth
 ```
 
-Externals include `drizzle-orm`, `pg`, `zod`, `@pocket-dimension/utils`.
+`types` point at `./src/index.ts`; `main` at `./dist/index.js`.
+
+## Scripts note
+
+`auth:generate` points at missing `./src/lib/auth.ts` — **stale**. Use `shared/auth` `auth:generate` instead.

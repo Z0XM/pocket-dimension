@@ -2,43 +2,54 @@
 
 ## Purpose
 
-Shared Zod-based environment validation for apps and sibling packages.
+Shared Zod-based environment validation.
 
-## Stack
+## Public API (`src/index.ts`)
 
-| Item | Value |
-| --- | --- |
-| Language | TypeScript |
-| Runtime build target | Bun (`bun build` → `dist/`) |
-| Dependency | `zod` ^4 |
-
-## Public API
-
-Source: `shared/utils/src/index.ts`.
-
-| Export | Role |
-| --- | --- |
-| `baseEnvSchema` | `{ NODE_ENV: development \| production \| test }` (default `development`) |
-| `validateEnv(source, appEnvSchema, env?)` | Merges `baseEnvSchema` with app schema, parses env (default `Bun.env`), logs `source` |
-
-## Build
-
-```bash
-bun run build:shared:utils
-# package: bun build ./src/index.ts --outdir ./dist --format esm --target bun --external zod
-```
-
-`package.json`: `main` → `./dist/index.js`, `types` → `./src/index.ts`.
-
-## Consumers
-
-Direct: auth-service, watchlist, howwasyourday, zeo, pocket, markitdown (local `env.ts`).  
-Transitive: `shared/db`, `shared/auth`.
+### `baseEnvSchema`
 
 ```ts
-import { validateEnv } from "@pocket-dimension/utils";
+z.object({
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+});
 ```
 
-## Tests
+### `validateEnv(source, appEnvSchema, env?)`
 
-No dedicated test suite in this package today.
+| Arg | Role |
+| --- | --- |
+| `source` | Log label (`Validating environment variables from ${source}`) |
+| `appEnvSchema` | Consumer `z.object({...})` |
+| `env` | Defaults to `Bun.env` |
+
+Behavior:
+
+1. Logs unconditionally to stdout.
+2. Merges `baseEnvSchema.extend(appEnvSchema.shape)` — consumer always gets `NODE_ENV` (default `development`). Consumer `NODE_ENV` key silently overrides base.
+3. `schema.parse(env)` — **throws** on failure (no Result type).
+4. Returns typed parsed object. No internal cache.
+
+## Failure modes
+
+- Missing/invalid required vars → process crash at call site.
+- Typo in `NODE_ENV` fails enum even if consumer did not declare it.
+- Bun-typed (`typeof Bun.env`); logic works with any string-map if passed explicitly.
+- No coercion beyond consumer Zod transforms.
+
+## Package shape
+
+| Field | Value |
+| --- | --- |
+| `main` | `./dist/index.js` |
+| `types` | `./src/index.ts` (source types, not emitted `.d.ts`) |
+| `exports["."]` | types → src, default → dist |
+| Scripts | `build`, `clean`, `lint` (prettier), `typecheck` (`tsgo --noEmit`) |
+| Tests | none |
+
+## Patterns for consumers
+
+| Pattern | Example |
+| --- | --- |
+| Lazy Proxy + memoized `validateEnv` | `shared/db/src/lib/env.ts` |
+| Eager top-level `validateEnv` | `shared/auth/src/lib/env.ts` |
+| App local `env.ts` | auth-service, zeo, pocket, markitdown |

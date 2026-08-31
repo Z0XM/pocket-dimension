@@ -1,9 +1,12 @@
 {
   "repository_type": "monorepo",
   "heimdall_modules_layout": true,
+  "scan_level": "deep",
   "refreshed": "2026-08-31",
+  "scan_scope": ["monorepo-tools", "shared-utils", "shared-db", "shared-auth"],
   "monorepo_module": "pocket-dimension",
   "parts": [
+    { "part_id": "monorepo-tools", "root_path": ".", "project_type_id": "infra", "bmad": "_bmad-output/pocket-dimension" },
     { "part_id": "shared-utils", "root_path": "shared/utils", "project_type_id": "library", "bmad": "_bmad-output/shared-utils" },
     { "part_id": "shared-db", "root_path": "shared/db", "project_type_id": "library", "bmad": "_bmad-output/shared-db" },
     { "part_id": "shared-auth", "root_path": "shared/auth", "project_type_id": "library", "bmad": "_bmad-output/shared-auth" },

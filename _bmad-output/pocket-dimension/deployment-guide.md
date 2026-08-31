@@ -6,9 +6,17 @@
 2. PostgreSQL **18+** in every environment that runs migrations (`uuidv7()`).
 3. Apply schema with `DATABASE_URL=… bun run db:migrate` (zeo `bun run start` can auto-migrate when `DATABASE_URL` is set).
 
-## Railpack / Dokploy
+## Dockerfile path (recommended)
 
-Per-app `Dockerfile`, `railpack.json`, and `scripts/deploy-build.sh` under `apps/<app>/` (exceptions: markitdown, zeo-music-worker, imposter-art). Set Docker context to repo root. Full contract: root [`DEPLOY.md`](../../DEPLOY.md).
+Build context = **repo root**. Dokploy: do not mix Build Path `apps/<app>` with Context `.` (breaks `COPY shared/`).
+
+## Railpack path
+
+Per-app `railpack.json` no-ops install (`"true"`), then `scripts/deploy-build.sh` installs/builds from monorepo root. `deploy.startCommand` detects workspace root vs app dir.
+
+## `.dockerignore`
+
+Stub-only strategy for apps excluded from multi-app images (`markitdown`, `zeo-music-worker`). **Keeps** `_bmad-output` (Heimdall needs it).
 
 ## Heimdall
 
@@ -18,10 +26,10 @@ Needs `_bmad-output` + root `heimdall.config.mjs` in the image. See `apps/heimda
 
 - Identical `BETTER_AUTH_SECRET` across auth-service and frontends.
 - Non-empty `RESEND_API_KEY` on any process importing `@pocket-dimension/auth`.
-- `PUBLIC_BASE_AUTH_URL` must point at the deployed auth-service origin.
-- Cookie domain / HTTPS must match Better Auth `secure` + `sameSite: "none"` expectations.
+- `PUBLIC_BASE_AUTH_URL` → deployed auth-service origin.
+- Cookie domain / HTTPS must match `secure` + `sameSite: "none"`.
 
-## Ports (prod-oriented defaults)
+## Ports
 
 | App | Port |
 | --- | --- |
@@ -31,3 +39,5 @@ Needs `_bmad-output` + root `heimdall.config.mjs` in the image. See `apps/heimda
 | zeo-music-worker | 3010 |
 | dashboard | 3011 |
 | heimdall | 3012 |
+
+Full contract: root [`DEPLOY.md`](../../DEPLOY.md). Tooling detail: [architecture-monorepo-tools.md](./architecture-monorepo-tools.md).
