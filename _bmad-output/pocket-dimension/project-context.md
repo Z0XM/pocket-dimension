@@ -37,8 +37,8 @@
 | --- | --- |
 | Shared packages | `_bmad-output/shared-{utils,db,auth}/project-context.md` |
 | watchlist | `_bmad-output/watchlist/project-context.md` |
-| zeo | `_bmad-output/zeo/project-context.md` |
 | chhan-chhan | `_bmad-output/chhan-chhan/project-context.md` |
+| zeo | `_bmad-output/zeo/project-context.md` |
 | Env / ports / Cloud | repo-root `AGENTS.md` |
 
 ## zeo join policy

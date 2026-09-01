@@ -10,8 +10,8 @@ _bmad-output/
   shared-db/                # @pocket-dimension/db (brownfield complete)
   shared-auth/              # @pocket-dimension/auth (brownfield complete)
   watchlist/                # apps/watchlist (brownfield + deep-dive complete)
+  chhan-chhan/              # apps/chhan-chhan (brownfield + deep-dive complete; planning SoR retained)
   zeo/                      # apps/zeo product SoR
-  chhan-chhan/              # apps/chhan-chhan product SoR
   heimdall/                 # apps/heimdall product SoR (incremental)
 ```
 

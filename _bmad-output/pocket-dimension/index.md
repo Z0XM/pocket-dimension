@@ -30,20 +30,21 @@ Cross-cutting SoR for the Bun + Turbo monorepo. Package knowledge lives in peer 
 | [`../shared-db/`](../shared-db/) | `@pocket-dimension/db` — schemas, migrations, client |
 | [`../shared-auth/`](../shared-auth/) | `@pocket-dimension/auth` — Better Auth config |
 | [`../watchlist/`](../watchlist/) | `apps/watchlist` — exhaustive deep-dive + brownfield (2026-08-31) |
+| [`../chhan-chhan/`](../chhan-chhan/) | `apps/chhan-chhan` — exhaustive deep-dive + module-root brownfield (2026-09-01) |
 
 ## Existing app trees
 
 | Module | Notes |
 | --- | --- |
 | [`../zeo/`](../zeo/) | Product SoR kept |
-| [`../chhan-chhan/`](../chhan-chhan/) | Product SoR kept |
 | [`../heimdall/`](../heimdall/) | Product SoR incremental / Soft-empty |
 
 ## Deep-Dive Documentation
 
 Detailed exhaustive analysis of specific areas:
 
-- [watchlist Deep-Dive](../watchlist/deep-dive-watchlist.md) — Comprehensive analysis of `apps/watchlist` (routes, APIs, data-table, feature UI) — Generated 2026-08-31
+- [watchlist Deep-Dive](../watchlist/deep-dive-watchlist.md) — `apps/watchlist` — Generated 2026-08-31
+- [chhan-chhan Deep-Dive](../chhan-chhan/deep-dive-chhan-chhan.md) — `apps/chhan-chhan` — Generated 2026-09-01
 
 ## Planning & delivery in this tree
 

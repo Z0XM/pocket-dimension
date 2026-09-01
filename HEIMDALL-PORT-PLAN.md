@@ -56,7 +56,8 @@ Layout contract: **Modules mode** — peer folders under `_bmad-output/` (monore
 
 ### Part 2b — Apps (incremental)
 
-- **watchlist** — DONE (2026-08-31): `_bmad-output/watchlist/` exhaustive deep-dive + full brownfield module docs; wired in `heimdall.config.mjs`
+- **watchlist** — DONE (2026-08-31): `_bmad-output/watchlist/` exhaustive deep-dive + full brownfield module docs
+- **chhan-chhan** — DONE (2026-09-01): module-root brownfield refresh + exhaustive deep-dive; existing planning/implementation SoR retained
 
 ### Part 2c — Remaining (later)
 
