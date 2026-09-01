@@ -14,4 +14,6 @@
 | [development-guide.md](./development-guide.md) | Build / typecheck / conventions |
 | [source-tree-analysis.md](./source-tree-analysis.md) | File layout |
 
-No Feature Registry or epics — omit those config keys. Monorepo: [`../pocket-dimension/`](../pocket-dimension/).
+| [FEATURE-REGISTRY.md](./FEATURE-REGISTRY.md) | Features SoT |
+
+Feature Registry wired in `heimdall.config.mjs`. No epics yet. Monorepo: [`../pocket-dimension/`](../pocket-dimension/).

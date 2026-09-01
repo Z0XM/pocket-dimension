@@ -21,6 +21,7 @@ Cross-cutting SoR for the Bun + Turbo monorepo. Package knowledge lives in peer 
 | [data-models.md](./data-models.md) | Named schemas map (detail in `shared-db`) |
 | [project-parts.json](./project-parts.json) | Machine-readable part list |
 | [project-scan-report.json](./project-scan-report.json) | Scan state |
+| [FEATURE-REGISTRY.md](./FEATURE-REGISTRY.md) | Features SoT (monorepo tooling) |
 
 ## Peer modules
 
@@ -51,4 +52,4 @@ Detailed exhaustive analysis of specific areas:
 - [planning-artifacts/](./planning-artifacts/) — epics, architecture, PRDs, UX (rhymes / dashboard tracks)
 - [implementation-artifacts/](./implementation-artifacts/) — stories, sprint status
 
-No Feature Registry authored yet for this module.
+Feature Registry: [FEATURE-REGISTRY.md](./FEATURE-REGISTRY.md) (wired as `featureRegistry` in `heimdall.config.mjs`).

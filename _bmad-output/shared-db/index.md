@@ -14,5 +14,6 @@
 | [data-models.md](./data-models.md) | Full schema inventory |
 | [development-guide.md](./development-guide.md) | Migrate / generate / gotchas |
 | [source-tree-analysis.md](./source-tree-analysis.md) | File layout |
+| [FEATURE-REGISTRY.md](./FEATURE-REGISTRY.md) | Features SoT |
 
-Monorepo map: [`../pocket-dimension/data-models.md`](../pocket-dimension/data-models.md).
+Feature Registry wired in `heimdall.config.mjs`. Monorepo map: [`../pocket-dimension/data-models.md`](../pocket-dimension/data-models.md).

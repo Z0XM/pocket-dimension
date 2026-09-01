@@ -34,7 +34,7 @@ export default {
       idPrefix: "PD",
       basePath: "_bmad-output/pocket-dimension",
       paths: {
-        // FR not authored yet — omit featureRegistry until SoT exists
+        featureRegistry: "FEATURE-REGISTRY.md",
         epics: [{ path: "planning-artifacts/epics.md", parser: "bmad-output" }],
       },
     },
@@ -44,7 +44,9 @@ export default {
       enabled: true,
       idPrefix: "SU",
       basePath: "_bmad-output/shared-utils",
-      paths: {},
+      paths: {
+        featureRegistry: "FEATURE-REGISTRY.md",
+      },
     },
     {
       id: "shared-db",
@@ -52,7 +54,9 @@ export default {
       enabled: true,
       idPrefix: "SD",
       basePath: "_bmad-output/shared-db",
-      paths: {},
+      paths: {
+        featureRegistry: "FEATURE-REGISTRY.md",
+      },
     },
     {
       id: "shared-auth",
@@ -60,7 +64,9 @@ export default {
       enabled: true,
       idPrefix: "SA",
       basePath: "_bmad-output/shared-auth",
-      paths: {},
+      paths: {
+        featureRegistry: "FEATURE-REGISTRY.md",
+      },
     },
     {
       id: "watchlist",
@@ -68,8 +74,9 @@ export default {
       enabled: true,
       idPrefix: "WL",
       basePath: "_bmad-output/watchlist",
-      // Brownfield complete; no FR/epics yet
-      paths: {},
+      paths: {
+        featureRegistry: "FEATURE-REGISTRY.md",
+      },
     },
     {
       id: "heimdall",
@@ -104,8 +111,9 @@ export default {
       enabled: true,
       idPrefix: "CC",
       basePath: "_bmad-output/chhan-chhan",
-      // No epics.md yet — omit Delivery paths until authored
-      paths: {},
+      paths: {
+        featureRegistry: "FEATURE-REGISTRY.md",
+      },
     },
   ],
   docs: {

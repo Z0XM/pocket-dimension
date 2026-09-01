@@ -19,6 +19,7 @@ Personal finance ledger — Indian bank-statement import (Kotak, ICICI, HDFC, ge
 | [source-tree-analysis.md](./source-tree-analysis.md) | Annotated file tree (`src/routes`, `src/lib`) |
 | [component-inventory.md](./component-inventory.md) | Feature components, importers, server libs, finance helpers, `ui/*` primitive gap |
 | [deep-dive-chhan-chhan.md](./deep-dive-chhan-chhan.md) | Exhaustive file-by-file review (every core/server/API/importer file plus every route and feature component) — the source for most findings summarized in the docs above |
+| [FEATURE-REGISTRY.md](./FEATURE-REGISTRY.md) | Features SoT (brownfield capability inventory) |
 
 Monorepo map: [`../pocket-dimension/index.md`](../pocket-dimension/index.md). Shared package docs: [`../shared-db/`](../shared-db/) (schema/client), [`../shared-auth/`](../shared-auth/) (Better Auth config).
 

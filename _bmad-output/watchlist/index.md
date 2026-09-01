@@ -20,6 +20,7 @@ Personal movie/series/shorts watchlist with per-user ratings, tags, saved views,
 | [source-tree-analysis.md](./source-tree-analysis.md) | Annotated file tree (`src/routes`, `src/lib`) |
 | [component-inventory.md](./component-inventory.md) | Feature components, `data-table-helpers/*`, `ui/*` primitive groups |
 | [deep-dive-watchlist.md](./deep-dive-watchlist.md) | Exhaustive file-by-file review (every route, every `data-table-helpers/*` file, every feature component) — the source for most findings summarized in the docs above |
+| [FEATURE-REGISTRY.md](./FEATURE-REGISTRY.md) | Features SoT (brownfield capability inventory) |
 
 Monorepo map: [`../pocket-dimension/index.md`](../pocket-dimension/index.md). Shared package docs: [`../shared-db/`](../shared-db/) (schema/client), [`../shared-auth/`](../shared-auth/) (Better Auth config).
 
@@ -30,4 +31,4 @@ Monorepo map: [`../pocket-dimension/index.md`](../pocket-dimension/index.md). Sh
 - Role gating (`user`/`contributor`/`admin`/synthetic `mobile`) is defined once in `edit-mode.svelte.ts` and re-enforced server-side in `bulk-update`; don't add a third copy — see [architecture.md](./architecture.md#role-permissions).
 - Five verified, currently-live issues (a bulk-edit-panel crash, two orphaned components, a dead route, and a missing `src/lib/auth.ts` masked by `skipLibCheck`) are catalogued in [project-context.md](./project-context.md#known-gotchas-verified-against-source-2026-08-31) — check that list before assuming unfamiliar behavior is a new bug.
 
-No planning/implementation artifacts exist yet for this module — `planning-artifacts/` and `implementation-artifacts/` subfolders are intentionally omitted until real PRD/story content exists (see `_bmad-output/README.md`'s layout contract).
+No planning/implementation artifacts exist yet for this module — `planning-artifacts/` and `implementation-artifacts/` subfolders are intentionally omitted until real PRD/story content exists (see `_bmad-output/README.md`'s layout contract). Feature Registry is authored at [FEATURE-REGISTRY.md](./FEATURE-REGISTRY.md) and wired in `heimdall.config.mjs`.
