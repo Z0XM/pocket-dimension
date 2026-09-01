@@ -41,7 +41,18 @@ describe("pocket-dimension Heimdall dogfood config", () => {
 
     const enabled = listEnabledModules(resolveModules(config, repoRoot));
     expect(enabled.length).toBeGreaterThan(0);
-    expect(enabled.map((m) => m.id)).toEqual(expect.arrayContaining(["pocket-dimension", "heimdall", "zeo", "chhan-chhan"]));
+    expect(enabled.map((m) => m.id)).toEqual(
+      expect.arrayContaining([
+        "pocket-dimension",
+        "shared-utils",
+        "shared-db",
+        "shared-auth",
+        "watchlist",
+        "heimdall",
+        "zeo",
+        "chhan-chhan",
+      ]),
+    );
   });
 
   it("loadDashboard all-scope smoke does not throw (Soft-empty OK)", async () => {

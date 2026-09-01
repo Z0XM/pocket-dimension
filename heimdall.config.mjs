@@ -5,8 +5,8 @@
  *
  * Plain .mjs so the CJS CLI can load it without a TS loader.
  *
- * Note: Heimdall BMAD SoR under `_bmad-output/heimdall/` lands in Part 2.
- * Until then, doctor Soft-empties missing FR/epics paths (informational).
+ * BMAD layout: peer folders under `_bmad-output/` (monorepo + packages + apps).
+ * See `_bmad-output/README.md`. Omit FR/epics keys until real SoT files exist.
  */
 export default {
   repoRoot: ".",
@@ -34,9 +34,42 @@ export default {
       idPrefix: "PD",
       basePath: "_bmad-output/pocket-dimension",
       paths: {
-        featureRegistry: "FEATURE-REGISTRY.md",
+        // FR not authored yet — omit featureRegistry until SoT exists
         epics: [{ path: "planning-artifacts/epics.md", parser: "bmad-output" }],
       },
+    },
+    {
+      id: "shared-utils",
+      label: "shared/utils",
+      enabled: true,
+      idPrefix: "SU",
+      basePath: "_bmad-output/shared-utils",
+      paths: {},
+    },
+    {
+      id: "shared-db",
+      label: "shared/db",
+      enabled: true,
+      idPrefix: "SD",
+      basePath: "_bmad-output/shared-db",
+      paths: {},
+    },
+    {
+      id: "shared-auth",
+      label: "shared/auth",
+      enabled: true,
+      idPrefix: "SA",
+      basePath: "_bmad-output/shared-auth",
+      paths: {},
+    },
+    {
+      id: "watchlist",
+      label: "watchlist",
+      enabled: true,
+      idPrefix: "WL",
+      basePath: "_bmad-output/watchlist",
+      // Brownfield complete; no FR/epics yet
+      paths: {},
     },
     {
       id: "heimdall",
@@ -61,7 +94,7 @@ export default {
       idPrefix: "Z",
       basePath: "_bmad-output/zeo",
       paths: {
-        featureRegistry: "FEATURE-REGISTRY.md",
+        // FR not authored — Delivery uses existing epics
         epics: [{ path: "planning-artifacts/epics.md", parser: "bmad-output" }],
       },
     },
@@ -71,10 +104,8 @@ export default {
       enabled: true,
       idPrefix: "CC",
       basePath: "_bmad-output/chhan-chhan",
-      paths: {
-        featureRegistry: "FEATURE-REGISTRY.md",
-        epics: [{ path: "planning-artifacts/epics.md", parser: "bmad-output" }],
-      },
+      // No epics.md yet — omit Delivery paths until authored
+      paths: {},
     },
   ],
   docs: {

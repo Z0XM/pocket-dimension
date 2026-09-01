@@ -1,35 +1,56 @@
-# BMAD output
+# BMAD output (Heimdall Modules layout)
 
-Default BMAD project is the **Pocket Dimension monorepo**. All new planning, stories, and brownfield documentation go under `_bmad-output/pocket-dimension/` unless you are working in an existing app-specific tree.
-
-## Layout
+Heimdall runs in **Modules mode**. Each durable scope is a **peer folder** under `_bmad-output/` — not a flat dump of `architecture-*.md` files in one tree.
 
 ```
 _bmad-output/
-  pocket-dimension/                 # default — monorepo + rhymes rework
-    project-context.md
-    planning-artifacts/             # PRDs, architecture, UX, epics
-    implementation-artifacts/       # stories, sprint-status
-  zeo/                              # existing zeo-only artifacts
-  chhan-chhan/                      # existing chhan-chhan-only artifacts
+  README.md                 # this file — layout contract
+  pocket-dimension/         # Monorepo module (cross-cutting + tools)
+  shared-utils/             # @pocket-dimension/utils (brownfield complete)
+  shared-db/                # @pocket-dimension/db (brownfield complete)
+  shared-auth/              # @pocket-dimension/auth (brownfield complete)
+  watchlist/                # apps/watchlist (brownfield + deep-dive complete)
+  chhan-chhan/              # apps/chhan-chhan (brownfield + deep-dive complete; planning SoR retained)
+  zeo/                      # apps/zeo product SoR
+  heimdall/                 # apps/heimdall product SoR (incremental)
 ```
 
-Do **not** write BMAD artifacts to a repo-root `docs/` folder.
+**Last deep scan (monorepo + tools + packages):** 2026-08-31 — see `pocket-dimension/project-scan-report.json`.
 
-## App map
+Wire new scopes in root `heimdall.config.mjs` (`modules[].id` + `basePath`). Docs are indexed via `paths.docsRoot` + `docs.extraRoots: ["_bmad-output"]`.
 
-| App | Code path | Where its BMAD artifacts live |
-| --- | --- | --- |
-| monorepo / rhymes rework | repo root, `apps/rhymes` | `_bmad-output/pocket-dimension/` (default) |
-| zeo | `apps/zeo` | `_bmad-output/zeo/` |
-| chhan-chhan | `apps/chhan-chhan` | `_bmad-output/chhan-chhan/` |
+## Per-module folder shape
 
-When implementing **zeo** or **chhan-chhan** features, load that app’s `project-context.md` and keep new specs in that app’s tree. Do not drop those specs into `pocket-dimension/` unless the work is actually monorepo-wide.
+```
+_bmad-output/<module-id>/
+  index.md                  # AI/human entry
+  project-context.md        # agent rules for this scope
+  # optional brownfield / ops docs (architecture, guides, …)
+  planning-artifacts/       # PRDs, architecture, UX, epics
+  implementation-artifacts/ # stories, sprint-status
+  FEATURE-REGISTRY.md       # only when Features SoT exists — never empty placeholders
+```
 
-## Switching away from the default
+**Do not** create empty `FEATURE-REGISTRY.md`, intake, or deferred indexes just to satisfy config. Omit those keys in `heimdall.config.mjs` until real content exists (Soft-empty is expected).
 
-[`_bmad/bmm/config.yaml`](../_bmad/bmm/config.yaml) and [`_bmad/custom/config.toml`](../_bmad/custom/config.toml) default to **pocket-dimension**. For a one-off app-only workflow, temporarily point `planning_artifacts` / `implementation_artifacts` at `_bmad-output/<app>/`, then restore the default.
+**Do not** write BMAD artifacts to a repo-root `docs/` folder.
 
-## Chhan Chhan agents
+## What belongs where
 
-Load `_bmad-output/chhan-chhan/project-context.md` when implementing finance/import/Control features. Living operational docs also live in-app: `apps/chhan-chhan/IMPORT.md`, `FUTURE-TODO.md`, `DEPLOY.md`.
+| Work | Put it in |
+| --- | --- |
+| Monorepo-wide / rhymes–dashboard planning already here | `pocket-dimension/` |
+| Shared package behavior or contracts | `shared-utils/` · `shared-db/` · `shared-auth/` |
+| App-only product work | `_bmad-output/<app>/` (e.g. `zeo/`, `chhan-chhan/`) |
+| Heimdall War Room product SoR | `heimdall/` (Part 2 incremental) |
+
+Default BMAD config (`_bmad/bmm/config.yaml` + `_bmad/custom/config.toml`) points at **pocket-dimension**. For an app-only workflow, temporarily retarget `planning_artifacts` / `implementation_artifacts` / `project_knowledge`, then restore the default.
+
+## Heimdall
+
+```bash
+bun run heimdall doctor   # path OK / MISSING (informational Soft-empty)
+bun run heimdall dev      # War Room http://127.0.0.1:5174/
+```
+
+Authoring contract: `apps/heimdall/docs/AUTHORING.md`.

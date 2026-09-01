@@ -56,9 +56,11 @@ CLI `dev` / `build` resolve the Vite binary with `src/lib/resolveViteBin.ts` (ne
 - Config: `heimdall.config.mjs` at monorepo root
 - Root DX: `bun run heimdall doctor` / `bun run heimdall dev` → `apps/heimdall/bin/heimdall.cjs` (CLI walks up to root config)
 - Alternate: `cd apps/heimdall && node ./bin/heimdall.cjs doctor` / `dev`
-- Contract smoke: `server/packagesDogfood.contract.test.ts` (Soft-empty OK until Part 2 BMAD lands)
+- Contract smoke: `server/packagesDogfood.contract.test.ts`
+- BMAD Modules layout: `_bmad-output/README.md` (monorepo + `shared-*` + app peers)
 
 ## Docs
 
 - App authoring: `docs/AUTHORING.md`
-- Planning SoR: `_bmad-output/heimdall/` (incremental Part 2)
+- Monorepo / packages SoR: `_bmad-output/pocket-dimension/`, `_bmad-output/shared-*/`
+- Heimdall product SoR: `_bmad-output/heimdall/` (still incremental)

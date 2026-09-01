@@ -1,73 +1,66 @@
-# Pocket Dimension — Project Overview
+# Project Overview — Pocket Dimension
 
-**Date:** 2026-08-23  
-**Type:** Monorepo (13 parts)  
-**Architecture:** Shared auth/db libraries + Elysia auth API + SvelteKit apps
+Personal Bun + Turbo monorepo of small apps. Auth-backed apps share Better Auth and named PostgreSQL 18 schemas. Standalone apps skip auth/DB. zeo adds LiveKit; Heimdall is the BMAD War Room.
 
-## Executive Summary
+**Scan:** Deep full rescan 2026-08-31 (monorepo + tools + shared packages).
 
-Pocket Dimension is a Bun + Turbo monorepo of personal apps that share Better Auth, Drizzle/PostgreSQL 18, and a small utils package. Auth-backed apps talk to `auth-service` (Elysia, port 5001) and query named PostgreSQL schemas. Standalone apps (`rhymes`, `markitdown`, `pocket`) do not use auth or the shared DB. `zeo` adds LiveKit SFU video and an internal music worker.
+## Classification
 
-## Project Classification
+| Field | Value |
+| --- | --- |
+| Repository type | Monorepo |
+| Primary language | TypeScript |
+| Package manager | Bun 1.3.5 (`packageManager` field) |
+| Node | ≥ 22.12.0 (`.node-version`) |
+| Orchestration | Turbo 2.x |
+| Architecture | Shared libraries → auth-service → independently deployed apps |
+| CI | None (husky pre-commit only) |
 
-- **Repository Type:** monorepo (`apps/**`, `shared/**`, `scripts/**`)
-- **Project Types:** library (3), backend (2), web (8)
-- **Primary Languages:** TypeScript, Svelte 5, SQL (Drizzle migrations)
-- **Architecture Pattern:** Shared packages → auth service → full-stack SvelteKit apps; optional workers
+## Documented parts (this scan)
 
-## Multi-Part Structure
-
-| Part | Path | Type | Purpose |
+| Part | Path | Type | BMAD folder |
 | --- | --- | --- | --- |
-| shared-utils | `shared/utils` | library | Zod env validation |
-| shared-db | `shared/db` | library | Drizzle client + all app schemas + migrations |
-| shared-auth | `shared/auth` | library | Better Auth instance (email, username, magic link, Resend) |
-| auth-service | `apps/auth-service` | backend | HTTP auth API on port 5001 |
-| watchlist | `apps/watchlist` | web | Collaborative media watchlist (3002) |
-| rhymes | `apps/rhymes` | web | Literary reader from markdown corpus (3003); rework in progress |
-| howwasyourday | `apps/howwasyourday` | web | Daily journal + push reminders (3004) |
-| chhan-chhan | `apps/chhan-chhan` | web | Personal finance ledger (3005) |
-| me-via-you | `apps/me-via-you` | web | Anonymous feedback forms (3006) |
-| markitdown | `apps/markitdown` | web | File-to-Markdown converter + Python (3009) |
-| pocket | `apps/pocket` | web | Hub that links sibling apps (3007) |
-| zeo | `apps/zeo` | web | Group video + games + shared listening (3008) |
-| zeo-music-worker | `apps/zeo-music-worker` | backend | yt-dlp/ffmpeg → LiveKit audio bot (3010) |
+| monorepo-tools | `.` / `scripts/` | infra | this folder (`architecture-monorepo-tools.md`) |
+| shared-utils | `shared/utils` | library | `_bmad-output/shared-utils/` |
+| shared-db | `shared/db` | library | `_bmad-output/shared-db/` |
+| shared-auth | `shared/auth` | library | `_bmad-output/shared-auth/` |
 
-### How Parts Integrate
+## Full apps map (ports)
 
-Auth-backed SvelteKit apps import `@pocket-dimension/auth` in `hooks.server.ts` and `@pocket-dimension/db` for queries. Browser clients call `auth-service` via `PUBLIC_BASE_AUTH_URL`. All app tables FK to `auth.user`. zeo additionally talks to LiveKit and `zeo-music-worker`. pocket only reads env URLs — it does not proxy traffic.
+| Part | Path | Port | Auth/DB? |
+| --- | --- | --- | --- |
+| auth-service | `apps/auth-service` | 5001 | yes |
+| watchlist | `apps/watchlist` | 3002 | yes |
+| rhymes | `apps/rhymes` | 3003 | no |
+| howwasyourday | `apps/howwasyourday` | 3004 | yes |
+| chhan-chhan | `apps/chhan-chhan` | 3005 | yes |
+| me-via-you | `apps/me-via-you` | 3006 | yes |
+| pocket | `apps/pocket` | 3007 | no |
+| zeo | `apps/zeo` | 3008 | yes |
+| markitdown | `apps/markitdown` | 3009 | no (+ Python) |
+| zeo-music-worker | `apps/zeo-music-worker` | 3010 | worker |
+| dashboard | `apps/dashboard` | 3011 | no |
+| heimdall | `apps/heimdall` | 5174/5175 · 3012 | no |
 
-## Technology Stack Summary
+## Layering
 
-| Category | Technology | Version / note |
-| --- | --- | --- |
-| Runtime | Bun | 1.3.5 (packageManager) |
-| Language | TypeScript | 5.9+ |
-| Monorepo | Turbo | 2.7 |
-| Web | SvelteKit 2 + Svelte 5 | svelte-adapter-bun |
-| CSS | Tailwind CSS | 4.x |
-| Auth API | Elysia | 1.4 |
-| Auth | Better Auth | 1.4 |
-| ORM | Drizzle + pg | 0.45 / 8.16 |
-| Database | PostgreSQL | **18+** (`uuidv7()`) |
-| Media (zeo) | LiveKit | client 2.20, server-sdk 2.15 |
-| Email | Resend | required non-empty API key to boot auth |
-| Convert | Python markitdown | markitdown app only |
+```
+shared/utils  →  shared/db  →  shared/auth
+                      ↓              ↓
+                 auth-backed apps   auth-service (:5001)
+                 (SvelteKit)        ↑ browser clients via PUBLIC_BASE_AUTH_URL
+```
 
-## Architecture Type
+Standalone: `rhymes`, `markitdown`, `pocket`, `dashboard`, `heimdall`.
 
-Layered monorepo: shared libraries, one auth HTTP service, many independently deployed SvelteKit apps, one worker. Not a single SPA and not a shared BFF beyond auth-service.
+## Tooling (summary)
 
-## Repository Structure
+- Workspaces: `apps/**`, `shared/**`, `scripts/**`
+- Most root scripts run through `./scripts/turbo-no-prefix.sh` (strips Turbo log prefixes)
+- Shared packages must build `dist/` before apps consume them (`turbo` `^build`)
+- Format/lint: Prettier (root README Biome mentions are stale)
+- Detail: [architecture-monorepo-tools.md](./architecture-monorepo-tools.md)
 
-See [source-tree-analysis.md](./source-tree-analysis.md) and [integration-architecture.md](./integration-architecture.md).
+## BMAD / Heimdall
 
-## Existing Planning (do not duplicate)
-
-- Rhymes rework: `planning-artifacts/` and `implementation-artifacts/` in this folder
-- zeo: `_bmad-output/zeo/`
-- chhan-chhan brownfield: `_bmad-output/chhan-chhan/planning-artifacts/`
-
-## Getting Started
-
-See [development-guide.md](./development-guide.md). Short path: PostgreSQL 18 up → `bun install && bun run build` → `bun run db:migrate` → `bun run dev:app:auth` plus the app you need.
+Modules mode — peer folders under `_bmad-output/`. This folder is the **Monorepo** module. Packages are siblings under `shared-*`.

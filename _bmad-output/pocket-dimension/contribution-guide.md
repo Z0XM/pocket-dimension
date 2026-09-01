@@ -1,14 +1,38 @@
-# Contribution Guide
+# Contribution Guide — Pocket Dimension
 
-There is no root `CONTRIBUTING.md`. Conventions inferred from the repo:
+## Defaults
 
-- **Package manager:** Bun 1.3.5 workspaces + Turbo
-- **Format:** Prettier (root `format` / `format:check`; per-package `lint` is prettier-check)
-- **Types:** `bun run typecheck` where scripts exist
-- **Shared packages:** build `dist/` before running apps
-- **Schema changes:** only in `shared/db`, then generate + migrate
-- **Deploy:** from repo root; see `DEPLOY.md`
-- **BMAD:** default artifacts in `_bmad-output/pocket-dimension/`; do not put chhan-chhan or zeo-only specs here unless the work is monorepo-wide
-- **Secrets:** never commit `.env`
+- Match neighboring app patterns (SvelteKit hooks, env validation, named DB schemas).
+- Build shared packages before running or testing apps.
+- Prefer small, focused changes; do not invent parallel auth/DB stacks.
+- Format with **Prettier** (root README Biome/`check` references are stale).
 
-Changesets exist (`.changeset/`) for versioning workspace packages.
+## Pre-commit (local gate — no CI)
+
+1. `lint-staged` → Prettier write on staged files  
+2. `turbo typecheck --filter='[HEAD^1]'`  
+3. `turbo build --filter='[HEAD^1]'` (unless `SKIP_PRE_COMMIT_BUILD=1`; skips `@pocket-dimension/scripts`)
+
+## Changesets
+
+For versionable workspace changes: `bun run changeset` → `bun run version` → `bun run release`. Config: `.changeset/` (`access: restricted`, `baseBranch: main`). No automated publish CI today.
+
+## BMAD placement
+
+| Change type | Artifact location |
+| --- | --- |
+| Monorepo / tools | `_bmad-output/pocket-dimension/` |
+| Shared package | `_bmad-output/shared-{utils,db,auth}/` |
+| App-only | `_bmad-output/<app>/` |
+| Heimdall product | `_bmad-output/heimdall/` |
+
+Do not create empty Feature Registries. Configure FR paths in `heimdall.config.mjs` only when real SoT exists.
+
+## Quality commands
+
+```bash
+bun run typecheck
+bun run test
+bun run format:check
+bun run heimdall doctor   # Soft-empty MISSING is informational
+```

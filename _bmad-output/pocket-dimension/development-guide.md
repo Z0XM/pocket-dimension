@@ -1,114 +1,70 @@
-# Development Guide
+# Development Guide — Pocket Dimension
 
 ## Prerequisites
 
-- Node.js >= 22.12
-- **Bun 1.3.5**
-- **PostgreSQL 18+** (not 16 — `uuidv7()` is required)
-- For markitdown: Python 3, `ffmpeg`, `exiftool`
+- Node.js ≥ 22.12
+- Bun 1.3.5
+- PostgreSQL **18+** (native `uuidv7()`)
+
+```bash
+sudo pg_ctlcluster 18 main start
+# DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+```
 
 ## First-time setup
 
 ```bash
-# PostgreSQL 18
-sudo pg_ctlcluster 18 main start   # or: sudo service postgresql start
-
-# Repo
 bun install
-bun run build                      # builds shared dist/ packages
-
-# Env (each package that needs it)
-cp shared/db/.env.example shared/db/.env
-# DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
-
-# Auth + each app: copy .env.example → .env
-# BETTER_AUTH_SECRET must match across auth-service and all frontends
-# RESEND_API_KEY must be non-empty (placeholder is fine to boot)
-
+# Copy each package/app `.env.example` → `.env`
+# RESEND_API_KEY=re_placeholder_local_dev_only  (must be non-empty)
+# BETTER_AUTH_SECRET=<same value everywhere>
+bun run build                 # shared dist/ required (^build)
 bun run db:migrate
 ```
 
-Connection used in AGENTS.md: user `postgres`, password `postgres`, db `postgres`.
-
-## Shared package build
-
-Apps import `dist/` of `@pocket-dimension/{auth,db,utils}`. After changing shared code:
+## Day-to-day
 
 ```bash
-bun run build:shared:utils
-bun run build:shared:db
-bun run build:shared:auth
+bun run build:shared:utils && bun run build:shared:db && bun run build:shared:auth
 # or: bun run build
+
+bun run dev:app:auth          # :5001 — needed for auth-backed apps
+bun run dev:app:<name>        # see AGENTS.md / project-overview ports
+
+bun run typecheck             # turbo; shared uses tsgo; SvelteKit apps may use `check` only
+bun run test
+bun run format                # Prettier write (not Biome)
+bun run format:check
+bun run heimdall doctor
+bun run heimdall dev          # needs apps/heimdall dist/cli.cjs or tsx
 ```
 
-`auth-service` has no app build step (Bun runs TypeScript).
-
-## Run locally
+## Scripts / ETL
 
 ```bash
-bun run dev:app:auth               # :5001 — needed for auth apps
-bun run dev:app:watchlist          # :3002
-bun run dev:app:rhymes             # :3003
-bun run dev:app:howwasyourday      # :3004
-bun run dev:app:chhan-chhan        # :3005
-bun run dev:app:me-via-you         # :3006
-bun run dev:app:markitdown         # :3009
-bun run dev:app:pocket             # :3007
-bun run dev:app:zeo                # :3008
-bun run dev:app:zeo-music-worker   # :3010
+cd scripts
+# watchlist / rhymes importers under src/; need DATABASE_URL + built db package
 ```
 
-Auth-backed apps also need `PUBLIC_BASE_AUTH_URL=http://localhost:5001`.
+## Env caveats
 
-### zeo extras
+- Bun loads `.env` from each package cwd (Turbo runs tasks in package dirs).
+- `shared/db/.env` only needs `DATABASE_URL`.
+- Importing `@pocket-dimension/auth` validates env **eagerly** — empty `RESEND_API_KEY` crashes.
+- Local session cookies may not persist over `http://localhost`.
 
-LiveKit for local calls: see `apps/zeo/deploy/livekit/`. Shared listening needs the music worker + YouTube env vars.
+## Lint quirks
 
-### markitdown extras
+- Per-package `bun run lint` may flag `dist/` (subdir Prettier ignores root `.prettierignore`).
+- Prefer root `bun run format:check` for whole-repo formatting signal.
 
-```bash
-cd apps/markitdown && bun run setup:python
-```
+## Pre-commit
 
-## Database
+Husky runs lint-staged → typecheck changed → build changed. Skip build with `SKIP_PRE_COMMIT_BUILD=1`.
 
-```bash
-bun run db:generate                # after schema edits
-bun run db:migrate
-bun run db:studio
-```
+## More detail
 
-Schemas: `auth`, `watchlist`, `howwasyourday`, `chhanchhan`, `meviayou`, `zeo`.
-
-## Tests
-
-| Area | Command | Notes |
-| --- | --- | --- |
-| Root | `bun run test` | Mostly empty; auth-service is `--passWithNoTests` |
-| zeo | `cd apps/zeo && bun test src` | LiveKit/UI/game unit tests |
-| chhan-chhan | `cd apps/chhan-chhan && bun test src/lib/importers/` | Bank importers |
-
-## Lint / typecheck
-
-```bash
-bun run typecheck
-bun run format:check               # root prettier (respects .prettierignore)
-bun run lint                       # per-package prettier; may flag dist/ after build
-```
-
-## Session caveat
-
-Better Auth uses `secure: true` / `sameSite: "none"`. On `http://localhost` the session cookie often does not persist. Signup still works; verifying users may require flipping `email_verified` in the DB if email is not delivered.
-
-## Email
-
-`RESEND_API_KEY` is required at module load (`shared/auth/src/lib/emails.ts`). Use a placeholder locally. Verification emails are fire-and-forget.
-
-## Common tasks
-
-| Task | Where |
-| --- | --- |
-| Add a DB table | `shared/db/src/schema/<app>.ts` → `db:generate` → `db:migrate` |
-| Add an auth-backed app | hooks + auth-client + `BETTER_AUTH_*` + named schema |
-| Add a bank importer | `apps/chhan-chhan` — see `IMPORT.md` |
-| Switch BMAD project | Default is this folder; zeo/chhan-chhan keep their own trees |
+- Tools architecture: [architecture-monorepo-tools.md](./architecture-monorepo-tools.md)
+- Deploy: [deployment-guide.md](./deployment-guide.md)
+- Packages: `_bmad-output/shared-*/development-guide.md`
+- Cloud agent caveats: root `AGENTS.md`

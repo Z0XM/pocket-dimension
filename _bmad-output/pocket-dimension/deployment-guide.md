@@ -1,76 +1,43 @@
-# Deployment Guide
+# Deployment Guide — Pocket Dimension
 
-Canonical runbook: root [`DEPLOY.md`](../../DEPLOY.md). Apps with `@pocket-dimension/*` workspace deps **must build from the repository root**.
+## Hard rules
 
-## Pattern
+1. Apps that depend on `@pocket-dimension/*` must build from the **repository root** (`/`), not `apps/<app>` alone.
+2. PostgreSQL **18+** in every environment that runs migrations (`uuidv7()`).
+3. Apply schema with `DATABASE_URL=… bun run db:migrate` (zeo `bun run start` can auto-migrate when `DATABASE_URL` is set).
 
-| Field | Typical value |
-| --- | --- |
-| Build type | Dockerfile (Dokploy) |
-| Build Path | `/` |
-| Docker Context | `.` (repo root) |
-| Dockerfile | `apps/<app>/Dockerfile` |
+## Dockerfile path (recommended)
 
-Do not set Build Path `apps/<app>` with Context `.` — `COPY shared/` fails.
+Build context = **repo root**. Dokploy: do not mix Build Path `apps/<app>` with Context `.` (breaks `COPY shared/`).
 
-**Railpack alternative:** each app `railpack.json` skips default install and runs `scripts/deploy-build.sh` from the monorepo root.
+## Railpack path
+
+Per-app `railpack.json` no-ops install (`"true"`), then `scripts/deploy-build.sh` installs/builds from monorepo root. `deploy.startCommand` detects workspace root vs app dir.
+
+## `.dockerignore`
+
+Stub-only strategy for apps excluded from multi-app images (`markitdown`, `zeo-music-worker`). **Keeps** `_bmad-output` (Heimdall needs it).
+
+## Heimdall
+
+Needs `_bmad-output` + root `heimdall.config.mjs` in the image. See `apps/heimdall/DEPLOY.md`. Prod port **3012**.
+
+## Auth runtime
+
+- Identical `BETTER_AUTH_SECRET` across auth-service and frontends.
+- Non-empty `RESEND_API_KEY` on any process importing `@pocket-dimension/auth`.
+- `PUBLIC_BASE_AUTH_URL` → deployed auth-service origin.
+- Cookie domain / HTTPS must match `secure` + `sameSite: "none"`.
 
 ## Ports
 
-| App | Port | Dockerfile |
-| --- | --- | --- |
-| auth-service | 5001 | `apps/auth-service/Dockerfile` |
-| watchlist | 3002 | `apps/watchlist/Dockerfile` |
-| rhymes | 3003 | `apps/rhymes/Dockerfile` |
-| howwasyourday | 3004 | `apps/howwasyourday/Dockerfile` |
-| chhan-chhan | 3005 | `apps/chhan-chhan/Dockerfile` |
-| me-via-you | 3006 | `apps/me-via-you/Dockerfile` |
-| markitdown | 3009 | Railpack only (Python + ffmpeg + exiftool) |
-| pocket | 3007 | `apps/pocket/Dockerfile` |
-| zeo | 3008 | `apps/zeo/Dockerfile` |
-| zeo-music-worker | 3010 | `apps/zeo-music-worker/Dockerfile` (internal) |
-
-## Shared production env
-
-Must match across auth-service and every auth frontend:
-
-- `BETTER_AUTH_SECRET`
-- `BETTER_AUTH_URL`, `BETTER_AUTH_PATH`, `BETTER_AUTH_COOKIE_DOMAIN`
-- `BETTER_AUTH_TRUSTED_ORIGINS` — all frontend origins
-- `DATABASE_URL` — PostgreSQL 18+
-- `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
-- Per-app `ORIGIN`, `PORT`, `PUBLIC_BASE_AUTH_URL`
-
-`.env.example` is **not** loaded by Dokploy — copy into the service Environment panel.
-
-## Database
-
-```bash
-DATABASE_URL=postgresql://... bun run db:migrate
-```
-
-zeo `bun run start` auto-migrates when `DATABASE_URL` is set.
-
-## zeo extras
-
-Primary runbook: `apps/zeo/deploy/dokploy/README.md`.
-
-- LiveKit (Dokploy template) + Cloudflare DNS
-- Production: `https://zeo.z0xm.com`, `wss://zeo-livekit.z0xm.com`
-- Music worker stays on the internal Docker network (no public domain)
-- Legacy Caddy/systemd: `apps/zeo/deploy/README.legacy-caddy-systemd.md`
-
-## Per-app guides
-
-| App | Doc |
+| App | Port |
 | --- | --- |
-| auth-service | `apps/auth-service/DEPLOY.md` |
-| watchlist | `apps/watchlist/DEPLOY.md` |
-| rhymes | `apps/rhymes/DEPLOY.md` |
-| howwasyourday | `apps/howwasyourday/DEPLOY.md` |
-| chhan-chhan | `apps/chhan-chhan/DEPLOY.md` |
-| me-via-you | `apps/me-via-you/DEPLOY.md` |
-| pocket | `apps/pocket/DEPLOY.md` |
-| zeo | `apps/zeo/DEPLOY.md` |
-| markitdown | `apps/markitdown/railpack.json` |
-| zeo-music-worker | `apps/zeo-music-worker/README.md` |
+| auth-service | 5001 |
+| watchlist … zeo | 3002–3008 |
+| markitdown | 3009 |
+| zeo-music-worker | 3010 |
+| dashboard | 3011 |
+| heimdall | 3012 |
+
+Full contract: root [`DEPLOY.md`](../../DEPLOY.md). Tooling detail: [architecture-monorepo-tools.md](./architecture-monorepo-tools.md).
