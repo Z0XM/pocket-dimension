@@ -31,7 +31,9 @@ _bmad-output/<module-id>/
   FEATURE-REGISTRY.md       # only when Features SoT exists — never empty placeholders
 ```
 
-**Do not** create empty `FEATURE-REGISTRY.md`, intake, or deferred indexes just to satisfy config. Omit those keys in `heimdall.config.mjs` until real content exists (Soft-empty is expected).
+**Feature Registries authored (brownfield):** `pocket-dimension`, `shared-utils`, `shared-db`, `shared-auth`, `watchlist`, `chhan-chhan` — each has module-root `FEATURE-REGISTRY.md` wired in `heimdall.config.mjs`. Still omit FR for `zeo` / `heimdall` until those SoTs are authored (Soft-empty is expected).
+
+**Do not** create empty `FEATURE-REGISTRY.md`, intake, or deferred indexes just to satisfy config. Omit those keys in `heimdall.config.mjs` until real content exists.
 
 **Do not** write BMAD artifacts to a repo-root `docs/` folder.
 

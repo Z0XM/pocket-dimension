@@ -13,5 +13,6 @@
 | [architecture.md](./architecture.md) | Better Auth config, emails, env |
 | [development-guide.md](./development-guide.md) | Build, secrets, local cookie caveat |
 | [source-tree-analysis.md](./source-tree-analysis.md) | File layout |
+| [FEATURE-REGISTRY.md](./FEATURE-REGISTRY.md) | Features SoT |
 
-HTTP boundary is `apps/auth-service` (document when that app module is added). Depends on [`../shared-db/`](../shared-db/) and [`../shared-utils/`](../shared-utils/).
+Feature Registry wired in `heimdall.config.mjs`. HTTP boundary is `apps/auth-service` (document when that app module is added). Depends on [`../shared-db/`](../shared-db/) and [`../shared-utils/`](../shared-utils/).
