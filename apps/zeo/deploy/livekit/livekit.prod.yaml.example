@@ -20,10 +20,10 @@ room:
   empty_timeout: 300
 
 # LiveKit embedded TURN — clients receive ephemeral credentials via signaling.
-# Requires TLS on zeo-livekit.z0xm.com (Caddy) and open UDP/TCP ports (see deploy README).
+# Requires TLS on zeo-livekit-turn.z0xm.com and open UDP/TCP ports (see deploy README).
 turn:
   enabled: true
-  domain: zeo-livekit.z0xm.com
+  domain: zeo-livekit-turn.z0xm.com
   tls_port: 5349
   udp_port: 3478
   # Relay ports (open in ufw — see ../firewall/ufw-rules.example.sh)
