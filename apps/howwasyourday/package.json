@@ -42,8 +42,8 @@
     "@pocket-dimension/auth": "workspace:*",
     "@pocket-dimension/db": "workspace:*",
     "@pocket-dimension/utils": "workspace:*",
-    "better-auth": "^1.4.10",
-    "drizzle-orm": "^0.45.1",
+    "better-auth": "1.6.33",
+    "drizzle-orm": "^0.45.2",
     "node-cron": "^3.0.3",
     "web-push": "^3.6.7"
   }

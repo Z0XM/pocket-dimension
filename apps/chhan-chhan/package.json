@@ -47,8 +47,8 @@
     "@lucide/svelte": "^1.17.0",
     "@pocket-dimension/auth": "workspace:*",
     "@pocket-dimension/db": "workspace:*",
-    "better-auth": "^1.4.10",
-    "drizzle-orm": "^0.45.1",
+    "better-auth": "1.6.33",
+    "drizzle-orm": "^0.45.2",
     "unpdf": "^1.6.2",
     "zod": "^4.2.1"
   }

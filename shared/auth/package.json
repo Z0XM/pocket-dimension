@@ -25,11 +25,11 @@
   "dependencies": {
     "@pocket-dimension/db": "workspace:*",
     "@pocket-dimension/utils": "workspace:*",
-    "better-auth": "^1.4.10",
+    "better-auth": "1.6.33",
     "resend": "^6.7.0",
     "zod": "^4.3.4"
   },
   "devDependencies": {
-    "@better-auth/cli": "^1.4.10"
+    "@better-auth/cli": "1.4.22"
   }
 }

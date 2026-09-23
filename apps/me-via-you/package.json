@@ -37,10 +37,10 @@
     "@pocket-dimension/auth": "workspace:*",
     "@pocket-dimension/db": "workspace:*",
     "bad-words": "^4.0.0",
-    "better-auth": "^1.4.10",
+    "better-auth": "1.6.33",
     "bits-ui": "^2.18.1",
     "clsx": "^2.1.1",
-    "drizzle-orm": "^0.45.1",
+    "drizzle-orm": "^0.45.2",
     "tailwind-merge": "^3.6.0",
     "tailwind-variants": "^3.2.2"
   }
