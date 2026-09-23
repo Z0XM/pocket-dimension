@@ -232,6 +232,13 @@
       "when": 1785001000000,
       "tag": "0032_zeo_listening_playback_clock",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790192565376,
+      "tag": "0033_auth_api_token",
+      "breakpoints": true
     }
   ]
 }

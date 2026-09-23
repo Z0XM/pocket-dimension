@@ -417,10 +417,10 @@
       "name": "@pocket-dimension/auth",
       "version": "0.0.0",
       "dependencies": {
-        "@better-auth/core": "1.6.33",
         "@pocket-dimension/db": "workspace:*",
         "@pocket-dimension/utils": "workspace:*",
         "better-auth": "1.6.33",
+        "drizzle-orm": "^0.45.1",
         "resend": "^6.7.0",
         "zod": "^4.3.4",
       },

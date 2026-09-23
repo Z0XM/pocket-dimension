@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "build": "bun build ./src/index.ts ./src/dev-mode-client.ts --outdir ./dist --format esm --target bun --external better-auth --external @pocket-dimension/utils --external @pocket-dimension/db --external resend --external node:path",
+    "build": "bun build ./src/index.ts ./src/dev-mode-client.ts --outdir ./dist --format esm --target bun --external better-auth --external @pocket-dimension/utils --external @pocket-dimension/db --external resend --external drizzle-orm --external node:path --external node:crypto",
     "clean": "rm -rf dist",
     "lint": "prettier --check .",
     "typecheck": "tsgo --noEmit",
@@ -26,6 +26,7 @@
     "@pocket-dimension/db": "workspace:*",
     "@pocket-dimension/utils": "workspace:*",
     "better-auth": "1.6.33",
+    "drizzle-orm": "^0.45.1",
     "resend": "^6.7.0",
     "zod": "^4.3.4"
   },
