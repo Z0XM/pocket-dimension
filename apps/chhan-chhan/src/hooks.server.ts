@@ -1,4 +1,4 @@
-import { auth } from "@pocket-dimension/auth";
+import { auth, getDevModeSessionRedirect, isDevModeEnabled } from "@pocket-dimension/auth";
 import type { schema } from "@pocket-dimension/db";
 import { redirect, type Handle } from "@sveltejs/kit";
 import { svelteKitHandler } from "better-auth/svelte-kit";
@@ -18,6 +18,25 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (session) {
     event.locals.session = session.session;
     event.locals.user = session.user as typeof schema.user.$inferSelect;
+  }
+
+  event.locals.devMode = isDevModeEnabled();
+
+  // Dev Mode: establish a real session for the default allowlisted account
+  if (!session && event.locals.devMode && !event.url.pathname.startsWith("/api/") && !building) {
+    const authBaseUrl = Bun.env.BETTER_AUTH_URL ?? Bun.env.PUBLIC_BASE_AUTH_URL;
+    if (authBaseUrl) {
+      const target = getDevModeSessionRedirect({
+        authBaseUrl,
+        appOrigin: event.url.origin,
+        pathname: event.url.pathname,
+        search: event.url.search,
+        hasSession: false,
+      });
+      if (target) {
+        return redirect(307, target);
+      }
+    }
   }
 
   if (event.route.id?.startsWith("/(auth)/")) {

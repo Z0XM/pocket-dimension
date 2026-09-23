@@ -18,7 +18,7 @@ describe("tryRefreshYouTubeAccessToken", () => {
   it("returns null when Google rejects the refresh instead of throwing", async () => {
     seedZeoEnv();
 
-    globalThis.fetch = mock(async () => new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 })) as typeof fetch;
+    globalThis.fetch = mock(async () => new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 })) as unknown as typeof fetch;
 
     const { tryRefreshYouTubeAccessToken } = await import("./youtube-oauth");
     const result = await tryRefreshYouTubeAccessToken("stale-refresh-token");

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DevModeNotch from "$lib/components/dev-mode-notch.svelte";
   import { onMount } from "svelte";
   import "../app.css";
 
@@ -9,7 +10,7 @@
   import icon from "$lib/assets/icon.svg";
   import { authClient } from "$lib/auth-client";
 
-  const { children } = $props();
+  const { children, data } = $props();
 
   onMount(() => {
     const session = authClient.useSession();
@@ -34,4 +35,7 @@
 <Toaster />
 <Overlay />
 <PwaInstallButton />
+{#if data?.devMode && data?.authBaseUrl}
+  <DevModeNotch authBaseUrl={data.authBaseUrl} currentUsername={data.devModeUser?.username} />
+{/if}
 {@render children()}

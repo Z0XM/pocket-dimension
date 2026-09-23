@@ -4,6 +4,7 @@ import { Elysia, StatusMap, status } from "elysia";
 import { env } from "./lib/env";
 import { authMiddleware } from "./middlewares/auth";
 import { authHandler } from "./routes/auth";
+import { devHandler } from "./routes/dev";
 
 const app = new Elysia()
   .onRequest(({ request }) => {
@@ -40,11 +41,16 @@ const app = new Elysia()
             name: "auth",
             description: "Authentication endpoints",
           },
+          {
+            name: "dev",
+            description: "Dev Mode endpoints (local development only)",
+          },
         ],
       },
     })
   )
   .use(authHandler)
+  .use(devHandler)
   .use(authMiddleware)
   .get(
     "/health",

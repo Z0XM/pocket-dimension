@@ -69,3 +69,7 @@ apps/chhan-chhan/data/
 
 # cookies
 cookies.txt
+
+# Dev Mode local config (contains local account allowlist)
+**/devMode.config.ts
+!**/devMode.config.example.ts
