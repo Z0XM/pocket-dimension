@@ -4,6 +4,10 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { magicLink, username } from "better-auth/plugins";
 import { sendMagicLinkEmail, sendResetPasswordEmail, sendVerificationEmail } from "./lib/emails";
 import { env } from "./lib/env";
+import { devMode } from "./plugins/dev-mode";
+
+/** Soft cookies on plain HTTP localhost so Dev Mode / local sessions stick. */
+const isDevelopment = env.NODE_ENV === "development";
 
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
@@ -75,11 +79,11 @@ export const auth = betterAuth({
       domain: env.BETTER_AUTH_COOKIE_DOMAIN,
     },
     defaultCookieAttributes: {
-      secure: true,
+      secure: !isDevelopment,
       httpOnly: true,
-      sameSite: "none",
+      sameSite: isDevelopment ? "lax" : "none",
     },
-    useSecureCookies: true,
+    useSecureCookies: !isDevelopment,
   },
   plugins: [
     magicLink({
@@ -99,5 +103,21 @@ export const auth = betterAuth({
         return username.toLowerCase();
       },
     }),
+    // Dev Mode endpoints hard-refuse unless DEV_MODE && NODE_ENV=development
+    devMode(),
   ],
 });
+
+export {
+  isDevModeEnabled,
+  assertDevModeEnabled,
+  toPublicAccounts,
+  findAllowedAccount,
+  loadDevModeConfig,
+  buildDevSignInUrl,
+  buildDevAccountsUrl,
+  getDevModeSessionRedirect,
+  type DevModeAccount,
+  type DevModeConfig,
+  type DevModePublicAccount,
+} from "./lib/dev-mode";

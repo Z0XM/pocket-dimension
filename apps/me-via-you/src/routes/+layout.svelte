@@ -1,11 +1,12 @@
 <script lang="ts">
+  import DevModeNotch from "$lib/components/dev-mode-notch.svelte";
   import "../app.css";
   import { onMount } from "svelte";
   import icon from "$lib/assets/icon.svg";
   import { authClient } from "$lib/auth-client";
   import { applyThemeMode, getThemeMode } from "$lib/theme-mode";
 
-  const { children } = $props();
+  const { children, data } = $props();
 
   onMount(() => {
     applyThemeMode(getThemeMode());
@@ -28,4 +29,7 @@
   <link rel="apple-touch-icon" href={icon} />
 </svelte:head>
 
+{#if data?.devMode && data?.authBaseUrl}
+  <DevModeNotch authBaseUrl={data.authBaseUrl} currentUsername={data.devModeUser?.username} />
+{/if}
 {@render children()}

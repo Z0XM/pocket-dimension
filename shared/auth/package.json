@@ -8,10 +8,14 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./dev-mode": {
+      "types": "./src/dev-mode-client.ts",
+      "default": "./dist/dev-mode-client.js"
     }
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --format esm --target bun --external better-auth --external @pocket-dimension/utils --external @pocket-dimension/db --external resend",
+    "build": "bun build ./src/index.ts ./src/dev-mode-client.ts --outdir ./dist --format esm --target bun --external better-auth --external @pocket-dimension/utils --external @pocket-dimension/db --external resend --external node:path",
     "clean": "rm -rf dist",
     "lint": "prettier --check .",
     "typecheck": "tsgo --noEmit",

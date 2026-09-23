@@ -1,10 +1,11 @@
 <script lang="ts">
+  import DevModeNotch from "$lib/components/dev-mode-notch.svelte";
   import "../app.css";
   import { onMount } from "svelte";
   import PwaInstallButton from "$lib/components/PwaInstallButton.svelte";
   import { authClient } from "$lib/auth-client";
 
-  const { children } = $props();
+  const { children, data } = $props();
 
   // Set timezone offset cookie so the server can compute dates in the client's timezone
   onMount(() => {
@@ -27,4 +28,7 @@
 </script>
 
 <PwaInstallButton />
+{#if data?.devMode && data?.authBaseUrl}
+  <DevModeNotch authBaseUrl={data.authBaseUrl} currentUsername={data.devModeUser?.username} />
+{/if}
 {@render children()}
