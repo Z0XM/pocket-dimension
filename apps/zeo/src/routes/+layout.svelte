@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DevModeNotch from "$lib/components/dev-mode-notch.svelte";
   import "../app.css";
   import "@fontsource-variable/inter";
   import "@fontsource/fira-mono";
@@ -7,7 +8,7 @@
   import { registerServiceWorker } from "$lib/pwa";
   import { TooltipProvider } from "$lib/components/ui/tooltip";
 
-  const { children } = $props();
+  const { children, data } = $props();
 
   onMount(() => {
     registerServiceWorker();
@@ -20,5 +21,8 @@
 </script>
 
 <TooltipProvider delayDuration={300}>
+  {#if data?.devMode && data?.authBaseUrl}
+    <DevModeNotch authBaseUrl={data.authBaseUrl} currentUsername={data.devModeUser?.username} />
+  {/if}
   {@render children()}
 </TooltipProvider>

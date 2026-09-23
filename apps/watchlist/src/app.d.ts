@@ -8,6 +8,7 @@ declare global {
   namespace App {
     // interface Error {}
     interface Locals {
+      devMode?: boolean;
       session?: Session;
       user?: typeof schema.user.$inferSelect;
     }

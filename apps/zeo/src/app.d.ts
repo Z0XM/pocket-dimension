@@ -6,6 +6,7 @@ import type { Session } from "$lib/auth";
 declare global {
   namespace App {
     interface Locals {
+      devMode?: boolean;
       session?: Session;
       user?: typeof schema.user.$inferSelect;
     }
