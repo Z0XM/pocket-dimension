@@ -49,19 +49,17 @@ export function buildYouTubeOAuthUrl(options: { requestUrl: URL; state: string }
   return url;
 }
 
-async function parseTokenResponse(response: Response) {
-  const body = (await response.json().catch(() => ({}))) as {
-    access_token?: string;
-    refresh_token?: string;
-    expires_in?: number;
-    scope?: string;
-    error_description?: string;
-    error?: string;
-  };
+type GoogleTokenBody = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  scope?: string;
+  error_description?: string;
+  error?: string;
+};
 
-  if (!response.ok || !body.access_token) {
-    throw error(502, body.error_description ?? body.error ?? "Google token exchange failed");
-  }
+function tokenFromGoogleBody(body: GoogleTokenBody) {
+  if (!body.access_token) return null;
 
   return {
     accessToken: body.access_token,
@@ -69,6 +67,35 @@ async function parseTokenResponse(response: Response) {
     accessExpiresAt: new Date(Date.now() + Math.max(0, body.expires_in ?? 3600) * 1000),
     scopes: body.scope?.split(/\s+/).filter(Boolean) ?? YOUTUBE_OAUTH_SCOPES,
   };
+}
+
+async function parseTokenResponse(response: Response) {
+  const body = (await response.json().catch(() => ({}))) as GoogleTokenBody;
+
+  if (!response.ok || !body.access_token) {
+    throw error(502, body.error_description ?? body.error ?? "Google token exchange failed");
+  }
+
+  return tokenFromGoogleBody(body)!;
+}
+
+/** Best-effort refresh for background callers; returns null instead of throwing. */
+export async function tryRefreshYouTubeAccessToken(refreshToken: string) {
+  const { clientId, clientSecret } = googleOAuthConfig();
+  const response = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const body = (await response.json().catch(() => ({}))) as GoogleTokenBody;
+  if (!response.ok) return null;
+  return tokenFromGoogleBody(body);
 }
 
 async function googleSubForAccessToken(accessToken: string) {
@@ -104,17 +131,9 @@ export async function exchangeYouTubeCode(options: { code: string; requestUrl: U
 }
 
 export async function refreshYouTubeAccessToken(refreshToken: string) {
-  const { clientId, clientSecret } = googleOAuthConfig();
-  const response = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: "refresh_token",
-    }),
-  });
-
-  return parseTokenResponse(response);
+  const refreshed = await tryRefreshYouTubeAccessToken(refreshToken);
+  if (!refreshed) {
+    throw error(502, "Google token refresh failed");
+  }
+  return refreshed;
 }
