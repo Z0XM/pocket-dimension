@@ -72,11 +72,13 @@
     "scripts/**"
   ],
   "overrides": {
-    "kysely": "0.28.17"
+    "kysely": "0.28.17",
+    "better-auth": "1.6.33",
+    "@better-auth/core": "1.6.33"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.0",
-    "better-auth": "^1.4.9",
+    "better-auth": "1.6.33",
     "elysia": "^1.4.19"
   }
 }
