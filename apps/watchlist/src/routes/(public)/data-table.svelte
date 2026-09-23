@@ -1252,7 +1252,6 @@
             {@const isDeleted = editMode.isRowDeleted((row.original as Watchlist).id)}
             {@const isSelected = editMode.isRowSelected((row.original as Watchlist).id)}
             {@const isNewRow = (row.original as Watchlist).id.startsWith("temp-")}
-            {@const hasInfinityCount = Number((row.original as Watchlist).infinity_counts) > 0}
             {@const rowData = row.original as Watchlist}
             <Table.Row
               data-state={row.getIsSelected() && "selected"}
@@ -1260,9 +1259,7 @@
                 ? ''
                 : 'hover:scale-[102%]'} scale-[97%] transition-all duration-300 ease-out bg-white/1 backdrop-blur-md [&>td:first-child]:border-l [&>td:first-child]:pl-4 [&>td:first-child]:rounded-l-md [&>td:last-child]:border-r [&>td:last-child]:pr-4 [&>td:last-child]:px-4 [&>td:last-child]:rounded-r-md [&>td]:border-t [&>td]:border-b {isDeleted
                 ? 'opacity-50 line-through bg-red-500/10'
-                : ''} {isSelected ? 'bg-blue-500/10' : ''} {isNewRow ? 'bg-green-500/5 border-l-2 border-l-green-500' : ''} {hasInfinityCount
-                ? 'shimmer-infinity'
-                : ''}"
+                : ''} {isSelected ? 'bg-blue-500/10' : ''} {isNewRow ? 'bg-green-500/5 border-l-2 border-l-green-500' : ''}"
               oncontextmenu={(e) => {
                 // Prevent default context menu on mobile long press
                 if (isMobile) {
