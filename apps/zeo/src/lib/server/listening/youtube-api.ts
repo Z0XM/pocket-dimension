@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { error } from "@sveltejs/kit";
 import { env } from "$lib/server/env";
 import { decryptToken, encryptToken } from "./tokens";
-import { refreshYouTubeAccessToken } from "./youtube-oauth";
+import { tryRefreshYouTubeAccessToken } from "./youtube-oauth";
 import type { ListeningQueueSource } from "./types";
 
 const DATA_API_URL = "https://www.googleapis.com/youtube/v3";
@@ -32,23 +32,29 @@ export async function getYouTubeAccessTokenForUser(userId: string) {
   });
   if (!link) return null;
 
-  if (link.accessExpiresAt.getTime() > Date.now() + 60_000) {
-    return decryptToken(link.accessTokenEnc);
+  try {
+    if (link.accessExpiresAt.getTime() > Date.now() + 60_000) {
+      return decryptToken(link.accessTokenEnc);
+    }
+
+    const refreshToken = decryptToken(link.refreshTokenEnc);
+    const refreshed = await tryRefreshYouTubeAccessToken(refreshToken);
+    if (!refreshed) return null;
+
+    await db
+      .update(schema.youtubeAccountLinks)
+      .set({
+        accessTokenEnc: encryptToken(refreshed.accessToken),
+        accessExpiresAt: refreshed.accessExpiresAt,
+        scopes: refreshed.scopes,
+        revokedAt: null,
+      })
+      .where(eq(schema.youtubeAccountLinks.userId, userId));
+
+    return refreshed.accessToken;
+  } catch {
+    return null;
   }
-
-  const refreshToken = decryptToken(link.refreshTokenEnc);
-  const refreshed = await refreshYouTubeAccessToken(refreshToken);
-  await db
-    .update(schema.youtubeAccountLinks)
-    .set({
-      accessTokenEnc: encryptToken(refreshed.accessToken),
-      accessExpiresAt: refreshed.accessExpiresAt,
-      scopes: refreshed.scopes,
-      revokedAt: null,
-    })
-    .where(eq(schema.youtubeAccountLinks.userId, userId));
-
-  return refreshed.accessToken;
 }
 
 export async function requireYouTubeAccessTokenForUser(userId: string) {

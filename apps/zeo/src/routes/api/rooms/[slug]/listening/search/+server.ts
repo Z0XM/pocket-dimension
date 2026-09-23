@@ -3,6 +3,7 @@ import { requireUser } from "$lib/server/authz";
 import { requireRoomMember } from "$lib/server/listening/authz";
 import { findActiveListeningSession } from "$lib/server/listening/sessions";
 import { getYouTubeAccessTokenForUser, parseYouTubeVideoId, resolveYouTubeVideo, searchYouTubeVideos } from "$lib/server/listening/youtube-api";
+import { env } from "$lib/server/env";
 import { findRoomBySlug } from "$lib/server/rooms";
 import type { RequestHandler } from "./$types";
 
@@ -19,7 +20,8 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
   const session = await findActiveListeningSession(room.id);
   if (!session) throw error(404, "No active listening session in this room");
 
-  const accessToken = await getYouTubeAccessTokenForUser(session.linkerUserId);
+  // Public search/metadata can use YOUTUBE_DATA_API_KEY; avoid refreshing linker OAuth unless needed.
+  const accessToken = env.YOUTUBE_DATA_API_KEY ? null : await getYouTubeAccessTokenForUser(session.linkerUserId);
   const videoId = parseYouTubeVideoId(query);
   if (videoId) {
     const item = await resolveYouTubeVideo(videoId, accessToken ?? undefined);
