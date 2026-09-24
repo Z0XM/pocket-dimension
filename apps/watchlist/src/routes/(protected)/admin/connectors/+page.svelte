@@ -124,6 +124,11 @@
         </div>
         <h1 class="text-3xl font-medium">Connectors</h1>
         <p class="text-muted-foreground text-sm">Enable auto imports, edit safe settings, and inspect load history.</p>
+        <p class="text-xs text-muted-foreground">
+          <a href="/admin" class="text-accent hover:underline">← Admin center</a>
+          ·
+          <a href="/admin/duplicates" class="text-accent hover:underline">Duplicates</a>
+        </p>
       </div>
       <div class="flex gap-2">
         <Button size="sm" variant="outline" onclick={refresh}>
@@ -133,6 +138,24 @@
         <a href="/connectors" class="text-xs text-accent hover:underline self-center">Public docs →</a>
       </div>
     </div>
+
+    <Card.Root>
+      <Card.Header>
+        <Card.Title>Ops notes</Card.Title>
+      </Card.Header>
+      <Card.Content class="space-y-2 text-xs/relaxed text-muted-foreground">
+        <p>
+          Cron also needs <code class="text-foreground">BUNKO_IMPORT_ENABLED=true</code> (optional
+          <code class="text-foreground">BUNKO_IMPORT_CRON</code>, default <code class="text-foreground">0 6 * * *</code> UTC). Manual sync accepts an admin
+          session or <code class="text-foreground">BUNKO_SYNC_SECRET</code>:
+        </p>
+        <pre class="bg-muted/40 rounded-md p-3 overflow-x-auto text-[11px] font-mono text-foreground/90">curl -X POST /api/connectors/integrators/bunko \
+  -H "Authorization: Bearer $BUNKO_SYNC_SECRET"
+
+curl /api/connectors/integrators/bunko</pre>
+        <p>Public users see a lean overview at <a href="/connectors" class="text-accent hover:underline">/connectors</a> — secrets, cron, and run internals stay here.</p>
+      </Card.Content>
+    </Card.Root>
 
     <Card.Root>
       <Card.Header>

@@ -32,7 +32,7 @@ export const INTEGRATORS: IntegratorStub[] = [
     id: "bunko",
     label: "Bunko",
     description:
-      "Auto-import movies/shows from the public Bunko Movies API into a configured watchlist account (catalog + ratings). Cron + manual sync.",
+      "Imports movies and shows from the public Bunko Movies API into Watchlist (catalog + ratings for a configured account).",
     direction: "import",
     status: "available",
     homepage: "https://bunko.byimti.tools/",

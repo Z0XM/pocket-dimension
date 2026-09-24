@@ -483,7 +483,7 @@
             <CableIcon class="size-4" />
           </a>
           {#if role === "admin"}
-            <a href="/admin/connectors" class="inline-flex items-center justify-center h-6 w-6 hover:text-accent transition-colors" title="Admin connectors">
+            <a href="/admin" class="inline-flex items-center justify-center h-6 w-6 hover:text-accent transition-colors" title="Admin center">
               <ShieldIcon class="size-4" />
             </a>
           {/if}
