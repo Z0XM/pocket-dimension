@@ -125,6 +125,23 @@ export const userRatingPreferences = watchlistSchema.table(
   (table) => [unique("user_rating_preferences_user_id_preferred_user_id_unique").on(table.userId, table.preferredUserId)]
 );
 
+/** Admin dismissals for false-positive duplicate clusters. */
+export const duplicateDismissals = watchlistSchema.table(
+  "duplicate_dismissals",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    /** Stable key: sorted watch_item ids joined by `|`. */
+    fingerprint: text("fingerprint").notNull(),
+    /** Snapshot of member ids at dismiss time. */
+    itemIds: json("item_ids").notNull().$type<string[]>(),
+    tier: text("tier").notNull(),
+    reason: text("reason"),
+  },
+  (table) => [unique("duplicate_dismissals_fingerprint_unique").on(table.fingerprint)]
+);
+
 /** Runtime toggles for auto/account connectors (admin console). */
 export const connectorSettings = watchlistSchema.table(
   "connector_settings",
