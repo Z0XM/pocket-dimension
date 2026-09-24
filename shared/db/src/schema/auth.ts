@@ -67,9 +67,34 @@ export const verification = authSchema.table(
   (table) => [index("verification_identifier_idx").on(table.identifier)]
 );
 
+/**
+ * Long-lived API tokens for machine/connector access (reusable across apps).
+ * Store only a hash of the secret; the raw token is shown once at creation.
+ */
+export const apiToken = authSchema.table(
+  "api_token",
+  {
+    id,
+    userId,
+    ...timestamps,
+    name: text("name").notNull(),
+    /** First characters of the token for UI display (e.g. pd_ab12cd34). */
+    prefix: text("prefix").notNull(),
+    /** SHA-256 hex digest of the full raw token. */
+    tokenHash: text("token_hash").notNull().unique(),
+    /** Optional expiry; null means no expiry. */
+    expiresAt: timestamp("expires_at"),
+    /** Set when revoked; revoked tokens fail validation. */
+    revokedAt: timestamp("revoked_at"),
+    lastUsedAt: timestamp("last_used_at"),
+  },
+  (table) => [index("api_token_userId_idx").on(table.userId), index("api_token_tokenHash_idx").on(table.tokenHash)]
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  apiTokens: many(apiToken),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -82,6 +107,13 @@ export const sessionRelations = relations(session, ({ one }) => ({
 export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const apiTokenRelations = relations(apiToken, ({ one }) => ({
+  user: one(user, {
+    fields: [apiToken.userId],
     references: [user.id],
   }),
 }));

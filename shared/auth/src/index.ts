@@ -121,3 +121,15 @@ export {
   type DevModeConfig,
   type DevModePublicAccount,
 } from "./lib/dev-mode";
+
+export {
+  createApiToken,
+  listApiTokens,
+  revokeApiToken,
+  validateApiToken,
+  extractApiTokenFromHeaders,
+  resolveUserFromRequest,
+  type ApiTokenPublic,
+  type CreatedApiToken,
+  type ValidatedApiToken,
+} from "./lib/api-tokens";

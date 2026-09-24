@@ -3,6 +3,7 @@ import { swagger } from "@elysiajs/swagger";
 import { Elysia, StatusMap, status } from "elysia";
 import { env } from "./lib/env";
 import { authMiddleware } from "./middlewares/auth";
+import { apiTokensHandler } from "./routes/api-tokens";
 import { authHandler } from "./routes/auth";
 import { devHandler } from "./routes/dev";
 
@@ -25,7 +26,7 @@ const app = new Elysia()
       origin: true, // Allow all origins (wildcard behavior) while supporting credentials
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       credentials: true,
-      allowedHeaders: ["Content-Type", "Authorization"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Api-Key"],
     })
   )
   .use(
@@ -42,6 +43,10 @@ const app = new Elysia()
             description: "Authentication endpoints",
           },
           {
+            name: "api-tokens",
+            description: "Long-lived API tokens for connectors and machine access",
+          },
+          {
             name: "dev",
             description: "Dev Mode endpoints (local development only)",
           },
@@ -51,6 +56,7 @@ const app = new Elysia()
   )
   .use(authHandler)
   .use(devHandler)
+  .use(apiTokensHandler)
   .use(authMiddleware)
   .get(
     "/health",
