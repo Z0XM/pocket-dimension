@@ -29,6 +29,18 @@ export const DATASETS: Record<DatasetId, DatasetDefinition> = {
 
 export const INTEGRATORS: IntegratorStub[] = [
   {
+    id: "bunko",
+    label: "Bunko",
+    description:
+      "Auto-import movies/shows from the public Bunko Movies API into a configured watchlist account (catalog + ratings). Cron + manual sync.",
+    direction: "import",
+    status: "available",
+    homepage: "https://bunko.byimti.tools/",
+    trigger: "both",
+    scope: "account",
+    accountUsername: "lordsparos",
+  },
+  {
     id: "imdb",
     label: "IMDb",
     description: "Import ratings and lists from IMDb. Stub only — real sync comes later.",
@@ -91,6 +103,15 @@ export function listConnectors(): ConnectorCatalogEntry[] {
       description: integrator.description,
       direction: integrator.direction,
       status: integrator.status,
+      trigger: integrator.trigger,
+      scope: integrator.scope,
+      accountUsername: integrator.accountUsername,
+      endpoints:
+        integrator.id === "bunko"
+          ? {
+              sync: "/api/connectors/integrators/bunko",
+            }
+          : undefined,
     })),
   ];
 }

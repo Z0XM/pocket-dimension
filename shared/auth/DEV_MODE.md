@@ -33,12 +33,21 @@ export default {
     { username: "admin", email: "admin@local.dev", label: "admin" },
     { username: "z0xm", email: "user1@local.dev", label: "z0xm" },
     { username: "mukul", email: "user2@local.dev", label: "mukul" },
+    { username: "lordsparos", email: "lordsparos@local.dev", label: "lordsparos (bunko)" },
   ],
 };
 ```
 
 Usernames must already exist in Postgres (`auth.user`). No passwords in config —
 Dev Mode creates a real Better Auth session via a gated auth-service endpoint.
+
+**lordsparos (Bunko):** create locally for watchlist auto-import testing. Prefer role
+`contributor` so catalog writes succeed (`BUNKO_IMPORT_USERNAME=lordsparos`). Example:
+
+```bash
+# After signup via auth-service, verify + promote:
+psql "$DATABASE_URL" -c "UPDATE auth.\"user\" SET email_verified = true, role = 'contributor', username = 'lordsparos', display_username = 'lordsparos' WHERE email = 'lordsparos@local.dev';"
+```
 
 ## Enable locally
 

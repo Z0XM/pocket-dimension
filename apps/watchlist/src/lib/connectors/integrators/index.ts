@@ -14,3 +14,13 @@ export function assertIntegratorNotReady(id: string): never {
   const stub = getIntegratorStub(id);
   throw new Error(stub ? `${stub.label} integration is coming soon (skeleton only).` : `Unknown integrator: ${id}`);
 }
+
+export { fetchAllBunkoMovies } from "./bunko";
+export {
+  mapBunkoRows,
+  mapBunkoType,
+  mapBunkoStatus,
+  mapBunkoRating,
+  mapBunkoToCatalogRow,
+  mapBunkoToRatingRow,
+} from "./bunko-map";

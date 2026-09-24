@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { boolean, integer, json, numeric, pgSchema, serial, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, json, numeric, pgSchema, serial, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import * as auth from "./auth";
 import { actionsByUser, id, timestamps } from "./common";
 
@@ -123,6 +123,52 @@ export const userRatingPreferences = watchlistSchema.table(
       .references(() => auth.user.id, { onDelete: "cascade" }),
   },
   (table) => [unique("user_rating_preferences_user_id_preferred_user_id_unique").on(table.userId, table.preferredUserId)]
+);
+
+/** Runtime toggles for auto/account connectors (admin console). */
+export const connectorSettings = watchlistSchema.table(
+  "connector_settings",
+  {
+    id,
+    ...timestamps,
+    connectorId: text("connector_id").notNull(),
+    enabled: boolean("enabled").notNull().default(false),
+    cronExpression: text("cron_expression"),
+    pageSize: integer("page_size"),
+    statusFilter: text("status_filter"),
+    destinationUsername: text("destination_username"),
+    catalogActorUsername: text("catalog_actor_username"),
+  },
+  (table) => [unique("connector_settings_connector_id_unique").on(table.connectorId)]
+);
+
+export const connectorRunTrigger = watchlistSchema.enum("connector_run_trigger", ["cron", "manual"]);
+export const connectorRunStatus = watchlistSchema.enum("connector_run_status", ["running", "success", "failure", "partial"]);
+
+/** Persisted load/run history for connectors. */
+export const connectorRuns = watchlistSchema.table(
+  "connector_runs",
+  {
+    id,
+    connectorId: text("connector_id").notNull(),
+    trigger: connectorRunTrigger("trigger").notNull(),
+    status: connectorRunStatus("status").notNull().default("running"),
+    startedAt: timestamp("started_at").notNull(),
+    finishedAt: timestamp("finished_at"),
+    durationMs: integer("duration_ms"),
+    fetched: integer("fetched").default(0),
+    catalogImported: integer("catalog_imported").default(0),
+    catalogUpdated: integer("catalog_updated").default(0),
+    catalogSkipped: integer("catalog_skipped").default(0),
+    ratingsImported: integer("ratings_imported").default(0),
+    ratingsUpdated: integer("ratings_updated").default(0),
+    ratingsSkipped: integer("ratings_skipped").default(0),
+    errorCount: integer("error_count").default(0),
+    errorSnippet: text("error_snippet"),
+    summary: json("summary"),
+    triggeredByUserId: uuid("triggered_by_user_id").references(() => auth.user.id, { onDelete: "set null" }),
+  },
+  (table) => [index("connector_runs_connector_id_started_at_idx").on(table.connectorId, table.startedAt)]
 );
 
 export const watchItemRelations = relations(watchItems, ({ many, one }) => ({
