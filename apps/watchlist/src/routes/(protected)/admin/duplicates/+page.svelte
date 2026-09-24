@@ -8,7 +8,24 @@
 
   let { data }: { data: PageData } = $props();
 
-  type Cluster = (typeof data.clusters)[number];
+  type Cluster = {
+    id: string;
+    tier: "direct" | "indirect" | "fuzzy";
+    confidence: number;
+    fingerprint: string;
+    members: Array<{ id: string; title: string; type: string; languageId: string; language: string | null }>;
+    dismissed: boolean;
+    totalRatings: number;
+    sampleRaters: string[];
+    memberStats: Array<{
+      id: string;
+      title: string;
+      type: string;
+      language: string | null;
+      ratingCount: number;
+    }>;
+  };
+
   type Preview = {
     keep: { id: string; title: string };
     losers: Array<{ id: string; title: string }>;
@@ -32,37 +49,143 @@
     ratingRowCount: number;
   };
 
-  let clusters = $state<Cluster[]>([]);
-  let counts = $state(data.counts);
+  type Counts = {
+    total: number;
+    direct: number;
+    indirect: number;
+    fuzzy: number | null;
+  };
+
+  let summary = $state(data.summary);
+  let counts = $state<Counts>({ ...data.summary.counts });
   let tier = $state(data.tier);
   let includeDismissed = $state(data.includeDismissed);
-  let loading = $state(false);
+  let pageSize = $state(data.pageSize);
+
+  let clusters = $state<Cluster[]>([]);
+  let offset = $state(0);
+  let hasMore = $state(false);
+  let totalMatching = $state(0);
+  let loadingPage = $state(false);
+  let loadingFuzzySummary = $state(false);
+  let initialLoadDone = $state(false);
   let busyId = $state<string | null>(null);
 
-  // Per-cluster UI state
   let keepByCluster = $state<Record<string, string>>({});
   let strategyByCluster = $state<Record<string, string>>({});
   let confirmByCluster = $state<Record<string, "merge" | "delete" | null>>({});
   let previewByCluster = $state<Record<string, Preview | null>>({});
 
-  // Sync server data → local state. Do not read keep/strategy here (avoids effect cycles).
-  $effect(() => {
-    const list = data.clusters;
-    clusters = list;
-    counts = data.counts;
-    tier = data.tier;
-    includeDismissed = data.includeDismissed;
-
-    const nextKeep: Record<string, string> = {};
-    const nextStrategy: Record<string, string> = {};
+  function applyClusterDefaults(list: Cluster[], replace: boolean) {
+    const nextKeep = replace ? {} : { ...keepByCluster };
+    const nextStrategy = replace ? {} : { ...strategyByCluster };
     for (const c of list) {
-      nextKeep[c.id] = c.members[0]?.id ?? "";
-      nextStrategy[c.id] = "prefer_kept";
+      if (!nextKeep[c.id]) nextKeep[c.id] = c.members[0]?.id ?? "";
+      if (!nextStrategy[c.id]) nextStrategy[c.id] = "prefer_kept";
     }
     keepByCluster = nextKeep;
     strategyByCluster = nextStrategy;
-    confirmByCluster = {};
-    previewByCluster = {};
+    if (replace) {
+      confirmByCluster = {};
+      previewByCluster = {};
+    }
+  }
+
+  function buildParams(extra: Record<string, string> = {}) {
+    const params = new URLSearchParams(extra);
+    if (tier !== "all") params.set("tier", tier);
+    if (includeDismissed) params.set("includeDismissed", "1");
+    return params;
+  }
+
+  async function fetchSummary(includeFuzzy = false) {
+    const params = buildParams({ view: "summary" });
+    if (includeFuzzy) params.set("includeFuzzy", "1");
+    const res = await fetch(`/api/admin/duplicates?${params}`, { credentials: "include" });
+    if (!res.ok) throw new Error("summary failed");
+    const body = await res.json();
+    summary = body.summary;
+    counts = {
+      ...body.summary.counts,
+      // Preserve fuzzy if already loaded and this call deferred it
+      fuzzy: body.summary.counts.fuzzy ?? counts.fuzzy,
+    };
+    return body.summary;
+  }
+
+  async function fetchPage(nextOffset: number, replace: boolean) {
+    loadingPage = true;
+    try {
+      const params = buildParams({
+        view: "page",
+        limit: String(pageSize),
+        offset: String(nextOffset),
+      });
+      const res = await fetch(`/api/admin/duplicates?${params}`, { credentials: "include" });
+      if (!res.ok) {
+        toast.error("Failed to load clusters");
+        return;
+      }
+      const body = await res.json();
+      const pageClusters: Cluster[] = body.clusters ?? [];
+      if (replace) {
+        clusters = pageClusters;
+      } else {
+        const seen = new Set(clusters.map((c) => c.id));
+        clusters = [...clusters, ...pageClusters.filter((c) => !seen.has(c.id))];
+      }
+      applyClusterDefaults(pageClusters, replace);
+      offset = nextOffset + pageClusters.length;
+      hasMore = Boolean(body.page?.hasMore);
+      totalMatching = Number(body.page?.totalMatching ?? clusters.length);
+      if (body.counts) {
+        counts = {
+          total: body.counts.total ?? counts.total,
+          direct: body.counts.direct ?? counts.direct,
+          indirect: body.counts.indirect ?? counts.indirect,
+          fuzzy: body.counts.fuzzy ?? counts.fuzzy,
+        };
+      }
+    } finally {
+      loadingPage = false;
+      initialLoadDone = true;
+    }
+  }
+
+  async function loadFuzzyCountInBackground() {
+    if (counts.fuzzy != null) return;
+    loadingFuzzySummary = true;
+    try {
+      await fetchSummary(true);
+    } catch {
+      // non-fatal — fuzzy count stays unknown
+    } finally {
+      loadingFuzzySummary = false;
+    }
+  }
+
+  async function resetAndLoad() {
+    clusters = [];
+    offset = 0;
+    hasMore = false;
+    initialLoadDone = false;
+    try {
+      await fetchSummary(false);
+    } catch {
+      toast.error("Failed to load summary");
+    }
+    await fetchPage(0, true);
+    void loadFuzzyCountInBackground();
+  }
+
+  // Sync filter props from SSR, then load first page client-side.
+  $effect(() => {
+    summary = data.summary;
+    counts = { ...data.summary.counts };
+    tier = data.tier;
+    includeDismissed = data.includeDismissed;
+    pageSize = data.pageSize;
+    void resetAndLoad();
   });
 
   async function refreshQuery() {
@@ -74,22 +197,12 @@
   }
 
   async function reloadClient() {
-    loading = true;
-    try {
-      const params = new URLSearchParams();
-      if (tier !== "all") params.set("tier", tier);
-      if (includeDismissed) params.set("includeDismissed", "1");
-      const res = await fetch(`/api/admin/duplicates?${params}`, { credentials: "include" });
-      if (!res.ok) {
-        toast.error("Failed to refresh");
-        return;
-      }
-      const body = await res.json();
-      clusters = body.clusters ?? [];
-      counts = body.counts ?? counts;
-    } finally {
-      loading = false;
-    }
+    await resetAndLoad();
+  }
+
+  async function loadMore() {
+    if (!hasMore || loadingPage) return;
+    await fetchPage(offset, false);
   }
 
   function tierBadge(t: string) {
@@ -101,6 +214,11 @@
   function confidenceLabel(c: Cluster) {
     if (c.tier !== "fuzzy") return null;
     return `${Math.round(c.confidence * 100)}% match`;
+  }
+
+  function fuzzyLabel() {
+    if (counts.fuzzy == null) return loadingFuzzySummary ? "…" : "?";
+    return String(counts.fuzzy);
   }
 
   async function previewMerge(cluster: Cluster) {
@@ -281,11 +399,44 @@
           <a href="/admin" class="text-accent hover:underline">← Admin center</a>
         </p>
       </div>
-      <Button size="sm" variant="outline" onclick={reloadClient} disabled={loading}>
+      <Button size="sm" variant="outline" onclick={reloadClient} disabled={loadingPage}>
         <RefreshCwIcon class="size-3.5 mr-1" />
         Refresh
       </Button>
     </div>
+
+    <Card.Root>
+      <Card.Header class="pb-2">
+        <Card.Title class="text-sm">Overview</Card.Title>
+      </Card.Header>
+      <Card.Content class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        <div>
+          <p class="text-muted-foreground">Catalog</p>
+          <p class="text-lg font-medium text-foreground">{summary.catalogSize}</p>
+        </div>
+        <div>
+          <p class="text-muted-foreground">Direct</p>
+          <p class="text-lg font-medium text-foreground">{counts.direct}</p>
+          <p class="text-[10px] text-muted-foreground">{summary.involvedItems.direct} items</p>
+        </div>
+        <div>
+          <p class="text-muted-foreground">Indirect</p>
+          <p class="text-lg font-medium text-foreground">{counts.indirect}</p>
+          <p class="text-[10px] text-muted-foreground">{summary.involvedItems.indirect} items</p>
+        </div>
+        <div>
+          <p class="text-muted-foreground">Fuzzy</p>
+          <p class="text-lg font-medium text-foreground">{fuzzyLabel()}</p>
+          <p class="text-[10px] text-muted-foreground">
+            {#if counts.fuzzy == null}
+              {loadingFuzzySummary ? "scanning…" : "pending"}
+            {:else}
+              {summary.involvedItems.fuzzy ?? "—"} items
+            {/if}
+          </p>
+        </div>
+      </Card.Content>
+    </Card.Root>
 
     <Card.Root>
       <Card.Content class="pt-4 flex flex-wrap gap-3 items-end text-xs">
@@ -296,10 +447,10 @@
             bind:value={tier}
             onchange={() => refreshQuery()}
           >
-            <option value="all">All ({counts.total})</option>
+            <option value="all">All ({counts.direct + counts.indirect + (counts.fuzzy ?? 0)})</option>
             <option value="direct">Direct ({counts.direct})</option>
             <option value="indirect">Indirect ({counts.indirect})</option>
-            <option value="fuzzy">Fuzzy ({counts.fuzzy})</option>
+            <option value="fuzzy">Fuzzy ({fuzzyLabel()})</option>
           </select>
         </label>
         <label class="flex items-center gap-2 cursor-pointer pb-1">
@@ -312,12 +463,16 @@
           <span>Show dismissed</span>
         </label>
         <p class="text-muted-foreground self-center pb-1">
-          Direct = exact title · Indirect = alphanumeric · Fuzzy = close match (confidence shown)
+          Showing {clusters.length} of {totalMatching || "…"} · Direct = exact · Indirect = alphanumeric · Fuzzy = close match
         </p>
       </Card.Content>
     </Card.Root>
 
-    {#if clusters.length === 0}
+    {#if !initialLoadDone && loadingPage}
+      <Card.Root>
+        <Card.Content class="py-10 text-center text-sm text-muted-foreground">Loading clusters…</Card.Content>
+      </Card.Root>
+    {:else if clusters.length === 0}
       <Card.Root>
         <Card.Content class="py-10 text-center text-sm text-muted-foreground">
           No duplicate suggestions{tier !== "all" ? ` in ${tier}` : ""}. Nice catalog hygiene.
@@ -337,7 +492,9 @@
               {#if confidenceLabel(cluster)}
                 <span class="text-[10px] text-muted-foreground">{confidenceLabel(cluster)}</span>
               {/if}
-              <span class="text-[10px] text-muted-foreground">{cluster.members.length} titles · {cluster.totalRatings} ratings</span>
+              <span class="text-[10px] text-muted-foreground"
+                >{cluster.members.length} titles · {cluster.totalRatings} ratings</span
+              >
               {#if cluster.dismissed}
                 <span class="text-[10px] uppercase tracking-wide text-muted-foreground">dismissed</span>
               {/if}
@@ -363,7 +520,9 @@
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-foreground truncate">{member.title}</p>
                     <p class="text-[11px] text-muted-foreground">
-                      {member.type} · {member.language ?? "—"} · {member.ratingCount} rating{member.ratingCount === 1 ? "" : "s"}
+                      {member.type} · {member.language ?? "—"} · {member.ratingCount} rating{member.ratingCount === 1
+                        ? ""
+                        : "s"}
                       {#if keepId === member.id}
                         <span class="text-accent"> · keep</span>
                       {/if}
@@ -417,7 +576,9 @@
                   {preview.losers.map((l) => l.title).join(", ")}. Strategy:
                   <span class="text-foreground">{preview.strategy.replaceAll("_", " ")}</span>.
                   {preview.userCount} user rating(s) across {preview.ratingRowCount} row(s).
-                  <span class="text-foreground">{preview.conflictCount} conflict{preview.conflictCount === 1 ? "" : "s"}</span>
+                  <span class="text-foreground"
+                    >{preview.conflictCount} conflict{preview.conflictCount === 1 ? "" : "s"}</span
+                  >
                   (users with disagreeing ratings).
                 </p>
                 {#if preview.conflicts.length > 0}
@@ -457,7 +618,12 @@
                   (no merge). Prefer Merge if you want ratings preserved.
                 </p>
                 <div class="flex gap-2">
-                  <Button size="sm" variant="destructive" disabled={busyId === cluster.id} onclick={() => confirmDelete(cluster)}>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={busyId === cluster.id}
+                    onclick={() => confirmDelete(cluster)}
+                  >
                     Delete others
                   </Button>
                   <Button size="sm" variant="ghost" onclick={() => cancelConfirm(cluster.id)}>Cancel</Button>
@@ -467,6 +633,14 @@
           </Card.Content>
         </Card.Root>
       {/each}
+
+      {#if hasMore}
+        <div class="flex justify-center pt-2">
+          <Button size="sm" variant="outline" disabled={loadingPage} onclick={loadMore}>
+            {loadingPage ? "Loading…" : `Load more (${clusters.length} / ${totalMatching})`}
+          </Button>
+        </div>
+      {/if}
     {/if}
   </div>
 </div>

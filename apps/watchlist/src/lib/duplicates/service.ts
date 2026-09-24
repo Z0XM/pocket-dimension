@@ -1,18 +1,16 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { DEFAULT_FUZZY_THRESHOLD, type DuplicateCluster, type DuplicateTier } from "./normalize";
 import {
-  findDuplicateClusters,
-  type DuplicateCluster,
-  type DuplicateTier,
-  DEFAULT_FUZZY_THRESHOLD,
-} from "./normalize";
-import {
-  planRatingMerges,
-  type MergeStrategy,
-  type RatingSnapshot,
-} from "./merge-ratings";
+  getDuplicateSummary,
+  hydrateGroupRefs,
+  listGroupRefsPage,
+  loadDismissedFingerprints,
+  type DuplicateSummary,
+} from "./detect";
+import { planRatingMerges, type MergeStrategy, type RatingSnapshot } from "./merge-ratings";
 
-export type { MergeStrategy, DuplicateTier };
+export type { MergeStrategy, DuplicateTier, DuplicateSummary };
 
 export type ClusterWithStats = DuplicateCluster & {
   dismissed: boolean;
@@ -27,91 +25,75 @@ export type ClusterWithStats = DuplicateCluster & {
   }>;
 };
 
-async function loadCatalogItems() {
-  const rows = await db
-    .select({
-      id: schema.watchItems.id,
-      title: schema.watchItems.title,
-      type: schema.watchItems.type,
-      languageId: schema.watchItems.languageId,
-      language: schema.watchLanguages.language,
-    })
-    .from(schema.watchItems)
-    .leftJoin(schema.watchLanguages, eq(schema.watchItems.languageId, schema.watchLanguages.id));
+export const DEFAULT_PAGE_SIZE = 10;
 
-  return rows;
+/** Cheap overview — no cluster payloads. Fuzzy count deferred unless includeFuzzy. */
+export async function summarizeDuplicates(options: {
+  includeDismissed?: boolean;
+  includeFuzzy?: boolean;
+  fuzzyThreshold?: number;
+} = {}): Promise<DuplicateSummary> {
+  return getDuplicateSummary(options);
 }
 
-async function loadDismissedFingerprints(): Promise<Set<string>> {
-  const rows = await db.select({ fingerprint: schema.duplicateDismissals.fingerprint }).from(schema.duplicateDismissals);
-  return new Set(rows.map((r) => r.fingerprint));
-}
+/** Paginated clusters with stats hydrated only for this page. */
+export async function listDuplicateSuggestionsPage(options: {
+  tier?: DuplicateTier | "all";
+  includeDismissed?: boolean;
+  fuzzyThreshold?: number;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{
+  clusters: ClusterWithStats[];
+  counts: DuplicateSummary["counts"];
+  fuzzyStatus: "ready" | "deferred";
+  fuzzyPending?: boolean;
+  page: { limit: number; offset: number; totalMatching: number; hasMore: boolean };
+}> {
+  const limit = Math.min(Math.max(options.limit ?? DEFAULT_PAGE_SIZE, 1), 50);
+  const offset = Math.max(options.offset ?? 0, 0);
+  const tier = options.tier ?? "all";
 
-async function attachStats(clusters: DuplicateCluster[], dismissed: Set<string>): Promise<ClusterWithStats[]> {
-  if (clusters.length === 0) return [];
-
-  const allIds = [...new Set(clusters.flatMap((c) => c.members.map((m) => m.id)))];
-  if (allIds.length === 0) return [];
-
-  const ratingRows = await db
-    .select({
-      watchItemId: schema.watchItemRatings.watchItemId,
-      userId: schema.watchItemRatings.userId,
-      username: schema.user.username,
-    })
-    .from(schema.watchItemRatings)
-    .leftJoin(schema.user, eq(schema.watchItemRatings.userId, schema.user.id))
-    .where(inArray(schema.watchItemRatings.watchItemId, allIds));
-
-  const countByItem = new Map<string, number>();
-  const ratersByItem = new Map<string, string[]>();
-  for (const r of ratingRows) {
-    countByItem.set(r.watchItemId, (countByItem.get(r.watchItemId) ?? 0) + 1);
-    if (r.username) {
-      const list = ratersByItem.get(r.watchItemId) ?? [];
-      if (!list.includes(r.username)) list.push(r.username);
-      ratersByItem.set(r.watchItemId, list);
-    }
-  }
-
-  return clusters.map((c) => {
-    const memberStats = c.members.map((m) => ({
-      id: m.id,
-      title: m.title,
-      type: m.type,
-      language: m.language,
-      ratingCount: countByItem.get(m.id) ?? 0,
-    }));
-    const sampleRaters = [
-      ...new Set(c.members.flatMap((m) => (ratersByItem.get(m.id) ?? []).slice(0, 4))),
-    ].slice(0, 8);
-    return {
-      ...c,
-      dismissed: dismissed.has(c.fingerprint),
-      totalRatings: memberStats.reduce((n, m) => n + m.ratingCount, 0),
-      sampleRaters,
-      memberStats,
-    };
+  const { refs, totalMatching, counts, fuzzyStatus, fuzzyPending } = await listGroupRefsPage({
+    tier,
+    limit,
+    offset,
+    includeDismissed: options.includeDismissed,
+    fuzzyThreshold: options.fuzzyThreshold ?? DEFAULT_FUZZY_THRESHOLD,
   });
+
+  const dismissed = await loadDismissedFingerprints();
+  const clusters = await hydrateGroupRefs(refs, dismissed);
+
+  const reachedExactEnd = offset + clusters.length >= totalMatching;
+  const hasMore = fuzzyPending ? true : offset + clusters.length < totalMatching;
+
+  return {
+    clusters,
+    counts,
+    fuzzyStatus,
+    fuzzyPending,
+    page: {
+      limit,
+      offset,
+      totalMatching,
+      hasMore: fuzzyPending && reachedExactEnd ? true : hasMore,
+    },
+  };
 }
 
+/** @deprecated Prefer summarizeDuplicates + listDuplicateSuggestionsPage */
 export async function listDuplicateSuggestions(options: {
   tier?: DuplicateTier | "all";
   includeDismissed?: boolean;
   fuzzyThreshold?: number;
 } = {}): Promise<ClusterWithStats[]> {
-  const [items, dismissed] = await Promise.all([loadCatalogItems(), loadDismissedFingerprints()]);
-  let clusters = findDuplicateClusters(items, {
-    fuzzyThreshold: options.fuzzyThreshold ?? DEFAULT_FUZZY_THRESHOLD,
+  const page = await listDuplicateSuggestionsPage({
+    ...options,
+    limit: 50,
+    offset: 0,
   });
-
-  if (options.tier && options.tier !== "all") {
-    clusters = clusters.filter((c) => c.tier === options.tier);
-  }
-
-  const withStats = await attachStats(clusters, dismissed);
-  if (options.includeDismissed) return withStats;
-  return withStats.filter((c) => !c.dismissed);
+  return page.clusters;
 }
 
 export async function previewMerge(params: {
@@ -243,20 +225,17 @@ export async function executeMerge(params: {
   const plan = planRatingMerges(ratingsRaw, keepId, strategy);
 
   await db.transaction(async (tx) => {
-    // Apply rating winners onto keep item
     for (const p of plan.plans) {
       const winner = p.keepRating;
       const onKeep = ratingsRaw.find((r) => r.userId === p.userId && r.watchItemId === keepId);
 
       if (winner.watchItemId === keepId) {
-        // Winner already on keep — delete other rows for this user
         if (p.dropRatingIds.length > 0) {
           await tx.delete(schema.watchItemRatings).where(inArray(schema.watchItemRatings.id, p.dropRatingIds));
         }
         continue;
       }
 
-      // Winner is on a loser row — move onto keep (update existing or re-point)
       if (onKeep) {
         await tx
           .update(schema.watchItemRatings)
@@ -274,13 +253,11 @@ export async function executeMerge(params: {
           })
           .where(eq(schema.watchItemRatings.id, onKeep.id));
 
-        // Delete all other rows for this user across merge set (including winner source)
         const toDelete = ratingsRaw.filter((r) => r.userId === p.userId && r.id !== onKeep.id).map((r) => r.id);
         if (toDelete.length > 0) {
           await tx.delete(schema.watchItemRatings).where(inArray(schema.watchItemRatings.id, toDelete));
         }
       } else {
-        // No rating on keep — move winner row to keep item
         await tx
           .update(schema.watchItemRatings)
           .set({
@@ -296,7 +273,6 @@ export async function executeMerge(params: {
       }
     }
 
-    // Move tags from losers onto keep (ignore conflicts)
     const loserTags = await tx
       .select()
       .from(schema.watchItemTags)
@@ -316,12 +292,8 @@ export async function executeMerge(params: {
       }
     }
 
-    // Delete loser catalog rows (cascades remaining ratings/tags)
     await tx.delete(schema.watchItems).where(inArray(schema.watchItems.id, mergeIds));
-
-    // Clear dismissals that referenced any of these ids
     await clearDismissalsTouching(tx, allIds);
-
     await tx
       .update(schema.watchItems)
       .set({ updatedById: adminUserId, updatedAt: sql`now()` })
@@ -358,7 +330,6 @@ export async function executeDeleteOthers(params: {
     throw new Error("One or more catalog items were not found");
   }
 
-  // Deleting losers cascades their ratings — intentional for keep/delete path
   await db.transaction(async (tx) => {
     await tx.delete(schema.watchItems).where(inArray(schema.watchItems.id, deleteIds));
     await clearDismissalsTouching(tx, [keepId, ...deleteIds]);
@@ -378,7 +349,7 @@ export async function dismissCluster(params: {
   reason?: string | null;
   adminUserId: string;
 }) {
-  const fingerprint = params.fingerprint || clusterFp(params.itemIds);
+  const fingerprint = params.fingerprint || [...params.itemIds].sort().join("|");
   const existing = await db
     .select({ id: schema.duplicateDismissals.id })
     .from(schema.duplicateDismissals)
@@ -404,10 +375,6 @@ export async function dismissCluster(params: {
 export async function undismissCluster(fingerprint: string) {
   await db.delete(schema.duplicateDismissals).where(eq(schema.duplicateDismissals.fingerprint, fingerprint));
   return { ok: true as const };
-}
-
-function clusterFp(ids: string[]) {
-  return [...ids].sort().join("|");
 }
 
 async function clearDismissalsTouching(
