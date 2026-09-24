@@ -1,5 +1,5 @@
 import { redirect } from "@sveltejs/kit";
-import { listDuplicateSuggestions } from "$lib/duplicates/service";
+import { summarizeDuplicates } from "$lib/duplicates/service";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -13,7 +13,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const tier = (url.searchParams.get("tier") || "all") as "all" | "direct" | "indirect" | "fuzzy";
   const includeDismissed = url.searchParams.get("includeDismissed") === "1";
 
-  const clusters = await listDuplicateSuggestions({ tier, includeDismissed });
+  // Summary only — never block navigation on full cluster payloads / fuzzy scan.
+  const summary = await summarizeDuplicates({ includeDismissed, includeFuzzy: false });
 
   return {
     user: {
@@ -23,12 +24,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     },
     tier,
     includeDismissed,
-    clusters,
-    counts: {
-      total: clusters.length,
-      direct: clusters.filter((c) => c.tier === "direct").length,
-      indirect: clusters.filter((c) => c.tier === "indirect").length,
-      fuzzy: clusters.filter((c) => c.tier === "fuzzy").length,
-    },
+    summary,
+    pageSize: 10,
   };
 };
