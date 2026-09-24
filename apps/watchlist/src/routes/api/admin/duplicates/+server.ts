@@ -1,10 +1,12 @@
 import { error, json } from "@sveltejs/kit";
 import {
+  DEFAULT_PAGE_SIZE,
   dismissCluster,
   executeDeleteOthers,
   executeMerge,
-  listDuplicateSuggestions,
+  listDuplicateSuggestionsPage,
   previewMerge,
+  summarizeDuplicates,
   undismissCluster,
   type MergeStrategy,
   type DuplicateTier,
@@ -25,23 +27,33 @@ const STRATEGIES = new Set<MergeStrategy>(["prefer_kept", "prefer_highest", "pre
 
 export const GET: RequestHandler = async ({ locals, url }) => {
   requireAdmin(locals);
+  const view = url.searchParams.get("view") || "page";
   const tier = (url.searchParams.get("tier") || "all") as DuplicateTier | "all";
   const includeDismissed = url.searchParams.get("includeDismissed") === "1";
   const fuzzyThreshold = url.searchParams.get("fuzzyThreshold");
-  const clusters = await listDuplicateSuggestions({
+  const includeFuzzy = url.searchParams.get("includeFuzzy") === "1";
+
+  if (view === "summary") {
+    const summary = await summarizeDuplicates({
+      includeDismissed,
+      includeFuzzy,
+      fuzzyThreshold: fuzzyThreshold ? Number(fuzzyThreshold) : undefined,
+    });
+    return json({ summary });
+  }
+
+  const limit = Number(url.searchParams.get("limit") || DEFAULT_PAGE_SIZE) || DEFAULT_PAGE_SIZE;
+  const offset = Number(url.searchParams.get("offset") || 0) || 0;
+
+  const result = await listDuplicateSuggestionsPage({
     tier,
     includeDismissed,
     fuzzyThreshold: fuzzyThreshold ? Number(fuzzyThreshold) : undefined,
+    limit,
+    offset,
   });
-  return json({
-    clusters,
-    counts: {
-      total: clusters.length,
-      direct: clusters.filter((c) => c.tier === "direct").length,
-      indirect: clusters.filter((c) => c.tier === "indirect").length,
-      fuzzy: clusters.filter((c) => c.tier === "fuzzy").length,
-    },
-  });
+
+  return json(result);
 };
 
 export const POST: RequestHandler = async ({ locals, request }) => {
