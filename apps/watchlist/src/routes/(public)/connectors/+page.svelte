@@ -129,6 +129,13 @@ curl ${originExample()}/api/connectors/api/ratings \\
   -H "Authorization: Bearer pd_…" \\
   -H "Content-Type: application/json" \\
   -d '{"rows":[{"title":"Example","rating":"8","progress_status":"watched"}]}'`);
+
+  let bunkoSyncExample = $derived(`# Manual sync (admin session cookie, or secret)
+curl -X POST ${originExample()}/api/connectors/integrators/bunko \\
+  -H "Authorization: Bearer $BUNKO_SYNC_SECRET"
+
+# Status / last run
+curl ${originExample()}/api/connectors/integrators/bunko`);
 </script>
 
 <div class="h-screen overflow-y-scroll pb-24">
@@ -138,7 +145,12 @@ curl ${originExample()}/api/connectors/api/ratings \\
         <CableIcon class="size-6" />
       </div>
       <h1 class="text-3xl font-medium">Connectors</h1>
-      <p class="text-muted-foreground text-sm">Export and import watchlist data via CSV, JSON API, or (soon) partner integrators.</p>
+      <p class="text-muted-foreground text-sm">Export and import watchlist data via CSV, JSON API, or partner integrators.</p>
+      {#if data.user?.role === "admin"}
+        <p class="text-xs">
+          <a href="/admin/connectors" class="text-accent hover:underline">Admin console — enable connectors & view run history →</a>
+        </p>
+      {/if}
     </div>
 
     <Card.Root>
@@ -287,17 +299,42 @@ curl ${originExample()}/api/connectors/api/ratings \\
       <Card.Header>
         <Card.Title>Partner integrators</Card.Title>
       </Card.Header>
-      <Card.Content class="space-y-3">
+      <Card.Content class="space-y-4">
         <p class="text-xs/relaxed text-muted-foreground">
-          Skeletons only for now — endpoints return 501. Real IMDb / Letterboxd sync will ship as follow-ups.
+          Partner syncs pull external catalogs into Watchlist. IMDb / Letterboxd remain stubs (501). Bunko is the first live auto account import.
         </p>
         {#each data.integrators as integrator}
-          <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/40 pb-2 last:border-0">
-            <div>
-              <h3 class="text-sm font-medium">{integrator.label}</h3>
-              <p class="text-xs text-muted-foreground">{integrator.description}</p>
+          <div class="border-b border-border/40 pb-3 last:border-0 last:pb-0 space-y-1">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <div>
+                <h3 class="text-sm font-medium">{integrator.label}</h3>
+                <p class="text-xs text-muted-foreground">{integrator.description}</p>
+              </div>
+              <span class="text-[10px] uppercase tracking-wide text-muted-foreground">{integrator.status.replace("_", " ")}</span>
             </div>
-            <span class="text-[10px] uppercase tracking-wide text-muted-foreground">coming soon</span>
+            {#if integrator.trigger || integrator.scope || integrator.accountUsername}
+              <p class="text-[11px] text-muted-foreground font-mono">
+                {#if integrator.trigger}trigger: {integrator.trigger}{/if}
+                {#if integrator.scope} · scope: {integrator.scope}{/if}
+                {#if integrator.accountUsername} · account: @{integrator.accountUsername}{/if}
+              </p>
+            {/if}
+            {#if integrator.id === "bunko"}
+              <div class="space-y-2 text-xs/relaxed text-muted-foreground pt-1">
+                <p>
+                  Pulls <a class="text-accent hover:underline" href="https://bunko.byimti.tools/" target="_blank" rel="noreferrer">Bunko</a>
+                  public Movies API → catalog + ratings for <code class="text-foreground">BUNKO_IMPORT_USERNAME</code> (default
+                  <code class="text-foreground">lordsparos</code>). Posters ignored; title-keyed upsert; Bunko wins on conflict; never auto-deletes.
+                </p>
+                <p>
+                  Cron: set <code class="text-foreground">BUNKO_IMPORT_ENABLED=true</code> (and optional
+                  <code class="text-foreground">BUNKO_IMPORT_CRON</code>, default <code class="text-foreground">0 6 * * *</code> UTC). Admins can also
+                  enable/disable and inspect history at <a href="/admin/connectors" class="text-accent hover:underline">/admin/connectors</a>.
+                </p>
+                <p>Manual sync (secret or admin):</p>
+                <pre class="bg-muted/40 rounded-md p-3 overflow-x-auto text-[11px] font-mono text-foreground/90">{bunkoSyncExample}</pre>
+              </div>
+            {/if}
           </div>
         {/each}
       </Card.Content>

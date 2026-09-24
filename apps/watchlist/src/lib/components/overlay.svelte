@@ -5,6 +5,7 @@
     ChartColumnIcon,
     CircleQuestionMarkIcon,
     CableIcon,
+    ShieldIcon,
     TrophyIcon,
     CopyIcon,
     LoaderCircleIcon,
@@ -481,6 +482,11 @@
           <a href="/connectors" class="inline-flex items-center justify-center h-6 w-6 hover:text-accent transition-colors" title="Connectors">
             <CableIcon class="size-4" />
           </a>
+          {#if role === "admin"}
+            <a href="/admin/connectors" class="inline-flex items-center justify-center h-6 w-6 hover:text-accent transition-colors" title="Admin connectors">
+              <ShieldIcon class="size-4" />
+            </a>
+          {/if}
           <a href="/about" class="inline-flex items-center justify-center h-6 w-6 hover:text-accent transition-colors" title="About">
             <CircleQuestionMarkIcon class="size-4" />
           </a>

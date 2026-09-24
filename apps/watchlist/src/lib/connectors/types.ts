@@ -5,6 +5,8 @@
 export type ConnectorAccess = "public" | "private";
 export type ConnectorDirection = "export" | "import" | "both";
 export type ConnectorKind = "csv" | "api" | "integrator";
+export type ConnectorTrigger = "manual" | "auto" | "both";
+export type ConnectorScope = "user" | "account" | "public";
 
 export type DatasetId = "catalog" | "ratings" | "views";
 
@@ -18,15 +20,19 @@ export type DatasetDefinition = {
   columns: string[];
 };
 
-export type IntegratorId = "imdb" | "letterboxd";
+export type IntegratorId = "imdb" | "letterboxd" | "bunko";
 
 export type IntegratorStub = {
   id: IntegratorId;
   label: string;
   description: string;
   direction: ConnectorDirection;
-  status: "coming_soon";
+  status: "coming_soon" | "available";
   homepage: string;
+  trigger?: ConnectorTrigger;
+  scope?: ConnectorScope;
+  /** Display-only destination account for account-scoped auto imports. */
+  accountUsername?: string;
 };
 
 export type ConnectorCatalogEntry = {
@@ -38,11 +44,15 @@ export type ConnectorCatalogEntry = {
   direction: ConnectorDirection;
   status?: "available" | "coming_soon";
   datasets?: DatasetId[];
+  trigger?: ConnectorTrigger;
+  scope?: ConnectorScope;
+  accountUsername?: string;
   endpoints?: {
     exportCsv?: string;
     importCsv?: string;
     getJson?: string;
     postJson?: string;
+    sync?: string;
   };
 };
 

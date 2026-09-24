@@ -3,6 +3,11 @@ import type { schema } from "@pocket-dimension/db";
 import { redirect } from "@sveltejs/kit";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
+import { startBunkoScheduler } from "$lib/connectors/jobs/bunko-scheduler";
+
+if (!building) {
+  startBunkoScheduler();
+}
 
 export async function handle({ event, resolve }) {
   // Fetch current session from Better Auth
