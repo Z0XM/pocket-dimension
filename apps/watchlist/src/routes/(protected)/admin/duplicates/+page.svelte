@@ -32,7 +32,7 @@
     ratingRowCount: number;
   };
 
-  let clusters = $state<Cluster[]>(data.clusters);
+  let clusters = $state<Cluster[]>([]);
   let counts = $state(data.counts);
   let tier = $state(data.tier);
   let includeDismissed = $state(data.includeDismissed);
@@ -45,19 +45,24 @@
   let confirmByCluster = $state<Record<string, "merge" | "delete" | null>>({});
   let previewByCluster = $state<Record<string, Preview | null>>({});
 
+  // Sync server data → local state. Do not read keep/strategy here (avoids effect cycles).
   $effect(() => {
-    clusters = data.clusters;
+    const list = data.clusters;
+    clusters = list;
     counts = data.counts;
     tier = data.tier;
     includeDismissed = data.includeDismissed;
+
     const nextKeep: Record<string, string> = {};
     const nextStrategy: Record<string, string> = {};
-    for (const c of data.clusters) {
-      nextKeep[c.id] = keepByCluster[c.id] ?? c.members[0]?.id ?? "";
-      nextStrategy[c.id] = strategyByCluster[c.id] ?? "prefer_kept";
+    for (const c of list) {
+      nextKeep[c.id] = c.members[0]?.id ?? "";
+      nextStrategy[c.id] = "prefer_kept";
     }
     keepByCluster = nextKeep;
     strategyByCluster = nextStrategy;
+    confirmByCluster = {};
+    previewByCluster = {};
   });
 
   async function refreshQuery() {
@@ -125,6 +130,14 @@
       }
       previewByCluster = { ...previewByCluster, [cluster.id]: body.preview };
       confirmByCluster = { ...confirmByCluster, [cluster.id]: "merge" };
+      toast.message(
+        body.preview.conflictCount
+          ? `Preview ready — ${body.preview.conflictCount} rating conflict(s)`
+          : "Preview ready — no rating conflicts"
+      );
+      queueMicrotask(() => {
+        document.getElementById(`confirm-${cluster.id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
     } finally {
       busyId = null;
     }
@@ -397,7 +410,7 @@
             {/if}
 
             {#if confirm === "merge" && preview}
-              <div class="rounded-md border border-accent/40 bg-accent/5 p-3 space-y-3">
+              <div id={`confirm-${cluster.id}`} class="rounded-md border border-accent/40 bg-accent/5 p-3 space-y-3">
                 <p class="text-foreground font-medium text-xs">Confirm merge</p>
                 <p class="text-muted-foreground">
                   Keep <span class="text-foreground">{preview.keep.title}</span>; remove
