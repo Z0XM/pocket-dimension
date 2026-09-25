@@ -82,12 +82,16 @@ export async function listIndirectGroupRefs(directFingerprints?: Set<string>): P
 
   // Strip short stop-words then non-alphanumerics so "The Matrix" ≡ "Matrix"
   // and "Foo and Bar" ≡ "Foo & Bar". Keep in sync with matchingKey() in normalize.ts.
+  // Bound as a param so Postgres receives real \m / \M word-boundary escapes
+  // (inline template strings eat backslashes).
+  const stopWordPattern = "\\m(a|an|and|or|the|of|to|in|on|at|for|vs|versus|with|by|from)\\M";
+
   const result = await db.execute(sql`
     select
       regexp_replace(
         regexp_replace(
           regexp_replace(lower(title), '[^a-z0-9]+', ' ', 'g'),
-          '\m(a|an|and|or|the|of|to|in|on|at|for|vs|versus|with|by|from)\M',
+          ${stopWordPattern},
           '',
           'g'
         ),
@@ -101,7 +105,7 @@ export async function listIndirectGroupRefs(directFingerprints?: Set<string>): P
     where regexp_replace(
       regexp_replace(
         regexp_replace(lower(title), '[^a-z0-9]+', ' ', 'g'),
-        '\m(a|an|and|or|the|of|to|in|on|at|for|vs|versus|with|by|from)\M',
+        ${stopWordPattern},
         '',
         'g'
       ),
