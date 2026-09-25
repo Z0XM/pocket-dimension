@@ -4,6 +4,8 @@ import {
   clusterFingerprint,
   findDuplicateClusters,
   levenshtein,
+  matchingKey,
+  normalizeForMatch,
   normalizeTitle,
   parseSequelParts,
   titleSimilarity,
@@ -23,6 +25,31 @@ describe("alphanumericKey", () => {
     expect(alphanumericKey("Spider-Man: No Way Home")).toBe("spidermannowayhome");
     expect(alphanumericKey("Spider Man No Way Home!")).toBe("spidermannowayhome");
     expect(alphanumericKey("  Foo & Bar #1 ")).toBe("foobar1");
+  });
+});
+
+describe("matchingKey / normalizeForMatch (stop-words)", () => {
+  test("ignores the/and/or and symbols", () => {
+    expect(matchingKey("The Matrix")).toBe("matrix");
+    expect(matchingKey("Matrix")).toBe("matrix");
+    expect(matchingKey("Foo and Bar")).toBe("foobar");
+    expect(matchingKey("Foo & Bar")).toBe("foobar");
+    expect(matchingKey("Foo or Bar")).toBe("foobar");
+    expect(normalizeForMatch("The Lord of the Rings")).toBe("lord rings");
+  });
+
+  test("clusters titles that only differ by stop-words", () => {
+    const items = [
+      { id: "1", title: "The Matrix", type: "movie", languageId: "l1" },
+      { id: "2", title: "Matrix", type: "movie", languageId: "l1" },
+      { id: "3", title: "Foo and Bar", type: "movie", languageId: "l1" },
+      { id: "4", title: "Foo & Bar", type: "movie", languageId: "l1" },
+    ];
+    const clusters = findDuplicateClusters(items);
+    const matrix = clusters.find((c) => c.members.some((m) => m.id === "1"));
+    expect(matrix?.members.map((m) => m.id).sort()).toEqual(["1", "2"]);
+    const foo = clusters.find((c) => c.members.some((m) => m.id === "3"));
+    expect(foo?.members.map((m) => m.id).sort()).toEqual(["3", "4"]);
   });
 });
 

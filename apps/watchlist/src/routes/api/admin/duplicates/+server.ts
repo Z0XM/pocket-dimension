@@ -65,7 +65,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     if (action === "preview") {
       const keepId = String(body.keepId || "");
       const mergeIds = Array.isArray(body.mergeIds) ? body.mergeIds.map(String) : [];
-      const strategy = String(body.strategy || "prefer_kept") as MergeStrategy;
+      const strategy = String(body.strategy || "prefer_highest") as MergeStrategy;
       if (!STRATEGIES.has(strategy)) {
         return json({ error: `Invalid strategy: ${strategy}` }, { status: 400 });
       }
@@ -76,7 +76,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     if (action === "merge") {
       const keepId = String(body.keepId || "");
       const mergeIds = Array.isArray(body.mergeIds) ? body.mergeIds.map(String) : [];
-      const strategy = String(body.strategy || "prefer_kept") as MergeStrategy;
+      const strategy = String(body.strategy || "prefer_highest") as MergeStrategy;
       if (!STRATEGIES.has(strategy)) {
         return json({ error: `Invalid strategy: ${strategy}` }, { status: 400 });
       }
