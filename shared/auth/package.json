@@ -12,6 +12,10 @@
     "./dev-mode": {
       "types": "./src/dev-mode-client.ts",
       "default": "./dist/dev-mode-client.js"
+    },
+    "./vite-ssr": {
+      "types": "./vite-better-auth-ssr.ts",
+      "default": "./vite-better-auth-ssr.ts"
     }
   },
   "scripts": {

@@ -16,9 +16,12 @@ RUN bun install --frozen-lockfile --ignore-scripts --linker hoisted --filter '@p
 # Hoisted filter install leaves broken symlinks under apps/*/node_modules; use root node_modules only.
 RUN find apps shared -type d -name node_modules -prune -exec rm -rf {} +
 
-# Fail fast if Dokploy/Docker reused a stale apps/ layer (old vite.config used ../../vite-kysely-compat).
+# Fail fast if Dokploy/Docker reused a stale apps/ layer (old vite.config used ../../vite-kysely-compat
+# or ../../shared/auth/vite-better-auth-ssr — both break under some Build Path layouts).
 RUN test -f apps/watchlist/vite-kysely-compat.ts \
- && grep -q './vite-kysely-compat' apps/watchlist/vite.config.ts
+ && grep -q './vite-kysely-compat' apps/watchlist/vite.config.ts \
+ && test -f shared/auth/vite-better-auth-ssr.ts \
+ && grep -q '@pocket-dimension/auth/vite-ssr' apps/watchlist/vite.config.ts
 
 RUN cd apps/watchlist && bun run prepare
 

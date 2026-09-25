@@ -74,7 +74,8 @@
   "overrides": {
     "kysely": "0.28.17",
     "better-auth": "1.6.33",
-    "@better-auth/core": "1.6.33"
+    "@better-auth/core": "1.6.33",
+    "better-call": "1.4.0"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.0",

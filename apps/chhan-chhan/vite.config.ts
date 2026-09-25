@@ -1,4 +1,5 @@
 import { kyselyCompat } from "./vite-kysely-compat";
+import { betterAuthDedupe, betterAuthSsrExternal } from "@pocket-dimension/auth/vite-ssr";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
@@ -15,5 +16,9 @@ export default defineConfig({
     alias: {
       "pg-native": "./src/lib/pg-native-stub.js",
     },
+    dedupe: [...betterAuthDedupe],
+  },
+  ssr: {
+    external: [...betterAuthSsrExternal],
   },
 });

@@ -108,6 +108,9 @@ export const auth = betterAuth({
   ],
 });
 
+/** Eagerly init Better Auth request-state ALS before concurrent getSession traffic. */
+void auth.api.getSession({ headers: new Headers() }).catch(() => {});
+
 export {
   isDevModeEnabled,
   assertDevModeEnabled,
