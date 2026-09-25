@@ -78,10 +78,8 @@
     "better-call": "1.4.0"
   },
   "dependencies": {
-    "@better-auth/core": "1.6.33",
     "@elysiajs/cors": "^1.4.0",
     "better-auth": "1.6.33",
-    "elysia": "^1.4.19",
-    "better-call": "1.4.0"
+    "elysia": "^1.4.19"
   }
 }

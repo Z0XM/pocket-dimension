@@ -23,7 +23,9 @@
   "deploy": {
     "startCommand": "bash -c 'if [ -f package.json ] && grep -q \"\\\"workspaces\\\"\" package.json 2>/dev/null; then cd apps/watchlist && exec bun run start; else exec bun run start; fi'",
     "variables": {
-      "NODE_ENV": "production"
+      "NODE_ENV": "production",
+      "PORT": "3002",
+      "HOST": "0.0.0.0"
     }
   }
 }

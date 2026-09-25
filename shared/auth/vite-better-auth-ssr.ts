@@ -1,6 +1,11 @@
 /**
  * Vite SSR settings for apps that use `@pocket-dimension/auth`.
  *
+ * Import from `@pocket-dimension/auth/vite-ssr` in app `vite.config.ts` (workspace
+ * package resolution) — do not use a relative `../../shared/auth/...` path. Relative
+ * cross-root imports break Dokploy/Docker layouts the same way `../../vite-kysely-compat`
+ * did.
+ *
  * Better Auth request state uses AsyncLocalStorage. Bundling `better-auth` into
  * the SvelteKit SSR graph while runtime also loads it from `node_modules` creates
  * a dual-module hazard ("No request state found" / Failed to get session).
