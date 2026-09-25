@@ -67,10 +67,12 @@
   ] as const;
 
   const STRATEGY_OPTIONS = [
-    { value: "prefer_kept", label: "Prefer kept row" },
     { value: "prefer_highest", label: "Prefer highest rating" },
+    { value: "prefer_kept", label: "Prefer kept row" },
     { value: "prefer_recent", label: "Prefer most recently updated" },
   ] as const;
+
+  const DEFAULT_STRATEGY = "prefer_highest";
 
   let summary = $state(data.summary);
   let counts = $state<Counts>({ ...data.summary.counts });
@@ -108,7 +110,7 @@
       if (!nextKeep[c.id] || !selected.includes(nextKeep[c.id])) {
         nextKeep[c.id] = selected[0] ?? allIds[0] ?? "";
       }
-      if (!nextStrategy[c.id]) nextStrategy[c.id] = "prefer_kept";
+      if (!nextStrategy[c.id]) nextStrategy[c.id] = DEFAULT_STRATEGY;
     }
     keepByCluster = nextKeep;
     strategyByCluster = nextStrategy;
@@ -335,7 +337,7 @@
           action: "preview",
           keepId: targets.keepId,
           mergeIds: targets.otherIds,
-          strategy: strategyByCluster[cluster.id] || "prefer_kept",
+          strategy: strategyByCluster[cluster.id] || DEFAULT_STRATEGY,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -374,7 +376,7 @@
           action: "merge",
           keepId: targets.keepId,
           mergeIds: targets.otherIds,
-          strategy: strategyByCluster[cluster.id] || "prefer_kept",
+          strategy: strategyByCluster[cluster.id] || DEFAULT_STRATEGY,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -674,9 +676,9 @@
                   </button>
                   {#if inSet}
                     <Button
-                      size="sm"
+                      size="xs"
                       variant={isKeep ? "default" : "outline"}
-                      class="shrink-0 h-7 text-[10px] px-2"
+                      class="shrink-0"
                       onclick={() => setKeep(cluster, member.id)}
                     >
                       {isKeep ? "Keeping" : "Keep"}
@@ -689,28 +691,33 @@
             {#if !cluster.dismissed}
               <div class="flex flex-wrap gap-2 items-end">
                 <div class="space-y-1.5">
-                  <Label class="text-muted-foreground font-normal">Merge strategy</Label>
+                  <Label class="text-muted-foreground font-normal text-[10px]">Merge strategy</Label>
                   <Select.Root
                     type="single"
-                    value={strategyByCluster[cluster.id] || "prefer_kept"}
+                    value={strategyByCluster[cluster.id] || DEFAULT_STRATEGY}
                     onValueChange={(v) => {
                       if (!v) return;
                       strategyByCluster = { ...strategyByCluster, [cluster.id]: v };
                       cancelConfirm(cluster.id);
                     }}
                   >
-                    <Select.Trigger size="sm" class="min-w-[12rem] bg-background/60 backdrop-blur-sm cursor-pointer">
-                      {strategyLabel(strategyByCluster[cluster.id] || "prefer_kept")}
+                    <Select.Trigger
+                      size="sm"
+                      class="min-w-[11rem] h-6 text-[10px] bg-background/60 backdrop-blur-sm cursor-pointer"
+                    >
+                      {strategyLabel(strategyByCluster[cluster.id] || DEFAULT_STRATEGY)}
                     </Select.Trigger>
-                    <Select.Content class="bg-background/80 backdrop-blur-md text-xs">
+                    <Select.Content class="bg-background/80 backdrop-blur-md text-[10px]">
                       {#each STRATEGY_OPTIONS as opt}
-                        <Select.Item class="text-xs" value={opt.value}>{opt.label}</Select.Item>
+                        <Select.Item class="text-[10px]" value={opt.value}>{opt.label}</Select.Item>
                       {/each}
                     </Select.Content>
                   </Select.Root>
                 </div>
                 <Button
                   size="sm"
+                  variant="outline"
+                  class="border-accent/50 text-accent hover:bg-accent/15 hover:text-accent"
                   disabled={busyId === cluster.id || !canAct}
                   onclick={() => previewMerge(cluster)}
                 >
@@ -724,7 +731,7 @@
                 >
                   Keep / delete selected…
                 </Button>
-                <Button size="sm" variant="outline" disabled={busyId === cluster.id} onclick={() => dismiss(cluster)}>
+                <Button size="sm" variant="ghost" disabled={busyId === cluster.id} onclick={() => dismiss(cluster)}>
                   Not duplicates
                 </Button>
               </div>

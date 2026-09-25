@@ -2,14 +2,60 @@
  * Title normalization & matching helpers for duplicate detection.
  */
 
+/** Short noise words / symbols ignored when building match keys & fuzzy text. */
+export const TITLE_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "or",
+  "the",
+  "of",
+  "to",
+  "in",
+  "on",
+  "at",
+  "for",
+  "vs",
+  "versus",
+  "with",
+  "by",
+  "from",
+]);
+
 /** Trim + collapse whitespace + lowercase for exact-ish comparison. */
 export function normalizeTitle(title: string): string {
   return title.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+/**
+ * Significant word tokens: lowercase, split on non-alphanumeric, drop stop-words.
+ * Used so "The Matrix" / "Matrix" and "Foo and Bar" / "Foo & Bar" compare equally.
+ */
+export function significantTitleWords(title: string): string[] {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0 && !TITLE_STOP_WORDS.has(w));
+}
+
+/** Normalized text for fuzzy compare — stop-words and symbols removed. */
+export function normalizeForMatch(title: string): string {
+  return significantTitleWords(title).join(" ");
+}
+
 /** Keep only a–z / 0–9 in order (strip symbols, spaces, punctuation). */
 export function alphanumericKey(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Indirect / content match key: alphanumeric of significant words only
+ * (stop-words and symbols ignored).
+ */
+export function matchingKey(title: string): string {
+  return significantTitleWords(title).join("");
 }
 
 const ROMAN_PARTS: Record<string, number> = {
@@ -73,10 +119,10 @@ export function parseSequelParts(title: string): SequelParts {
     const part = parsePartToken(m[2] ?? "");
     // Require a non-empty base so bare "2" / "II" never count as sequels.
     if (!base || part == null) continue;
-    return { base, baseAlpha: alphanumericKey(base), part };
+    return { base, baseAlpha: matchingKey(base) || alphanumericKey(base), part };
   }
 
-  return { base: norm, baseAlpha: alphanumericKey(norm), part: null };
+  return { base: norm, baseAlpha: matchingKey(norm) || alphanumericKey(norm), part: null };
 }
 
 /**
@@ -119,12 +165,12 @@ export function levenshtein(a: string, b: string): number {
 }
 
 /**
- * Similarity in [0, 1] from Levenshtein on normalized titles.
+ * Similarity in [0, 1] from Levenshtein on stop-word-stripped titles.
  * 1 = identical, 0 = completely different.
  */
 export function titleSimilarity(a: string, b: string): number {
-  const na = normalizeTitle(a);
-  const nb = normalizeTitle(b);
+  const na = normalizeForMatch(a);
+  const nb = normalizeForMatch(b);
   if (!na && !nb) return 1;
   if (!na || !nb) return 0;
   const dist = levenshtein(na, nb);
@@ -182,7 +228,7 @@ export function findDuplicateClusters(
   const maxFuzzyPairsPerItem = options.maxFuzzyPairsPerItem ?? 8;
 
   const byDirect = new Map<string, CatalogItemForMatching[]>();
-  const byAlpha = new Map<string, CatalogItemForMatching[]>();
+  const byMatch = new Map<string, CatalogItemForMatching[]>();
 
   for (const item of items) {
     const direct = normalizeTitle(item.title);
@@ -191,11 +237,11 @@ export function findDuplicateClusters(
       list.push(item);
       byDirect.set(direct, list);
     }
-    const alpha = alphanumericKey(item.title);
-    if (alpha) {
-      const list = byAlpha.get(alpha) ?? [];
+    const match = matchingKey(item.title);
+    if (match) {
+      const list = byMatch.get(match) ?? [];
       list.push(item);
-      byAlpha.set(alpha, list);
+      byMatch.set(match, list);
     }
   }
 
@@ -220,11 +266,11 @@ export function findDuplicateClusters(
     }
   }
 
-  for (const [, group] of byAlpha) {
+  for (const [, group] of byMatch) {
     if (group.length < 2) continue;
     // Also include claimed siblings so indirect clusters that mix with
     // differently-cased titles still surface remaining rows — but only if
-    // the alphanumeric group isn't already fully represented by one direct cluster.
+    // the match-key group isn't already fully represented by one direct cluster.
     const allIds = group.map((g) => g.id);
     const fingerprint = clusterFingerprint(allIds);
     const alreadyAsDirect = clusters.some((c) => c.tier === "direct" && c.fingerprint === fingerprint);
@@ -253,12 +299,12 @@ export function findDuplicateClusters(
 
   // Fuzzy: compare unclaimed items (plus soft matches to claimed only if both unclaimed)
   const fuzzyCandidates = items.filter((i) => !claimed.has(i.id));
-  // Bucket by series base prefix (falls back to full alpha) + length band to bound O(n²)
+  // Bucket by series base prefix (falls back to match key) + length band to bound O(n²)
   // while keeping same-series titles nearby for comparison.
   const buckets = new Map<string, CatalogItemForMatching[]>();
   for (const item of fuzzyCandidates) {
     const parts = parseSequelParts(item.title);
-    const alpha = parts.baseAlpha || alphanumericKey(item.title);
+    const alpha = parts.baseAlpha || matchingKey(item.title);
     if (alpha.length < 3) continue;
     const lenBand = Math.floor(alpha.length / 4);
     const prefix = alpha.slice(0, 2);
@@ -279,8 +325,8 @@ export function findDuplicateClusters(
       for (let j = i + 1; j < bucket.length; j++) {
         const left = bucket[i];
         const right = bucket[j];
-        // Skip alphanumeric-identical (would be indirect)
-        if (alphanumericKey(left.title) === alphanumericKey(right.title)) continue;
+        // Skip match-key-identical (would be indirect)
+        if (matchingKey(left.title) === matchingKey(right.title)) continue;
         // Numbered sequels/parts of the same series are never fuzzy-duplicates
         if (titlesAreDistinctSequels(left.title, right.title)) continue;
         const score = titleSimilarity(left.title, right.title);

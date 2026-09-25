@@ -74,19 +74,41 @@ export async function listDirectGroupRefs(): Promise<GroupRef[]> {
 }
 
 /**
- * Indirect groups: alphanumeric key match, excluding groups already identical
- * to a direct cluster fingerprint.
+ * Indirect groups: match-key (alphanumeric of significant words; stop-words /
+ * symbols ignored), excluding groups already identical to a direct cluster fingerprint.
  */
 export async function listIndirectGroupRefs(directFingerprints?: Set<string>): Promise<GroupRef[]> {
   const directSet = directFingerprints ?? new Set((await listDirectGroupRefs()).map((g) => g.fingerprint));
 
+  // Strip short stop-words then non-alphanumerics so "The Matrix" ≡ "Matrix"
+  // and "Foo and Bar" ≡ "Foo & Bar". Keep in sync with matchingKey() in normalize.ts.
   const result = await db.execute(sql`
     select
-      regexp_replace(lower(title), '[^a-z0-9]', '', 'g') as key,
+      regexp_replace(
+        regexp_replace(
+          regexp_replace(lower(title), '[^a-z0-9]+', ' ', 'g'),
+          '\m(a|an|and|or|the|of|to|in|on|at|for|vs|versus|with|by|from)\M',
+          '',
+          'g'
+        ),
+        '[^a-z0-9]',
+        '',
+        'g'
+      ) as key,
       array_agg(id order by id) as ids,
       array_agg(lower(btrim(title)) order by id) as norms
     from watchlist.watch_items
-    where regexp_replace(lower(title), '[^a-z0-9]', '', 'g') <> ''
+    where regexp_replace(
+      regexp_replace(
+        regexp_replace(lower(title), '[^a-z0-9]+', ' ', 'g'),
+        '\m(a|an|and|or|the|of|to|in|on|at|for|vs|versus|with|by|from)\M',
+        '',
+        'g'
+      ),
+      '[^a-z0-9]',
+      '',
+      'g'
+    ) <> ''
     group by 1
     having count(*) >= 2
     order by count(*) desc, min(title) asc
@@ -384,6 +406,8 @@ export async function hydrateGroupRefs(
 export {
   normalizeTitle,
   alphanumericKey,
+  matchingKey,
+  normalizeForMatch,
   parseSequelParts,
   titlesAreDistinctSequels,
 };
