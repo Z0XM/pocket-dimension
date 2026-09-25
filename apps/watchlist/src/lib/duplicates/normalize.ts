@@ -12,6 +12,90 @@ export function alphanumericKey(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+const ROMAN_PARTS: Record<string, number> = {
+  i: 1,
+  ii: 2,
+  iii: 3,
+  iv: 4,
+  v: 5,
+  vi: 6,
+  vii: 7,
+  viii: 8,
+  ix: 9,
+  x: 10,
+  xi: 11,
+  xii: 12,
+};
+
+/** Parse a trailing part/season token into a number, or null if not recognized. */
+export function parsePartToken(raw: string): number | null {
+  const t = raw.trim().toLowerCase();
+  if (!t) return null;
+  if (/^\d+$/.test(t)) {
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
+  return ROMAN_PARTS[t] ?? null;
+}
+
+export type SequelParts = {
+  /** Normalized title with trailing part/season suffix removed. */
+  base: string;
+  /** Alphanumeric key of `base` (for series identity). */
+  baseAlpha: string;
+  /** Part/season ordinal when present; null if title has no recognized suffix. */
+  part: number | null;
+};
+
+/**
+ * Strip common sequel / season / volume suffixes so "ABC 1" and "ABC 2"
+ * share a base but carry different part numbers.
+ *
+ * Patterns (end of title): Part/Pt/Vol/Season/Series/S/#/Ep/#, "#N", or a bare
+ * trailing number / short roman numeral.
+ */
+export function parseSequelParts(title: string): SequelParts {
+  const norm = normalizeTitle(title);
+  if (!norm) return { base: "", baseAlpha: "", part: null };
+
+  const patterns: RegExp[] = [
+    /^(.*?)\s*(?:part|pt\.?|volume|vol\.?)\s*[:.#-]?\s*([0-9]+|[ivxlcdm]+)$/i,
+    /^(.*?)\s*(?:season|series)\s*[:.#-]?\s*([0-9]+|[ivxlcdm]+)$/i,
+    /^(.*?)\s+(?:s|ep\.?|e)(\d+)$/i,
+    /^(.*?)\s*#\s*([0-9]+)$/i,
+    /^(.*?)\s+([0-9]+|[ivxlcdm]{1,4})$/i,
+  ];
+
+  for (const re of patterns) {
+    const m = norm.match(re);
+    if (!m) continue;
+    const base = (m[1] ?? "").trim();
+    const part = parsePartToken(m[2] ?? "");
+    // Require a non-empty base so bare "2" / "II" never count as sequels.
+    if (!base || part == null) continue;
+    return { base, baseAlpha: alphanumericKey(base), part };
+  }
+
+  return { base: norm, baseAlpha: alphanumericKey(norm), part: null };
+}
+
+/**
+ * True when two titles look like distinct numbered parts/seasons of the same
+ * series (e.g. "ABC 1" vs "ABC 2"), and must not be treated as duplicates.
+ *
+ * Same part twice ("ABC 1" + "ABC 1") → false (they *are* duplicate candidates).
+ * Different series with the same part ("ABC 1" + "ADC 1") → false (matching
+ * tiers may still link them).
+ */
+export function titlesAreDistinctSequels(a: string, b: string): boolean {
+  const pa = parseSequelParts(a);
+  const pb = parseSequelParts(b);
+  if (!pa.baseAlpha || pa.baseAlpha !== pb.baseAlpha) return false;
+  // Same series base: different part markers (including one missing) → distinct.
+  if (pa.part === pb.part) return false;
+  return true;
+}
+
 /** Unicode-aware Levenshtein distance. */
 export function levenshtein(a: string, b: string): number {
   if (a === b) return 0;
@@ -88,6 +172,7 @@ export type DuplicateCluster = {
  * Build duplicate clusters from catalog items.
  * Direct and indirect take precedence; fuzzy only links items not already
  * paired via a stronger tier (union-find style within fuzzy pairs).
+ * Numbered sequels/parts of the same series are never clustered together.
  */
 export function findDuplicateClusters(
   items: CatalogItemForMatching[],
@@ -117,24 +202,26 @@ export function findDuplicateClusters(
   const claimed = new Set<string>(); // item ids already in a stronger cluster
   const clusters: DuplicateCluster[] = [];
 
-  for (const [key, group] of byDirect) {
+  for (const [, group] of byDirect) {
     if (group.length < 2) continue;
-    const members = toMembers(group);
-    const fingerprint = clusterFingerprint(members.map((m) => m.id));
-    clusters.push({
-      id: `direct:${fingerprint}`,
-      tier: "direct",
-      confidence: 1,
-      fingerprint,
-      members,
-    });
-    for (const m of members) claimed.add(m.id);
+    // Same normalized title ⇒ same part token; still partition defensively.
+    for (const subgroup of partitionBySequelPart(group)) {
+      if (subgroup.length < 2) continue;
+      const members = toMembers(subgroup);
+      const fingerprint = clusterFingerprint(members.map((m) => m.id));
+      clusters.push({
+        id: `direct:${fingerprint}`,
+        tier: "direct",
+        confidence: 1,
+        fingerprint,
+        members,
+      });
+      for (const m of members) claimed.add(m.id);
+    }
   }
 
-  for (const [key, group] of byAlpha) {
+  for (const [, group] of byAlpha) {
     if (group.length < 2) continue;
-    // Skip if every pair already covered by direct (same normalized title)
-    const unclaimed = group.filter((g) => !claimed.has(g.id));
     // Also include claimed siblings so indirect clusters that mix with
     // differently-cased titles still surface remaining rows — but only if
     // the alphanumeric group isn't already fully represented by one direct cluster.
@@ -147,24 +234,31 @@ export function findDuplicateClusters(
     const norms = new Set(group.map((g) => normalizeTitle(g.title)));
     if (norms.size <= 1 && group.every((g) => claimed.has(g.id))) continue;
 
-    const members = toMembers(group);
-    if (members.length < 2) continue;
-    clusters.push({
-      id: `indirect:${fingerprint}`,
-      tier: "indirect",
-      confidence: 1,
-      fingerprint,
-      members,
-    });
-    for (const m of members) claimed.add(m.id);
+    for (const subgroup of partitionBySequelPart(group)) {
+      if (subgroup.length < 2) continue;
+      const members = toMembers(subgroup);
+      const fp = clusterFingerprint(members.map((m) => m.id));
+      const already = clusters.some((c) => c.fingerprint === fp);
+      if (already) continue;
+      clusters.push({
+        id: `indirect:${fp}`,
+        tier: "indirect",
+        confidence: 1,
+        fingerprint: fp,
+        members,
+      });
+      for (const m of members) claimed.add(m.id);
+    }
   }
 
   // Fuzzy: compare unclaimed items (plus soft matches to claimed only if both unclaimed)
   const fuzzyCandidates = items.filter((i) => !claimed.has(i.id));
-  // Bucket by first alphanumeric char + length band to bound O(n²)
+  // Bucket by series base prefix (falls back to full alpha) + length band to bound O(n²)
+  // while keeping same-series titles nearby for comparison.
   const buckets = new Map<string, CatalogItemForMatching[]>();
   for (const item of fuzzyCandidates) {
-    const alpha = alphanumericKey(item.title);
+    const parts = parseSequelParts(item.title);
+    const alpha = parts.baseAlpha || alphanumericKey(item.title);
     if (alpha.length < 3) continue;
     const lenBand = Math.floor(alpha.length / 4);
     const prefix = alpha.slice(0, 2);
@@ -187,6 +281,8 @@ export function findDuplicateClusters(
         const right = bucket[j];
         // Skip alphanumeric-identical (would be indirect)
         if (alphanumericKey(left.title) === alphanumericKey(right.title)) continue;
+        // Numbered sequels/parts of the same series are never fuzzy-duplicates
+        if (titlesAreDistinctSequels(left.title, right.title)) continue;
         const score = titleSimilarity(left.title, right.title);
         if (score < fuzzyThreshold || score >= 1) continue;
         const pk = clusterFingerprint([left.id, right.id]);
@@ -216,14 +312,8 @@ export function findDuplicateClusters(
     if (ra !== rb) parent.set(ra, rb);
   };
 
-  const minScore = new Map<string, number>(); // root -> min edge score in component
   for (const e of edges) {
     union(e.a, e.b);
-  }
-  for (const e of edges) {
-    const root = find(e.a);
-    const prev = minScore.get(root);
-    minScore.set(root, prev == null ? e.score : Math.min(prev, e.score));
   }
 
   const byRoot = new Map<string, string[]>();
@@ -236,19 +326,31 @@ export function findDuplicateClusters(
   }
 
   const byId = new Map(items.map((i) => [i.id, i]));
-  for (const [root, ids] of byRoot) {
+  for (const ids of byRoot.values()) {
     if (ids.length < 2) continue;
-    const members = toMembers(ids.map((id) => byId.get(id)!).filter(Boolean));
-    if (members.length < 2) continue;
-    const fingerprint = clusterFingerprint(members.map((m) => m.id));
-    const confidence = Math.round((minScore.get(root) ?? fuzzyThreshold) * 1000) / 1000;
-    clusters.push({
-      id: `fuzzy:${fingerprint}`,
-      tier: "fuzzy",
-      confidence,
-      fingerprint,
-      members,
-    });
+    const group = ids.map((id) => byId.get(id)!).filter(Boolean);
+    for (const subgroup of partitionBySequelPart(group)) {
+      if (subgroup.length < 2) continue;
+      // Recompute confidence from edges wholly inside the subgroup (sequel
+      // bridges may have been severed by partitionBySequelPart).
+      const idSet = new Set(subgroup.map((m) => m.id));
+      let conf: number | null = null;
+      for (const e of edges) {
+        if (idSet.has(e.a) && idSet.has(e.b)) {
+          conf = conf == null ? e.score : Math.min(conf, e.score);
+        }
+      }
+      const members = toMembers(subgroup);
+      const fingerprint = clusterFingerprint(members.map((m) => m.id));
+      const confidence = Math.round((conf ?? fuzzyThreshold) * 1000) / 1000;
+      clusters.push({
+        id: `fuzzy:${fingerprint}`,
+        tier: "fuzzy",
+        confidence,
+        fingerprint,
+        members,
+      });
+    }
   }
 
   // Sort: direct → indirect → fuzzy, then by confidence desc, then size desc
@@ -270,4 +372,35 @@ function toMembers(items: CatalogItemForMatching[]): DuplicateClusterMember[] {
     languageId: i.languageId,
     language: i.language ?? null,
   }));
+}
+
+/**
+ * Split a candidate group so distinct numbered parts of the same series never
+ * share a cluster. Items with the same (baseAlpha, part) stay together.
+ */
+function partitionBySequelPart(items: CatalogItemForMatching[]): CatalogItemForMatching[][] {
+  if (items.length < 2) return [items];
+
+  // If no pair looks like distinct sequels, keep the group intact.
+  let anyConflict = false;
+  for (let i = 0; i < items.length && !anyConflict; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      if (titlesAreDistinctSequels(items[i].title, items[j].title)) {
+        anyConflict = true;
+        break;
+      }
+    }
+  }
+  if (!anyConflict) return [items];
+
+  const buckets = new Map<string, CatalogItemForMatching[]>();
+  for (const item of items) {
+    const parts = parseSequelParts(item.title);
+    // Key by part only within an already-similar group; null → "none"
+    const key = parts.part == null ? "none" : String(parts.part);
+    const list = buckets.get(key) ?? [];
+    list.push(item);
+    buckets.set(key, list);
+  }
+  return [...buckets.values()];
 }

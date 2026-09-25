@@ -5,7 +5,9 @@ import {
   findDuplicateClusters,
   levenshtein,
   normalizeTitle,
+  parseSequelParts,
   titleSimilarity,
+  titlesAreDistinctSequels,
 } from "./normalize";
 import { chooseRating, planRatingMerges, ratingsDisagree, type RatingSnapshot } from "./merge-ratings";
 
@@ -21,6 +23,32 @@ describe("alphanumericKey", () => {
     expect(alphanumericKey("Spider-Man: No Way Home")).toBe("spidermannowayhome");
     expect(alphanumericKey("Spider Man No Way Home!")).toBe("spidermannowayhome");
     expect(alphanumericKey("  Foo & Bar #1 ")).toBe("foobar1");
+  });
+});
+
+describe("parseSequelParts / titlesAreDistinctSequels", () => {
+  test("parses trailing numbers and part/season suffixes", () => {
+    expect(parseSequelParts("ABC 1")).toEqual({ base: "abc", baseAlpha: "abc", part: 1 });
+    expect(parseSequelParts("ABC 2")).toEqual({ base: "abc", baseAlpha: "abc", part: 2 });
+    expect(parseSequelParts("Foo Part 2")).toEqual({ base: "foo", baseAlpha: "foo", part: 2 });
+    expect(parseSequelParts("Bar Season 3")).toEqual({ base: "bar", baseAlpha: "bar", part: 3 });
+    expect(parseSequelParts("Baz #4")).toEqual({ base: "baz", baseAlpha: "baz", part: 4 });
+    expect(parseSequelParts("Qux II")).toEqual({ base: "qux", baseAlpha: "qux", part: 2 });
+    expect(parseSequelParts("Inception").part).toBeNull();
+  });
+
+  test("ABC 1 vs ABC 2 are distinct sequels; same part is not", () => {
+    expect(titlesAreDistinctSequels("ABC 1", "ABC 2")).toBe(true);
+    expect(titlesAreDistinctSequels("ABC 1", "ABC 1")).toBe(false);
+    expect(titlesAreDistinctSequels("ABC Part 1", "ABC Part 2")).toBe(true);
+  });
+
+  test("different series with same part are not sequels of each other", () => {
+    expect(titlesAreDistinctSequels("ABC 1", "ADC 1")).toBe(false);
+  });
+
+  test("base title vs numbered sequel counts as distinct", () => {
+    expect(titlesAreDistinctSequels("Alien", "Alien 2")).toBe(true);
   });
 });
 
@@ -88,6 +116,39 @@ describe("findDuplicateClusters", () => {
     const clusters = findDuplicateClusters(items);
     expect(clusters.every((c) => c.members.length >= 2)).toBe(true);
     expect(clusters.some((c) => c.members.some((m) => m.id === "7"))).toBe(false);
+  });
+
+  test("does not treat numbered parts as duplicates of each other", () => {
+    const sequels = [
+      { id: "a1", title: "ABC 1", type: "movie", languageId: "l1" },
+      { id: "a2", title: "ABC 2", type: "movie", languageId: "l1" },
+      { id: "a1b", title: "ABC 1", type: "movie", languageId: "l1" },
+      { id: "d1", title: "ADC 1", type: "movie", languageId: "l1" },
+      { id: "p1", title: "Show Part 1", type: "series", languageId: "l1" },
+      { id: "p2", title: "Show Part 2", type: "series", languageId: "l1" },
+    ];
+    const clusters = findDuplicateClusters(sequels, { fuzzyThreshold: 0.7 });
+
+    // Exact same title twice → direct duplicate
+    const abc1 = clusters.find(
+      (c) => c.tier === "direct" && c.members.some((m) => m.id === "a1") && c.members.some((m) => m.id === "a1b")
+    );
+    expect(abc1).toBeTruthy();
+    expect(abc1!.members.map((m) => m.id).sort()).toEqual(["a1", "a1b"]);
+
+    // Different parts must never share a cluster
+    const hasAbc12 = clusters.some(
+      (c) => c.members.some((m) => m.id === "a1" || m.id === "a1b") && c.members.some((m) => m.id === "a2")
+    );
+    expect(hasAbc12).toBe(false);
+
+    const hasShowParts = clusters.some(
+      (c) => c.members.some((m) => m.id === "p1") && c.members.some((m) => m.id === "p2")
+    );
+    expect(hasShowParts).toBe(false);
+
+    // ADC 1 is allowed to match ABC 1 if fuzzy rules say so — not blocked as a sequel
+    expect(titlesAreDistinctSequels("ABC 1", "ADC 1")).toBe(false);
   });
 });
 

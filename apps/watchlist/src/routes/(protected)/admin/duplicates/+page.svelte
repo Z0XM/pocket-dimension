@@ -3,7 +3,10 @@
   import { toast } from "svelte-sonner";
   import { goto, invalidateAll } from "$app/navigation";
   import { Button } from "$components/ui/button";
+  import { Checkbox } from "$lib/components/ui/checkbox";
+  import { Label } from "$lib/components/ui/label";
   import * as Card from "$lib/components/ui/card";
+  import * as Select from "$lib/components/ui/select";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -56,6 +59,19 @@
     fuzzy: number | null;
   };
 
+  const TIER_OPTIONS = [
+    { value: "all", label: "All" },
+    { value: "direct", label: "Direct" },
+    { value: "indirect", label: "Indirect" },
+    { value: "fuzzy", label: "Fuzzy" },
+  ] as const;
+
+  const STRATEGY_OPTIONS = [
+    { value: "prefer_kept", label: "Prefer kept row" },
+    { value: "prefer_highest", label: "Prefer highest rating" },
+    { value: "prefer_recent", label: "Prefer most recently updated" },
+  ] as const;
+
   let summary = $state(data.summary);
   let counts = $state<Counts>({ ...data.summary.counts });
   let tier = $state(data.tier);
@@ -70,8 +86,12 @@
   let loadingFuzzySummary = $state(false);
   let initialLoadDone = $state(false);
   let busyId = $state<string | null>(null);
+  /** Skip one effect-driven reload after we already reloaded from a filter change. */
+  let skipEffectReload = $state(false);
 
   let keepByCluster = $state<Record<string, string>>({});
+  /** Item ids included in merge/delete for each cluster (partial selection). */
+  let selectedByCluster = $state<Record<string, string[]>>({});
   let strategyByCluster = $state<Record<string, string>>({});
   let confirmByCluster = $state<Record<string, "merge" | "delete" | null>>({});
   let previewByCluster = $state<Record<string, Preview | null>>({});
@@ -79,16 +99,63 @@
   function applyClusterDefaults(list: Cluster[], replace: boolean) {
     const nextKeep = replace ? {} : { ...keepByCluster };
     const nextStrategy = replace ? {} : { ...strategyByCluster };
+    const nextSelected = replace ? {} : { ...selectedByCluster };
     for (const c of list) {
-      if (!nextKeep[c.id]) nextKeep[c.id] = c.members[0]?.id ?? "";
+      const allIds = c.members.map((m) => m.id);
+      if (!nextSelected[c.id]?.length) nextSelected[c.id] = [...allIds];
+      // Keep must be one of the selected ids
+      const selected = nextSelected[c.id];
+      if (!nextKeep[c.id] || !selected.includes(nextKeep[c.id])) {
+        nextKeep[c.id] = selected[0] ?? allIds[0] ?? "";
+      }
       if (!nextStrategy[c.id]) nextStrategy[c.id] = "prefer_kept";
     }
     keepByCluster = nextKeep;
     strategyByCluster = nextStrategy;
+    selectedByCluster = nextSelected;
     if (replace) {
       confirmByCluster = {};
       previewByCluster = {};
     }
+  }
+
+  function selectedIds(cluster: Cluster): string[] {
+    return selectedByCluster[cluster.id] ?? cluster.members.map((m) => m.id);
+  }
+
+  function isSelected(clusterId: string, itemId: string): boolean {
+    return (selectedByCluster[clusterId] ?? []).includes(itemId);
+  }
+
+  function toggleMemberSelected(cluster: Cluster, itemId: string, checked: boolean) {
+    const cur = new Set(selectedIds(cluster));
+    if (checked) cur.add(itemId);
+    else cur.delete(itemId);
+    const next = [...cur];
+    selectedByCluster = { ...selectedByCluster, [cluster.id]: next };
+    // If keep was deselected, move keep to first remaining selection
+    if (!next.includes(keepByCluster[cluster.id] ?? "")) {
+      keepByCluster = { ...keepByCluster, [cluster.id]: next[0] ?? "" };
+    }
+    cancelConfirm(cluster.id);
+  }
+
+  function setKeep(cluster: Cluster, itemId: string) {
+    // Selecting keep also ensures the item is in the merge set
+    const cur = new Set(selectedIds(cluster));
+    cur.add(itemId);
+    selectedByCluster = { ...selectedByCluster, [cluster.id]: [...cur] };
+    keepByCluster = { ...keepByCluster, [cluster.id]: itemId };
+    cancelConfirm(cluster.id);
+  }
+
+  function actionTargets(cluster: Cluster): { keepId: string; otherIds: string[] } | null {
+    const keepId = keepByCluster[cluster.id];
+    const selected = selectedIds(cluster);
+    if (!keepId || !selected.includes(keepId)) return null;
+    const otherIds = selected.filter((id) => id !== keepId);
+    if (otherIds.length === 0) return null;
+    return { keepId, otherIds };
   }
 
   function buildParams(extra: Record<string, string> = {}) {
@@ -178,22 +245,41 @@
     void loadFuzzyCountInBackground();
   }
 
-  // Sync filter props from SSR, then load first page client-side.
+  // Sync filter props from SSR (back/forward / invalidate), then load first page.
   $effect(() => {
     summary = data.summary;
     counts = { ...data.summary.counts };
     tier = data.tier;
     includeDismissed = data.includeDismissed;
     pageSize = data.pageSize;
+    if (skipEffectReload) {
+      skipEffectReload = false;
+      return;
+    }
     void resetAndLoad();
   });
 
-  async function refreshQuery() {
+  /** Apply filter locally first (so API params are correct), then sync URL. */
+  async function applyFilters(next: { tier?: typeof tier; includeDismissed?: boolean }) {
+    if (next.tier != null) tier = next.tier;
+    if (next.includeDismissed != null) includeDismissed = next.includeDismissed;
+
     const params = new URLSearchParams();
     if (tier !== "all") params.set("tier", tier);
     if (includeDismissed) params.set("includeDismissed", "1");
     const qs = params.toString();
-    await goto(`/admin/duplicates${qs ? `?${qs}` : ""}`, { invalidateAll: true, keepFocus: true });
+
+    // Reload with local filter state immediately — don't wait on SSR round-trip
+    // (previous bind+goto+effect path left Show dismissed out of sync).
+    await resetAndLoad();
+
+    skipEffectReload = true;
+    await goto(`/admin/duplicates${qs ? `?${qs}` : ""}`, {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+      invalidateAll: true,
+    });
   }
 
   async function reloadClient() {
@@ -221,11 +307,22 @@
     return String(counts.fuzzy);
   }
 
+  function tierTriggerLabel() {
+    const base = TIER_OPTIONS.find((o) => o.value === tier)?.label ?? "All";
+    if (tier === "all") return `${base} (${counts.direct + counts.indirect + (counts.fuzzy ?? 0)})`;
+    if (tier === "direct") return `${base} (${counts.direct})`;
+    if (tier === "indirect") return `${base} (${counts.indirect})`;
+    return `${base} (${fuzzyLabel()})`;
+  }
+
+  function strategyLabel(value: string) {
+    return STRATEGY_OPTIONS.find((o) => o.value === value)?.label ?? value;
+  }
+
   async function previewMerge(cluster: Cluster) {
-    const keepId = keepByCluster[cluster.id];
-    const mergeIds = cluster.members.map((m) => m.id).filter((id) => id !== keepId);
-    if (!keepId || mergeIds.length === 0) {
-      toast.error("Pick a title to keep");
+    const targets = actionTargets(cluster);
+    if (!targets) {
+      toast.error("Select at least two titles (and a keep) to merge");
       return;
     }
     busyId = cluster.id;
@@ -236,8 +333,8 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "preview",
-          keepId,
-          mergeIds,
+          keepId: targets.keepId,
+          mergeIds: targets.otherIds,
           strategy: strategyByCluster[cluster.id] || "prefer_kept",
         }),
       });
@@ -262,8 +359,11 @@
   }
 
   async function confirmMerge(cluster: Cluster) {
-    const keepId = keepByCluster[cluster.id];
-    const mergeIds = cluster.members.map((m) => m.id).filter((id) => id !== keepId);
+    const targets = actionTargets(cluster);
+    if (!targets) {
+      toast.error("Select at least two titles (and a keep) to merge");
+      return;
+    }
     busyId = cluster.id;
     try {
       const res = await fetch("/api/admin/duplicates", {
@@ -272,8 +372,8 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "merge",
-          keepId,
-          mergeIds,
+          keepId: targets.keepId,
+          mergeIds: targets.otherIds,
           strategy: strategyByCluster[cluster.id] || "prefer_kept",
         }),
       });
@@ -282,7 +382,7 @@
         toast.error(body.error || "Merge failed");
         return;
       }
-      toast.success(`Merged ${mergeIds.length} into kept title`);
+      toast.success(`Merged ${targets.otherIds.length} into kept title`);
       confirmByCluster = { ...confirmByCluster, [cluster.id]: null };
       previewByCluster = { ...previewByCluster, [cluster.id]: null };
       await invalidateAll();
@@ -293,27 +393,38 @@
   }
 
   function startDelete(cluster: Cluster) {
+    if (!actionTargets(cluster)) {
+      toast.error("Select at least two titles (and a keep) to delete others");
+      return;
+    }
     confirmByCluster = { ...confirmByCluster, [cluster.id]: "delete" };
     previewByCluster = { ...previewByCluster, [cluster.id]: null };
   }
 
   async function confirmDelete(cluster: Cluster) {
-    const keepId = keepByCluster[cluster.id];
-    const deleteIds = cluster.members.map((m) => m.id).filter((id) => id !== keepId);
+    const targets = actionTargets(cluster);
+    if (!targets) {
+      toast.error("Select at least two titles (and a keep) to delete others");
+      return;
+    }
     busyId = cluster.id;
     try {
       const res = await fetch("/api/admin/duplicates", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete_others", keepId, deleteIds }),
+        body: JSON.stringify({
+          action: "delete_others",
+          keepId: targets.keepId,
+          deleteIds: targets.otherIds,
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.ok) {
         toast.error(body.error || "Delete failed");
         return;
       }
-      toast.success(`Deleted ${deleteIds.length} catalog row(s); ratings on those rows were removed`);
+      toast.success(`Deleted ${targets.otherIds.length} catalog row(s); ratings on those rows were removed`);
       confirmByCluster = { ...confirmByCluster, [cluster.id]: null };
       await invalidateAll();
       await reloadClient();
@@ -393,7 +504,7 @@
         </div>
         <h1 class="text-3xl font-medium">Duplicates &amp; merge</h1>
         <p class="text-muted-foreground text-sm">
-          Review suggested duplicate clusters, merge ratings into one survivor, or dismiss false positives.
+          Review suggested duplicate clusters, merge a selected subset into one survivor, or dismiss false positives.
         </p>
         <p class="text-xs text-muted-foreground">
           <a href="/admin" class="text-accent hover:underline">← Admin center</a>
@@ -439,31 +550,48 @@
     </Card.Root>
 
     <Card.Root>
-      <Card.Content class="pt-4 flex flex-wrap gap-3 items-end text-xs">
-        <label class="space-y-1">
-          <span class="text-muted-foreground">Tier</span>
-          <select
-            class="block h-8 rounded-md border border-border bg-background px-2"
-            bind:value={tier}
-            onchange={() => refreshQuery()}
+      <Card.Content class="pt-4 flex flex-wrap gap-4 items-end text-xs">
+        <div class="space-y-1.5">
+          <Label class="text-muted-foreground font-normal">Tier</Label>
+          <Select.Root
+            type="single"
+            value={tier}
+            onValueChange={(v) => {
+              if (v) void applyFilters({ tier: v as typeof tier });
+            }}
           >
-            <option value="all">All ({counts.direct + counts.indirect + (counts.fuzzy ?? 0)})</option>
-            <option value="direct">Direct ({counts.direct})</option>
-            <option value="indirect">Indirect ({counts.indirect})</option>
-            <option value="fuzzy">Fuzzy ({fuzzyLabel()})</option>
-          </select>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer pb-1">
-          <input
-            type="checkbox"
-            bind:checked={includeDismissed}
-            onchange={() => refreshQuery()}
-            class="rounded border-border"
+            <Select.Trigger size="sm" class="min-w-[10rem] bg-background/60 backdrop-blur-sm cursor-pointer">
+              {tierTriggerLabel()}
+            </Select.Trigger>
+            <Select.Content class="bg-background/80 backdrop-blur-md text-xs">
+              {#each TIER_OPTIONS as opt}
+                <Select.Item class="text-xs" value={opt.value}>
+                  {opt.label}
+                  {#if opt.value === "all"}
+                    ({counts.direct + counts.indirect + (counts.fuzzy ?? 0)})
+                  {:else if opt.value === "direct"}
+                    ({counts.direct})
+                  {:else if opt.value === "indirect"}
+                    ({counts.indirect})
+                  {:else}
+                    ({fuzzyLabel()})
+                  {/if}
+                </Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer pb-1.5">
+          <Checkbox
+            checked={includeDismissed}
+            onCheckedChange={(v) => void applyFilters({ includeDismissed: v === true })}
+            class="cursor-pointer border-border"
           />
-          <span>Show dismissed</span>
+          <span class="text-foreground">Show dismissed</span>
         </label>
-        <p class="text-muted-foreground self-center pb-1">
-          Showing {clusters.length} of {totalMatching || "…"} · Direct = exact · Indirect = alphanumeric · Fuzzy = close match
+        <p class="text-muted-foreground self-center pb-1.5">
+          Showing {clusters.length} of {totalMatching || "…"} · Direct = exact · Indirect = alphanumeric · Fuzzy = close
+          match · Numbered parts are not merged
         </p>
       </Card.Content>
     </Card.Root>
@@ -483,6 +611,8 @@
         {@const keepId = keepByCluster[cluster.id]}
         {@const confirm = confirmByCluster[cluster.id]}
         {@const preview = previewByCluster[cluster.id]}
+        {@const selected = selectedIds(cluster)}
+        {@const canAct = selected.length >= 2 && selected.includes(keepId)}
         <Card.Root class={cluster.dismissed ? "opacity-70" : ""}>
           <Card.Header class="pb-2">
             <div class="flex flex-wrap items-center gap-2">
@@ -493,7 +623,7 @@
                 <span class="text-[10px] text-muted-foreground">{confidenceLabel(cluster)}</span>
               {/if}
               <span class="text-[10px] text-muted-foreground"
-                >{cluster.members.length} titles · {cluster.totalRatings} ratings</span
+                >{cluster.members.length} titles · {selected.length} selected · {cluster.totalRatings} ratings</span
               >
               {#if cluster.dismissed}
                 <span class="text-[10px] uppercase tracking-wide text-muted-foreground">dismissed</span>
@@ -502,66 +632,107 @@
             {#if cluster.sampleRaters.length > 0}
               <p class="text-[11px] text-muted-foreground mt-1">Raters: {cluster.sampleRaters.join(", ")}</p>
             {/if}
+            <p class="text-[11px] text-muted-foreground mt-1">
+              Uncheck titles that are unique — merge / delete only the selected set.
+            </p>
           </Card.Header>
           <Card.Content class="space-y-4 text-xs">
             <div class="space-y-2">
               {#each cluster.memberStats as member}
-                <label class="flex items-start gap-2 cursor-pointer rounded-md border border-border/40 p-2 hover:bg-muted/30">
-                  <input
-                    type="radio"
-                    name={`keep-${cluster.id}`}
-                    class="mt-1"
-                    checked={keepId === member.id}
-                    onchange={() => {
-                      keepByCluster = { ...keepByCluster, [cluster.id]: member.id };
-                      cancelConfirm(cluster.id);
-                    }}
+                {@const inSet = isSelected(cluster.id, member.id)}
+                {@const isKeep = keepId === member.id}
+                <div
+                  class="flex items-start gap-2 rounded-md border border-border/40 p-2 {inSet
+                    ? 'hover:bg-muted/30'
+                    : 'opacity-55 bg-muted/10'}"
+                >
+                  <Checkbox
+                    checked={inSet}
+                    onCheckedChange={(v) => toggleMemberSelected(cluster, member.id, v === true)}
+                    class="mt-1 cursor-pointer border-border"
+                    aria-label={`Include ${member.title} in merge set`}
                   />
-                  <div class="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    class="min-w-0 flex-1 text-left cursor-pointer"
+                    disabled={!inSet && !isKeep}
+                    onclick={() => setKeep(cluster, member.id)}
+                  >
                     <p class="text-sm font-medium text-foreground truncate">{member.title}</p>
                     <p class="text-[11px] text-muted-foreground">
                       {member.type} · {member.language ?? "—"} · {member.ratingCount} rating{member.ratingCount === 1
                         ? ""
                         : "s"}
-                      {#if keepId === member.id}
+                      {#if !inSet}
+                        <span> · excluded</span>
+                      {:else if isKeep}
                         <span class="text-accent"> · keep</span>
+                      {:else}
+                        <span> · click to keep</span>
                       {/if}
                     </p>
-                  </div>
-                </label>
+                  </button>
+                  {#if inSet}
+                    <Button
+                      size="sm"
+                      variant={isKeep ? "default" : "outline"}
+                      class="shrink-0 h-7 text-[10px] px-2"
+                      onclick={() => setKeep(cluster, member.id)}
+                    >
+                      {isKeep ? "Keeping" : "Keep"}
+                    </Button>
+                  {/if}
+                </div>
               {/each}
             </div>
 
             {#if !cluster.dismissed}
               <div class="flex flex-wrap gap-2 items-end">
-                <label class="space-y-1">
-                  <span class="text-muted-foreground">Merge strategy</span>
-                  <select
-                    class="block h-8 rounded-md border border-border bg-background px-2"
+                <div class="space-y-1.5">
+                  <Label class="text-muted-foreground font-normal">Merge strategy</Label>
+                  <Select.Root
+                    type="single"
                     value={strategyByCluster[cluster.id] || "prefer_kept"}
-                    onchange={(e) => {
-                      strategyByCluster = {
-                        ...strategyByCluster,
-                        [cluster.id]: (e.currentTarget as HTMLSelectElement).value,
-                      };
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      strategyByCluster = { ...strategyByCluster, [cluster.id]: v };
                       cancelConfirm(cluster.id);
                     }}
                   >
-                    <option value="prefer_kept">Prefer kept row</option>
-                    <option value="prefer_highest">Prefer highest rating</option>
-                    <option value="prefer_recent">Prefer most recently updated</option>
-                  </select>
-                </label>
-                <Button size="sm" disabled={busyId === cluster.id} onclick={() => previewMerge(cluster)}>
-                  Merge into kept…
+                    <Select.Trigger size="sm" class="min-w-[12rem] bg-background/60 backdrop-blur-sm cursor-pointer">
+                      {strategyLabel(strategyByCluster[cluster.id] || "prefer_kept")}
+                    </Select.Trigger>
+                    <Select.Content class="bg-background/80 backdrop-blur-md text-xs">
+                      {#each STRATEGY_OPTIONS as opt}
+                        <Select.Item class="text-xs" value={opt.value}>{opt.label}</Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
+                </div>
+                <Button
+                  size="sm"
+                  disabled={busyId === cluster.id || !canAct}
+                  onclick={() => previewMerge(cluster)}
+                >
+                  Merge selected…
                 </Button>
-                <Button size="sm" variant="secondary" disabled={busyId === cluster.id} onclick={() => startDelete(cluster)}>
-                  Keep / delete others…
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busyId === cluster.id || !canAct}
+                  onclick={() => startDelete(cluster)}
+                >
+                  Keep / delete selected…
                 </Button>
                 <Button size="sm" variant="outline" disabled={busyId === cluster.id} onclick={() => dismiss(cluster)}>
                   Not duplicates
                 </Button>
               </div>
+              {#if !canAct}
+                <p class="text-[11px] text-muted-foreground">
+                  Select 2+ titles and pick one to keep before merging or deleting.
+                </p>
+              {/if}
             {:else}
               <Button size="sm" variant="outline" disabled={busyId === cluster.id} onclick={() => undismiss(cluster)}>
                 Undo dismiss
@@ -570,10 +741,11 @@
 
             {#if confirm === "merge" && preview}
               <div id={`confirm-${cluster.id}`} class="rounded-md border border-accent/40 bg-accent/5 p-3 space-y-3">
-                <p class="text-foreground font-medium text-xs">Confirm merge</p>
+                <p class="text-foreground font-medium text-xs">Confirm merge (selected subset)</p>
                 <p class="text-muted-foreground">
                   Keep <span class="text-foreground">{preview.keep.title}</span>; remove
-                  {preview.losers.map((l) => l.title).join(", ")}. Strategy:
+                  {preview.losers.map((l) => l.title).join(", ")}. Unselected titles in this cluster stay untouched.
+                  Strategy:
                   <span class="text-foreground">{preview.strategy.replaceAll("_", " ")}</span>.
                   {preview.userCount} user rating(s) across {preview.ratingRowCount} row(s).
                   <span class="text-foreground"
@@ -611,11 +783,12 @@
 
             {#if confirm === "delete"}
               <div class="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-3">
-                <p class="text-foreground font-medium text-xs">Confirm keep / delete</p>
+                <p class="text-foreground font-medium text-xs">Confirm keep / delete selected</p>
                 <p class="text-muted-foreground">
-                  Keep the selected title. Delete the other catalog rows
+                  Keep the selected survivor. Delete the other <span class="text-foreground">selected</span> catalog
+                  rows
                   <span class="text-destructive">and their ratings</span>
-                  (no merge). Prefer Merge if you want ratings preserved.
+                  (no merge). Excluded titles are left alone. Prefer Merge if you want ratings preserved.
                 </p>
                 <div class="flex gap-2">
                   <Button
@@ -624,7 +797,7 @@
                     disabled={busyId === cluster.id}
                     onclick={() => confirmDelete(cluster)}
                   >
-                    Delete others
+                    Delete selected others
                   </Button>
                   <Button size="sm" variant="ghost" onclick={() => cancelConfirm(cluster.id)}>Cancel</Button>
                 </div>

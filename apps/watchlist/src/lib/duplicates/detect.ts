@@ -381,4 +381,9 @@ export async function hydrateGroupRefs(
 }
 
 // Re-export helpers used by tests / callers that still want in-memory full scan
-export { normalizeTitle, alphanumericKey };
+export {
+  normalizeTitle,
+  alphanumericKey,
+  parseSequelParts,
+  titlesAreDistinctSequels,
+};
