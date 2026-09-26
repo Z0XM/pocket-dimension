@@ -5,12 +5,13 @@
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
   import * as Popover from "$lib/components/ui/popover";
-  import { getEffectiveDate } from "$lib/utils";
+  import { getEffectiveDate, toDayInt } from "$lib/utils";
   import ColorPicker from "./ColorPicker.svelte";
   import { Progress } from "./ui/progress";
 
   // Use effective date: "today" = yesterday until noon
   const today = getEffectiveDate();
+  const todayDayInt = toDayInt(today);
   const noOfDaysInYear = today.getFullYear() % 4 === 0 ? 366 : 365;
   const todayCountOfDay = Math.ceil((today.getTime() - new Date(today.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24));
 
@@ -110,7 +111,10 @@
   <Card.Header>
     <p class="mb-2 text-[0.8rem] font-medium tracking-[0.14em] text-muted-foreground uppercase">Today</p>
     <Card.Title>
-      <div class="font-display text-3xl leading-none tracking-tight text-foreground md:text-4xl">
+      <a
+        href="/day/{todayDayInt}"
+        class="font-display block text-3xl leading-none tracking-tight text-foreground transition-colors hover:text-primary hover:underline md:text-4xl"
+      >
         {today.toLocaleDateString("en-IN", { weekday: "long" })}
         <span class="text-primary">,</span>{" "}
         {today
@@ -120,55 +124,77 @@
             year: "numeric",
           })
           .replace(/ /g, " ")}
-      </div>
+      </a>
     </Card.Title>
     <Card.Description>
       <span class="font-display text-2xl text-primary">{todayCountOfDay}</span>
       <span class="text-sm tracking-wide text-muted-foreground">{` / ${noOfDaysInYear}`}</span>
     </Card.Description>
 
-    <!-- Theme color picker icon -->
-    <Popover.Root bind:open={themePickerOpen}>
-      <Popover.Trigger>
-        <button
-          type="button"
-          class="absolute top-4 right-4 rounded-full p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-          aria-label="Change theme color"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+    <!-- Header actions: theme (left) + profile (right) -->
+    <div class="absolute top-4 right-4 flex items-center gap-0.5">
+      <Popover.Root bind:open={themePickerOpen}>
+        <Popover.Trigger>
+          <button
+            type="button"
+            class="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+            aria-label="Change theme color"
           >
-            <circle cx="13.5" cy="6.5" r="0.5" fill="currentColor" />
-            <circle cx="17.5" cy="10.5" r="0.5" fill="currentColor" />
-            <circle cx="8.5" cy="7.5" r="0.5" fill="currentColor" />
-            <circle cx="6.5" cy="12.5" r="0.5" fill="currentColor" />
-            <path
-              d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"
-            />
-          </svg>
-        </button>
-      </Popover.Trigger>
-      <Popover.Content class="w-auto p-4" align="end">
-        <div class="flex flex-col items-center gap-3">
-          <p class="text-sm font-medium text-foreground">Theme Color</p>
-          <ColorPicker bind:color={themeColor} hueOnly />
-          <div class="flex w-full gap-2">
-            <Button type="button" variant="secondary" size="sm" class="flex-1" onclick={clearTheme}>Reset</Button>
-            <Popover.Close>
-              <Button type="button" size="sm" class="flex-1">Done</Button>
-            </Popover.Close>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="13.5" cy="6.5" r="0.5" fill="currentColor" />
+              <circle cx="17.5" cy="10.5" r="0.5" fill="currentColor" />
+              <circle cx="8.5" cy="7.5" r="0.5" fill="currentColor" />
+              <circle cx="6.5" cy="12.5" r="0.5" fill="currentColor" />
+              <path
+                d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"
+              />
+            </svg>
+          </button>
+        </Popover.Trigger>
+        <Popover.Content class="w-auto p-4" align="end">
+          <div class="flex flex-col items-center gap-3">
+            <p class="text-sm font-medium text-foreground">Theme Color</p>
+            <ColorPicker bind:color={themeColor} hueOnly />
+            <div class="flex w-full gap-2">
+              <Button type="button" variant="secondary" size="sm" class="flex-1" onclick={clearTheme}>Reset</Button>
+              <Popover.Close>
+                <Button type="button" size="sm" class="flex-1">Done</Button>
+              </Popover.Close>
+            </div>
           </div>
-        </div>
-      </Popover.Content>
-    </Popover.Root>
+        </Popover.Content>
+      </Popover.Root>
+      <a
+        href="/profile"
+        class="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+        aria-label="Your profile"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      </a>
+    </div>
   </Card.Header>
   <Progress value={(todayCountOfDay / noOfDaysInYear) * 100} class="w-full" />
   <Card.Content class="px-6">
