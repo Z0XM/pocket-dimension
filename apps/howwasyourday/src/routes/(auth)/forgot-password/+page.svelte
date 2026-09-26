@@ -56,7 +56,7 @@
       <div class="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-2">
         <KeyIcon class="h-6 w-6 text-primary" />
       </div>
-      <h1 class="text-2xl font-bold">Forgot Password?</h1>
+      <h1 class="font-display text-3xl tracking-tight">Forgot Password?</h1>
       <p class="text-muted-foreground text-sm text-balance">Enter your email address and we'll send you a link to reset your password.</p>
     </div>
 

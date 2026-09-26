@@ -601,22 +601,34 @@
 </Card.Root>
 
 {#if data.publicNotes && data.publicNotes.length > 0}
-  <div class="flex flex-wrap w-full gap-2">
-    {#each data.publicNotes as { author, note }}
-      <div class="flex flex-col gap-1 rounded-md bg-primary/10 border border-primary/15 px-3 py-2">
-        <span class="text-xs text-primary/70">{author}</span>
-        <span class="text-sm text-foreground">{note}</span>
-      </div>
-    {/each}
-  </div>
+  <section class="w-full">
+    <div class="mb-3">
+      <h2 class="font-display text-xl tracking-tight text-foreground">Public notes today</h2>
+      <p class="text-sm text-muted-foreground">What people shared with the neighborhood.</p>
+    </div>
+    <div class="flex w-full flex-col gap-2">
+      {#each data.publicNotes as { author, note }}
+        <div class="flex flex-col gap-1 border-b border-border/70 py-2 last:border-b-0">
+          <span class="text-[0.75rem] tracking-[0.06em] text-muted-foreground uppercase">{author}</span>
+          <span class="text-[0.95rem] leading-relaxed text-foreground/85 italic">{note}</span>
+        </div>
+      {/each}
+    </div>
+  </section>
 {/if}
 
 {#if data.todayDrawings && data.todayDrawings.length > 0}
-  <div class="flex w-full max-w-[90%] flex-wrap items-center justify-center gap-2">
-    {#each data.todayDrawings as { drawing }}
-      <div class="flex max-w-[150px] items-center justify-center sm:max-w-[300px]">
-        <img src={drawing} alt="" width="300" height="180" class="rounded-md" />
-      </div>
-    {/each}
-  </div>
+  <section class="w-full">
+    <div class="mb-3">
+      <h2 class="font-display text-xl tracking-tight text-foreground">Drawings today</h2>
+      <p class="text-sm text-muted-foreground">Sketches from today’s forms.</p>
+    </div>
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {#each data.todayDrawings as { drawing }}
+        <figure class="m-0 border border-border/80 bg-white p-1">
+          <img src={drawing} alt="" class="aspect-[5/3] w-full bg-[#142326] object-contain" />
+        </figure>
+      {/each}
+    </div>
+  </section>
 {/if}

@@ -79,7 +79,7 @@
     </div>
 
     <div class="flex flex-col gap-2">
-      <h1 class="text-2xl font-bold">{title}</h1>
+      <h1 class="font-display text-3xl tracking-tight">{title}</h1>
       <p class="text-muted-foreground text-sm text-balance">
         {description}
       </p>

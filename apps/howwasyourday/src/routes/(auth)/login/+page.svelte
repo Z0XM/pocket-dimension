@@ -128,8 +128,8 @@
 
   <FieldGroup>
     <div class="flex flex-col items-center gap-2 text-center">
-      <h1 class="text-2xl font-bold">Welcome back</h1>
-      <p class="text-muted-foreground text-balance">Login to your account</p>
+      <h1 class="font-display text-3xl tracking-tight">Welcome back</h1>
+      <p class="text-balance text-muted-foreground">Login to your account</p>
     </div>
     <Field>
       <div class="flex items-center gap-2">

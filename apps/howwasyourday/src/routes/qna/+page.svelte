@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { ChevronLeftIcon, ChevronRightIcon, Maximize2Icon, SearchIcon, ShuffleIcon, SparklesIcon, XIcon } from "@lucide/svelte";
+  import { ChevronLeftIcon, ChevronRightIcon, Maximize2Icon, SearchIcon, ShuffleIcon, XIcon } from "@lucide/svelte";
   import { Input } from "$components/ui/input/index.js";
   import { cn } from "$lib/utils";
   import type { PageData } from "./$types";
@@ -97,15 +97,10 @@
   <div aria-hidden="true" class="pointer-events-none absolute -left-24 bottom-24 h-64 w-64 rounded-full bg-primary/5 blur-3xl"></div>
 
   <div class="relative mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-    <header class="mb-10 text-center">
-      <div
-        class="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium tracking-wide text-primary uppercase"
-      >
-        <SparklesIcon class="size-3.5" />
-        Daily prompts
-      </div>
-      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Questions</h1>
-      <p class="text-muted-foreground mx-auto mt-3 max-w-lg text-sm leading-relaxed sm:text-base">
+    <header class="mb-10 max-w-xl">
+      <p class="mb-3 text-[0.8rem] font-medium tracking-[0.14em] text-muted-foreground uppercase">Daily prompts</p>
+      <h1 class="font-display text-4xl tracking-tight sm:text-5xl">Questions</h1>
+      <p class="mt-3 text-[1.05rem] leading-relaxed text-foreground/75">
         {data.questions.length} questions to reflect on your day. Search the list or shuffle for a random one.
       </p>
     </header>
@@ -148,8 +143,8 @@
           <li
             id="qna-{item.id}"
             class={cn(
-              "group border-border/60 bg-card/40 hover:border-primary/30 hover:bg-card/70 cursor-pointer rounded-xl border p-4 backdrop-blur-sm transition-all duration-200 sm:p-5",
-              spotlightId === item.id && "ring-2 ring-primary/40 border-primary/30"
+              "group cursor-pointer border border-border/80 bg-white/70 p-4 backdrop-blur-[2px] transition-all duration-200 hover:border-primary/40 sm:p-5",
+              spotlightId === item.id && "border-primary/40 ring-1 ring-primary/30"
             )}
             onclick={() => openPopupForId(item.id)}
             onkeydown={(e) => e.key === "Enter" && openPopupForId(item.id)}
@@ -157,9 +152,7 @@
             tabindex="0"
           >
             <div class="flex gap-4">
-              <span
-                class="bg-primary/15 text-primary inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold tabular-nums"
-              >
+              <span class="font-display inline-flex size-9 shrink-0 items-center justify-center bg-primary/10 text-sm text-primary tabular-nums">
                 {item.id}
               </span>
               <p class="text-foreground pt-1 text-sm leading-relaxed sm:text-base">{item.question}</p>

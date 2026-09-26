@@ -25,15 +25,14 @@
     goto("/login");
   }
 
-  // --- Theme color logic ---
+  // --- Theme accent (paper/ink stay fixed; brand tints the page) ---
   const STORAGE_KEY = "hwyd-theme-color";
-  const DEFAULT_PRIMARY = "#22c55e"; // default green
 
   let themeColor = $state<string | undefined>(undefined);
 
-  function hexToHue(hex: string): number {
+  function hexToHsl(hex: string): { h: number; s: number; l: number } {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (!result) return 142;
+    if (!result) return { h: 187, s: 34, l: 20 };
     const r = parseInt(result[1], 16) / 255;
     const g = parseInt(result[2], 16) / 255;
     const b = parseInt(result[3], 16) / 255;
@@ -41,77 +40,50 @@
     const min = Math.min(r, g, b);
     const d = max - min;
     let h = 0;
+    let s = 0;
+    const l = (max + min) / 2;
     if (d !== 0) {
+      s = d / (1 - Math.abs(2 * l - 1));
       if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
       else if (max === g) h = ((b - r) / d + 2) * 60;
       else h = ((r - g) / d + 4) * 60;
     }
-    return Math.round(h * 10) / 10;
+    return {
+      h: Math.round(h * 10) / 10,
+      s: Math.round(s * 1000) / 10,
+      l: Math.round(l * 1000) / 10,
+    };
   }
 
   function applyTheme(hex: string) {
-    const h = hexToHue(hex);
+    const { h, s, l } = hexToHsl(hex);
+    // Keep primary dark enough for contrast on light paper
+    const primaryL = Math.min(Math.max(l, 18), 42);
     const root = document.documentElement;
-    const vars: Record<string, string> = {
-      "--background": `${h} 15% 4.5%`,
-      "--foreground": `${h} 15% 93%`,
-      "--card": `${h} 12% 9%`,
-      "--card-foreground": `${h} 15% 93%`,
-      "--popover": `${h} 12% 8%`,
-      "--popover-foreground": `${h} 15% 93%`,
-      "--primary": `${h} 70.6% 45.3%`,
-      "--primary-foreground": `${h} 80.4% 10%`,
-      "--secondary": `${h} 18% 14%`,
-      "--secondary-foreground": `${h} 10% 96%`,
-      "--muted": `${h} 12% 13%`,
-      "--muted-foreground": `${h} 10% 55%`,
-      "--accent": `${h} 25% 15%`,
-      "--accent-foreground": `${h} 10% 96%`,
-      "--border": `${h} 18% 16%`,
-      "--input": `${h} 15% 14%`,
-      "--ring": `${h} 71.8% 29.2%`,
-      "--sidebar-background": `${h} 12% 8%`,
-      "--sidebar-foreground": `${h} 10% 95%`,
-      "--sidebar-primary": `${h} 70.6% 45.3%`,
-      "--sidebar-accent": `${h} 20% 14%`,
-      "--sidebar-accent-foreground": `${h} 10% 95%`,
-      "--sidebar-border": `${h} 18% 16%`,
-      "--sidebar-ring": `${h} 71.8% 29.2%`,
-    };
-    for (const [key, value] of Object.entries(vars)) {
-      root.style.setProperty(key, value);
-    }
+    // Wash uses the vivid mid hex (year-recap profile --accent), not the clamped primary
+    const washHex = hex.startsWith("#") ? hex : `#${hex}`;
+    root.style.setProperty("--brand", washHex);
+    root.style.setProperty("--primary", `${h} ${s}% ${primaryL}%`);
+    root.style.setProperty("--primary-foreground", "140 20% 97%");
+    root.style.setProperty("--ring", `${h} ${s}% ${Math.min(primaryL + 8, 48)}%`);
+    root.style.setProperty("--accent", `${h} 16% 92%`);
+    root.style.setProperty("--accent-foreground", "189 28% 11%");
+    root.style.setProperty("--sidebar-primary", `${h} ${s}% ${primaryL}%`);
+    root.style.setProperty("--sidebar-ring", `${h} ${s}% ${Math.min(primaryL + 8, 48)}%`);
   }
 
   function clearTheme() {
     const root = document.documentElement;
-    const vars = [
-      "--background",
-      "--foreground",
-      "--card",
-      "--card-foreground",
-      "--popover",
-      "--popover-foreground",
+    for (const v of [
+      "--brand",
       "--primary",
       "--primary-foreground",
-      "--secondary",
-      "--secondary-foreground",
-      "--muted",
-      "--muted-foreground",
+      "--ring",
       "--accent",
       "--accent-foreground",
-      "--border",
-      "--input",
-      "--ring",
-      "--sidebar-background",
-      "--sidebar-foreground",
       "--sidebar-primary",
-      "--sidebar-accent",
-      "--sidebar-accent-foreground",
-      "--sidebar-border",
       "--sidebar-ring",
-    ];
-    for (const v of vars) {
+    ]) {
       root.style.removeProperty(v);
     }
     themeColor = undefined;
@@ -136,8 +108,9 @@
 
 <Card.Root class="relative">
   <Card.Header>
+    <p class="mb-2 text-[0.8rem] font-medium tracking-[0.14em] text-muted-foreground uppercase">Today</p>
     <Card.Title>
-      <div class="text-2xl text-foreground">
+      <div class="font-display text-3xl leading-none tracking-tight text-foreground md:text-4xl">
         {today.toLocaleDateString("en-IN", { weekday: "long" })}
         <span class="text-primary">,</span>{" "}
         {today
@@ -150,8 +123,8 @@
       </div>
     </Card.Title>
     <Card.Description>
-      <span class="text-xl text-primary">{todayCountOfDay}</span>
-      <span class="text-md text-muted-foreground">{` / ${noOfDaysInYear}`}</span>
+      <span class="font-display text-2xl text-primary">{todayCountOfDay}</span>
+      <span class="text-sm tracking-wide text-muted-foreground">{` / ${noOfDaysInYear}`}</span>
     </Card.Description>
 
     <!-- Theme color picker icon -->
@@ -199,16 +172,16 @@
   </Card.Header>
   <Progress value={(todayCountOfDay / noOfDaysInYear) * 100} class="w-full" />
   <Card.Content class="px-6">
-    <div class="text-2xl">
-      <a href="/" class="text-foreground! cursor-pointer hover:underline hover:text-foreground/80!"> How Was Your Day</a>
+    <div class="font-display text-2xl leading-tight tracking-tight md:text-3xl">
+      <a href="/" class="text-foreground! cursor-pointer hover:text-foreground/80! hover:underline"> How Was Your Day</a>
       <Popover.Root bind:open={logoutPopoverOpen}>
         <Popover.Trigger>
-          <span class="text-3xl font-bold text-primary cursor-pointer hover:underline">{user?.username}</span>
+          <span class="cursor-pointer text-primary hover:underline">{user?.username}</span>
         </Popover.Trigger>
         <Popover.Content class="w-auto">
           <div class="flex flex-col gap-3">
             <p class="text-sm font-medium">Are you sure you want to logout?</p>
-            <div class="flex gap-2 justify-end">
+            <div class="flex justify-end gap-2">
               <Popover.Close>
                 <Button variant="secondary" size="sm">Cancel</Button>
               </Popover.Close>

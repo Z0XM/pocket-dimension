@@ -97,7 +97,7 @@
         <CircleXIcon class="h-8 w-8 text-destructive" />
       </div>
       <div class="flex flex-col gap-2">
-        <h1 class="text-2xl font-bold">Invalid Reset Link</h1>
+        <h1 class="font-display text-3xl tracking-tight">Invalid Reset Link</h1>
         <p class="text-muted-foreground text-sm text-balance">
           {hasErrorFromParam && errorMessage ? errorMessage : "This password reset link is invalid or has expired. Please request a new one."}
         </p>
@@ -115,7 +115,7 @@
         <CircleCheckIcon class="h-8 w-8 text-primary" />
       </div>
       <div class="flex flex-col gap-2">
-        <h1 class="text-2xl font-bold">Password Reset!</h1>
+        <h1 class="font-display text-3xl tracking-tight">Password Reset!</h1>
         <p class="text-muted-foreground text-sm text-balance">Your password has been reset successfully. You will be redirected to login...</p>
       </div>
       <Button onclick={() => goto("/login")} class="w-full">Continue to Login</Button>
@@ -134,7 +134,7 @@
         <div class="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-2">
           <LockIcon class="h-6 w-6 text-primary" />
         </div>
-        <h1 class="text-2xl font-bold">Reset Password</h1>
+        <h1 class="font-display text-3xl tracking-tight">Reset Password</h1>
         <p class="text-muted-foreground text-sm text-balance">Enter your new password below.</p>
       </div>
 

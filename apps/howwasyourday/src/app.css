@@ -1,89 +1,134 @@
-@import 'tailwindcss';
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500;600&display=swap");
+@import "tailwindcss";
 @import "tw-animate-css";
 
-body {
-    overflow-x: hidden;
-}
-
 @layer base {
-    :root {
-        --background: 150 15% 4.5%;
-        --foreground: 142 15% 93%;
-        --card: 148 12% 9%;
-        --card-foreground: 142 15% 93%;
-        --popover: 150 12% 8%;
-        --popover-foreground: 142 15% 93%;
-        --primary: 142.1 70.6% 45.3%;
-        --primary-foreground: 144.9 80.4% 10%;
-        --secondary: 148 18% 14%;
-        --secondary-foreground: 142 10% 96%;
-        --muted: 148 12% 13%;
-        --muted-foreground: 142 10% 55%;
-        --accent: 142 25% 15%;
-        --accent-foreground: 142 10% 96%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 0 85.7% 97.3%;
-        --border: 145 18% 16%;
-        --input: 148 15% 14%;
-        --ring: 142.4 71.8% 29.2%;
-        --sidebar-background: 150 12% 8%;
-        --sidebar-foreground: 142 10% 95%;
-        --sidebar-primary: 142.1 70.6% 45.3%;
-        --sidebar-primary-foreground: 0 0% 100%;
-        --sidebar-accent: 142 20% 14%;
-        --sidebar-accent-foreground: 142 10% 95%;
-        --sidebar-border: 145 18% 16%;
-        --sidebar-ring: 142.4 71.8% 29.2%;
-    }
+  :root {
+    /*
+      Year-recap profile wash uses a mid-chroma hex accent mixed into paper
+      (see dashboard UserDashboard.svelte --accent). Dark #214247 mixes muddy;
+      keep buttons dark via --primary, wash via --brand.
+    */
+    --brand: #12a37a;
+    --paper: #f3f6f4;
+    --ink: #142326;
+    --ink-soft: #3d5256;
+    --ink-mute: #6a7f83;
+
+    --background: 150 22% 94%;
+    --foreground: 189 28% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 189 28% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 189 28% 11%;
+    --primary: 187 34% 20%;
+    --primary-foreground: 140 20% 97%;
+    --secondary: 150 14% 90%;
+    --secondary-foreground: 189 28% 11%;
+    --muted: 150 12% 90%;
+    --muted-foreground: 189 10% 46%;
+    --accent: 150 16% 92%;
+    --accent-foreground: 189 28% 11%;
+    --destructive: 0 72% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 189 12% 82%;
+    --input: 189 12% 82%;
+    --ring: 187 34% 28%;
+    --sidebar-background: 150 18% 96%;
+    --sidebar-foreground: 189 28% 11%;
+    --sidebar-primary: 187 34% 20%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 150 14% 90%;
+    --sidebar-accent-foreground: 189 28% 11%;
+    --sidebar-border: 189 12% 82%;
+    --sidebar-ring: 187 34% 28%;
+  }
 }
 
 @theme inline {
-    --color-background: hsl(var(--background));
-    --color-foreground: hsl(var(--foreground));
-    --color-card: hsl(var(--card));
-    --color-card-foreground: hsl(var(--card-foreground));
-    --color-popover: hsl(var(--popover));
-    --color-popover-foreground: hsl(var(--popover-foreground));
-    --color-primary: hsl(var(--primary));
-    --color-primary-foreground: hsl(var(--primary-foreground));
-    --color-secondary: hsl(var(--secondary));
-    --color-secondary-foreground: hsl(var(--secondary-foreground));
-    --color-muted: hsl(var(--muted));
-    --color-muted-foreground: hsl(var(--muted-foreground));
-    --color-accent: hsl(var(--accent));
-    --color-accent-foreground: hsl(var(--accent-foreground));
-    --color-destructive: hsl(var(--destructive));
-    --color-destructive-foreground: hsl(var(--destructive-foreground));
-    --color-border: hsl(var(--border));
-    --color-input: hsl(var(--input));
-    --color-ring: hsl(var(--ring));
-    --color-sidebar-background: hsl(var(--sidebar-background));
-    --color-sidebar-foreground: hsl(var(--sidebar-foreground));
-    --color-sidebar-primary: hsl(var(--sidebar-primary));
-    --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
-    --color-sidebar-accent: hsl(var(--sidebar-accent));
-    --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
-    --color-sidebar-border: hsl(var(--sidebar-border));
-    --color-sidebar-ring: hsl(var(--sidebar-ring));
+  --font-sans: "Outfit", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-sidebar-background: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
 }
 
 @layer base {
-    * {
-        @apply border-border;
-    }
-    body {
-        @apply bg-background text-foreground;
-    }
+  * {
+    @apply border-border;
+  }
 
-    a {
-        @apply text-primary hover:text-primary/80 transition-colors;
-    }
+  html {
+    color-scheme: light;
+  }
 
-    ::-webkit-scrollbar {
-        @apply w-px h-px bg-accent;
-    }
+  body {
+    overflow-x: hidden;
+    font-family: var(--font-sans);
+    color: hsl(var(--foreground));
+    background: #eef4f1;
+    min-height: 100%;
+  }
 
-    ::-webkit-scrollbar-thumb {
-        @apply rounded-full bg-primary;
-    }
+  /*
+    Year-recap profile wash (UserDashboard.svelte): left + right accent radials
+    over a neutral paper linear — reads color → whitish → color horizontally.
+    On short viewports, use width-% for the horizontal falloff (same as year-recap)
+    and vh for vertical reach so the page stays covered without flooding the center.
+  */
+  .hwyd-shell {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: #eef4f1;
+    background-image:
+      radial-gradient(ellipse 120% 130vh at 10% -10%, color-mix(in srgb, var(--brand) 28%, #f3f6f4), transparent 55%),
+      radial-gradient(ellipse 90% 110vh at 100% 0%, color-mix(in srgb, var(--brand) 18%, #e8f0ec), transparent 50%),
+      linear-gradient(180deg, #eef4f1 0%, var(--paper) 40%, #e7efeb 100%);
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  a {
+    @apply text-primary transition-colors hover:text-primary/80;
+  }
+
+  ::-webkit-scrollbar {
+    @apply h-1.5 w-1.5 bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-primary/35;
+  }
 }

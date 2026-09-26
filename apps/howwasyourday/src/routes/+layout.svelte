@@ -27,8 +27,10 @@
   });
 </script>
 
-<PwaInstallButton />
-{#if data?.devMode && data?.authBaseUrl}
-  <DevModeNotch authBaseUrl={data.authBaseUrl} currentUsername={data.devModeUser?.username} />
-{/if}
-{@render children()}
+<div class="hwyd-shell">
+  <PwaInstallButton />
+  {#if data?.devMode && data?.authBaseUrl}
+    <DevModeNotch authBaseUrl={data.authBaseUrl} currentUsername={data.devModeUser?.username} />
+  {/if}
+  {@render children()}
+</div>

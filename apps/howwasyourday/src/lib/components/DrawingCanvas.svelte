@@ -44,6 +44,7 @@
     // Set canvas dimensions
     canvasEl.width = containerEl.clientWidth;
     canvasEl.height = canvasEl.width * 0.6;
+    fillCanvasBackground();
 
     if (initialDrawing) {
       const img = new Image();
@@ -61,6 +62,13 @@
     return () => window.removeEventListener("resize", handleResize);
   });
 
+  function fillCanvasBackground() {
+    if (!ctx || !canvasEl) return;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#142326";
+    ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+  }
+
   function resize() {
     if (!canvasEl || !containerEl) return;
     const prevWidth = canvasEl.width;
@@ -69,6 +77,7 @@
 
     canvasEl.width = containerEl.clientWidth;
     canvasEl.height = canvasEl.width * 0.6;
+    fillCanvasBackground();
 
     if (existingData && ctx) {
       // Create a temp canvas to scale the old content to the new size
@@ -168,7 +177,7 @@
   function clearCanvas() {
     if (ctx && canvasEl) {
       saveUndo();
-      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      fillCanvasBackground();
       ctx.beginPath();
       hasDrawn = false;
       updateDrawingOutput();
@@ -206,11 +215,11 @@
     </svg>
   </button>
 
-  <div class="relative w-full rounded-lg ring-2 ring-primary/15" style="display: {collapsed ? 'none' : 'block'};">
+  <div class="relative w-full overflow-hidden rounded-md ring-1 ring-border" style="display: {collapsed ? 'none' : 'block'};">
     <!-- Canvas -->
     <canvas
       bind:this={canvasEl}
-      class="relative touch-none cursor-crosshair"
+      class="relative touch-none cursor-crosshair bg-[#142326]"
       onmousedown={onDown}
       onmousemove={onMove}
       ontouchstart={(e) => {

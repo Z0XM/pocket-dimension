@@ -8,7 +8,10 @@
 <div
   bind:this={ref}
   data-slot="card"
-  class={cn("bg-card text-card-foreground flex flex-col gap-2 rounded-xl border border-primary/10 py-4 shadow-sm shadow-primary/5", className)}
+  class={cn(
+    "flex flex-col gap-2 rounded-md border border-border/80 bg-white/50 py-4 text-card-foreground shadow-none backdrop-blur-[2px]",
+    className
+  )}
   {...restProps}
 >
   {@render children?.()}

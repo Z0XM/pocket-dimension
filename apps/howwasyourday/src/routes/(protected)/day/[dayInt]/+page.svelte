@@ -81,9 +81,9 @@
 
 <Card.Root class="">
   <Card.Content class="px-6">
-    <div class="text-lg text-muted-foreground">
+    <div class="font-display text-xl tracking-tight text-muted-foreground md:text-2xl">
       {isEditing ? "Editing" : "Fill in"}{" "}
-      <span class="font-semibold text-primary">{dateLabel}</span>
+      <span class="text-primary">{dateLabel}</span>
     </div>
   </Card.Content>
 </Card.Root>
