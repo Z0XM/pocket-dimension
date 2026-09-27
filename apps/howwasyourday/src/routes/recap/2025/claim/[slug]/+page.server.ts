@@ -1,4 +1,5 @@
 import { error, redirect } from "@sveltejs/kit";
+import { isDevModeEnabled } from "@pocket-dimension/auth";
 import type { PageServerLoad } from "./$types";
 import { canAccessProfile, getProfileBySlug } from "$lib/server/legacy-recap/access";
 import { censorEmail } from "$lib/server/legacy-recap/censor";
@@ -27,5 +28,6 @@ export const load: PageServerLoad = async ({ params, cookies, locals }) => {
     accentColor: profile.accentColor,
     emailMask: censorEmail(profile.email),
     signedIn: !!locals.user,
+    otpBypass: isDevModeEnabled(),
   };
 };

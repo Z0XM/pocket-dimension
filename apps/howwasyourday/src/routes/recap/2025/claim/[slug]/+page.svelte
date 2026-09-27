@@ -54,6 +54,31 @@
       busy = false;
     }
   }
+
+  async function bypassOtp() {
+    error = null;
+    busy = true;
+    try {
+      const res = await fetch("/api/recap/2025/otp/bypass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: data.slug }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        error = body.error || "Bypass failed";
+        return;
+      }
+      linked = !!body.linked;
+      claimSignedIn = !!body.signedIn;
+      step = "done";
+      if (body.redirectTo) {
+        setTimeout(() => goto(body.redirectTo), 400);
+      }
+    } finally {
+      busy = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -77,6 +102,10 @@
     <button type="button" class="cta" disabled={busy} onclick={sendOtp}>
       {busy ? "Sending…" : "Confirm & send code"}
     </button>
+    {#if data.otpBypass}
+      <p class="dev-note">Local DEV_MODE is on — you can skip email OTP.</p>
+      <button type="button" class="ghost bypass" disabled={busy} onclick={bypassOtp}> Skip OTP (local dev) </button>
+    {/if}
   {:else if step === "otp"}
     <p class="lede">Enter the 6-digit code sent to <strong>{data.emailMask}</strong>.</p>
     <label class="code-label">
@@ -242,5 +271,17 @@
 
   .nudge.ok {
     color: var(--accent);
+  }
+
+  .dev-note {
+    margin: 1.25rem 0 0;
+    max-width: 28rem;
+    font-size: 0.9rem;
+    color: var(--ink-mute);
+  }
+
+  .bypass {
+    display: block;
+    margin-top: 0.65rem;
   }
 </style>
