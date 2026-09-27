@@ -132,7 +132,8 @@
 
 <style>
   .mood-panel {
-    max-width: 48rem;
+    width: 100%;
+    max-width: none;
     margin-bottom: 3.25rem;
   }
 
@@ -157,7 +158,7 @@
   .constellation {
     position: relative;
     width: 100%;
-    height: clamp(18rem, 46vw, 26rem);
+    height: clamp(20rem, 38vw, 32rem);
     border-radius: 0.75rem;
     background:
       radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%),
@@ -173,21 +174,6 @@
     font-size: var(--s);
     line-height: 1;
     transform: translate(-50%, -50%) rotate(var(--r));
-    opacity: 0;
-    animation: float-in 0.5s ease forwards;
-    animation-delay: calc(0.04s + var(--i) * 0.028s);
     user-select: none;
-    filter: drop-shadow(0 1px 0 color-mix(in srgb, white 35%, transparent));
-  }
-
-  @keyframes float-in {
-    from {
-      opacity: 0;
-      transform: translate(-50%, -50%) rotate(var(--r)) scale(0.7);
-    }
-    to {
-      opacity: 1;
-      transform: translate(-50%, -50%) rotate(var(--r)) scale(1);
-    }
   }
 </style>

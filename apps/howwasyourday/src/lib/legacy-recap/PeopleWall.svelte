@@ -176,7 +176,8 @@
 
 <style>
   .people-panel {
-    max-width: 48rem;
+    width: 100%;
+    max-width: none;
     margin-bottom: 3.25rem;
   }
 
@@ -195,7 +196,7 @@
   .wall {
     position: relative;
     width: 100%;
-    height: clamp(22rem, 52vw, 30rem);
+    height: clamp(24rem, 42vw, 36rem);
     border-radius: 0.75rem;
     background:
       radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 55%),
@@ -224,9 +225,6 @@
     width: var(--w);
     height: var(--h);
     transform: translate(-50%, -50%) rotate(var(--rot));
-    opacity: 0;
-    animation: pin-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    animation-delay: var(--d);
   }
 
   .tape {
@@ -289,16 +287,5 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  @keyframes pin-in {
-    from {
-      opacity: 0;
-      transform: translate(-50%, -58%) rotate(var(--rot)) scale(0.92);
-    }
-    to {
-      opacity: 1;
-      transform: translate(-50%, -50%) rotate(var(--rot)) scale(1);
-    }
   }
 </style>

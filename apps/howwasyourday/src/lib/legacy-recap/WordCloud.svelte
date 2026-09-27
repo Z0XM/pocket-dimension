@@ -167,7 +167,8 @@
 
 <style>
   .words-panel {
-    max-width: 48rem;
+    width: 100%;
+    max-width: none;
     margin-bottom: 3.25rem;
   }
 
@@ -192,7 +193,7 @@
   .hangar {
     position: relative;
     width: 100%;
-    height: clamp(22rem, 52vw, 30rem);
+    height: clamp(24rem, 40vw, 34rem);
     border-radius: 0.75rem;
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, #eef4f1) 0%, transparent 28%),
@@ -288,11 +289,9 @@
     align-items: center;
     transform: translateX(-50%);
     transform-origin: top center;
-    opacity: 0;
-    animation:
-      drop-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards,
-      sway 4.5s ease-in-out infinite;
-    animation-delay: var(--d), calc(var(--d) + 0.7s);
+    animation: sway 4.5s ease-in-out infinite;
+    animation-delay: var(--d, 0s);
+    will-change: transform;
   }
 
   .string {
@@ -367,17 +366,6 @@
     white-space: nowrap;
   }
 
-  @keyframes drop-in {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(-12px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-  }
-
   @keyframes sway {
     0%,
     100% {
@@ -390,8 +378,8 @@
 
   @media (prefers-reduced-motion: reduce) {
     .hang {
-      animation: drop-in 0.01s linear forwards;
-      opacity: 1;
+      animation: none;
+      transform: translateX(-50%);
     }
   }
 </style>

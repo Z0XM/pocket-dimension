@@ -621,7 +621,8 @@
 
 <style>
   .canvas-panel {
-    max-width: 48rem;
+    width: 100%;
+    max-width: none;
     margin-bottom: 3.25rem;
   }
 

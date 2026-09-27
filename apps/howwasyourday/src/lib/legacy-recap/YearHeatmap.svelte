@@ -209,10 +209,8 @@
     padding: 0.7rem 0.85rem 0.85rem;
     pointer-events: none;
     border-radius: 0.65rem;
-    border: 1px solid color-mix(in srgb, white 55%, transparent);
-    background: color-mix(in srgb, #f3f6f4 42%, transparent);
-    backdrop-filter: blur(14px) saturate(1.15);
-    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+    border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+    background: color-mix(in srgb, #f3f6f4 92%, white);
     box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 10%, transparent);
     color: var(--ink);
   }
