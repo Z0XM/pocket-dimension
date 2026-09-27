@@ -67,6 +67,10 @@ next-env.d.ts
 # chhan-chhan local data (bank statements, imports, etc.)
 apps/chhan-chhan/data/
 
+# Legacy 2025 recap private email map + local export copies (never commit)
+apps/howwasyourday/scripts/legacy-recap-emails.json
+apps/howwasyourday/scripts/year-recap-export/
+
 # cookies
 cookies.txt
 

@@ -24,7 +24,8 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.devMode = isDevModeEnabled();
 
   // Dev Mode: establish a real session for the default allowlisted account
-  if (!session && event.locals.devMode && !event.url.pathname.startsWith("/api/") && !building) {
+  // Skip public legacy recap surfaces so OTP claim can be tested anonymously.
+  if (!session && event.locals.devMode && !event.url.pathname.startsWith("/api/") && !event.url.pathname.startsWith("/recap/") && !building) {
     const authBaseUrl = Bun.env.BETTER_AUTH_URL ?? Bun.env.PUBLIC_BASE_AUTH_URL;
     if (authBaseUrl) {
       const target = getDevModeSessionRedirect({

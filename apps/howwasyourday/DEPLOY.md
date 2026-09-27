@@ -81,6 +81,23 @@ docker build -f apps/howwasyourday/Dockerfile -t howwasyourday .
 docker run --rm -p 3004:3004 --env-file apps/howwasyourday/.env howwasyourday
 ```
 
+## Legacy 2025 year recap (ops)
+
+Frozen dashboards live in Postgres (`howwasyourday.legacy_recap_*`). JSON/PNGs are **not** in git.
+
+1. Apply migrations: `bun run db:migrate` (from monorepo root; needs PG18).
+2. Build a private email map JSON `{ "slug": "email@…" }` (copy from `scripts/legacy-recap-emails.example.json`). Never commit real emails.
+3. Point at a local year-recap export (dashboard root with `src/data/*.json` + `public/drawings/`):
+
+```bash
+cd apps/howwasyourday
+YEAR_RECAP_EXPORT_DIR=/path/to/year-recap/dashboard \
+YEAR_RECAP_EMAILS_FILE=./scripts/legacy-recap-emails.json \
+bun run import:legacy-recap-2025
+```
+
+4. App routes: public `/recap/2025`, claim `/recap/2025/claim/[slug]`, gated `/recap/2025/[slug]`. OTP uses `RESEND_API_KEY`. Claim cookies use `LEGACY_RECAP_CLAIM_SECRET` or `BETTER_AUTH_SECRET`.
+
 ## Troubleshooting
 
 **`Could not resolve "../../vite-kysely-compat"` / missing `.svelte-kit/tsconfig.json`**

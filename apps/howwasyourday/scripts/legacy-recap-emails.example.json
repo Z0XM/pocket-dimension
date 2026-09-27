@@ -1,0 +1,11 @@
+/**
+ * Example email map for Legacy 2025 import.
+ * Copy to legacy-recap-emails.json (gitignored) and fill real emails.
+ * Never commit the real file.
+ *
+ * {
+ *   "mukul": "person@example.com",
+ *   "vo1d": "other@example.com"
+ * }
+ */
+{}

@@ -253,6 +253,13 @@
       "when": 1790280000000,
       "tag": "0035_watchlist_duplicate_dismissals",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790509022286,
+      "tag": "0036_clammy_solo",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,19 @@
 <script lang="ts">
   import { LoaderCircleIcon, MailIcon } from "@lucide/svelte";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import { Button } from "$components/ui/button/index.js";
   import { Field, FieldDescription, FieldGroup, FieldLabel } from "$components/ui/field/index.js";
   import { Input } from "$components/ui/input/index.js";
   import { authClient } from "$lib/auth-client.js";
 
   const id = $props.id();
+
+  function safeRedirectTo(): string {
+    const raw = page.url.searchParams.get("redirectTo");
+    if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+    return "/";
+  }
 
   let loginBy = $state<"email" | "username">("email");
   let email = $state("");
@@ -52,8 +59,7 @@
         return;
       }
 
-      // Redirect to home page on success
-      await goto("/");
+      await goto(safeRedirectTo());
     } catch (err) {
       console.error(err);
       error = "Something went wrong!";

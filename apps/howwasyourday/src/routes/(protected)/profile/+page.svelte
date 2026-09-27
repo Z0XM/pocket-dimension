@@ -45,6 +45,14 @@
     </Card.Content>
   </Card.Root>
 
+  <Card.Root>
+    <Card.Content class="flex flex-col gap-2 px-6 py-5">
+      <span class="text-[0.75rem] tracking-[0.06em] text-muted-foreground uppercase">Legacy</span>
+      <a href="/recap/2025" class="font-display text-xl text-primary hover:underline">2025 year recap</a>
+      <p class="text-sm text-muted-foreground">Claim or open your frozen 2025 dashboard.</p>
+    </Card.Content>
+  </Card.Root>
+
   <div class="flex flex-wrap items-center gap-2">
     <Button href="/" variant="secondary">Back home</Button>
     <Button variant="destructive" onclick={handleLogout}>Log out</Button>
