@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
+  import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "$lib/components/ui/dropdown-menu";
   import type { CountItem } from "./types";
   import PhotoCropModal from "./PhotoCropModal.svelte";
 
@@ -43,11 +44,14 @@
   let densityPct = $state(100);
   let wallWidthPct = $state(100);
   let wallHeightRem = $state(28);
+  let layoutWallHeightRem = $state(28);
   let wallEl = $state<HTMLDivElement | null>(null);
   /** Measured wall width in rem (falls back to BASE_WALL_W_REM * width%). */
   let measuredWallWRem = $state(BASE_WALL_W_REM);
   let downloading = $state(false);
   let fileInputEl = $state<HTMLInputElement | null>(null);
+  let peopleMenuOpen = $state(false);
+  let heightApplyTimer: ReturnType<typeof setTimeout> | null = null;
 
   let hiddenLabels = $state<Set<string>>(new Set());
   let photos = $state<Record<string, string>>({});
@@ -59,10 +63,11 @@
 
   const density = $derived(densityPct / 100);
   const remX = $derived(100 / Math.max(8, measuredWallWRem));
-  const remY = $derived(100 / wallHeightRem);
+  const remY = $derived(100 / layoutWallHeightRem);
   /** Approximate face W/H above the name strip (card aspect 1.18, ~22% name). */
   const faceAspect = 1 / (1.18 * (1 - NAME_STRIP));
   const storageKey = $derived(`hwyd-stars-hidden:${exportName}`);
+  const hiddenCount = $derived(hiddenLabels.size);
 
   $effect(() => {
     const el = wallEl;
@@ -310,7 +315,13 @@
     wallWidthPct = clamp(Math.round(value), MIN_WIDTH_PCT, MAX_WIDTH_PCT);
   }
   function setWallHeight(value: number) {
-    wallHeightRem = clamp(Math.round(value), MIN_HEIGHT_REM, MAX_HEIGHT_REM);
+    const next = clamp(Math.round(value), MIN_HEIGHT_REM, MAX_HEIGHT_REM);
+    wallHeightRem = next;
+    if (heightApplyTimer) clearTimeout(heightApplyTimer);
+    heightApplyTimer = setTimeout(() => {
+      layoutWallHeightRem = next;
+      heightApplyTimer = null;
+    }, 100);
   }
 
   function toggleHide(label: string) {
@@ -360,6 +371,7 @@
   }
 
   onDestroy(() => {
+    if (heightApplyTimer) clearTimeout(heightApplyTimer);
     for (const url of Object.values(photos)) URL.revokeObjectURL(url);
     if (cropSrc) URL.revokeObjectURL(cropSrc);
   });
@@ -628,30 +640,36 @@
         />
         <span class="density-value">{wallHeightRem}rem</span>
       </div>
+      <DropdownMenu bind:open={peopleMenuOpen}>
+        <DropdownMenuTrigger class="btn people-menu-trigger" aria-label="Show people filters">
+          <span class="people-menu-icon" aria-hidden="true">👥</span>
+          <span class="people-menu-text">People</span>
+          {#if hiddenCount}
+            <span class="people-menu-badge">{hiddenCount}</span>
+          {/if}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="people-menu-content">
+          <div class="people-menu-head">
+            <span>People on board</span>
+            <span>{peopleList.length}</span>
+          </div>
+          <div class="people-menu-list">
+            {#each peopleList as person}
+              {@const visible = !hiddenLabels.has(person.label)}
+              <label class="people-menu-item">
+                <input type="checkbox" checked={visible} onchange={() => toggleHide(person.label)} />
+                <span class="people-menu-name">{person.label}</span>
+                <span class="people-menu-count">{person.count}</span>
+              </label>
+            {/each}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <button type="button" class="btn primary" onclick={download} disabled={!placed.length || downloading}>
         {downloading ? "Preparing…" : "Download"}
       </button>
     </div>
   </div>
-
-  {#if peopleList.length}
-    <div class="people-list" aria-label="People on your stars board">
-      <span class="people-list-label">People</span>
-      <ul>
-        {#each peopleList as person}
-          {@const hidden = hiddenLabels.has(person.label)}
-          <li class:hidden>
-            <button type="button" class="person-toggle" onclick={() => toggleHide(person.label)} aria-pressed={!hidden}>
-              <span class="eye" aria-hidden="true">{hidden ? "○" : "●"}</span>
-              <span class="person-name">{person.label}</span>
-              <span class="person-count">{person.count}</span>
-              <span class="person-action">{hidden ? "Show" : "Hide"}</span>
-            </button>
-          </li>
-        {/each}
-      </ul>
-    </div>
-  {/if}
 
   <div class="wall" bind:this={wallEl} style={`width: ${wallWidthPct}%; height: ${wallHeightRem}rem;`} aria-label="Your stars as memory cards">
     {#each placed as p, i}
@@ -771,65 +789,78 @@
     color: var(--accent);
   }
 
-  .people-list {
+  .people-menu-trigger {
+    gap: 0.45rem;
+  }
+
+  .people-menu-icon {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .people-menu-text {
+    font-size: 0.82rem;
+  }
+
+  .people-menu-badge {
+    min-width: 1.15rem;
+    padding: 0.05rem 0.28rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 16%, white);
+    color: var(--accent);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .people-menu-content {
+    width: min(18rem, calc(100vw - 2rem));
+    padding: 0.4rem;
+  }
+
+  .people-menu-head {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.45rem 0.55rem;
-    margin-bottom: 0.75rem;
+    justify-content: space-between;
+    padding: 0.25rem 0.35rem 0.45rem;
+    font-size: 0.76rem;
+    color: color-mix(in srgb, var(--ink) 60%, transparent);
   }
 
-  .people-list-label {
-    font-size: 0.78rem;
-    color: color-mix(in srgb, var(--ink) 55%, transparent);
-    user-select: none;
+  .people-menu-list {
+    max-height: 16rem;
+    overflow: auto;
   }
 
-  .people-list ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .person-toggle {
-    display: inline-flex;
+  .people-menu-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.28rem 0.55rem;
-    border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+    gap: 0.55rem;
+    padding: 0.4rem 0.45rem;
     border-radius: 0.45rem;
-    background: color-mix(in srgb, white 70%, transparent);
-    color: var(--ink);
-    font-family: var(--sans);
-    font-size: 0.8rem;
     cursor: pointer;
   }
 
-  .person-toggle:hover {
-    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  .people-menu-item:hover {
+    background: color-mix(in srgb, var(--accent) 6%, white);
   }
 
-  li.hidden .person-toggle {
-    opacity: 0.55;
-    text-decoration: line-through;
+  .people-menu-item input {
+    accent-color: var(--accent);
   }
 
-  .eye {
-    font-size: 0.65rem;
-    color: var(--accent);
+  .people-menu-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.84rem;
   }
 
-  .person-count {
+  .people-menu-count {
+    font-size: 0.76rem;
     font-variant-numeric: tabular-nums;
     color: color-mix(in srgb, var(--ink) 45%, transparent);
-  }
-
-  .person-action {
-    font-size: 0.72rem;
-    color: var(--accent);
   }
 
   .wall {
