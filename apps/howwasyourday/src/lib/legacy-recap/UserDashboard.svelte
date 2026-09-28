@@ -93,6 +93,8 @@
 </script>
 
 <main style={`--accent: ${user.accent_color || "#214247"}`}>
+  <p class="device-tip" role="note">Open on a laptop for better view</p>
+
   <a class="back" href="/recap/2025">All dashboards</a>
 
   <section class="hero">
@@ -108,19 +110,21 @@
         {/each}
       </p>
     </div>
-    <div
-      class="ribbon"
-      bind:this={ribbonEl}
-      style={`--cols: ${Math.max(days.length, 1)}`}
-      role="img"
-      aria-label="Day score color ribbon. Hover to magnify a section."
-      onmousemove={onRibbonMove}
-      onmouseleave={onRibbonLeave}
-    >
-      {#each days as day, i}
-        <span class:focus={loupeOpen && i === loupeIndex} style={`--c: ${day.day_color || "#a1a1a1"}; --i: ${i}; --h: ${scoreHeight(day.day_score)}`}
-        ></span>
-      {/each}
+    <div class="ribbon-scroll">
+      <div
+        class="ribbon"
+        bind:this={ribbonEl}
+        style={`--cols: ${Math.max(days.length, 1)}`}
+        role="img"
+        aria-label="Day score color ribbon. Hover to magnify a section."
+        onmousemove={onRibbonMove}
+        onmouseleave={onRibbonLeave}
+      >
+        {#each days as day, i}
+          <span class:focus={loupeOpen && i === loupeIndex} style={`--c: ${day.day_color || "#a1a1a1"}; --i: ${i}; --h: ${scoreHeight(day.day_score)}`}
+          ></span>
+        {/each}
+      </div>
     </div>
   </section>
 
@@ -179,7 +183,7 @@
   {/if}
 
   {#if people.length}
-    <PeopleWall items={people} />
+    <PeopleWall items={people} exportName={summary.slug || user.display_name} />
   {/if}
 
   {#if drawings.length}
@@ -239,6 +243,14 @@
 
   .back:hover {
     color: var(--accent);
+  }
+
+  .device-tip {
+    display: none;
+  }
+
+  .ribbon-scroll {
+    width: 100%;
   }
 
   .hero {
@@ -465,12 +477,38 @@
   }
 
   @media (max-width: 720px) {
+    .device-tip {
+      display: block;
+      margin: 0 0 1rem;
+      padding: 0.65rem 0.85rem;
+      border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+      border-radius: 0.5rem;
+      background: color-mix(in srgb, var(--accent) 8%, white);
+      font-family: var(--sans);
+      font-size: 0.88rem;
+      line-height: 1.35;
+      color: var(--ink-soft);
+      text-align: center;
+    }
+
     .stats {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .hero {
       min-height: auto;
+    }
+
+    .ribbon-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+    }
+
+    .ribbon {
+      width: max(100%, calc(var(--cols) * 5px));
+      min-width: max(100%, calc(var(--cols) * 5px));
+      gap: 1px;
     }
   }
 </style>
