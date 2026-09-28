@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import type { CountItem } from "./types";
+  import PhotoCropModal from "./PhotoCropModal.svelte";
 
   type Props = {
     items: CountItem[];
@@ -18,28 +20,100 @@
     y: number;
     rot: number;
     delay: number;
+    z: number;
   };
+
+  type BoxPct = { x1: number; y1: number; x2: number; y2: number };
 
   const MAX = 24;
   /** Reject only when overlap area exceeds this fraction of the smaller card. */
   const MAX_OVERLAP = 0.22;
-  // rem → % of wall (≈48rem × 28rem)
-  const REM_X = 100 / 48;
-  const REM_Y = 100 / 28;
+  /** Assumed wall width at 100% for rem→% placement. */
+  const BASE_WALL_W_REM = 48;
+  /** Name strip = bottom fraction of each card (for layering). */
+  const NAME_STRIP = 0.22;
 
   const MIN_DENSITY = 55;
   const MAX_DENSITY = 140;
-  /** 100 = default card size; lower packs tighter / rearranges. */
+  const MIN_WIDTH_PCT = 70;
+  const MAX_WIDTH_PCT = 100;
+  const MIN_HEIGHT_REM = 20;
+  const MAX_HEIGHT_REM = 42;
+
   let densityPct = $state(100);
+  let wallWidthPct = $state(100);
+  let wallHeightRem = $state(28);
   let wallEl = $state<HTMLDivElement | null>(null);
+  /** Measured wall width in rem (falls back to BASE_WALL_W_REM * width%). */
+  let measuredWallWRem = $state(BASE_WALL_W_REM);
   let downloading = $state(false);
+  let fileInputEl = $state<HTMLInputElement | null>(null);
+
+  let hiddenLabels = $state<Set<string>>(new Set());
+  let photos = $state<Record<string, string>>({});
+
+  let cropOpen = $state(false);
+  let cropSrc = $state("");
+  let cropLabel = $state("");
+  let pendingPickLabel = $state<string | null>(null);
 
   const density = $derived(densityPct / 100);
+  const remX = $derived(100 / Math.max(8, measuredWallWRem));
+  const remY = $derived(100 / wallHeightRem);
+  /** Approximate face W/H above the name strip (card aspect 1.18, ~22% name). */
+  const faceAspect = 1 / (1.18 * (1 - NAME_STRIP));
+  const storageKey = $derived(`hwyd-stars-hidden:${exportName}`);
+
+  $effect(() => {
+    const el = wallEl;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      if (w > 0) measuredWallWRem = w / rootPx;
+    });
+    ro.observe(el);
+    measuredWallWRem = (el.getBoundingClientRect().width || BASE_WALL_W_REM * rootPx) / rootPx;
+    return () => ro.disconnect();
+  });
+
+  $effect(() => {
+    const key = storageKey;
+    if (typeof sessionStorage === "undefined") return;
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) {
+        hiddenLabels = new Set();
+        return;
+      }
+      const arr = JSON.parse(raw) as unknown;
+      if (Array.isArray(arr)) hiddenLabels = new Set(arr.filter((x): x is string => typeof x === "string"));
+      else hiddenLabels = new Set();
+    } catch {
+      hiddenLabels = new Set();
+    }
+  });
+
+  function persistHidden(next: Set<string>) {
+    hiddenLabels = next;
+    if (typeof sessionStorage === "undefined") return;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify([...next]));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const peopleList = $derived([...items].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)));
+
+  const visibleItems = $derived(peopleList.filter((i) => !hiddenLabels.has(i.label)).slice(0, MAX));
 
   const placed = $derived.by((): Polaroid[] => {
-    if (!items.length) return [];
+    if (!visibleItems.length) return [];
     const scale = density;
-    const ordered = [...items].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)).slice(0, MAX);
+    const rx = remX;
+    const ry = remY;
+    const ordered = visibleItems;
     const maxCount = Math.max(1, ...ordered.map((i) => i.count));
 
     const out: Polaroid[] = [];
@@ -51,9 +125,8 @@
       const h = hash(item.label, idx * 41 + 7);
       const cardW = (4.8 + weight * 3.2) * scale;
       const cardH = cardW * 1.18;
-      // Full card size in % of wall
-      const rw = cardW * REM_X;
-      const rh = cardH * REM_Y;
+      const rw = cardW * rx;
+      const rh = cardH * ry;
 
       const rankT = idx / Math.max(1, ordered.length - 1);
       const startR = 2 + rankT * 10;
@@ -65,7 +138,6 @@
         const cand = { x, y, rw, rh };
         const worst = worstOverlap(cand, boxes);
         if (worst > MAX_OVERLAP) return;
-        // Prefer less overlap, then closer to intended radius band
         const score = worst * 10 + Math.abs(distFromCenter(x, y) - (startR + 8)) * 0.02;
         if (!best || score < best.score) best = { x, y, score };
       };
@@ -79,7 +151,6 @@
         }
       }
 
-      // Denser fallback scan if spiral found nothing under threshold
       if (!best) {
         for (let attempt = 0; attempt < 120; attempt++) {
           const hh = hash(item.label, attempt * 97 + idx * 13);
@@ -87,7 +158,6 @@
         }
       }
 
-      // Last resort: pick least-overlapping grid slot (never pile on center)
       if (!best) {
         let least = { x: 20, y: 20, score: Infinity };
         for (let gx = 12; gx <= 88; gx += 6) {
@@ -110,19 +180,86 @@
         y: best.y,
         rot: (((h >> 6) % 17) - 8) * 0.85,
         delay: 0.05 + idx * 0.045,
+        z: idx + 1,
       });
     }
 
-    return out;
+    return assignNameSafeZ(out, rx, ry);
   });
 
-  function distFromCenter(x: number, y: number): number {
-    const dx = x - 50;
-    const dy = y - 50;
-    return Math.sqrt(dx * dx + dy * dy);
+  function cardBoxPct(p: Polaroid, rx: number, ry: number): BoxPct {
+    const rw = p.w * rx;
+    const rh = p.h * ry;
+    return { x1: p.x - rw / 2, y1: p.y - rh / 2, x2: p.x + rw / 2, y2: p.y + rh / 2 };
   }
 
-  /** Overlap area / min(card areas). 0 = separate, 1 = one fully covers the other. */
+  function nameStripPct(p: Polaroid, rx: number, ry: number): BoxPct {
+    const box = cardBoxPct(p, rx, ry);
+    const midY = box.y2 - (box.y2 - box.y1) * NAME_STRIP;
+    return { x1: box.x1, y1: midY, x2: box.x2, y2: box.y2 };
+  }
+
+  function rectsOverlap(a: BoxPct, b: BoxPct): boolean {
+    return a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.y1;
+  }
+
+  /** If A covers B's name strip, B sits above A. Cycles break via stable score sort. */
+  function assignNameSafeZ(cards: Polaroid[], rx: number, ry: number): Polaroid[] {
+    const n = cards.length;
+    if (n <= 1) return cards;
+
+    const preferAbove: boolean[][] = Array.from({ length: n }, () => Array(n).fill(false));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (i === j) continue;
+        if (rectsOverlap(cardBoxPct(cards[i], rx, ry), nameStripPct(cards[j], rx, ry))) {
+          preferAbove[j][i] = true;
+        }
+      }
+    }
+
+    // Score = how many cards this one should sit above; stable by index then label
+    const order = cards.map((_, i) => i);
+    order.sort((ia, ib) => {
+      let scoreA = 0;
+      let scoreB = 0;
+      for (let k = 0; k < n; k++) {
+        if (preferAbove[ia][k]) scoreA++;
+        if (preferAbove[ib][k]) scoreB++;
+      }
+      if (scoreA !== scoreB) return scoreA - scoreB;
+      const byLabel = cards[ia].label.localeCompare(cards[ib].label);
+      if (byLabel !== 0) return byLabel;
+      return ia - ib;
+    });
+
+    const zRank = new Array<number>(n);
+    order.forEach((idx, rank) => {
+      zRank[idx] = rank + 1;
+    });
+
+    // Enforce direct edges when stable sort left a conflict (acyclic bumps only)
+    let changed = true;
+    let guard = 0;
+    while (changed && guard++ < n * n) {
+      changed = false;
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          if (!preferAbove[i][j] || zRank[i] > zRank[j]) continue;
+          // Skip mutual/cyclic edges — stable order already decided those
+          if (preferAbove[j][i]) continue;
+          zRank[i] = zRank[j] + 1;
+          changed = true;
+        }
+      }
+    }
+    return cards.map((c, i) => ({ ...c, z: zRank[i] }));
+  }
+
+  function distFromCenter(x: number, y: number): number {
+    return Math.sqrt((x - 50) ** 2 + (y - 50) ** 2);
+  }
+
   function overlapRatio(a: { x: number; y: number; rw: number; rh: number }, b: { x: number; y: number; rw: number; rh: number }): number {
     const ax1 = a.x - a.rw / 2;
     const ay1 = a.y - a.rh / 2;
@@ -132,14 +269,11 @@
     const by1 = b.y - b.rh / 2;
     const bx2 = b.x + b.rw / 2;
     const by2 = b.y + b.rh / 2;
-
     const ix = Math.max(0, Math.min(ax2, bx2) - Math.max(ax1, bx1));
     const iy = Math.max(0, Math.min(ay2, by2) - Math.max(ay1, by1));
     const inter = ix * iy;
     if (inter <= 0) return 0;
-    const areaA = a.rw * a.rh;
-    const areaB = b.rw * b.rh;
-    return inter / Math.min(areaA, areaB);
+    return inter / Math.min(a.rw * a.rh, b.rw * b.rh);
   }
 
   function worstOverlap(cand: { x: number; y: number; rw: number; rh: number }, boxes: { x: number; y: number; rw: number; rh: number }[]): number {
@@ -162,13 +296,73 @@
     return t.slice(0, 1).toUpperCase();
   }
 
-  function adjustDensity(delta: number) {
-    densityPct = Math.max(MIN_DENSITY, Math.min(MAX_DENSITY, densityPct + delta));
+  function clamp(n: number, lo: number, hi: number) {
+    return Math.max(lo, Math.min(hi, n));
   }
 
-  function setDensity(value: number) {
-    densityPct = Math.max(MIN_DENSITY, Math.min(MAX_DENSITY, Math.round(value)));
+  function adjustDensity(delta: number) {
+    densityPct = clamp(densityPct + delta, MIN_DENSITY, MAX_DENSITY);
   }
+  function setDensity(value: number) {
+    densityPct = clamp(Math.round(value), MIN_DENSITY, MAX_DENSITY);
+  }
+  function setWallWidth(value: number) {
+    wallWidthPct = clamp(Math.round(value), MIN_WIDTH_PCT, MAX_WIDTH_PCT);
+  }
+  function setWallHeight(value: number) {
+    wallHeightRem = clamp(Math.round(value), MIN_HEIGHT_REM, MAX_HEIGHT_REM);
+  }
+
+  function toggleHide(label: string) {
+    const next = new Set(hiddenLabels);
+    if (next.has(label)) next.delete(label);
+    else next.add(label);
+    persistHidden(next);
+  }
+
+  function setPhoto(label: string, url: string) {
+    const prev = photos[label];
+    if (prev) URL.revokeObjectURL(prev);
+    photos = { ...photos, [label]: url };
+  }
+
+  function openPhotoPicker(label: string) {
+    pendingPickLabel = label;
+    fileInputEl?.click();
+  }
+
+  function onFileChosen(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    const label = pendingPickLabel;
+    pendingPickLabel = null;
+    if (!file || !label) return;
+    const mimeOk = !file.type || file.type.startsWith("image/");
+    if (!mimeOk) return;
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    cropSrc = URL.createObjectURL(file);
+    cropLabel = label;
+    cropOpen = true;
+  }
+
+  function onCropConfirm(url: string) {
+    setPhoto(cropLabel, url);
+    closeCrop();
+  }
+
+  function closeCrop() {
+    cropOpen = false;
+    cropLabel = "";
+    const stale = cropSrc;
+    cropSrc = "";
+    if (stale) queueMicrotask(() => URL.revokeObjectURL(stale));
+  }
+
+  onDestroy(() => {
+    for (const url of Object.values(photos)) URL.revokeObjectURL(url);
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+  });
 
   function safeFileStem(name: string): string {
     return (
@@ -185,9 +379,19 @@
     return rem * rootPx;
   }
 
+  function loadImage(src: string): Promise<HTMLImageElement | null> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  }
+
   async function download() {
     const el = wallEl;
-    if (!el || !placed.length || downloading) return;
+    const cards = placed;
+    if (!el || !cards.length || downloading) return;
     downloading = true;
     try {
       await new Promise<void>((r) => requestAnimationFrame(() => r()));
@@ -202,20 +406,17 @@
       if (!ctx) return;
       ctx.scale(scale, scale);
 
-      // Wall background (match CSS)
       const accent = getComputedStyle(el).getPropertyValue("--accent").trim() || "#214247";
       const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#1a1f1c";
       ctx.fillStyle = "#eef2ef";
       ctx.fillRect(0, 0, W, H);
 
-      // Soft accent wash
       const wash = ctx.createRadialGradient(W * 0.5, H * 0.45, 0, W * 0.5, H * 0.45, Math.max(W, H) * 0.45);
       wash.addColorStop(0, hexToRgba(accent, 0.1));
       wash.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = wash;
       ctx.fillRect(0, 0, W, H);
 
-      // Grid lines
       ctx.strokeStyle = hexToRgba(ink, 0.035);
       ctx.lineWidth = 1;
       const step = (12 / 16) * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16);
@@ -233,8 +434,9 @@
       }
 
       const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const drawOrder = [...cards].sort((a, b) => a.z - b.z);
 
-      for (const p of placed) {
+      for (const p of drawOrder) {
         const cx = (p.x / 100) * W;
         const cy = (p.y / 100) * H;
         const pw = remToPx(p.w, rootPx);
@@ -245,18 +447,15 @@
         ctx.translate(cx, cy);
         ctx.rotate(rot);
 
-        // Shadow
         ctx.fillStyle = "rgba(0,0,0,0.12)";
         ctx.fillRect(-pw / 2 + 2, -ph / 2 + 4, pw, ph);
 
-        // Frame
         ctx.fillStyle = "#fbfaf7";
         ctx.strokeStyle = hexToRgba(ink, 0.1);
         ctx.lineWidth = 1;
         ctx.fillRect(-pw / 2, -ph / 2, pw, ph);
         ctx.strokeRect(-pw / 2, -ph / 2, pw, ph);
 
-        // Tape
         const tapeW = pw * 0.28;
         const tapeH = remToPx(0.55, rootPx);
         ctx.save();
@@ -268,46 +467,73 @@
         ctx.restore();
         ctx.globalAlpha = 1;
 
-        // Face
         const pad = remToPx(0.35, rootPx);
         const faceX = -pw / 2 + pad;
         const faceY = -ph / 2 + pad;
         const faceW = pw - pad * 2;
         const nameBlock = remToPx(0.35, rootPx) + remToPx(0.62 + p.weight * 0.45, rootPx) * 1.15 + remToPx(0.1, rootPx);
-        const faceH = ph - pad - remToPx(0.45, rootPx) - nameBlock;
-        const faceGrad = ctx.createRadialGradient(
-          faceX + faceW * 0.4,
-          faceY + faceH * 0.35,
-          0,
-          faceX + faceW * 0.5,
-          faceY + faceH * 0.5,
-          Math.max(faceW, faceH) * 0.7
-        );
-        faceGrad.addColorStop(0, mixHex(accent, "#dfe8e3", 0.18 + p.weight * 0.28));
-        faceGrad.addColorStop(1, mixHex(ink, "#c5d0cb", 0.08));
-        ctx.fillStyle = faceGrad;
-        ctx.fillRect(faceX, faceY, faceW, Math.max(8, faceH));
-        ctx.strokeStyle = hexToRgba(ink, 0.08);
-        ctx.strokeRect(faceX, faceY, faceW, Math.max(8, faceH));
+        const faceH = Math.max(8, ph - pad - remToPx(0.45, rootPx) - nameBlock);
 
-        // Initial
-        const ini = initial(p.label);
-        ctx.fillStyle = mixHex("#ffffff", accent, 0.55);
-        ctx.font = `500 ${pw * 0.28}px Fraunces, Georgia, serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(ini, 0, faceY + Math.max(8, faceH) / 2);
+        const photoUrl = photos[p.label];
+        const photoImg = photoUrl ? await loadImage(photoUrl) : null;
+        const photoOk = photoImg && photoImg.naturalWidth > 0 && photoImg.naturalHeight > 0;
 
-        // Name
+        if (photoOk) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(faceX, faceY, faceW, faceH);
+          ctx.clip();
+          const ir = photoImg.naturalWidth / photoImg.naturalHeight;
+          const fr = faceW / faceH;
+          let dw = faceW;
+          let dh = faceH;
+          let dx = faceX;
+          let dy = faceY;
+          if (ir > fr) {
+            dh = faceH;
+            dw = faceH * ir;
+            dx = faceX + (faceW - dw) / 2;
+          } else {
+            dw = faceW;
+            dh = faceW / ir;
+            dy = faceY + (faceH - dh) / 2;
+          }
+          ctx.drawImage(photoImg, dx, dy, dw, dh);
+          ctx.restore();
+          ctx.strokeStyle = hexToRgba(ink, 0.08);
+          ctx.strokeRect(faceX, faceY, faceW, faceH);
+        } else {
+          const faceGrad = ctx.createRadialGradient(
+            faceX + faceW * 0.4,
+            faceY + faceH * 0.35,
+            0,
+            faceX + faceW * 0.5,
+            faceY + faceH * 0.5,
+            Math.max(faceW, faceH) * 0.7
+          );
+          faceGrad.addColorStop(0, mixHex(accent, "#dfe8e3", 0.18 + p.weight * 0.28));
+          faceGrad.addColorStop(1, mixHex(ink, "#c5d0cb", 0.08));
+          ctx.fillStyle = faceGrad;
+          ctx.fillRect(faceX, faceY, faceW, faceH);
+          ctx.strokeStyle = hexToRgba(ink, 0.08);
+          ctx.strokeRect(faceX, faceY, faceW, faceH);
+
+          const ini = initial(p.label);
+          ctx.fillStyle = mixHex("#ffffff", accent, 0.55);
+          ctx.font = `500 ${pw * 0.28}px Fraunces, Georgia, serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(ini, 0, faceY + faceH / 2);
+        }
+
         const nameSize = remToPx(0.62 + p.weight * 0.45, rootPx);
         ctx.fillStyle = ink;
         ctx.font = `500 ${nameSize}px Fraunces, Georgia, serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        const nameY = faceY + Math.max(8, faceH) + remToPx(0.35, rootPx);
-        const maxNameW = faceW;
+        const nameY = faceY + faceH + remToPx(0.35, rootPx);
         let name = p.label;
-        while (ctx.measureText(name).width > maxNameW && name.length > 1) {
+        while (ctx.measureText(name).width > faceW && name.length > 1) {
           name = name.slice(0, -2) + "…";
         }
         ctx.fillText(name, 0, nameY);
@@ -350,10 +576,7 @@
     const [ar, ag, ab] = parse(a);
     const [br, bg, bb] = parse(b);
     const t = Math.max(0, Math.min(1, tA));
-    const r = Math.round(ar * t + br * (1 - t));
-    const g = Math.round(ag * t + bg * (1 - t));
-    const bl = Math.round(ab * t + bb * (1 - t));
-    return `rgb(${r},${g},${bl})`;
+    return `rgb(${Math.round(ar * t + br * (1 - t))},${Math.round(ag * t + bg * (1 - t))},${Math.round(ab * t + bb * (1 - t))})`;
   }
 </script>
 
@@ -363,9 +586,7 @@
     <div class="actions">
       <div class="density-ctrl" title="Card size — changes how stars are arranged">
         <span class="density-label">Size</span>
-        <button type="button" class="btn" onclick={() => adjustDensity(-5)} disabled={densityPct <= MIN_DENSITY} aria-label="Smaller cards"
-          >−</button
-        >
+        <button type="button" class="btn" onclick={() => adjustDensity(-5)} disabled={densityPct <= MIN_DENSITY} aria-label="Smaller cards">−</button>
         <input
           class="density-range"
           type="range"
@@ -377,9 +598,35 @@
           aria-label="Star card size"
         />
         <span class="density-value">{densityPct}%</span>
-        <button type="button" class="btn" onclick={() => adjustDensity(5)} disabled={densityPct >= MAX_DENSITY} aria-label="Larger cards"
-          >+</button
-        >
+        <button type="button" class="btn" onclick={() => adjustDensity(5)} disabled={densityPct >= MAX_DENSITY} aria-label="Larger cards">+</button>
+      </div>
+      <div class="density-ctrl" title="Wall width">
+        <span class="density-label">Width</span>
+        <input
+          class="density-range"
+          type="range"
+          min={MIN_WIDTH_PCT}
+          max={MAX_WIDTH_PCT}
+          step="5"
+          value={wallWidthPct}
+          oninput={(e) => setWallWidth(Number((e.currentTarget as HTMLInputElement).value))}
+          aria-label="Stars canvas width"
+        />
+        <span class="density-value">{wallWidthPct}%</span>
+      </div>
+      <div class="density-ctrl" title="Wall height">
+        <span class="density-label">Height</span>
+        <input
+          class="density-range short"
+          type="range"
+          min={MIN_HEIGHT_REM}
+          max={MAX_HEIGHT_REM}
+          step="1"
+          value={wallHeightRem}
+          oninput={(e) => setWallHeight(Number((e.currentTarget as HTMLInputElement).value))}
+          aria-label="Stars canvas height"
+        />
+        <span class="density-value">{wallHeightRem}rem</span>
       </div>
       <button type="button" class="btn primary" onclick={download} disabled={!placed.length || downloading}>
         {downloading ? "Preparing…" : "Download"}
@@ -387,23 +634,57 @@
     </div>
   </div>
 
-  <div class="wall" bind:this={wallEl} aria-label="Your stars as memory cards">
+  {#if peopleList.length}
+    <div class="people-list" aria-label="People on your stars board">
+      <span class="people-list-label">People</span>
+      <ul>
+        {#each peopleList as person}
+          {@const hidden = hiddenLabels.has(person.label)}
+          <li class:hidden>
+            <button type="button" class="person-toggle" onclick={() => toggleHide(person.label)} aria-pressed={!hidden}>
+              <span class="eye" aria-hidden="true">{hidden ? "○" : "●"}</span>
+              <span class="person-name">{person.label}</span>
+              <span class="person-count">{person.count}</span>
+              <span class="person-action">{hidden ? "Show" : "Hide"}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
+
+  <div class="wall" bind:this={wallEl} style={`width: ${wallWidthPct}%; height: ${wallHeightRem}rem;`} aria-label="Your stars as memory cards">
     {#each placed as p, i}
       <article
         class="polaroid"
-        style={`--x: ${p.x}%; --y: ${p.y}%; --rot: ${p.rot}deg; --w: ${p.w}rem; --h: ${p.h}rem; --wt: ${p.weight}; --d: ${p.delay}s; --i: ${i}`}
+        style={`--x: ${p.x}%; --y: ${p.y}%; --rot: ${p.rot}deg; --w: ${p.w}rem; --h: ${p.h}rem; --wt: ${p.weight}; --d: ${p.delay}s; --i: ${i}; --z: ${p.z}`}
       >
         <div class="tape" aria-hidden="true"></div>
         <div class="frame">
-          <div class="face" aria-hidden="true">
-            <span class="initial">{initial(p.label)}</span>
-          </div>
+          <button
+            type="button"
+            class="face"
+            aria-label={photos[p.label] ? `Replace photo for ${p.label}` : `Add photo for ${p.label}`}
+            onclick={() => openPhotoPicker(p.label)}
+          >
+            {#if photos[p.label]}
+              <img class="face-photo" src={photos[p.label]} alt="" />
+            {:else}
+              <span class="initial">{initial(p.label)}</span>
+            {/if}
+          </button>
           <p class="name">{p.label}</p>
         </div>
       </article>
     {/each}
   </div>
+
+  <input bind:this={fileInputEl} type="file" accept="image/*" class="sr-only" onchange={onFileChosen} />
 </section>
+
+{#if cropOpen && cropSrc}
+  <PhotoCropModal open={cropOpen} src={cropSrc} personLabel={cropLabel} aspectRatio={faceAspect} onconfirm={onCropConfirm} oncancel={closeCrop} />
+{/if}
 
 <style>
   .people-panel {
@@ -464,6 +745,10 @@
     cursor: pointer;
   }
 
+  .density-range.short {
+    width: 5rem;
+  }
+
   .btn {
     padding: 0.45rem 0.85rem;
     border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
@@ -486,10 +771,71 @@
     color: var(--accent);
   }
 
+  .people-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.55rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .people-list-label {
+    font-size: 0.78rem;
+    color: color-mix(in srgb, var(--ink) 55%, transparent);
+    user-select: none;
+  }
+
+  .people-list ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .person-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.55rem;
+    border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+    border-radius: 0.45rem;
+    background: color-mix(in srgb, white 70%, transparent);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .person-toggle:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
+  li.hidden .person-toggle {
+    opacity: 0.55;
+    text-decoration: line-through;
+  }
+
+  .eye {
+    font-size: 0.65rem;
+    color: var(--accent);
+  }
+
+  .person-count {
+    font-variant-numeric: tabular-nums;
+    color: color-mix(in srgb, var(--ink) 45%, transparent);
+  }
+
+  .person-action {
+    font-size: 0.72rem;
+    color: var(--accent);
+  }
+
   .wall {
     position: relative;
-    width: 100%;
-    height: clamp(24rem, 42vw, 36rem);
+    max-width: 100%;
+    margin-inline: auto;
     border-radius: 0.75rem;
     background:
       radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 55%),
@@ -515,6 +861,7 @@
     position: absolute;
     left: var(--x);
     top: var(--y);
+    z-index: var(--z);
     width: var(--w);
     height: var(--h);
     transform: translate(-50%, -50%) rotate(var(--rot));
@@ -550,12 +897,27 @@
     display: grid;
     place-items: center;
     min-height: 0;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
     background: radial-gradient(
       circle at 40% 35%,
       color-mix(in srgb, var(--accent) calc(18% + var(--wt) * 28%), #dfe8e3),
       color-mix(in srgb, var(--ink) 8%, #c5d0cb)
     );
-    border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .face:hover {
+    outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    outline-offset: -2px;
+  }
+
+  .face-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
 
   .initial {
@@ -580,6 +942,18 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   @media (max-width: 520px) {
