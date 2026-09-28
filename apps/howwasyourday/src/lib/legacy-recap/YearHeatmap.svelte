@@ -85,37 +85,38 @@
   }
 </script>
 
-<div class="cal" aria-label="2025 year color calendar of logged days">
-  <div class="months">
-    {#each months as m}
-      <span>{m}</span>
-    {/each}
-  </div>
-  <div
-    class="grid"
-    bind:this={gridEl}
-    style={`--weeks: ${Math.max(weeks.length, 1)}`}
-    role="img"
-    aria-label="Hover to magnify a section of the calendar"
-    onmousemove={onGridMove}
-    onmouseleave={onGridLeave}
-  >
-    {#each weeks as week, wi}
-      <div class="week">
-        {#each week as cell}
-          {#if cell}
-            <span
-              class:filled={cell.filled}
-              class:focus={loupeOpen && wi === loupeWeek}
-              title={cell.filled ? `${cell.date} · score ${cell.score ?? "—"} ${cell.emoji}` : cell.date}
-              style={cell.filled && cell.color ? `background:${cell.color}` : undefined}
-            ></span>
-          {:else}
-            <span class="empty" class:focus={loupeOpen && wi === loupeWeek}></span>
-          {/if}
-        {/each}
-      </div>
-    {/each}
+<div class="cal-scroll">
+  <div class="cal" style={`--weeks: ${Math.max(weeks.length, 1)}`} aria-label="2025 year color calendar of logged days">
+    <div class="months">
+      {#each months as m}
+        <span>{m}</span>
+      {/each}
+    </div>
+    <div
+      class="grid"
+      bind:this={gridEl}
+      role="img"
+      aria-label="Hover to magnify a section of the calendar"
+      onmousemove={onGridMove}
+      onmouseleave={onGridLeave}
+    >
+      {#each weeks as week, wi}
+        <div class="week">
+          {#each week as cell}
+            {#if cell}
+              <span
+                class:filled={cell.filled}
+                class:focus={loupeOpen && wi === loupeWeek}
+                title={cell.filled ? `${cell.date} · score ${cell.score ?? "—"} ${cell.emoji}` : cell.date}
+                style={cell.filled && cell.color ? `background:${cell.color}` : undefined}
+              ></span>
+            {:else}
+              <span class="empty" class:focus={loupeOpen && wi === loupeWeek}></span>
+            {/if}
+          {/each}
+        </div>
+      {/each}
+    </div>
   </div>
 </div>
 
@@ -143,9 +144,12 @@
 {/if}
 
 <style>
+  .cal-scroll {
+    width: 100%;
+  }
+
   .cal {
     width: 100%;
-    overflow-x: visible;
   }
 
   .months {
@@ -266,23 +270,31 @@
     background: transparent;
   }
 
-  @media (max-width: 520px) {
-    .cal {
+  @media (max-width: 720px) {
+    .cal-scroll {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      padding-bottom: 0.25rem;
     }
 
-    .months,
-    .grid {
-      min-width: 520px;
+    .cal {
+      /* Keep months + grid as one wide unit so they scroll together */
+      width: max(100%, calc(var(--weeks, 53) * 14px));
+      min-width: max(100%, calc(var(--weeks, 53) * 14px));
+    }
+
+    .months {
+      width: 100%;
     }
 
     .grid {
+      width: 100%;
       aspect-ratio: auto;
       max-height: none;
       grid-template-rows: repeat(7, 12px);
-      grid-auto-columns: 12px;
-      grid-template-columns: none;
+      grid-template-columns: repeat(var(--weeks), 12px);
+      gap: 2px;
     }
 
     .grid span {
