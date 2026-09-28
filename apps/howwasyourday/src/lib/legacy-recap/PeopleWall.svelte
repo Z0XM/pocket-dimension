@@ -69,7 +69,8 @@
   const remY = $derived(100 / layoutWallHeightRem);
   /** Approximate face W/H above the name strip (card aspect 1.18, ~22% name). */
   const faceAspect = 1 / (1.18 * (1 - NAME_STRIP));
-  const storageKey = $derived(`hwyd-stars-hidden:${exportName}`);
+  // Version the key so older hidden-state snapshots do not carry forward forever.
+  const storageKey = $derived(`hwyd-stars-hidden:v2:${exportName}`);
   const hiddenCount = $derived(hiddenLabels.size);
 
   $effect(() => {
