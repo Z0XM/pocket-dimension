@@ -2,7 +2,7 @@
 title: 'HWYD Your Stars — canvas size, hide people, photos, layering'
 type: 'feature'
 created: '2026-09-28'
-status: 'in-review'
+status: 'done'
 baseline_commit: '4de2c7fb07827bc3c644ac3314670fb2879c6eb6'
 context: []
 ---
@@ -94,3 +94,39 @@ context: []
 
 **Manual checks:**
 - On `/recap/2025/[slug]` with people data: resize wall, hide/unhide, upload+crop+replace, download PNG shows photos, overlapping names remain readable via z-index
+
+## Suggested Review Order
+
+**Wall size + placement**
+
+- Measured rem width drives rem→% so resize keeps collision math honest
+  [`PeopleWall.svelte:69`](../../../apps/howwasyourday/src/lib/legacy-recap/PeopleWall.svelte#L69)
+
+- Width/height clamps wired into wall `style`
+  [`PeopleWall.svelte:656`](../../../apps/howwasyourday/src/lib/legacy-recap/PeopleWall.svelte#L656)
+
+**Session hide list**
+
+- Persist hide set in sessionStorage; placement uses filtered visible items
+  [`PeopleWall.svelte:97`](../../../apps/howwasyourday/src/lib/legacy-recap/PeopleWall.svelte#L97)
+
+**Photos + cropper**
+
+- Face click → file pick → cropperjs modal with face aspect
+  [`PeopleWall.svelte:329`](../../../apps/howwasyourday/src/lib/legacy-recap/PeopleWall.svelte#L329)
+
+- OSS cropper confirm → object URL
+  [`PhotoCropModal.svelte:3`](../../../apps/howwasyourday/src/lib/legacy-recap/PhotoCropModal.svelte#L3)
+
+**Download + layering**
+
+- PNG download draws uploaded photos cover-fit into face rects
+  [`PeopleWall.svelte:391`](../../../apps/howwasyourday/src/lib/legacy-recap/PeopleWall.svelte#L391)
+
+- Name-strip overlap → higher z; cycles broken via stable sort
+  [`PeopleWall.svelte:207`](../../../apps/howwasyourday/src/lib/legacy-recap/PeopleWall.svelte#L207)
+
+**Deps**
+
+- cropperjs 1.6.2 (+ types)
+  [`package.json:50`](../../../apps/howwasyourday/package.json#L50)
