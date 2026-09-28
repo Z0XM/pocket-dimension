@@ -29,17 +29,17 @@ Same monorepo context rules as auth-service — see [DEPLOY.md](../../DEPLOY.md)
 
 | Setting | Value |
 |---------|-------|
-| Root directory | `apps/howwasyourday` **or** `/` |
+| Root directory | `/` (monorepo root) **recommended** |
 | Build type | Railpack |
 | Port | `3004` |
 
-If root is `/`, add to Dokploy **Environment**:
+**Required** when root is `/` — otherwise Railpack auto-runs plain `bun install --frozen-lockfile` and can fail on the workspace lockfile:
 
 ```env
 RAILPACK_CONFIG_FILE=apps/howwasyourday/railpack.json
 ```
 
-If root is `apps/howwasyourday`, `railpack.json` is auto-detected.
+If root is `apps/howwasyourday`, `railpack.json` is auto-detected (full git checkout still required so `../..` reaches shared packages).
 
 ### Application env
 
