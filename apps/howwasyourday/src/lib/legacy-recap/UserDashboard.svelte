@@ -93,7 +93,7 @@
 </script>
 
 <main style={`--accent: ${user.accent_color || "#214247"}`}>
-  <p class="device-tip" role="note">Open on a laptop for better view</p>
+  <p class="device-tip" role="note">Open on a bigger screen for better view</p>
 
   <a class="back" href="/recap/2025">All dashboards</a>
 
@@ -121,7 +121,9 @@
         onmouseleave={onRibbonLeave}
       >
         {#each days as day, i}
-          <span class:focus={loupeOpen && i === loupeIndex} style={`--c: ${day.day_color || "#a1a1a1"}; --i: ${i}; --h: ${scoreHeight(day.day_score)}`}
+          <span
+            class:focus={loupeOpen && i === loupeIndex}
+            style={`--c: ${day.day_color || "#a1a1a1"}; --i: ${i}; --h: ${scoreHeight(day.day_score)}`}
           ></span>
         {/each}
       </div>
@@ -477,13 +479,24 @@
   }
 
   @media (max-width: 720px) {
+    main {
+      padding-top: 3rem;
+    }
+
     .device-tip {
       display: block;
-      margin: 0 0 1rem;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 60;
+      margin: 0;
       padding: 0.65rem 0.85rem;
-      border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
-      border-radius: 0.5rem;
-      background: color-mix(in srgb, var(--accent) 8%, white);
+      border: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+      border-radius: 0;
+      background: color-mix(in srgb, var(--accent) 12%, white);
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--ink) 10%, transparent);
       font-family: var(--sans);
       font-size: 0.88rem;
       line-height: 1.35;
