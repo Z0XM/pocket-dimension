@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { UserRecap } from "./types";
+  import type { AiAnalysisBody } from "./ai-analysis-types";
   import { buildYearHeatmap, countBy, formatMonthYear, formatShortDate, monthLabel, normalizePerson, wordTokens } from "./types";
   import DayTimeline from "./DayTimeline.svelte";
   import YearHeatmap from "./YearHeatmap.svelte";
@@ -7,12 +8,14 @@
   import WordCloud from "./WordCloud.svelte";
   import PeopleWall from "./PeopleWall.svelte";
   import DrawingsCanvas from "./DrawingsCanvas.svelte";
+  import AiSummary from "./AiSummary.svelte";
 
   type Props = {
     recap: UserRecap;
+    aiAnalysis?: AiAnalysisBody | null;
   };
 
-  let { recap }: Props = $props();
+  let { recap, aiAnalysis = null }: Props = $props();
 
   const user = $derived(recap.user);
   const summary = $derived(recap.summary);
@@ -158,6 +161,10 @@
       <span class="stat-label">People named</span>
     </div>
   </section>
+
+  {#if aiAnalysis}
+    <AiSummary analysis={aiAnalysis} />
+  {/if}
 
   <section class="panel calendar-panel">
     <YearHeatmap cells={heat} />

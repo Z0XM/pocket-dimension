@@ -70,6 +70,8 @@ apps/chhan-chhan/data/
 # Legacy 2025 recap private email map + local export copies (never commit)
 apps/howwasyourday/scripts/legacy-recap-emails.json
 apps/howwasyourday/scripts/year-recap-export/
+apps/howwasyourday/scripts/ai-briefs/
+apps/howwasyourday/scripts/ai-out/
 
 # cookies
 cookies.txt

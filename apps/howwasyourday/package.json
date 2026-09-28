@@ -12,7 +12,9 @@
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "import:legacy-recap-2025": "bun --env-file=.env ./scripts/import-legacy-recap-2025.ts"
+    "import:legacy-recap-2025": "bun --env-file=.env ./scripts/import-legacy-recap-2025.ts",
+    "build:legacy-recap-ai-briefs": "bun --env-file=.env ./scripts/build-legacy-recap-ai-briefs.ts",
+    "import:legacy-recap-ai-analysis": "bun --env-file=.env ./scripts/import-legacy-recap-ai-analysis.ts"
   },
   "devDependencies": {
     "@internationalized/date": "^3.10.0",

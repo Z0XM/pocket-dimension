@@ -141,3 +141,28 @@ export async function canAccessDrawing(opts: {
 
   return { ok: true, png: row.png as Buffer, contentType: row.contentType };
 }
+
+export async function getAiAnalysisForProfile(profileId: string) {
+  try {
+    const rows = await db
+      .select({
+        status: schema.legacyRecapAiAnalysis.status,
+        analysis: schema.legacyRecapAiAnalysis.analysis,
+        promptVersion: schema.legacyRecapAiAnalysis.promptVersion,
+      })
+      .from(schema.legacyRecapAiAnalysis)
+      .where(eq(schema.legacyRecapAiAnalysis.profileId, profileId))
+      .limit(1);
+    const row = rows[0];
+    if (!row || row.status !== "ready") return null;
+    // Only serve the current insight-only contract.
+    if (row.promptVersion !== "v3") return null;
+    const a = row.analysis as Record<string, unknown> | null;
+    if (!a || typeof a !== "object" || !("reflection" in a) || !("headline" in a)) return null;
+    return row;
+  } catch (err) {
+    // Table may not exist yet before migrate; never block the dashboard.
+    console.warn("[legacy-recap] AI analysis lookup failed", err);
+    return null;
+  }
+}

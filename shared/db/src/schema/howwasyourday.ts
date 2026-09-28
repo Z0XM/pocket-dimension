@@ -122,3 +122,23 @@ export const legacyRecapLink = howWasYourDaySchema.table(
   },
   (table) => [unique("legacy_recap_link_profile").on(table.profileId), index("legacy_recap_link_user_idx").on(table.userId)]
 );
+
+/** Offline AI year summary (written by subagents; claim-gated on read). */
+export const legacyRecapAiAnalysis = howWasYourDaySchema.table(
+  "legacy_recap_ai_analysis",
+  {
+    id,
+    ...timestamps,
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => legacyRecapProfile.id, { onDelete: "cascade" }),
+    year: integer("year").notNull().default(2025),
+    modelLabel: text("model_label").notNull().default("cursor-subagent"),
+    promptVersion: text("prompt_version").notNull().default("v1"),
+    inputFingerprint: text("input_fingerprint").notNull(),
+    analysis: jsonb("analysis").$type<Record<string, unknown>>().notNull(),
+    status: text("status").notNull().default("ready"),
+    error: text("error"),
+  },
+  (table) => [unique("legacy_recap_ai_analysis_profile").on(table.profileId), index("legacy_recap_ai_analysis_year_idx").on(table.year)]
+);

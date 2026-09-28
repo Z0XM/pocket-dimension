@@ -9,7 +9,7 @@
 </svelte:head>
 
 <div class="legacy-recap-root">
-  <UserDashboard recap={data.recap} />
+  <UserDashboard recap={data.recap} aiAnalysis={data.aiAnalysis} />
 </div>
 
 <style>

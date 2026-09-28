@@ -97,6 +97,7 @@ bun run import:legacy-recap-2025
 ```
 
 4. App routes: public `/recap/2025`, claim `/recap/2025/claim/[slug]`, gated `/recap/2025/[slug]`. OTP uses `RESEND_API_KEY`. Claim cookies use `LEGACY_RECAP_CLAIM_SECRET` or `BETTER_AUTH_SECRET`.
+5. Optional AI year summaries (offline, claim-gated): see [`scripts/ai-analysis/README.md`](./scripts/ai-analysis/README.md) — `build:legacy-recap-ai-briefs` → one Cursor subagent per slug → `import:legacy-recap-ai-analysis`. No in-app LLM.
 
 ## Troubleshooting
 

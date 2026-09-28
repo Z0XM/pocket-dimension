@@ -13,3 +13,7 @@ bun run import:legacy-recap-2025
 ```
 
 Never commit emails or export JSON/PNGs. See `DEPLOY.md` for production ops notes.
+
+## AI year summaries (subagent-written)
+
+See [`ai-analysis/README.md`](./ai-analysis/README.md) for briefing packs, methodology v1, subagent template, and import into `legacy_recap_ai_analysis`.
