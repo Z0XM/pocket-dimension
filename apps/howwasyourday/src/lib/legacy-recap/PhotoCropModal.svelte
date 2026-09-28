@@ -8,17 +8,18 @@
     /** Object URL or data URL of the source image. */
     src: string;
     personLabel: string;
-    /** Face aspect (width / height). Defaults to ~square polaroid face. */
+    /** Face aspect (width / height). ~0.95 for polaroid face above name. */
     aspectRatio?: number;
     onconfirm: (croppedObjectUrl: string) => void;
     oncancel: () => void;
   };
 
-  let { open, src, personLabel, aspectRatio = 1, onconfirm, oncancel }: Props = $props();
+  let { open, src, personLabel, aspectRatio = 0.95, onconfirm, oncancel }: Props = $props();
 
   let imgEl = $state<HTMLImageElement | null>(null);
   let cropper: Cropper | null = null;
   let busy = $state(false);
+  let alive = true;
 
   function destroyCropper() {
     if (cropper) {
@@ -51,16 +52,41 @@
       return;
     }
     const el = imgEl;
-    const ready = () => initCropper(el);
-    if (el.complete && el.naturalWidth > 0) ready();
-    else el.addEventListener("load", ready, { once: true });
+    const ready = () => {
+      if (el.naturalWidth <= 0) {
+        oncancel();
+        return;
+      }
+      initCropper(el);
+    };
+    const onError = () => oncancel();
+    if (el.complete) {
+      if (el.naturalWidth > 0) ready();
+      else onError();
+    } else {
+      el.addEventListener("load", ready, { once: true });
+      el.addEventListener("error", onError, { once: true });
+    }
     return () => {
       el.removeEventListener("load", ready);
+      el.removeEventListener("error", onError);
       destroyCropper();
     };
   });
 
-  onDestroy(() => destroyCropper());
+  $effect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) oncancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  onDestroy(() => {
+    alive = false;
+    destroyCropper();
+  });
 
   function confirm() {
     if (!cropper || busy) return;
@@ -71,13 +97,21 @@
         maxHeight: 1024,
         imageSmoothingEnabled: true,
         imageSmoothingQuality: "high",
+        fillColor: "#fbfaf7",
       });
       if (!canvas) {
+        busy = false;
         oncancel();
         return;
       }
       canvas.toBlob(
         (blob) => {
+          if (!alive) {
+            if (blob) {
+              /* discard */
+            }
+            return;
+          }
           busy = false;
           if (!blob) {
             oncancel();

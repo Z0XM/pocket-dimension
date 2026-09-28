@@ -44,6 +44,8 @@
   let wallWidthPct = $state(100);
   let wallHeightRem = $state(28);
   let wallEl = $state<HTMLDivElement | null>(null);
+  /** Measured wall width in rem (falls back to BASE_WALL_W_REM * width%). */
+  let measuredWallWRem = $state(BASE_WALL_W_REM);
   let downloading = $state(false);
   let fileInputEl = $state<HTMLInputElement | null>(null);
 
@@ -56,9 +58,24 @@
   let pendingPickLabel = $state<string | null>(null);
 
   const density = $derived(densityPct / 100);
-  const remX = $derived(100 / (BASE_WALL_W_REM * (wallWidthPct / 100)));
+  const remX = $derived(100 / Math.max(8, measuredWallWRem));
   const remY = $derived(100 / wallHeightRem);
+  /** Approximate face W/H above the name strip (card aspect 1.18, ~22% name). */
+  const faceAspect = 1 / (1.18 * (1 - NAME_STRIP));
   const storageKey = $derived(`hwyd-stars-hidden:${exportName}`);
+
+  $effect(() => {
+    const el = wallEl;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      if (w > 0) measuredWallWRem = w / rootPx;
+    });
+    ro.observe(el);
+    measuredWallWRem = (el.getBoundingClientRect().width || BASE_WALL_W_REM * rootPx) / rootPx;
+    return () => ro.disconnect();
+  });
 
   $effect(() => {
     const key = storageKey;
@@ -186,7 +203,7 @@
     return a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.y1;
   }
 
-  /** If A covers B's name strip, B sits above A. */
+  /** If A covers B's name strip, B sits above A. Cycles break via stable score sort. */
   function assignNameSafeZ(cards: Polaroid[], rx: number, ry: number): Polaroid[] {
     const n = cards.length;
     if (n <= 1) return cards;
@@ -201,17 +218,38 @@
       }
     }
 
-    const zRank = cards.map((_, i) => i + 1);
+    // Score = how many cards this one should sit above; stable by index then label
+    const order = cards.map((_, i) => i);
+    order.sort((ia, ib) => {
+      let scoreA = 0;
+      let scoreB = 0;
+      for (let k = 0; k < n; k++) {
+        if (preferAbove[ia][k]) scoreA++;
+        if (preferAbove[ib][k]) scoreB++;
+      }
+      if (scoreA !== scoreB) return scoreA - scoreB;
+      const byLabel = cards[ia].label.localeCompare(cards[ib].label);
+      if (byLabel !== 0) return byLabel;
+      return ia - ib;
+    });
+
+    const zRank = new Array<number>(n);
+    order.forEach((idx, rank) => {
+      zRank[idx] = rank + 1;
+    });
+
+    // Enforce direct edges when stable sort left a conflict (acyclic bumps only)
     let changed = true;
     let guard = 0;
     while (changed && guard++ < n * n) {
       changed = false;
       for (let i = 0; i < n; i++) {
         for (let j = 0; j < n; j++) {
-          if (preferAbove[i][j] && zRank[i] <= zRank[j]) {
-            zRank[i] = zRank[j] + 1;
-            changed = true;
-          }
+          if (!preferAbove[i][j] || zRank[i] > zRank[j]) continue;
+          // Skip mutual/cyclic edges — stable order already decided those
+          if (preferAbove[j][i]) continue;
+          zRank[i] = zRank[j] + 1;
+          changed = true;
         }
       }
     }
@@ -300,7 +338,8 @@
     const label = pendingPickLabel;
     pendingPickLabel = null;
     if (!file || !label) return;
-    if (!file.type.startsWith("image/")) return;
+    const mimeOk = !file.type || file.type.startsWith("image/");
+    if (!mimeOk) return;
     if (cropSrc) URL.revokeObjectURL(cropSrc);
     cropSrc = URL.createObjectURL(file);
     cropLabel = label;
@@ -314,11 +353,10 @@
 
   function closeCrop() {
     cropOpen = false;
-    if (cropSrc) {
-      URL.revokeObjectURL(cropSrc);
-      cropSrc = "";
-    }
     cropLabel = "";
+    const stale = cropSrc;
+    cropSrc = "";
+    if (stale) queueMicrotask(() => URL.revokeObjectURL(stale));
   }
 
   onDestroy(() => {
@@ -438,8 +476,9 @@
 
         const photoUrl = photos[p.label];
         const photoImg = photoUrl ? await loadImage(photoUrl) : null;
+        const photoOk = photoImg && photoImg.naturalWidth > 0 && photoImg.naturalHeight > 0;
 
-        if (photoImg) {
+        if (photoOk) {
           ctx.save();
           ctx.beginPath();
           ctx.rect(faceX, faceY, faceW, faceH);
@@ -644,7 +683,7 @@
 </section>
 
 {#if cropOpen && cropSrc}
-  <PhotoCropModal open={cropOpen} src={cropSrc} personLabel={cropLabel} onconfirm={onCropConfirm} oncancel={closeCrop} />
+  <PhotoCropModal open={cropOpen} src={cropSrc} personLabel={cropLabel} aspectRatio={faceAspect} onconfirm={onCropConfirm} oncancel={closeCrop} />
 {/if}
 
 <style>

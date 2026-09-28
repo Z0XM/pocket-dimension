@@ -67,11 +67,13 @@ context: []
 
 **Acceptance Criteria:**
 - Given the stars panel, when width/height sliders change within range, then the wall resizes and cards rearrange without leaving the page.
-- Given a people list, when the user hides someone, then that polaroid disappears and others rearrange; unhide brings them back; refresh of the tab clears hide state (sessionStorage lifetime).
+- Given a people list, when the user hides someone, then that polaroid disappears and others rearrange; unhide brings them back; hide state persists for the browser tab session via sessionStorage (survives refresh, clears when the tab/session ends).
 - Given a polaroid, when the user uploads and crops a photo, then the face shows it; replace works; download PNG contains the photo.
 - Given two overlapping polaroids where one covers the other's name area, when the wall renders, then the named card is layered above so its name remains visible.
 
 ## Spec Change Log
+
+- 2026-09-28 acceptance-auditor: AC hide wording said “refresh clears” which contradicts Design Notes (`sessionStorage`). Amended AC to match sessionStorage lifetime. Avoids known-bad: agents flipping hide to ephemeral `$state` only. KEEP: sessionStorage key `hwyd-stars-hidden:{exportName}`.
 
 ## Design Notes
 
