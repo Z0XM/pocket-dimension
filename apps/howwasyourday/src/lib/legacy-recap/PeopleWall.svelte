@@ -52,8 +52,11 @@
   let fileInputEl = $state<HTMLInputElement | null>(null);
   let peopleMenuOpen = $state(false);
   let heightApplyTimer: ReturnType<typeof setTimeout> | null = null;
+  let hideApplyTimer: ReturnType<typeof setTimeout> | null = null;
+  let rearranging = $state(false);
 
   let hiddenLabels = $state<Set<string>>(new Set());
+  let layoutHiddenLabels = $state<Set<string>>(new Set());
   let photos = $state<Record<string, string>>({});
 
   let cropOpen = $state(false);
@@ -89,13 +92,21 @@
       const raw = sessionStorage.getItem(key);
       if (!raw) {
         hiddenLabels = new Set();
+        layoutHiddenLabels = new Set();
         return;
       }
       const arr = JSON.parse(raw) as unknown;
-      if (Array.isArray(arr)) hiddenLabels = new Set(arr.filter((x): x is string => typeof x === "string"));
-      else hiddenLabels = new Set();
+      if (Array.isArray(arr)) {
+        const next = new Set(arr.filter((x): x is string => typeof x === "string"));
+        hiddenLabels = next;
+        layoutHiddenLabels = new Set(next);
+      } else {
+        hiddenLabels = new Set();
+        layoutHiddenLabels = new Set();
+      }
     } catch {
       hiddenLabels = new Set();
+      layoutHiddenLabels = new Set();
     }
   });
 
@@ -111,7 +122,7 @@
 
   const peopleList = $derived([...items].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)));
 
-  const visibleItems = $derived(peopleList.filter((i) => !hiddenLabels.has(i.label)).slice(0, MAX));
+  const visibleItems = $derived(peopleList.filter((i) => !layoutHiddenLabels.has(i.label)).slice(0, MAX));
 
   const placed = $derived.by((): Polaroid[] => {
     if (!visibleItems.length) return [];
@@ -329,6 +340,13 @@
     if (next.has(label)) next.delete(label);
     else next.add(label);
     persistHidden(next);
+    rearranging = true;
+    if (hideApplyTimer) clearTimeout(hideApplyTimer);
+    hideApplyTimer = setTimeout(() => {
+      layoutHiddenLabels = new Set(next);
+      rearranging = false;
+      hideApplyTimer = null;
+    }, 120);
   }
 
   function setPhoto(label: string, url: string) {
@@ -372,6 +390,7 @@
 
   onDestroy(() => {
     if (heightApplyTimer) clearTimeout(heightApplyTimer);
+    if (hideApplyTimer) clearTimeout(hideApplyTimer);
     for (const url of Object.values(photos)) URL.revokeObjectURL(url);
     if (cropSrc) URL.revokeObjectURL(cropSrc);
   });
@@ -644,6 +663,9 @@
         <DropdownMenuTrigger class="btn people-menu-trigger" aria-label="Show people filters">
           <span class="people-menu-icon" aria-hidden="true">👥</span>
           <span class="people-menu-text">People</span>
+          {#if rearranging}
+            <span class="people-menu-status">Rearranging…</span>
+          {/if}
           {#if hiddenCount}
             <span class="people-menu-badge">{hiddenCount}</span>
           {/if}
@@ -672,6 +694,9 @@
   </div>
 
   <div class="wall" bind:this={wallEl} style={`width: ${wallWidthPct}%; height: ${wallHeightRem}rem;`} aria-label="Your stars as memory cards">
+    {#if rearranging}
+      <div class="wall-loader" aria-live="polite">Rearranging…</div>
+    {/if}
     {#each placed as p, i}
       <article
         class="polaroid"
@@ -812,6 +837,12 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .people-menu-status {
+    font-size: 0.72rem;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
   .people-menu-content {
     width: min(18rem, calc(100vw - 2rem));
     padding: 0.4rem;
@@ -886,6 +917,21 @@
       ),
       #eef2ef;
     overflow: hidden;
+  }
+
+  .wall-loader {
+    position: absolute;
+    top: 0.7rem;
+    right: 0.7rem;
+    z-index: 10;
+    padding: 0.3rem 0.55rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, white 88%, var(--accent) 12%);
+    border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent);
+    font-size: 0.74rem;
+    font-family: var(--sans);
+    box-shadow: 0 4px 10px color-mix(in srgb, var(--ink) 10%, transparent);
   }
 
   .polaroid {
