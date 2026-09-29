@@ -28,6 +28,11 @@
 
 <main>
   <header>
+    <a class="home-link" href="/">
+      <span class="home-link-kicker">Back to How Was Your Day</span>
+      <strong>Go to the homepage to fill out your form</strong>
+      <span class="home-link-copy">Use the normal homepage to log a new daily entry.</span>
+    </a>
     <p class="eyebrow">Year recap · 2025</p>
     <h1>In-scope dashboards</h1>
     <p class="lede">
@@ -77,6 +82,48 @@
   header {
     margin-bottom: 2.5rem;
     max-width: 38rem;
+  }
+
+  .home-link {
+    display: grid;
+    gap: 0.2rem;
+    margin-bottom: 1.15rem;
+    padding: 0.95rem 1rem;
+    text-decoration: none;
+    color: var(--ink);
+    border: 1px solid color-mix(in srgb, #214247 18%, transparent);
+    border-radius: 0.7rem;
+    background: color-mix(in srgb, #214247 10%, white);
+    box-shadow: 0 10px 28px color-mix(in srgb, #214247 7%, transparent);
+    transition:
+      transform 0.2s ease,
+      border-color 0.2s ease,
+      background 0.2s ease;
+  }
+
+  .home-link:hover {
+    transform: translateY(-1px);
+    border-color: #214247;
+    background: color-mix(in srgb, #214247 14%, white);
+  }
+
+  .home-link-kicker {
+    font-size: 0.76rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  .home-link strong {
+    font-family: var(--display);
+    font-size: clamp(1.1rem, 2.6vw, 1.45rem);
+    font-weight: 500;
+    line-height: 1.1;
+  }
+
+  .home-link-copy {
+    color: var(--ink-soft);
+    line-height: 1.45;
   }
 
   .eyebrow {
