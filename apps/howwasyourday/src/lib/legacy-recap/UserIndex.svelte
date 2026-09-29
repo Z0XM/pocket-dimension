@@ -28,6 +28,7 @@
 
 <main>
   <header>
+    <a class="home-link" href="/">← Home</a>
     <p class="eyebrow">Year recap · 2025</p>
     <h1>In-scope dashboards</h1>
     <p class="lede">
@@ -77,6 +78,19 @@
   header {
     margin-bottom: 2.5rem;
     max-width: 38rem;
+  }
+
+  .home-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    font-size: 0.85rem;
+    color: var(--ink-mute);
+    text-decoration: none;
+    letter-spacing: 0.04em;
+  }
+
+  .home-link:hover {
+    color: #214247;
   }
 
   .eyebrow {
