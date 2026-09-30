@@ -1,8 +1,8 @@
 # Monorepo Docker builds (context = repo root).
 # Stub apps without Dockerfiles to package.json only for bun.lock workspace resolution.
 # Apps with Dockerfiles ship full source (not listed below).
-# zeo-music-worker is stub-only here — it depends on @livekit/rtc-node (native).
 # markitdown / imposter-art are skipped from this deploy rollout.
+# zeo-music-worker has its own Dockerfile (COPY apps/zeo-music-worker/src) — do NOT stub it.
 
 node_modules
 **/.git
@@ -20,5 +20,3 @@ apps/imposter-art
 
 apps/markitdown/**
 !apps/markitdown/package.json
-apps/zeo-music-worker/**
-!apps/zeo-music-worker/package.json
