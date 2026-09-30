@@ -1,3 +1,6 @@
+import { appendPending, clearPending, createPendingPcm, releaseWarmFrames, takeFrame } from "./pcm-buffer";
+import { createLruStringCache } from "./url-cache";
+
 type SessionRtcJob = {
   sessionId: string;
   roomId: string;
@@ -11,11 +14,17 @@ type PlayJob = SessionRtcJob & {
   generation: number;
 };
 
+type RtcAudioSource = {
+  captureFrame: (frame: unknown) => Promise<void>;
+  clearQueue?: () => void;
+  close?: () => Promise<void> | void;
+};
+
 type RtcSession = {
   rtc: Record<string, any>;
   room: { disconnect?: () => Promise<void> | void; localParticipant?: any };
-  source: { captureFrame: (frame: unknown) => Promise<void> };
-  track: unknown;
+  source: RtcAudioSource;
+  track: { close?: (closeSource?: boolean) => Promise<void> | void } | unknown;
   roomId: string;
   livekitRoomName: string;
   botIdentity: string;
@@ -59,6 +68,8 @@ const FRAME_MS = (FRAME_SAMPLES_PER_CHANNEL / SAMPLE_RATE) * 1000;
 const POSITION_HEARTBEAT_MS = 2_500;
 /** Prefill ~2.5s of PCM for the next track so skip/play can start immediately. */
 const WARM_TARGET_FRAMES = Math.ceil(2_500 / FRAME_MS);
+/** Bound yt-dlp URL cache — URLs expire and must not grow without limit across a long room. */
+const AUDIO_URL_CACHE_MAX = 64;
 
 /** Dokploy/Railpack sometimes ship a PATH without /usr/bin — prefer absolute paths. */
 async function resolveBinary(candidates: string[]) {
@@ -131,7 +142,7 @@ function ytDlpBaseArgs() {
 const activeJobs = new Map<string, PlaybackState>();
 /** LiveKit bot connections kept for the lifetime of a listening session. */
 const sessionRtc = new Map<string, RtcSession>();
-const audioUrlCache = new Map<string, string>();
+const audioUrlCache = createLruStringCache(AUDIO_URL_CACHE_MAX);
 /** In-flight next-track warm buffers, keyed by listening session. */
 const warmBySession = new Map<string, WarmState>();
 const resolvingUrls = new Map<string, Promise<string>>();
@@ -330,7 +341,7 @@ async function ensureSessionRtc(job: SessionRtcJob): Promise<RtcSession> {
   }
 
   if (existing) {
-    await existing.room.disconnect?.();
+    await releaseRtcSession(existing);
     sessionRtc.delete(job.sessionId);
   }
 
@@ -339,21 +350,54 @@ async function ensureSessionRtc(job: SessionRtcJob): Promise<RtcSession> {
   return session;
 }
 
-async function disconnectSessionRtc(sessionId: string) {
-  const existing = sessionRtc.get(sessionId);
-  if (!existing) return;
-  sessionRtc.delete(sessionId);
+function clearRtcAudioQueue(session?: RtcSession | null) {
+  if (!session) return;
   try {
-    await existing.room.disconnect?.();
+    session.source.clearQueue?.();
+  } catch {
+    // native queue may already be cleared/closed
+  }
+}
+
+async function releaseRtcSession(session: RtcSession) {
+  clearRtcAudioQueue(session);
+
+  try {
+    const track = session.track as { sid?: string; close?: (closeSource?: boolean) => Promise<void> | void } | undefined;
+    if (track) {
+      try {
+        await session.room.localParticipant?.unpublishTrack?.(track);
+      } catch {
+        // may already be unpublished during disconnect
+      }
+      if (typeof track.close === "function") {
+        // closeSource=true also closes the AudioSource FFI handle.
+        await track.close(true);
+      } else {
+        await session.source.close?.();
+      }
+    } else {
+      await session.source.close?.();
+    }
+  } catch {
+    // already closed
+  }
+
+  try {
+    await session.room.disconnect?.();
   } catch {
     // already disconnected
   }
 }
 
-async function stopFfmpeg(state: PlaybackState) {
-  state.pumpToken += 1;
-  const ffmpeg = state.ffmpeg;
-  state.ffmpeg = undefined;
+async function disconnectSessionRtc(sessionId: string) {
+  const existing = sessionRtc.get(sessionId);
+  if (!existing) return;
+  sessionRtc.delete(sessionId);
+  await releaseRtcSession(existing);
+}
+
+async function killFfmpegProcess(ffmpeg?: PipedSubprocess | null) {
   if (!ffmpeg) return;
   try {
     ffmpeg.kill();
@@ -363,10 +407,18 @@ async function stopFfmpeg(state: PlaybackState) {
   await ffmpeg.exited.catch(() => undefined);
 }
 
+async function stopFfmpeg(state: PlaybackState) {
+  state.pumpToken += 1;
+  const ffmpeg = state.ffmpeg;
+  state.ffmpeg = undefined;
+  await killFfmpegProcess(ffmpeg);
+}
+
 async function cancelWarm(sessionId: string) {
   const warm = warmBySession.get(sessionId);
   if (!warm) return;
   warm.cancelled = true;
+  releaseWarmFrames(warm.frames);
   warmBySession.delete(sessionId);
 }
 
@@ -425,6 +477,7 @@ async function startWarm(sessionId: string, videoId: string) {
   warmBySession.set(sessionId, warm);
 
   let ffmpeg: PipedSubprocess | undefined;
+  const pending = createPendingPcm();
   try {
     const audioUrl = await resolveAudioUrl(videoId);
     if (warm.cancelled || warmBySession.get(sessionId) !== warm) return;
@@ -432,15 +485,15 @@ async function startWarm(sessionId: string, videoId: string) {
 
     ffmpeg = spawnAudioFfmpeg(audioUrl, 0);
     const reader = ffmpeg.stdout.getReader();
-    let pending = new Uint8Array(0);
 
     while (!warm.cancelled && warm.frames.length < WARM_TARGET_FRAMES) {
       const { value, done } = await reader.read();
       if (done) break;
-      pending = concatBytes(pending, value);
-      while (pending.byteLength >= FRAME_BYTES && warm.frames.length < WARM_TARGET_FRAMES) {
-        warm.frames.push(pending.slice(0, FRAME_BYTES));
-        pending = pending.slice(FRAME_BYTES);
+      appendPending(pending, value);
+      while (warm.frames.length < WARM_TARGET_FRAMES) {
+        const frame = takeFrame(pending, FRAME_BYTES);
+        if (!frame) break;
+        warm.frames.push(frame);
       }
     }
 
@@ -457,21 +510,18 @@ async function startWarm(sessionId: string, videoId: string) {
       warmBySession.delete(sessionId);
     }
   } finally {
-    if (ffmpeg) {
-      try {
-        ffmpeg.kill();
-      } catch {
-        // already exited
-      }
-      await ffmpeg.exited.catch(() => undefined);
+    clearPending(pending);
+    if (warm.cancelled) {
+      releaseWarmFrames(warm.frames);
     }
+    await killFfmpegProcess(ffmpeg);
   }
 }
 
 async function capturePcmFrame(
   state: PlaybackState,
   rtc: Record<string, any>,
-  source: { captureFrame: (frame: unknown) => Promise<void> },
+  source: RtcAudioSource,
   frameBytes: Uint8Array,
   pumpToken: number
 ) {
@@ -493,75 +543,88 @@ async function pumpFfmpegToLiveKit(state: PlaybackState, audioUrl: string, warm?
   const { rtc, source } = rtcSession;
   const pumpToken = state.pumpToken;
   let lastHeartbeatAt = 0;
+  let ffmpeg: PipedSubprocess | undefined;
+  const pending = createPendingPcm();
 
-  // Play prebuffered PCM immediately so the room hears audio while ffmpeg opens.
-  if (warm && warm.frames.length > 0 && (state.positionMs ?? 0) === 0) {
-    for (const frameBytes of warm.frames) {
-      if (state.stopped || state.pumpToken !== pumpToken) return;
-      const ok = await capturePcmFrame(state, rtc, source, frameBytes, pumpToken);
-      if (!ok) return;
+  try {
+    if (state.stopped || state.pumpToken !== pumpToken) return;
 
-      if (!state.started) {
-        state.started = true;
-        await postWorkerEvent(state.sessionId, "playback_started", {
-          generation: state.generation,
-          positionMs: state.positionMs,
-        });
-        lastHeartbeatAt = Date.now();
+    // Play prebuffered PCM immediately so the room hears audio while ffmpeg opens.
+    if (warm && warm.frames.length > 0 && (state.positionMs ?? 0) === 0) {
+      for (const frameBytes of warm.frames) {
+        if (state.stopped || state.pumpToken !== pumpToken) return;
+        const ok = await capturePcmFrame(state, rtc, source, frameBytes, pumpToken);
+        if (!ok) return;
+
+        if (!state.started) {
+          state.started = true;
+          await postWorkerEvent(state.sessionId, "playback_started", {
+            generation: state.generation,
+            positionMs: state.positionMs,
+          });
+          lastHeartbeatAt = Date.now();
+        }
       }
     }
-  }
 
-  // Continue from the prebuffered position so we don't replay the warm lead-in.
-  const ffmpeg = spawnAudioFfmpeg(audioUrl, state.positionMs ?? 0);
-  const reader = ffmpeg.stdout.getReader();
-  state.ffmpeg = ffmpeg;
-  let pending = new Uint8Array(0);
+    // Drop warm PCM references as soon as they've been captured (or skipped).
+    if (warm) releaseWarmFrames(warm.frames);
 
-  while (!state.stopped && state.pumpToken === pumpToken) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    pending = concatBytes(pending, value);
+    if (state.stopped || state.pumpToken !== pumpToken) return;
 
-    while (pending.byteLength >= FRAME_BYTES && !state.stopped && state.pumpToken === pumpToken) {
-      const frameBytes = pending.slice(0, FRAME_BYTES);
-      pending = pending.slice(FRAME_BYTES);
-      const ok = await capturePcmFrame(state, rtc, source, frameBytes, pumpToken);
-      if (!ok) break;
+    // Continue from the prebuffered position so we don't replay the warm lead-in.
+    ffmpeg = spawnAudioFfmpeg(audioUrl, state.positionMs ?? 0);
+    const reader = ffmpeg.stdout.getReader();
+    state.ffmpeg = ffmpeg;
 
-      if (!state.started) {
-        state.started = true;
-        await postWorkerEvent(state.sessionId, "playback_started", {
-          generation: state.generation,
-          positionMs: state.positionMs,
-        });
-        lastHeartbeatAt = Date.now();
-      } else if (Date.now() - lastHeartbeatAt >= POSITION_HEARTBEAT_MS) {
-        lastHeartbeatAt = Date.now();
-        void postWorkerEvent(state.sessionId, "position", {
-          generation: state.generation,
-          positionMs: state.positionMs,
-        });
+    while (!state.stopped && state.pumpToken === pumpToken) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      appendPending(pending, value);
+
+      while (!state.stopped && state.pumpToken === pumpToken) {
+        const frameBytes = takeFrame(pending, FRAME_BYTES);
+        if (!frameBytes) break;
+        const ok = await capturePcmFrame(state, rtc, source, frameBytes, pumpToken);
+        if (!ok) break;
+
+        if (!state.started) {
+          state.started = true;
+          await postWorkerEvent(state.sessionId, "playback_started", {
+            generation: state.generation,
+            positionMs: state.positionMs,
+          });
+          lastHeartbeatAt = Date.now();
+        } else if (Date.now() - lastHeartbeatAt >= POSITION_HEARTBEAT_MS) {
+          lastHeartbeatAt = Date.now();
+          void postWorkerEvent(state.sessionId, "position", {
+            generation: state.generation,
+            positionMs: state.positionMs,
+          });
+        }
       }
     }
-  }
 
-  const exitCode = await ffmpeg.exited;
-  if (state.ffmpeg === ffmpeg) {
-    state.ffmpeg = undefined;
-  }
+    if (state.ffmpeg === ffmpeg) {
+      // Detach before kill so a concurrent stopFfmpeg doesn't double-manage.
+      state.ffmpeg = undefined;
+    }
 
-  if (!state.stopped && state.pumpToken === pumpToken && exitCode !== 0) {
-    const stderr = await new Response(ffmpeg.stderr).text();
-    throw new Error(stderr.trim() || "ffmpeg failed");
+    if (!state.stopped && state.pumpToken === pumpToken) {
+      const exitCode = await ffmpeg.exited;
+      if (exitCode !== 0) {
+        const stderr = await new Response(ffmpeg.stderr).text();
+        throw new Error(stderr.trim() || "ffmpeg failed");
+      }
+    }
+  } finally {
+    clearPending(pending);
+    if (warm) releaseWarmFrames(warm.frames);
+    if (state.ffmpeg === ffmpeg) {
+      state.ffmpeg = undefined;
+    }
+    await killFfmpegProcess(ffmpeg);
   }
-}
-
-function concatBytes(left: Uint8Array, right: Uint8Array) {
-  const merged = new Uint8Array(left.byteLength + right.byteLength);
-  merged.set(left, 0);
-  merged.set(right, left.byteLength);
-  return merged;
 }
 
 /** Stop current playback/ffmpeg but keep the session's LiveKit bot connected. */
@@ -571,6 +634,8 @@ async function stopPlayback(sessionId: string) {
 
   existing.stopped = true;
   await stopFfmpeg(existing);
+  // Flush any queued PCM from the previous track so it cannot linger across skips.
+  clearRtcAudioQueue(existing.rtcSession ?? sessionRtc.get(sessionId));
   if (existing.rtcSession) {
     sessionRtc.set(sessionId, existing.rtcSession);
   }
@@ -612,8 +677,16 @@ async function startPlay(job: PlayJob) {
     });
 
     const audioUrl = state.audioUrl ?? (await resolveAudioUrl(job.videoId));
+    if (state.stopped || activeJobs.get(job.sessionId) !== state) {
+      if (warm) releaseWarmFrames(warm.frames);
+      return;
+    }
     state.audioUrl = audioUrl;
     await ensureSessionRtc(job);
+    if (state.stopped || activeJobs.get(job.sessionId) !== state) {
+      if (warm) releaseWarmFrames(warm.frames);
+      return;
+    }
     await pumpFfmpegToLiveKit(state, audioUrl, warm);
 
     const current = activeJobs.get(job.sessionId);
@@ -630,6 +703,7 @@ async function startPlay(job: PlayJob) {
       }
     }
   } catch (cause) {
+    if (warm) releaseWarmFrames(warm.frames);
     const current = activeJobs.get(job.sessionId);
     if (current === state) {
       activeJobs.delete(job.sessionId);

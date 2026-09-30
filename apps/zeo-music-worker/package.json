@@ -7,6 +7,7 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "build": "bun build ./src/index.ts --outdir ./dist --format esm --target bun",
+    "test": "bun test src",
     "typecheck": "tsc --noEmit",
     "lint": "prettier --check ."
   },
