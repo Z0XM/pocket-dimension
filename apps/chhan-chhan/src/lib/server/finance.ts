@@ -380,6 +380,14 @@ const sortMap = {
   createdAt: schema.financeTransactions.createdAt,
 } as const;
 
+export const ACTIVE_ACCOUNT_COOKIE = "chhan_active_account";
+
+const ACCOUNT_COLOR_PRESETS = ["#E85D4C", "#2F6FED", "#0F9F6E", "#C97816", "#7C3AED", "#0D9488", "#DB2777", "#475569"] as const;
+
+export function defaultAccountColor(index = 0): string {
+  return ACCOUNT_COLOR_PRESETS[index % ACCOUNT_COLOR_PRESETS.length]!;
+}
+
 export async function listAccountsForUser(userId: string) {
   return db
     .select({
@@ -387,15 +395,23 @@ export async function listAccountsForUser(userId: string) {
       name: schema.financeAccounts.name,
       currencyCode: schema.financeAccounts.currencyCode,
       timezone: schema.financeAccounts.timezone,
+      colorHex: schema.financeAccounts.colorHex,
+      bankImporterId: schema.financeAccounts.bankImporterId,
+      balanceMinor: schema.financeAccounts.balanceMinor,
+      balanceAsOf: schema.financeAccounts.balanceAsOf,
+      isArchived: schema.financeAccounts.isArchived,
       role: schema.financeAccountMembers.role,
     })
     .from(schema.financeAccountMembers)
     .innerJoin(schema.financeAccounts, eq(schema.financeAccounts.id, schema.financeAccountMembers.accountId))
-    .where(eq(schema.financeAccountMembers.userId, userId))
+    .where(and(eq(schema.financeAccountMembers.userId, userId), eq(schema.financeAccounts.isArchived, false)))
     .orderBy(asc(schema.financeAccounts.name));
 }
 
 export async function createAccount(userId: string, payload: z.infer<typeof import("$lib/validation/finance").createAccountSchema>) {
+  const existing = await listAccountsForUser(userId);
+  const colorHex = payload.colorHex ?? defaultAccountColor(existing.length);
+
   return db.transaction(async (tx) => {
     const [account] = await tx
       .insert(schema.financeAccounts)
@@ -403,6 +419,8 @@ export async function createAccount(userId: string, payload: z.infer<typeof impo
         name: payload.name,
         currencyCode: payload.currencyCode.toUpperCase(),
         timezone: payload.timezone,
+        colorHex,
+        bankImporterId: payload.bankImporterId ?? null,
         ownerUserId: userId,
         createdById: userId,
         updatedById: userId,
@@ -421,23 +439,70 @@ export async function createAccount(userId: string, payload: z.infer<typeof impo
   });
 }
 
-export async function getOrCreateDefaultAccount(userId: string) {
-  const accounts = await listAccountsForUser(userId);
-  if (accounts.length > 0) return accounts[0];
+export async function updateAccount(
+  userId: string,
+  accountId: string,
+  payload: z.infer<typeof import("$lib/validation/finance").updateAccountSchema>
+) {
+  const patch: {
+    name?: string;
+    currencyCode?: string;
+    timezone?: string;
+    colorHex?: string | null;
+    bankImporterId?: string | null;
+    updatedById: string;
+  } = { updatedById: userId };
 
-  const account = await createAccount(userId, {
+  if (payload.name != null) patch.name = payload.name;
+  if (payload.currencyCode != null) patch.currencyCode = payload.currencyCode;
+  if (payload.timezone != null) patch.timezone = payload.timezone;
+  if (payload.colorHex !== undefined) {
+    patch.colorHex = payload.colorHex === "" || payload.colorHex == null ? null : payload.colorHex;
+  }
+  if (payload.bankImporterId !== undefined) {
+    patch.bankImporterId = payload.bankImporterId === "" || payload.bankImporterId == null ? null : payload.bankImporterId;
+  }
+
+  const [account] = await db.update(schema.financeAccounts).set(patch).where(eq(schema.financeAccounts.id, accountId)).returning({
+    id: schema.financeAccounts.id,
+    name: schema.financeAccounts.name,
+    currencyCode: schema.financeAccounts.currencyCode,
+    timezone: schema.financeAccounts.timezone,
+    colorHex: schema.financeAccounts.colorHex,
+    bankImporterId: schema.financeAccounts.bankImporterId,
+    balanceMinor: schema.financeAccounts.balanceMinor,
+    balanceAsOf: schema.financeAccounts.balanceAsOf,
+  });
+
+  return account ?? null;
+}
+
+export async function resolveActiveAccount(userId: string, preferredAccountId?: string | null) {
+  const accounts = await listAccountsForUser(userId);
+
+  if (preferredAccountId) {
+    const preferred = accounts.find((account) => account.id === preferredAccountId);
+    if (preferred) return { account: preferred, accounts };
+  }
+
+  if (accounts.length > 0) {
+    return { account: accounts[0]!, accounts };
+  }
+
+  const created = await createAccount(userId, {
     name: "Personal",
     currencyCode: "INR",
     timezone: "Asia/Kolkata",
   });
 
-  return {
-    id: account.id,
-    name: account.name,
-    currencyCode: account.currencyCode,
-    timezone: account.timezone,
-    role: "owner" as const,
-  };
+  const refreshed = await listAccountsForUser(userId);
+  const account = refreshed.find((row) => row.id === created.id) ?? refreshed[0]!;
+  return { account, accounts: refreshed };
+}
+
+export async function getOrCreateDefaultAccount(userId: string) {
+  const { account } = await resolveActiveAccount(userId);
+  return account;
 }
 
 export async function getAccountCurrency(accountId: string) {

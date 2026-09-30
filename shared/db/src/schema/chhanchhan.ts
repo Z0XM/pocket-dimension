@@ -25,6 +25,8 @@ export const financeAccounts = chhanSchema.table(
     isArchived: boolean("is_archived").notNull().default(false),
     balanceMinor: bigint("balance_minor", { mode: "number" }),
     balanceAsOf: date("balance_as_of"),
+    colorHex: text("color_hex"),
+    bankImporterId: text("bank_importer_id"),
   },
   (table) => [index("finance_accounts_owner_user_id_idx").on(table.ownerUserId)]
 );

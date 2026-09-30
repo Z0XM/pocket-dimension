@@ -1,9 +1,19 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
   import { enhance } from "$app/forms";
-  import { importProgressLabel, importProgressPercent, importStatementWithProgress, type ImportStreamEvent } from "$lib/import-stream";
+  import {
+    importProgressLabel,
+    importProgressPercent,
+    importStatementWithProgress,
+    previewStatementWithProgress,
+    type ImportPreviewStreamEvent,
+    type ImportStreamEvent,
+  } from "$lib/import-stream";
   import AppSettings from "$lib/components/app-settings.svelte";
+  import ImportReviewPanel from "$lib/components/import-review-panel.svelte";
+  import AccountSwitcher from "$lib/components/account-switcher.svelte";
   import { formatMoney } from "$lib/finance/money";
+  import type { ImportPreview, ImportResult } from "$lib/importers/types";
   import { SquarePen, Tag, Trash2, Layers } from "@lucide/svelte";
   import type { PageData, ActionData } from "./$types";
 
@@ -15,6 +25,15 @@
   let importMessage = $state<string | null>(null);
   let importSuccess = $state(true);
   let importReportCsv = $state<string | null>(null);
+  let pendingFile = $state<File | null>(null);
+  let pendingImporter = $state("kotak");
+  let importPreview = $state<ImportPreview | null>(null);
+  let importResult = $state<(ImportResult & { metadata?: Record<string, string> }) | null>(null);
+  let reviewMode = $state<"preview" | "result" | null>(null);
+  let confirmingImport = $state(false);
+  let confirmProgress = $state(0);
+  let confirmStatus = $state("");
+  let importFormEl = $state<HTMLFormElement | null>(null);
   let addingCategory = $state(false);
   let editingId = $state<string | null>(null);
   let savingCategoryId = $state<string | null>(null);
@@ -27,10 +46,20 @@
   let editingGroupId = $state<string | null>(null);
   let savingGroupId = $state<string | null>(null);
   let deletingGroupId = $state<string | null>(null);
-  let savingCurrency = $state(false);
+  let savingAccount = $state(false);
+  let creatingAccount = $state(false);
+  let showCreateAccount = $state(false);
   let savingOpeningBalance = $state(false);
   let clearingOpeningBalance = $state(false);
   let clearingTransactions = $state(false);
+
+  const ACCOUNT_COLOR_PRESETS = ["#E85D4C", "#2F6FED", "#0F9F6E", "#C97816", "#7C3AED", "#0D9488", "#DB2777", "#475569"] as const;
+  let draftColorHex = $state("#2F6FED");
+  $effect(() => {
+    draftColorHex = data.account.colorHex ?? ACCOUNT_COLOR_PRESETS[0]!;
+  });
+  const defaultImporterId = $derived(data.account.bankImporterId ?? data.importers[0]?.id ?? "kotak");
+  let createColorHex = $state<string>(ACCOUNT_COLOR_PRESETS[0]!);
 
   function formatDisplayDate(iso: string): string {
     const [year, month, day] = iso.split("-").map(Number);
@@ -54,9 +83,31 @@
     URL.revokeObjectURL(url);
   }
 
-  function handleImportEvent(event: ImportStreamEvent) {
+  function handlePreviewEvent(event: ImportPreviewStreamEvent) {
     importProgress = importProgressPercent(event);
-    importStatus = importProgressLabel(event);
+    importStatus = importProgressLabel(event, "preview");
+  }
+
+  function handleImportEvent(event: ImportStreamEvent) {
+    confirmProgress = importProgressPercent(event);
+    confirmStatus = importProgressLabel(event, "import");
+  }
+
+  function clearReview() {
+    reviewMode = null;
+    importPreview = null;
+    importResult = null;
+    pendingFile = null;
+    confirmingImport = false;
+    confirmProgress = 0;
+    confirmStatus = "";
+  }
+
+  function buildImportFormData(file: File, importer: string): FormData {
+    const formData = new FormData();
+    formData.set("file", file);
+    formData.set("importer", importer);
+    return formData;
   }
 
   async function submitImport(event: SubmitEvent) {
@@ -64,6 +115,7 @@
     const formEl = event.currentTarget as HTMLFormElement;
     const formData = new FormData(formEl);
     const file = formData.get("file");
+    const importer = String(formData.get("importer") ?? "kotak");
 
     if (!(file instanceof File) || file.size === 0) {
       importMessage = "Choose a statement file to import";
@@ -77,21 +129,54 @@
     importMessage = null;
     importReportCsv = null;
     importSuccess = true;
+    importPreview = null;
+    importResult = null;
+    reviewMode = null;
 
     try {
-      const result = await importStatementWithProgress(data.account.id, formData, handleImportEvent);
+      const previewPayload = buildImportFormData(file, importer);
+      const preview = await previewStatementWithProgress(data.account.id, previewPayload, handlePreviewEvent);
       importProgress = 100;
-      importStatus = "Import complete";
-      importMessage = `Imported ${result.accepted} transactions (${result.skipped} skipped, ${result.rejected} rejected)`;
-      importSuccess = true;
+      importStatus = "Preview ready";
+      pendingFile = file;
+      pendingImporter = importer;
+      importPreview = preview;
+      reviewMode = "preview";
+    } catch (cause) {
+      importMessage = cause instanceof Error ? cause.message : "Failed to preview statement";
+      importSuccess = false;
+    } finally {
+      importing = false;
+    }
+  }
+
+  async function confirmPendingImport() {
+    if (!pendingFile || !importPreview) return;
+
+    confirmingImport = true;
+    confirmProgress = 4;
+    confirmStatus = "Starting import…";
+    importMessage = null;
+
+    try {
+      const formData = buildImportFormData(pendingFile, pendingImporter);
+      const result = await importStatementWithProgress(data.account.id, formData, handleImportEvent);
+      confirmProgress = 100;
+      confirmStatus = "Import complete";
+      importResult = result;
       importReportCsv = result.reportCsv ?? null;
-      formEl.reset();
+      importSuccess = true;
+      importMessage = `Imported ${result.accepted} transactions (${result.skipped} skipped, ${result.rejected} rejected)`;
+      reviewMode = "result";
+      importPreview = null;
+      pendingFile = null;
+      importFormEl?.reset();
       await invalidateAll();
     } catch (cause) {
       importMessage = cause instanceof Error ? cause.message : "Failed to import statement";
       importSuccess = false;
     } finally {
-      importing = false;
+      confirmingImport = false;
     }
   }
 </script>
@@ -104,7 +189,8 @@
     <p class="sub">Import · export · categories · tags · groups</p>
   </div>
   <div class="actions">
-    <a class="back" href="/app">← Transactions</a>
+    <AccountSwitcher accounts={data.accounts} activeAccountId={data.account.id} />
+    <a class="back" href="/app/dashboards">← Dashboard</a>
     <AppSettings />
   </div>
 </header>
@@ -117,32 +203,53 @@
   <p class="flash" class:error={!form?.success}>{form.message}</p>
 {/if}
 
-{#if importReportCsv}
+{#if importReportCsv && reviewMode !== "result"}
   <p class="flash report">
     Some rows were skipped or rejected.
     <button type="button" class="report-link" onclick={() => downloadImportReport(importReportCsv!)}> Download import report CSV </button>
   </p>
 {/if}
 
+{#if reviewMode === "preview" && importPreview}
+  <ImportReviewPanel
+    mode="preview"
+    currencyCode={data.account.currencyCode}
+    preview={importPreview}
+    confirming={confirmingImport}
+    {confirmProgress}
+    {confirmStatus}
+    onConfirm={confirmPendingImport}
+    onCancel={clearReview}
+  />
+{:else if reviewMode === "result" && importResult}
+  <ImportReviewPanel
+    mode="result"
+    currencyCode={data.account.currencyCode}
+    result={importResult}
+    onClose={clearReview}
+    onDownloadReport={importReportCsv ? () => downloadImportReport(importReportCsv!) : undefined}
+  />
+{/if}
+
 <div class="cols">
   <section class="panel">
     <h2>Import</h2>
     <p class="panel-copy dim">
-      Upload a bank statement as CSV or PDF (Kotak, ICICI, HDFC, or Generic CSV). Imports use
-      <strong>{data.account.currencyCode}</strong>.
+      Upload a bank statement as CSV or PDF (Kotak, ICICI, HDFC, or Generic CSV). You'll review every row and the projected balance before anything is
+      written. Imports use <strong>{data.account.currencyCode}</strong>.
     </p>
-    <form class="import-form" enctype="multipart/form-data" onsubmit={submitImport}>
+    <form class="import-form" enctype="multipart/form-data" bind:this={importFormEl} onsubmit={submitImport}>
       <label class="field">
         <span>Bank</span>
-        <select name="importer" disabled={importing}>
+        <select name="importer" disabled={importing || confirmingImport}>
           {#each data.importers as importer}
-            <option value={importer.id}>{importer.label}</option>
+            <option value={importer.id} selected={importer.id === defaultImporterId}>{importer.label}</option>
           {/each}
         </select>
       </label>
       <label class="field">
         <span>Statement file</span>
-        <input name="file" type="file" accept=".csv,.pdf,text/csv,application/pdf" required disabled={importing} />
+        <input name="file" type="file" accept=".csv,.pdf,text/csv,application/pdf" required disabled={importing || confirmingImport} />
       </label>
 
       {#if importing}
@@ -152,33 +259,52 @@
         <p class="import-status dim">{importStatus}</p>
       {/if}
 
-      <button class="add" type="submit" disabled={importing}>
-        {importing ? "IMPORTING…" : "IMPORT STATEMENT"}
+      <button class="add" type="submit" disabled={importing || confirmingImport}>
+        {importing ? "ANALYZING…" : "IMPORT STATEMENT"}
       </button>
     </form>
   </section>
 
   <section class="panel">
-    <h2>Account</h2>
+    <h2>Accounts</h2>
     <p class="panel-copy dim">
-      First recorded transaction:
+      Active:
+      <span class="account-pill">
+        <span class="swatch" style="background: {draftColorHex}" aria-hidden="true"></span>
+        <strong>{data.account.name}</strong>
+      </span>
+      · first transaction
       <strong>{data.firstTransactionOn ? formatDisplayDate(data.firstTransactionOn) : "None yet"}</strong>
     </p>
-    <p class="panel-copy dim">Default currency for imports and amount display.</p>
+
     <form
       method="POST"
-      action="?/updateCurrency"
+      action="?/updateAccount"
       use:enhance={() => {
-        savingCurrency = true;
+        savingAccount = true;
         return async ({ update }) => {
-          savingCurrency = false;
+          savingAccount = false;
           await update();
+          await invalidateAll();
         };
       }}
     >
       <label class="field">
+        <span>Account name</span>
+        <input name="name" type="text" value={data.account.name} required maxlength="120" disabled={savingAccount} />
+      </label>
+      <label class="field">
+        <span>Linked bank (default importer)</span>
+        <select name="bankImporterId" disabled={savingAccount}>
+          <option value="" selected={!data.account.bankImporterId}>Not set</option>
+          {#each data.importers as importer}
+            <option value={importer.id} selected={importer.id === data.account.bankImporterId}>{importer.label}</option>
+          {/each}
+        </select>
+      </label>
+      <label class="field">
         <span>Currency</span>
-        <select name="currencyCode">
+        <select name="currencyCode" disabled={savingAccount}>
           {#each data.currencies as currency}
             <option value={currency.code} selected={currency.code === data.account.currencyCode}>
               {currency.label}
@@ -189,8 +315,35 @@
           {/if}
         </select>
       </label>
-      <button class="add" type="submit" disabled={savingCurrency}>
-        {savingCurrency ? "SAVING…" : "SAVE CURRENCY"}
+      <label class="field">
+        <span>Account color</span>
+        <input type="hidden" name="colorHex" value={draftColorHex} />
+        <div class="color-row">
+          {#each ACCOUNT_COLOR_PRESETS as color}
+            <button
+              type="button"
+              class="color-option"
+              class:selected={draftColorHex.toUpperCase() === color.toUpperCase()}
+              aria-label="Use color {color}"
+              disabled={savingAccount}
+              onclick={() => (draftColorHex = color)}
+            >
+              <span class="swatch lg" style="background: {color}"></span>
+            </button>
+          {/each}
+          <label class="color-custom field">
+            <span>Custom</span>
+            <input
+              type="color"
+              value={draftColorHex}
+              disabled={savingAccount}
+              oninput={(e) => (draftColorHex = (e.currentTarget as HTMLInputElement).value)}
+            />
+          </label>
+        </div>
+      </label>
+      <button class="add" type="submit" disabled={savingAccount}>
+        {savingAccount ? "SAVING…" : "SAVE ACCOUNT"}
       </button>
     </form>
 
@@ -243,9 +396,8 @@
           method="POST"
           action="?/updateOpeningBalance"
           use:enhance={() => {
-            return async ({ cancel, update }) => {
+            return async ({ update }) => {
               if (!confirm("Clear the opening balance for this account?")) {
-                cancel();
                 return;
               }
               clearingOpeningBalance = true;
@@ -259,6 +411,81 @@
           <button class="ghost danger" type="submit" disabled={clearingOpeningBalance || savingOpeningBalance}>
             {clearingOpeningBalance ? "CLEARING…" : "CLEAR OPENING BALANCE"}
           </button>
+        </form>
+      {/if}
+    </div>
+
+    <div class="create-account">
+      <h3>Add another account</h3>
+      {#if !showCreateAccount}
+        <button
+          class="ghost"
+          type="button"
+          onclick={() => {
+            createColorHex = ACCOUNT_COLOR_PRESETS[data.accounts.length % ACCOUNT_COLOR_PRESETS.length]!;
+            showCreateAccount = true;
+          }}>NEW ACCOUNT</button
+        >
+      {:else}
+        <form
+          method="POST"
+          action="?/createAccount"
+          use:enhance={() => {
+            creatingAccount = true;
+            return async ({ update, result }) => {
+              creatingAccount = false;
+              await update();
+              if (result.type === "success") {
+                showCreateAccount = false;
+                await invalidateAll();
+              }
+            };
+          }}
+        >
+          <label class="field">
+            <span>Name</span>
+            <input name="name" type="text" placeholder="Kotak salary" required maxlength="120" disabled={creatingAccount} />
+          </label>
+          <label class="field">
+            <span>Bank</span>
+            <select name="bankImporterId" disabled={creatingAccount}>
+              {#each data.importers as importer}
+                <option value={importer.id}>{importer.label}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="field">
+            <span>Currency</span>
+            <select name="currencyCode" disabled={creatingAccount}>
+              {#each data.currencies as currency}
+                <option value={currency.code} selected={currency.code === "INR"}>{currency.label}</option>
+              {/each}
+            </select>
+          </label>
+          <fieldset class="color-field">
+            <legend>Color</legend>
+            <input type="hidden" name="colorHex" value={createColorHex} />
+            <div class="color-row">
+              {#each ACCOUNT_COLOR_PRESETS as color}
+                <button
+                  type="button"
+                  class="color-option"
+                  class:selected={createColorHex.toUpperCase() === color.toUpperCase()}
+                  aria-label="Use color {color}"
+                  disabled={creatingAccount}
+                  onclick={() => (createColorHex = color)}
+                >
+                  <span class="swatch lg" style="background: {color}"></span>
+                </button>
+              {/each}
+            </div>
+          </fieldset>
+          <div class="create-actions">
+            <button class="ghost" type="button" onclick={() => (showCreateAccount = false)} disabled={creatingAccount}>Cancel</button>
+            <button class="add" type="submit" disabled={creatingAccount}>
+              {creatingAccount ? "CREATING…" : "CREATE ACCOUNT"}
+            </button>
+          </div>
         </form>
       {/if}
     </div>
@@ -665,12 +892,81 @@
     border-top: 1px solid var(--chrome-line);
   }
 
-  .opening-balance h3 {
+  .opening-balance h3,
+  .create-account h3 {
     margin: 0 0 0.35rem;
     font-family: "Archivo Black", sans-serif;
     font-size: 0.78rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+
+  .create-account {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--chrome-line);
+  }
+
+  .account-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .swatch {
+    display: inline-block;
+    width: 0.7rem;
+    height: 0.7rem;
+    border: 1px solid color-mix(in srgb, var(--chrome-line) 65%, transparent);
+    vertical-align: middle;
+  }
+
+  .swatch.lg {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  .color-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    align-items: center;
+  }
+
+  .color-option {
+    border: 2px solid transparent;
+    background: transparent;
+    padding: 0.15rem;
+    cursor: pointer;
+  }
+
+  .color-option.selected {
+    border-color: var(--hi-cyan);
+  }
+
+  .color-custom {
+    margin: 0;
+    min-width: 5rem;
+  }
+
+  .color-field {
+    border: none;
+    padding: 0;
+    margin: 0 0 0.75rem;
+  }
+
+  .color-field legend {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+  }
+
+  .create-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .clear-opening-form {

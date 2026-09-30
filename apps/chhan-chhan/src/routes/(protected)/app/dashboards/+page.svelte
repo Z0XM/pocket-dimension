@@ -95,7 +95,7 @@
     }
     if (type) params.set("type", type);
     const query = params.toString();
-    return query ? `/app?${query}` : "/app";
+    return query ? `/app/transactions?${query}` : "/app/transactions";
   }
 
   onMount(() => {

@@ -1,5 +1,6 @@
 import { fail, redirect } from "@sveltejs/kit";
 import { canEdit, getMembershipOrThrow, requireUser } from "$lib/server/authz";
+import { resolveRequestAccount, setActiveAccountCookie } from "$lib/server/active-account";
 import {
   createCategory,
   createGroup,
@@ -11,10 +12,11 @@ import {
   getAccountCurrency,
   getAccountOpeningBalance,
   getFirstTransactionDate,
-  getOrCreateDefaultAccount,
   listCategories,
   listGroups,
   listTags,
+  createAccount,
+  updateAccount,
   updateAccountCurrency,
   updateAccountOpeningBalance,
   updateCategory as saveCategory,
@@ -32,6 +34,9 @@ import {
   deleteCategorySchema,
   deleteGroupSchema,
   deleteTagSchema,
+  createAccountSchema,
+  updateAccountSchema,
+  switchAccountSchema,
   updateAccountCurrencySchema,
   updateAccountOpeningBalanceSchema,
   clearAccountOpeningBalanceSchema,
@@ -44,7 +49,7 @@ import type { Actions, PageServerLoad } from "./$types";
 export const load: PageServerLoad = async ({ locals, parent }) => {
   if (!locals.user?.id) redirect(307, "/login");
 
-  const { account } = await parent();
+  const { account, accounts } = await parent();
   const [categories, tags, groups, transactionCount, firstTransactionOn, openingBalance] = await Promise.all([
     listCategories(account.id),
     listTags(account.id),
@@ -56,6 +61,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 
   return {
     account,
+    accounts,
     transactionCount,
     firstTransactionOn,
     openingBalance,
@@ -68,9 +74,9 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 };
 
 export const actions: Actions = {
-  createCategory: async ({ request, locals }) => {
+  createCategory: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -93,9 +99,9 @@ export const actions: Actions = {
     return { success: true, message: `Added category “${category.name}”` };
   },
 
-  updateCategory: async ({ request, locals }) => {
+  updateCategory: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -123,9 +129,9 @@ export const actions: Actions = {
     }
   },
 
-  deleteCategory: async ({ request, locals }) => {
+  deleteCategory: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -143,9 +149,9 @@ export const actions: Actions = {
     return { success: true, message: "Category deleted" };
   },
 
-  createTag: async ({ request, locals }) => {
+  createTag: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -167,9 +173,9 @@ export const actions: Actions = {
     return { success: true, message: `Added tag “${tag.name}”` };
   },
 
-  updateTag: async ({ request, locals }) => {
+  updateTag: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -196,9 +202,9 @@ export const actions: Actions = {
     }
   },
 
-  deleteTag: async ({ request, locals }) => {
+  deleteTag: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -216,9 +222,9 @@ export const actions: Actions = {
     return { success: true, message: "Tag deleted" };
   },
 
-  createGroup: async ({ request, locals }) => {
+  createGroup: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -239,9 +245,9 @@ export const actions: Actions = {
     return { success: true, message: `Added group “${group.name}”` };
   },
 
-  updateGroup: async ({ request, locals }) => {
+  updateGroup: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -267,9 +273,9 @@ export const actions: Actions = {
     }
   },
 
-  deleteGroup: async ({ request, locals }) => {
+  deleteGroup: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -287,9 +293,9 @@ export const actions: Actions = {
     return { success: true, message: "Group deleted" };
   },
 
-  updateCurrency: async ({ request, locals }) => {
+  updateCurrency: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -310,9 +316,9 @@ export const actions: Actions = {
     return { success: true, message: `Currency set to ${updated.currencyCode}` };
   },
 
-  updateOpeningBalance: async ({ request, locals }) => {
+  updateOpeningBalance: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -352,9 +358,9 @@ export const actions: Actions = {
     return { success: true, message: "Opening balance saved" };
   },
 
-  importStatement: async ({ request, locals }) => {
+  importStatement: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -397,9 +403,9 @@ export const actions: Actions = {
     }
   },
 
-  clearAllTransactions: async ({ locals }) => {
+  clearAllTransactions: async ({ locals, cookies }) => {
     const user = requireUser(locals);
-    const account = await getOrCreateDefaultAccount(user.id);
+    const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
@@ -412,5 +418,65 @@ export const actions: Actions = {
       success: true,
       message: `Deleted ${removed} transaction${removed === 1 ? "" : "s"}`,
     };
+  },
+
+  switchAccount: async ({ request, locals, cookies }) => {
+    const user = requireUser(locals);
+    const form = await request.formData();
+    const parsed = switchAccountSchema.safeParse({ accountId: form.get("accountId") });
+    if (!parsed.success) {
+      return fail(400, { message: "Invalid account" });
+    }
+
+    await getMembershipOrThrow(user.id, parsed.data.accountId);
+    setActiveAccountCookie(cookies, parsed.data.accountId);
+    return { success: true, message: "Switched account" };
+  },
+
+  createAccount: async ({ request, locals, cookies }) => {
+    const user = requireUser(locals);
+    const form = await request.formData();
+    const parsed = createAccountSchema.safeParse({
+      name: form.get("name"),
+      currencyCode: form.get("currencyCode") || "INR",
+      timezone: form.get("timezone") || "Asia/Kolkata",
+      colorHex: form.get("colorHex") || undefined,
+      bankImporterId: form.get("bankImporterId") || undefined,
+    });
+
+    if (!parsed.success) {
+      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid account" });
+    }
+
+    const account = await createAccount(user.id, parsed.data);
+    setActiveAccountCookie(cookies, account.id);
+    return { success: true, message: `Created account “${account.name}”` };
+  },
+
+  updateAccount: async ({ request, locals, cookies }) => {
+    const user = requireUser(locals);
+    const { account } = await resolveRequestAccount(user.id, cookies);
+    const membership = await getMembershipOrThrow(user.id, account.id);
+    if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
+
+    const form = await request.formData();
+    const parsed = updateAccountSchema.safeParse({
+      name: form.get("name") || undefined,
+      currencyCode: form.get("currencyCode") || undefined,
+      timezone: form.get("timezone") || undefined,
+      colorHex: form.get("colorHex") === "" ? "" : form.get("colorHex") || undefined,
+      bankImporterId: form.get("bankImporterId") === "" ? "" : form.get("bankImporterId") || undefined,
+    });
+
+    if (!parsed.success) {
+      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid account settings" });
+    }
+
+    const updated = await updateAccount(user.id, account.id, parsed.data);
+    if (!updated) {
+      return fail(404, { message: "Account not found" });
+    }
+
+    return { success: true, message: `Updated account “${updated.name}”` };
   },
 };

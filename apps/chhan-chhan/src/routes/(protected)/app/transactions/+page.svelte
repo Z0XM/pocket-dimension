@@ -284,7 +284,7 @@
     if (linkFilter) params.set("link", linkFilter);
 
     const query = params.toString();
-    return query ? `/app?${query}` : "/app";
+    return query ? `/app/transactions?${query}` : "/app/transactions";
   }
 
   function setSummaryPeriod(period: SummaryPeriod) {
