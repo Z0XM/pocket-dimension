@@ -5,8 +5,15 @@ Discord-style Shared Listening worker: `yt-dlp` → `ffmpeg` → LiveKit bot aud
 Startup latency mitigations:
 
 1. **`/jobs/prepare`** — join the LiveKit bot when a listening session starts; keep it connected across tracks (teardown only on session end).
-2. **`/jobs/prefetch`** — resolve yt-dlp audio URLs into an in-memory cache when songs are queued.
+2. **`/jobs/prefetch`** — resolve yt-dlp audio URLs into a bounded in-memory LRU cache when songs are queued.
 3. **`/jobs/warm`** — prefetch URL + prebuffer ~2.5s of PCM for the next track so play/skip can start immediately.
+
+Memory hygiene on track switch / session end:
+
+- Kill the active `ffmpeg` pipe in a `finally` (including superseded plays that never started pumping) so orphaned decoders cannot retain audio.
+- Clear the LiveKit `AudioSource` queue when stopping a track; close the track + source FFI handles on session teardown.
+- Drop warm PCM frame arrays as soon as they are consumed or cancelled.
+- Cap the URL cache so long rooms cannot accumulate unbounded yt-dlp URL strings.
 
 ## Local
 
