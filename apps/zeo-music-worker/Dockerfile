@@ -8,6 +8,10 @@
 #   Port:            3010
 #   Public domain:   none (internal only — zeo calls it on the Docker network)
 #
+# Root .dockerignore must NOT stub apps/zeo-music-worker/** (except package.json) —
+# this image COPYs package.json + src from that path. No railpack.json / deploy-build.sh
+# (ffmpeg + yt-dlp require this Dockerfile path; see README.md).
+#
 # Intentionally NOT a monorepo bun install: the root workspace lockfile + other
 # apps' lifecycle scripts make frozen installs fragile in Docker. This image
 # installs only the worker's own dependencies.
