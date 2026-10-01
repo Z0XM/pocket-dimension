@@ -12,12 +12,37 @@
   import AppSettings from "$lib/components/app-settings.svelte";
   import ImportReviewPanel from "$lib/components/import-review-panel.svelte";
   import AccountSwitcher from "$lib/components/account-switcher.svelte";
+  import {
+    FONT_OPTIONS,
+    PAPER_OPTIONS,
+    applyAppearanceToDocument,
+    readAppearance,
+    setAppearance,
+    type Appearance,
+    type FontId,
+    type PaperId,
+  } from "$lib/appearance";
   import { formatMoney } from "$lib/finance/money";
   import type { ImportPreview, ImportResult } from "$lib/importers/types";
   import { SquarePen, Tag, Trash2, Layers } from "@lucide/svelte";
+  import { onMount } from "svelte";
   import type { PageData, ActionData } from "./$types";
 
   const { data, form }: { data: PageData; form: ActionData } = $props();
+
+  let appearance = $state<Appearance>({ fonts: "virgil", paper: "plain" });
+
+  onMount(() => {
+    appearance = applyAppearanceToDocument(readAppearance());
+  });
+
+  function chooseFonts(fonts: FontId) {
+    appearance = setAppearance({ fonts });
+  }
+
+  function choosePaper(paper: PaperId) {
+    appearance = setAppearance({ paper });
+  }
 
   let importing = $state(false);
   let importProgress = $state(0);
@@ -194,6 +219,47 @@
     <AppSettings />
   </div>
 </header>
+
+<section class="panel customise-panel span-all">
+  <h2>Customise</h2>
+  <p class="panel-copy dim">Fonts and paper texture apply across the app on this browser.</p>
+
+  <div class="customise-block">
+    <p class="customise-label">Hand fonts</p>
+    <div class="customise-options" role="radiogroup" aria-label="Font pairing">
+      {#each FONT_OPTIONS as option (option.id)}
+        <button
+          type="button"
+          class="customise-chip"
+          class:active={appearance.fonts === option.id}
+          role="radio"
+          aria-checked={appearance.fonts === option.id}
+          onclick={() => chooseFonts(option.id)}
+        >
+          {option.label}
+        </button>
+      {/each}
+    </div>
+  </div>
+
+  <div class="customise-block">
+    <p class="customise-label">Paper texture</p>
+    <div class="customise-options" role="radiogroup" aria-label="Paper texture">
+      {#each PAPER_OPTIONS as option (option.id)}
+        <button
+          type="button"
+          class="customise-chip"
+          class:active={appearance.paper === option.id}
+          role="radio"
+          aria-checked={appearance.paper === option.id}
+          onclick={() => choosePaper(option.id)}
+        >
+          {option.label}
+        </button>
+      {/each}
+    </div>
+  </div>
+</section>
 
 {#if importMessage}
   <p class="flash" class:error={!importSuccess}>{importMessage}</p>
@@ -791,16 +857,62 @@
 </div>
 
 <style>
+  .customise-panel {
+    margin-bottom: 1rem;
+  }
+
+  .customise-block + .customise-block {
+    margin-top: 0.85rem;
+  }
+
+  .customise-label {
+    margin: 0 0 0.45rem;
+    font-family: var(--hand);
+    font-size: 1rem;
+    color: var(--ink-muted);
+  }
+
+  .customise-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .customise-chip {
+    appearance: none;
+    border: 1.5px solid var(--chrome-line);
+    background: color-mix(in srgb, var(--blue) 28%, transparent);
+    color: var(--ink);
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    padding: 0.28rem 0.65rem;
+    cursor: pointer;
+    border-radius: 3px 9px 4px 8px / 8px 3px 9px 2px;
+  }
+
+  .customise-chip:hover {
+    border-color: var(--brand);
+  }
+
+  .customise-chip.active {
+    background: var(--brand-soft);
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+
   .flash {
     margin: 0 0 1rem;
     padding: 0.65rem 0.85rem;
-    border: 1px solid var(--hi-purple);
-    font-size: 0.78rem;
+    border: 1.5px solid var(--brand);
+    font-size: 0.9rem;
+    border-radius: 4px 12px 6px 10px / 10px 4px 12px 6px;
+    background: var(--brand-soft);
   }
 
   .flash.error {
     border-color: var(--danger);
     color: var(--danger);
+    background: color-mix(in srgb, var(--pink) 35%, white);
   }
 
   .flash.report {
@@ -814,10 +926,12 @@
     background: none;
     border: none;
     padding: 0;
-    color: var(--hi-cyan);
+    color: var(--brand);
     font-family: inherit;
     font-size: inherit;
     text-decoration: underline;
+    text-decoration-style: wavy;
+    text-underline-offset: 0.2em;
     cursor: pointer;
   }
 
@@ -830,25 +944,26 @@
   .import-progress {
     height: 10px;
     margin: 0.35rem 0 0.15rem;
-    border: 2px solid var(--chrome-line);
+    border: 1.5px solid var(--chrome-line);
     background: var(--surface2);
     overflow: hidden;
+    border-radius: 2px 8px 3px 6px;
   }
 
   .import-progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, var(--hi-purple), var(--hi-cyan));
+    background: color-mix(in srgb, var(--green) 70%, var(--brand));
     transition: width 180ms ease;
   }
 
   .import-status {
     margin: 0 0 0.55rem;
-    font-size: 0.74rem;
+    font-size: 0.85rem;
   }
 
   .panel-copy {
     margin: 0 0 0.85rem;
-    font-size: 0.76rem;
+    font-size: 0.9rem;
     line-height: 1.45;
   }
 
@@ -857,9 +972,9 @@
     flex-direction: column;
     gap: 0.35rem;
     margin-bottom: 0.75rem;
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     color: var(--muted);
   }
 
@@ -867,14 +982,15 @@
   .field input[type="file"],
   .field input[type="date"],
   .field input[type="text"] {
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
+    background: var(--surface);
+    border: 1.5px solid var(--chrome-line);
     color: var(--main-text);
     padding: 0.45rem 0.6rem;
     font-family: inherit;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     text-transform: none;
     letter-spacing: normal;
+    border-radius: 3px 10px 4px 8px / 8px 3px 10px 4px;
   }
 
   .field select:focus,
@@ -882,29 +998,31 @@
   .field input[type="date"]:focus-visible,
   .field input[type="text"]:focus-visible {
     outline: none;
-    border-color: var(--hi-focus);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 2px var(--brand-soft);
   }
 
   .opening-balance {
     margin-top: 1.25rem;
     padding-top: 1rem;
-    border-top: 1px solid var(--chrome-line);
+    border-top: 1px solid var(--hair);
   }
 
   .opening-balance h3,
   .create-account h3 {
     margin: 0 0 0.35rem;
-    font-family: "Archivo Black", sans-serif;
-    font-size: 0.78rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-family: var(--hand);
+    font-size: 1rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    font-weight: 400;
+    color: var(--ink-muted);
   }
 
   .create-account {
     margin-top: 1.25rem;
     padding-top: 1rem;
-    border-top: 1px solid var(--chrome-line);
+    border-top: 1px solid var(--hair);
   }
 
   .account-pill {

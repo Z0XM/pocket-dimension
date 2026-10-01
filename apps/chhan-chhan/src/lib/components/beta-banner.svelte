@@ -11,21 +11,24 @@
     flex-wrap: wrap;
     margin-bottom: 0.75rem;
     padding: 0.45rem 0.65rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    font-size: 0.68rem;
-    letter-spacing: 0.04em;
+    background: color-mix(in srgb, var(--yellow) 42%, transparent);
+    border: 1.25px solid color-mix(in srgb, var(--ink) 18%, transparent);
+    border-radius: 3px 10px 4px 8px / 8px 3px 10px 4px;
+    font-size: 0.9rem;
+    letter-spacing: 0.01em;
     color: var(--muted);
+    font-family: var(--hand);
   }
 
   .beta-label {
     padding: 0.12rem 0.4rem;
-    background: var(--hi-green);
-    color: var(--background);
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    background: color-mix(in srgb, var(--green) 70%, transparent);
+    color: var(--ink);
+    font-size: 0.82rem;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    border-radius: 3px 7px 3px 6px;
   }
 
   .beta-copy {

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" data-fonts="virgil" data-paper="plain">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -17,7 +17,28 @@
     <link rel="icon" href="%sveltekit.assets%/icon.png" type="image/png" />
     <link rel="apple-touch-icon" href="%sveltekit.assets%/icon.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#060b0f" />
+    <meta name="theme-color" content="#fffefd" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Assistant:wght@400;600;700&family=Caveat:wght@500;700&family=Gaegu:wght@400;700&family=Indie+Flower&family=Kalam:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("chhan-appearance");
+          if (!raw) return;
+          var parsed = JSON.parse(raw);
+          if (parsed && typeof parsed.fonts === "string") {
+            document.documentElement.setAttribute("data-fonts", parsed.fonts);
+          }
+          if (parsed && typeof parsed.paper === "string") {
+            document.documentElement.setAttribute("data-paper", parsed.paper);
+          }
+        } catch (_) {}
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

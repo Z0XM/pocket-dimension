@@ -185,7 +185,7 @@
     <button
       type="submit"
       disabled={loading}
-      class="border-2 border-foreground bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-[3px_3px_0_var(--foreground)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_var(--foreground)] disabled:opacity-50"
+      class="rounded-[255px_12px_225px_10px/12px_225px_10px_255px] border border-[var(--brand)] bg-[var(--brand-soft)] px-4 py-2 text-sm font-normal text-[var(--brand)] disabled:opacity-50"
     >
       {#if loading}
         Please wait…

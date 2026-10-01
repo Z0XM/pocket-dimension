@@ -107,21 +107,23 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
+    background: transparent;
+    border: 1.5px solid var(--chrome-line);
     color: var(--main-text);
     padding: 0.35rem 0.65rem;
-    font-family: inherit;
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     cursor: pointer;
+    border-radius: 255px 12px 225px 10px / 12px 225px 10px 255px;
   }
 
   .widget-picker-btn:hover,
   .widget-picker.open .widget-picker-btn {
-    border-color: var(--hi-purple);
-    color: var(--hi-purple);
+    border-color: var(--brand);
+    color: var(--brand);
+    background: var(--brand-soft);
   }
 
   .widget-picker-panel {
@@ -133,9 +135,10 @@
     max-height: min(28rem, calc(100vh - 8rem));
     overflow: auto;
     background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 6px 6px 0 rgba(234, 242, 240, 0.12);
+    border: 1.5px solid var(--chrome-line);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.06);
     padding: 0.85rem;
+    border-radius: 4px 14px 6px 12px / 12px 4px 14px 6px;
   }
 
   .widget-picker-head {
@@ -148,7 +151,7 @@
 
   .widget-picker-head h3 {
     margin: 0;
-    font-family: "Archivo Black", sans-serif;
+    font-family: var(--hand);
     font-size: 0.72rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;

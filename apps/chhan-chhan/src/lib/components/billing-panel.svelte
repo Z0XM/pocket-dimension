@@ -110,10 +110,10 @@
   }
 
   .billing-category-total {
-    font-family: "Archivo Black", sans-serif;
-    font-size: 0.82rem;
+    font-family: var(--hand);
+    font-size: 0.95rem;
     font-variant-numeric: tabular-nums;
-    color: var(--hi-cyan);
+    color: var(--brand);
     white-space: nowrap;
   }
 

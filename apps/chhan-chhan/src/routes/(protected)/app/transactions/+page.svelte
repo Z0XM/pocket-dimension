@@ -1703,21 +1703,23 @@
     flex-wrap: wrap;
     margin-bottom: 0.85rem;
     padding: 0.75rem 0.9rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+    background: color-mix(in srgb, var(--yellow) 28%, transparent);
+    border: 1.5px solid var(--chrome-line);
+    box-shadow: none;
+    border-radius: 255px 16px 225px 12px / 16px 225px 12px 255px;
   }
 
   .balance-k {
-    font-size: 0.66rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     color: var(--muted);
+    font-family: var(--hand);
   }
 
   .balance-v {
-    font-family: "Archivo Black", sans-serif;
-    font-size: 1.35rem;
+    font-family: var(--hand);
+    font-size: 1.55rem;
     font-variant-numeric: tabular-nums;
     color: var(--main-text);
   }
@@ -1729,25 +1731,25 @@
   }
 
   .balance-txn-count {
-    font-size: 0.62rem;
-    letter-spacing: 0.05em;
+    font-size: 0.82rem;
+    letter-spacing: 0.01em;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
 
   .balance-card.stale {
-    border-color: color-mix(in srgb, var(--hi-purple) 55%, var(--chrome-line));
+    border-color: color-mix(in srgb, var(--brand) 55%, var(--chrome-line));
   }
 
   .balance-asof {
-    font-size: 0.72rem;
+    font-size: 0.85rem;
     margin-left: auto;
     text-align: right;
     line-height: 1.4;
   }
 
   .balance-asof a {
-    color: var(--hi-cyan);
+    color: var(--brand);
   }
 
   .stats-block {
@@ -1861,19 +1863,22 @@
 
   .period-tabs {
     display: inline-flex;
-    border: 2px solid var(--chrome-line);
+    border: 1.5px solid var(--chrome-line);
+    border-radius: 255px 12px 225px 10px / 12px 225px 10px 255px;
+    overflow: hidden;
   }
 
   .period-tabs button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: var(--surface2);
+    background: transparent;
     border: none;
-    border-right: 2px solid var(--chrome-line);
+    border-right: 1px solid var(--hair);
     color: var(--muted);
     padding: 0 0.65rem;
-    text-transform: uppercase;
+    text-transform: none;
+    font-family: var(--hand);
     cursor: pointer;
   }
 
@@ -1882,12 +1887,12 @@
   }
 
   .period-tabs button.active {
-    background: var(--hi-purple);
-    color: var(--background);
+    background: var(--brand-soft);
+    color: var(--brand);
   }
 
   .period-tabs button:hover:not(.active) {
-    color: var(--hi-purple);
+    color: var(--brand);
   }
 
   .empty-row {
@@ -1950,7 +1955,7 @@
     padding: 0.45rem 0.55rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 3px 3px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
     color: var(--main-text);
     font-size: 0.72rem;
     line-height: 1.35;
@@ -1975,7 +1980,7 @@
     padding: 0.45rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
   }
 
   .note-textarea {
@@ -2199,7 +2204,7 @@
     padding: 0.45rem 0.55rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 3px 3px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
     color: var(--main-text);
     font-size: 0.72rem;
     line-height: 1.35;
@@ -2226,7 +2231,7 @@
     padding: 0.45rem 0.55rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 3px 3px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
     color: var(--main-text);
     font-size: 0.72rem;
     line-height: 1.35;
@@ -2251,7 +2256,7 @@
     padding: 0.45rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
   }
 
   .group-select {
@@ -2417,7 +2422,7 @@
     min-width: 8rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 3px 3px 0 color-mix(in srgb, var(--hi-purple) 25%, transparent);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
     z-index: 15;
     display: flex;
     flex-direction: column;

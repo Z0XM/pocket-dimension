@@ -46,7 +46,7 @@
     padding: 0.55rem 0.65rem 0.55rem 0.85rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 6px 6px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.06);
     max-width: calc(100vw - 2rem);
   }
 

@@ -169,7 +169,7 @@
     overflow: auto;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 6px 6px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.06);
     padding: 0.65rem;
   }
 
@@ -235,7 +235,7 @@
     height: 0.95rem;
     border: 2px solid var(--chrome-line);
     background: var(--surface2);
-    box-shadow: 1px 1px 0 rgba(234, 242, 240, 0.08);
+    box-shadow: 1px 1px 0 rgba(27, 27, 31, 0.05);
     flex-shrink: 0;
     color: var(--background);
   }

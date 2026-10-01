@@ -374,7 +374,7 @@
 
   h2 {
     margin: 0.15rem 0 0;
-    font-family: "Archivo Black", sans-serif;
+    font-family: var(--hand);
     font-size: 1.05rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -400,14 +400,15 @@
   }
 
   .primary {
-    background: linear-gradient(90deg, var(--hi-purple), var(--hi-cyan));
-    border: none;
-    color: #0b0a12;
-    font-weight: 700;
+    background: var(--brand-soft);
+    border: 1.5px solid var(--brand);
+    color: var(--brand);
+    font-weight: 400;
     padding: 0.5rem 0.9rem;
-    font-size: 0.74rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    font-family: var(--hand);
+    border-radius: 255px 12px 225px 10px / 12px 225px 10px 255px;
   }
 
   .primary:disabled,
@@ -625,7 +626,7 @@
 
   .confirm-progress .bar > div {
     height: 100%;
-    background: linear-gradient(90deg, var(--hi-purple), var(--hi-cyan));
+    background: color-mix(in srgb, var(--green) 70%, var(--brand));
     transition: width 180ms ease;
   }
 

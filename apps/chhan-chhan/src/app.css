@@ -2,60 +2,71 @@
 @plugin "@tailwindcss/forms";
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
-@import "@fontsource/archivo-black";
-@import "@fontsource-variable/archivo";
-@import "@fontsource/fira-mono";
+@import "./lib/styles/appearance.css";
 @import "./lib/styles/forge.css";
 
 :root {
-  /* Locked palette */
-  --brand-black: #060b0f;
-  --brand-white: #e8e4f0;
-  --brand-accent: #ee7c02;
-  --brand-accent-light: #ffb86c;
-  --brand-table: #060b0f;
-  --brand-cards: #4a3010;
-  --brand-danger: #a50036;
-  --brand-success: #00a553;
-  --brand-hi-purple: #bd93f9;
-  --brand-hi-green: #50fa7b;
-  --brand-hi-cyan: #54dbee;
+  /* Marker paper palette */
+  --paper: #fffefd;
+  --ink: #1b1b1f;
+  --ink-muted: #5b5b5b;
+  --ink-soft: #8a8a8a;
+  --brand: #6965db;
+  --brand-soft: #e8e7fb;
+  --yellow: #ffe066;
+  --pink: #ffadad;
+  --green: #9be7c4;
+  --blue: #bde0fe;
+  --orange: #ffb997;
+  --purple: #d4c5f9;
+  --hair: rgba(27, 27, 31, 0.12);
 
-  /* Interactive highlight roles */
-  --hi-purple: var(--brand-hi-purple);
-  --hi-green: var(--brand-hi-green);
-  --hi-cyan: var(--brand-hi-cyan);
-  --hi-hover: var(--brand-hi-green);
-  --hi-focus: var(--brand-accent-light);
-  --hi-select: var(--brand-hi-purple);
+  /* Legacy brand aliases → paper (keeps forge/components working) */
+  --brand-black: var(--paper);
+  --brand-white: var(--ink);
+  --brand-accent: var(--brand);
+  --brand-accent-light: #8b87e8;
+  --brand-table: var(--hair);
+  --brand-cards: rgba(27, 27, 31, 0.22);
+  --brand-danger: #c45b6a;
+  --brand-success: #1f7a52;
+  --brand-hi-purple: var(--purple);
+  --brand-hi-green: var(--green);
+  --brand-hi-cyan: var(--blue);
 
-  /* Derived theme tokens */
-  --background: var(--brand-black);
-  --main-text: var(--brand-white);
-  --foreground: var(--brand-cards);
-  --card: var(--brand-black);
-  --card-foreground: var(--brand-white);
-  --primary: var(--brand-black);
-  --primary-foreground: var(--brand-accent);
-  --secondary: var(--brand-black);
-  --secondary-foreground: var(--brand-white);
-  --muted: var(--brand-black);
-  --muted-foreground: var(--brand-white);
-  --accent: var(--brand-accent);
-  --accent-foreground: var(--brand-black);
-  --border: var(--brand-table);
+  --hi-purple: var(--brand);
+  --hi-green: var(--brand-success);
+  --hi-cyan: #3d7ab8;
+  --hi-hover: var(--brand);
+  --hi-focus: var(--brand);
+  --hi-select: var(--brand-soft);
+
+  --background: var(--paper);
+  --main-text: var(--ink);
+  --foreground: var(--ink);
+  --card: #ffffff;
+  --card-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: #f6f4ef;
+  --secondary-foreground: var(--ink);
+  --muted: #f3f1ec;
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--brand);
+  --accent-foreground: #ffffff;
+  --border: var(--hair);
   --success: var(--brand-success);
   --danger: var(--brand-danger);
-  --ring: var(--hi-focus);
-  --scrollbar-thumb: var(--brand-accent);
-  --scrollbar-track: var(--brand-black);
-  --scrollbar-thumb-hover: var(--brand-accent-light);
+  --ring: var(--brand);
+  --scrollbar-thumb: color-mix(in srgb, var(--ink) 28%, transparent);
+  --scrollbar-track: var(--paper);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--ink) 45%, transparent);
 }
 
 @theme inline {
-  --font-sans: "Archivo Variable", sans-serif;
-  --font-mono: "Fira Mono", monospace;
-  --font-heading: "Archivo Black", var(--font-sans);
+  --font-sans: var(--ui);
+  --font-mono: var(--hand);
+  --font-heading: var(--hand);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-text: var(--main-text);
@@ -82,11 +93,13 @@
 
   html,
   body {
-    @apply min-h-screen bg-background text-text font-mono;
+    @apply min-h-screen bg-background text-text;
+    font-family: var(--ui);
   }
 
   body {
     background: var(--background);
+    color: var(--main-text);
   }
 
   h1,
@@ -95,12 +108,13 @@
   h4,
   h5,
   h6 {
-    font-family: var(--font-heading);
+    font-family: var(--hand);
+    font-weight: 400;
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--hi-purple) 38%, transparent);
-    color: var(--main-text);
+    background: color-mix(in srgb, var(--yellow) 55%, transparent);
+    color: var(--ink);
   }
 
   *::-webkit-scrollbar {

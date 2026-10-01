@@ -62,15 +62,21 @@
     display: flex;
     flex-direction: column;
     gap: 0.65rem;
+    padding: 0.35rem 0.15rem 0.15rem;
+    background-image:
+      linear-gradient(rgba(90, 130, 180, 0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(90, 130, 180, 0.14) 1px, transparent 1px);
+    background-size: 18px 18px;
+    border-radius: 4px 12px 6px 10px / 10px 4px 12px 6px;
   }
 
   .trend-legend {
     display: flex;
     flex-wrap: wrap;
     gap: 0.55rem 0.85rem;
-    font-size: 0.66rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-family: var(--hand);
+    font-size: 0.9rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     color: var(--muted);
   }
 
@@ -95,6 +101,9 @@
     gap: 0.45rem;
     align-items: end;
     min-height: 9rem;
+    border-left: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
+    padding: 0.35rem 0.25rem 0.15rem 0.45rem;
   }
 
   .trend-col {
@@ -125,6 +134,7 @@
     width: 100%;
     min-height: 0;
     border-radius: 0;
+    opacity: 0.92;
   }
 
   .segment:first-child {
@@ -132,9 +142,10 @@
   }
 
   .trend-label {
-    font-size: 0.58rem;
-    letter-spacing: 0.04em;
-    color: var(--muted);
+    font-family: var(--hand);
+    font-size: 0.78rem;
+    letter-spacing: 0.01em;
+    color: var(--ink-muted);
     text-align: center;
     white-space: nowrap;
     overflow: hidden;

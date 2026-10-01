@@ -84,13 +84,14 @@
   }
 
   select {
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
+    background: var(--surface);
+    border: 1.5px solid var(--chrome-line);
     color: var(--main-text);
     padding: 0.35rem 0.5rem;
-    font-family: inherit;
-    font-size: 0.78rem;
+    font-family: var(--hand);
+    font-size: 0.95rem;
     max-width: 12rem;
+    border-radius: 3px 10px 4px 8px / 8px 3px 10px 4px;
   }
 
   select:disabled {
@@ -99,7 +100,7 @@
 
   .err {
     margin: 0.25rem 0 0;
-    font-size: 0.68rem;
-    color: #ff6b6b;
+    font-size: 0.85rem;
+    color: var(--neg);
   }
 </style>

@@ -1,0 +1,1627 @@
+<!doctype html>
+<html lang="en" data-fonts="virgil" data-paper="plain">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chhan Chhan · Marker paper · font &amp; texture trials</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Assistant:wght@400;500;600&family=Caveat:wght@400;600;700&family=Gaegu:wght@400;700&family=Indie+Flower&family=Kalam:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /*
+        Locked layout. This pass only explores:
+        - type pairings (similar hand fonts / mixes)
+        - paper textures (plain · rough · lines · grid · dots)
+        See DESIGN-NOTES.md.
+      */
+      @font-face {
+        font-family: "Virgil";
+        src:
+          url("https://excalidraw.com/Virgil.woff2") format("woff2"),
+          local("Virgil");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        --bg: #fffefd;
+        --canvas: #ffffff;
+        --ink: #1b1b1f;
+        --ink-muted: #5b5b5b;
+        --ink-soft: #8a8a8a;
+        --brand: #6965db;
+        --brand-soft: #e8e7fb;
+        --yellow: #ffe066;
+        --pink: #ffadad;
+        --green: #9be7c4;
+        --blue: #bde0fe;
+        --orange: #ffb997;
+        --purple: #d4c5f9;
+        --hair: rgba(27, 27, 31, 0.1);
+        --hand: "Virgil", "Caveat", cursive;
+        --ui: "Assistant", system-ui, sans-serif;
+      }
+
+      /* ---- Font pairings (liked hand set only) ---- */
+      html[data-fonts="virgil"] {
+        --hand: "Virgil", "Caveat", cursive;
+        --ui: "Assistant", system-ui, sans-serif;
+      }
+      html[data-fonts="architects"] {
+        --hand: "Architects Daughter", cursive;
+        --ui: "Assistant", system-ui, sans-serif;
+      }
+      html[data-fonts="gaegu"] {
+        --hand: "Gaegu", cursive;
+        --ui: "Assistant", system-ui, sans-serif;
+      }
+      html[data-fonts="indie"] {
+        --hand: "Indie Flower", cursive;
+        --ui: "Assistant", system-ui, sans-serif;
+      }
+      html[data-fonts="kalam"] {
+        --hand: "Kalam", cursive;
+        --ui: "Assistant", system-ui, sans-serif;
+      }
+      html[data-fonts="virgil-kalam"] {
+        --hand: "Virgil", cursive;
+        --ui: "Kalam", cursive;
+      }
+      html[data-fonts="architects-gaegu"] {
+        --hand: "Architects Daughter", cursive;
+        --ui: "Gaegu", cursive;
+      }
+      html[data-fonts="indie-kalam"] {
+        --hand: "Indie Flower", cursive;
+        --ui: "Kalam", cursive;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--bg);
+        font-family: var(--ui);
+      }
+
+      .stage {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+      }
+
+      .sheet {
+        position: relative;
+        isolation: isolate;
+        min-height: 100vh;
+        min-height: 100dvh;
+        padding: clamp(1.35rem, 3vw, 2.4rem) clamp(1.35rem, 4vw, 3.25rem)
+          calc(2.75rem + 4.5rem);
+        color: var(--ink);
+        background-color: var(--bg);
+        background-image: none;
+        width: 100%;
+        border: none;
+        overflow: hidden;
+      }
+
+      /* Paper textures — layered on the sheet itself so they always read */
+      html[data-paper="rough"] .sheet {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.2 0 0 0 0 0.2 0 0 0 0 0.2 0 0 0 0.28 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-size: 220px 220px;
+        background-blend-mode: multiply;
+      }
+
+      html[data-paper="lines"] .sheet {
+        background-image: repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent 26px,
+          rgba(90, 130, 180, 0.38) 26px,
+          rgba(90, 130, 180, 0.38) 27px
+        );
+        background-size: auto;
+        background-blend-mode: normal;
+      }
+
+      html[data-paper="lines-gray"] .sheet {
+        background-image: repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent 26px,
+          rgba(40, 40, 40, 0.22) 26px,
+          rgba(40, 40, 40, 0.22) 27px
+        );
+        background-size: auto;
+        background-blend-mode: normal;
+      }
+
+      html[data-paper="grid"] .sheet {
+        background-image:
+          linear-gradient(rgba(90, 130, 180, 0.32) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(90, 130, 180, 0.32) 1px, transparent 1px);
+        background-size: 26px 26px;
+        background-blend-mode: normal;
+      }
+
+      html[data-paper="grid-gray"] .sheet {
+        background-image:
+          linear-gradient(rgba(40, 40, 40, 0.18) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(40, 40, 40, 0.18) 1px, transparent 1px);
+        background-size: 26px 26px;
+        background-blend-mode: normal;
+      }
+
+      html[data-paper="dots"] .sheet {
+        background-image: radial-gradient(rgba(90, 130, 180, 0.4) 1.1px, transparent 1.25px);
+        background-size: 12px 12px;
+        background-blend-mode: normal;
+      }
+
+      html[data-paper="dots-gray"] .sheet {
+        background-image: radial-gradient(rgba(40, 40, 40, 0.28) 1.1px, transparent 1.25px);
+        background-size: 12px 12px;
+        background-blend-mode: normal;
+      }
+
+      .sheet > * {
+        position: relative;
+        z-index: 1;
+        max-width: 68rem;
+      }
+
+      /* Font / paper trial switcher */
+      .trial-switcher {
+        position: fixed;
+        right: 1.1rem;
+        bottom: 1.1rem;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.55rem;
+        font-family: "Assistant", system-ui, sans-serif;
+      }
+
+      .trial-menu {
+        display: none;
+        width: min(18.5rem, calc(100vw - 2.2rem));
+        max-height: min(70vh, 28rem);
+        overflow: auto;
+        padding: 0.55rem 0.55rem 0.65rem;
+        background: #fffefd;
+        border: 1.5px solid var(--ink);
+        border-radius: 255px 18px 225px 16px / 18px 225px 16px 255px;
+        box-shadow: 0 10px 28px rgba(27, 27, 31, 0.12);
+      }
+
+      .trial-menu[data-open="true"] {
+        display: block;
+      }
+
+      .trial-menu .menu-label {
+        margin: 0.35rem 0.35rem 0.35rem;
+        font-family: var(--hand);
+        font-size: 0.95rem;
+        color: var(--ink-muted);
+      }
+
+      .trial-menu .menu-label:first-child {
+        margin-top: 0.1rem;
+      }
+
+      .trial-menu button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: none;
+        background: transparent;
+        color: var(--ink);
+        padding: 0.4rem 0.55rem;
+        font-family: var(--hand);
+        font-size: 1.02rem;
+        cursor: pointer;
+        border-radius: 8px 14px 10px 12px / 12px 8px 14px 10px;
+      }
+
+      .trial-menu button:hover {
+        background: color-mix(in srgb, var(--blue) 35%, transparent);
+      }
+
+      .trial-menu button[aria-selected="true"] {
+        background: var(--brand-soft);
+        color: var(--brand);
+      }
+
+      .trial-fab-wrap {
+        position: relative;
+      }
+
+      .trial-fab {
+        width: 3rem;
+        height: 3rem;
+        border: 1.75px solid var(--ink);
+        border-radius: 40% 60% 55% 45%;
+        background: #fffefd;
+        color: var(--ink);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 6px 18px rgba(27, 27, 31, 0.14);
+        padding: 0;
+      }
+
+      .trial-fab:hover,
+      .trial-fab[aria-expanded="true"] {
+        background: var(--brand);
+        border-color: var(--brand);
+        color: #fff;
+      }
+
+      .trial-fab svg {
+        width: 1.25rem;
+        height: 1.25rem;
+      }
+
+      .top {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: flex-start;
+        margin-bottom: 1.5rem;
+      }
+
+      .brand {
+        margin: 0;
+        font-family: var(--hand);
+        font-weight: 400;
+        line-height: 1;
+        font-size: 2rem;
+      }
+
+      .nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1.1rem;
+        margin-top: 0.55rem;
+        font-family: var(--hand);
+        font-size: 1.15rem;
+      }
+
+      .nav a {
+        color: var(--ink-muted);
+        text-decoration: none;
+      }
+
+      .nav a.on {
+        color: var(--ink);
+        background: color-mix(in srgb, var(--blue) 70%, transparent);
+        padding: 0 0.2em;
+        border-radius: 3px 8px 4px 7px;
+      }
+
+      .tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem 0.85rem;
+        align-items: center;
+        justify-content: flex-end;
+        font-family: var(--hand);
+        font-size: 1.05rem;
+        color: var(--ink-muted);
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.1rem 0.25rem;
+        border: none;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .dot {
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 40% 60% 55% 45%;
+        display: inline-block;
+        border: 1.5px solid color-mix(in srgb, var(--ink) 30%, transparent);
+        background: var(--orange);
+      }
+
+      .balance-box {
+        display: inline-block;
+        padding: 0.7rem 1.05rem 0.8rem;
+        margin: 0.15rem 0 1.35rem;
+        border: 2.25px solid var(--ink);
+        border-radius: 255px 22px 225px 18px / 22px 225px 18px 255px;
+        background: color-mix(in srgb, var(--yellow) 42%, white);
+        transform: rotate(-0.5deg);
+      }
+
+      .balance-box .k {
+        display: block;
+        font-family: var(--hand);
+        color: var(--ink-muted);
+        font-size: 0.95rem;
+      }
+
+      .balance-box .v {
+        font-family: var(--hand);
+        font-size: clamp(2.4rem, 7vw, 3.8rem);
+        line-height: 0.95;
+      }
+
+      .balance-box .meta {
+        margin-top: 0.25rem;
+        color: var(--ink-soft);
+        font-size: 0.8rem;
+      }
+
+      .balance-open {
+        margin: 0.15rem 0 1.35rem;
+      }
+
+      .balance-open .k {
+        display: block;
+        font-family: var(--hand);
+        color: var(--ink-muted);
+        font-size: 1.05rem;
+      }
+
+      .balance-open .v {
+        display: inline-block;
+        font-family: var(--hand);
+        font-size: clamp(2.9rem, 8vw, 4.6rem);
+        line-height: 0.95;
+      }
+
+      .balance-open .v .rough-mark {
+        /* keep the big type; stroke sizing handled below */
+      }
+
+      .balance-open .rough-mark.is-balance > .stroke {
+        left: -6%;
+        top: 18%;
+        width: 114%;
+        height: 62%;
+        transform: rotate(-0.9deg);
+      }
+
+      .balance-open .meta {
+        margin-top: 0.35rem;
+        color: var(--ink-soft);
+        font-size: 0.82rem;
+      }
+
+      .figures {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem 1.75rem;
+        margin-bottom: 1.35rem;
+        font-family: var(--hand);
+      }
+
+      .fig .k {
+        color: var(--ink-muted);
+        font-size: 1rem;
+      }
+
+      .fig .v {
+        font-size: clamp(1.45rem, 3.2vw, 2rem);
+        line-height: 1.05;
+      }
+
+      .fig.pos .v {
+        color: #1f7a52;
+      }
+
+      .fig.neg .v {
+        color: #c23b3b;
+      }
+
+      .flow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.45rem;
+        margin: 0 0 1.1rem;
+        font-family: var(--hand);
+        font-size: 1.15rem;
+      }
+
+      .flow .arrow {
+        color: var(--brand);
+        font-size: 1.25rem;
+      }
+
+      .flow .node {
+        border: 2px solid var(--ink);
+        padding: 0.25rem 0.65rem;
+        border-radius: 255px 16px 225px / 16px 225px 16px 255px;
+        background: var(--canvas);
+      }
+
+      .pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem 0.6rem;
+        margin: 0 0 1.5rem;
+        font-family: var(--hand);
+        font-size: 1.05rem;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.18rem 0.55rem;
+        border-radius: 3px 9px 4px 8px / 8px 3px 9px 2px;
+      }
+
+      .pill svg {
+        width: 1rem;
+        height: 1rem;
+        flex: none;
+      }
+
+      .pill-blue {
+        background: color-mix(in srgb, var(--blue) 72%, transparent);
+      }
+      .pill-purple {
+        background: color-mix(in srgb, var(--purple) 72%, transparent);
+      }
+      .pill-yellow {
+        background: color-mix(in srgb, var(--yellow) 72%, transparent);
+      }
+      .pill-green {
+        background: color-mix(in srgb, var(--green) 72%, transparent);
+      }
+      .pill-pink {
+        background: color-mix(in srgb, var(--pink) 70%, transparent);
+      }
+      .pill-orange {
+        background: color-mix(in srgb, var(--orange) 72%, transparent);
+      }
+
+      .section-title {
+        margin: 0 0 0.55rem;
+        font-family: var(--hand);
+        font-size: 1.15rem;
+        color: var(--ink-muted);
+        font-weight: 400;
+      }
+
+      .lines {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        font-family: var(--hand);
+        font-size: 1.12rem;
+      }
+
+      .lines li {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.75rem;
+        padding: 0.35rem 0;
+        border-bottom: 1px solid var(--hair);
+      }
+
+      .footer-links {
+        margin-top: 1.7rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem 1.4rem;
+        font-family: var(--hand);
+        font-size: 1.1rem;
+      }
+
+      .footer-links a {
+        color: var(--brand);
+        text-decoration: none;
+      }
+
+      .footer-links a:hover {
+        text-decoration: underline;
+        text-decoration-style: wavy;
+        text-underline-offset: 0.2em;
+      }
+
+      .hl {
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+        padding: 0 0.14em;
+        border-radius: 2px 8px 3px 7px / 7px 3px 8px 2px;
+      }
+
+      .hl-yellow {
+        background: color-mix(in srgb, var(--yellow) 72%, transparent);
+      }
+      .hl-green {
+        background: color-mix(in srgb, var(--green) 72%, transparent);
+      }
+      .hl-pink {
+        background: color-mix(in srgb, var(--pink) 70%, transparent);
+      }
+      .hl-purple {
+        background: color-mix(in srgb, var(--purple) 72%, transparent);
+      }
+      .hl-blue {
+        background: color-mix(in srgb, var(--blue) 75%, transparent);
+      }
+      .hl-orange {
+        background: color-mix(in srgb, var(--orange) 72%, transparent);
+      }
+
+      /* Rough highlighter stroke — rectangular marker tip dragged L→R */
+      .rough-mark {
+        position: relative;
+        display: inline-block;
+        padding: 0.02em 0.08em;
+        isolation: isolate;
+      }
+
+      .rough-mark > .txt {
+        position: relative;
+        z-index: 1;
+      }
+
+      .rough-mark > .stroke {
+        position: absolute;
+        z-index: 0;
+        pointer-events: none;
+        overflow: visible;
+      }
+
+      .rough-mark > .stroke rect,
+      .rough-mark > .stroke path {
+        mix-blend-mode: multiply;
+      }
+
+      /* each mark gets a slightly different drag angle / overflow */
+      .rough-mark.is-in > .stroke {
+        left: -10%;
+        top: 12%;
+        width: 118%;
+        height: 72%;
+        transform: rotate(-1.4deg);
+      }
+
+      .rough-mark.is-out > .stroke {
+        left: -8%;
+        top: 18%;
+        width: 122%;
+        height: 68%;
+        transform: rotate(1.8deg);
+      }
+
+      .rough-mark.is-net > .stroke {
+        left: -14%;
+        top: 8%;
+        width: 128%;
+        height: 78%;
+        transform: rotate(-2.6deg);
+      }
+
+      .scribble {
+        font-family: var(--hand);
+        color: var(--ink-muted);
+        font-size: 1rem;
+        transform: rotate(-1.2deg);
+        margin: 0.2rem 0 1rem;
+      }
+
+      .scribble.brand {
+        color: var(--brand);
+      }
+
+      /* Sticky notes */
+      .sticky {
+        display: inline-block;
+        padding: 0.65rem 0.75rem 0.8rem;
+        font-family: var(--hand);
+        font-size: 0.98rem;
+        line-height: 1.3;
+        color: var(--ink);
+        border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+        border-radius: 2px 10px 3px 8px / 8px 2px 10px 3px;
+        box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.06);
+        max-width: 12.5rem;
+      }
+
+      .sticky.yellow {
+        background: color-mix(in srgb, var(--yellow) 55%, white);
+        transform: rotate(-2.5deg);
+      }
+      .sticky.blue {
+        background: color-mix(in srgb, var(--blue) 50%, white);
+        transform: rotate(2deg);
+      }
+      .sticky.pink {
+        background: color-mix(in srgb, var(--pink) 48%, white);
+        transform: rotate(-1deg);
+      }
+      .sticky.green {
+        background: color-mix(in srgb, var(--green) 48%, white);
+        transform: rotate(1.5deg);
+      }
+      .sticky .tiny {
+        display: block;
+        color: var(--ink-muted);
+        font-size: 0.85rem;
+        margin-top: 0.2rem;
+      }
+
+      .doodle {
+        display: inline-block;
+        vertical-align: -0.2em;
+        margin-right: 0.25rem;
+      }
+
+      .doodle svg {
+        width: 1.35rem;
+        height: 1.35rem;
+        display: block;
+      }
+
+      @media (max-width: 720px) {
+        .top {
+          flex-direction: column;
+        }
+        .tools {
+          justify-content: flex-start;
+        }
+      }
+
+      /* ---- 1 Marker page ---- */
+      .v1 .sheet {
+        /* room for taped sticky in the corner */
+      }
+
+      .v1 .hero-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem 1.5rem;
+        margin-bottom: 0.35rem;
+      }
+
+      .v1 .hero-main {
+        min-width: min(100%, 18rem);
+        flex: 1 1 18rem;
+      }
+
+      .v1 .lines li {
+        border-bottom-color: transparent;
+      }
+      .v1 .lines li + li {
+        border-top: 1px solid var(--hair);
+      }
+
+      .v1 .flow {
+        margin: 0.15rem 0 1.35rem;
+      }
+
+      /* use shared .flow .node sizing from style 2; only keep slight tilt */
+      .v1 .flow .node:nth-child(3) {
+        transform: rotate(0.5deg);
+      }
+
+      .v1 .flow .node:nth-child(5) {
+        transform: rotate(-0.5deg);
+      }
+
+      .v1 .flow .node .rough-mark {
+        /* inline with the label text inside the tiny box */
+        vertical-align: baseline;
+      }
+
+      /* Taped sticky — stuck on the page */
+      .v1 .taped-sticky {
+        position: relative;
+        width: 9.5rem;
+        padding: 0.85rem 0.7rem 0.75rem;
+        margin: 0.2rem 0.4rem 0 0;
+        background: #fff3a0;
+        background-image: linear-gradient(
+          135deg,
+          transparent 62%,
+          rgba(0, 0, 0, 0.04) 62%,
+          rgba(0, 0, 0, 0.04) 100%
+        );
+        border: 1.25px solid color-mix(in srgb, var(--ink) 22%, transparent);
+        box-shadow:
+          1px 2px 0 rgba(27, 27, 31, 0.05),
+          3px 5px 10px rgba(27, 27, 31, 0.06);
+        transform: rotate(3.2deg);
+        font-family: var(--hand);
+        font-size: 0.95rem;
+        line-height: 1.3;
+        color: var(--ink);
+        flex: none;
+      }
+
+      .v1 .taped-sticky::before {
+        /* washi / masking tape across the top */
+        content: "";
+        position: absolute;
+        top: -0.45rem;
+        left: 50%;
+        width: 3.1rem;
+        height: 0.85rem;
+        transform: translateX(-50%) rotate(-2deg);
+        background: color-mix(in srgb, #f5e6b8 70%, rgba(255, 255, 255, 0.55));
+        border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+        opacity: 0.92;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+      }
+
+      .v1 .taped-sticky::after {
+        /* folded dog-ear */
+        content: "";
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 0;
+        height: 0;
+        border-style: solid;
+        border-width: 0 0 0.85rem 0.85rem;
+        border-color: transparent transparent #e6d56a transparent;
+        filter: drop-shadow(-0.5px -0.5px 0 rgba(27, 27, 31, 0.12));
+      }
+
+      .v1 .taped-sticky .tiny {
+        display: block;
+        margin-top: 0.25rem;
+        color: var(--ink-muted);
+        font-size: 0.82rem;
+      }
+
+      .v1 .taped-sticky.blue {
+        background: #cfe6fb;
+        background-image: linear-gradient(
+          135deg,
+          transparent 62%,
+          rgba(0, 0, 0, 0.035) 62%,
+          rgba(0, 0, 0, 0.035) 100%
+        );
+        transform: rotate(-2.4deg);
+      }
+
+      .v1 .taped-sticky.blue::after {
+        border-color: transparent transparent #a8c8e0 transparent;
+      }
+
+      .v1 .stickies-cluster {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.85rem;
+        padding-top: 0.15rem;
+      }
+
+      @media (max-width: 720px) {
+        .v1 .stickies-cluster {
+          flex-direction: row;
+          flex-wrap: wrap;
+          align-items: flex-start;
+          justify-content: flex-start;
+        }
+      }
+
+
+      /* Sketch charts (marker page) */
+      .sketch-charts {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+        gap: 1.75rem 2.25rem;
+        margin: 0.4rem 0 1.6rem;
+        max-width: 68rem;
+      }
+
+      .sketch-chart {
+        font-family: var(--hand);
+      }
+
+      .sketch-chart h3 {
+        margin: 0 0 0.65rem;
+        font-size: 1.15rem;
+        font-weight: 400;
+        color: var(--ink-muted);
+      }
+
+      .chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem 1rem;
+        margin-bottom: 0.65rem;
+        font-size: 0.95rem;
+        color: var(--ink-muted);
+      }
+
+      .chart-legend i {
+        display: inline-block;
+        width: 0.7rem;
+        height: 0.7rem;
+        margin-right: 0.25rem;
+        border: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
+        border-radius: 20% 40% 30% 45%;
+        vertical-align: -0.05em;
+      }
+
+      .trend-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 0.55rem 0.65rem;
+        align-items: end;
+        min-height: 9.5rem;
+        padding-top: 0.35rem;
+        border-bottom: 1.5px solid var(--hair);
+      }
+
+      .trend-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .trend-bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.22rem;
+        height: 7.5rem;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .trend-bar {
+        width: 0.72rem;
+        border: 1.5px solid color-mix(in srgb, var(--ink) 40%, transparent);
+        border-radius: 255px 8px 225px 6px / 8px 225px 6px 255px;
+        min-height: 0.25rem;
+      }
+
+      .trend-bar.in {
+        background: color-mix(in srgb, var(--green) 75%, white);
+        transform: rotate(-1.5deg);
+      }
+
+      .trend-bar.out {
+        background: color-mix(in srgb, var(--pink) 75%, white);
+        transform: rotate(1.2deg);
+      }
+
+      .trend-label {
+        font-size: 0.85rem;
+        color: var(--ink-soft);
+      }
+
+      .meter-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+      }
+
+      .meter-row {
+        display: grid;
+        grid-template-columns: 5.5rem 1fr auto;
+        gap: 0.45rem 0.65rem;
+        align-items: center;
+        font-size: 1.02rem;
+      }
+
+      .meter-row .name {
+        color: var(--ink);
+      }
+
+      .meter-row .amt {
+        color: var(--ink-muted);
+        white-space: nowrap;
+      }
+
+      .meter-track {
+        position: relative;
+        height: 0.85rem;
+      }
+
+      .meter-track svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+      }
+
+      .sketch-charts.three {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .sketch-charts.three .span-2 {
+        grid-column: 1 / -1;
+      }
+
+      /* Math-class notebook graphs */
+      .math-graph {
+        width: 100%;
+        max-width: 28rem;
+        height: auto;
+        display: block;
+        overflow: visible;
+        font-family: var(--hand);
+      }
+
+      .math-graph.wide {
+        max-width: 36rem;
+      }
+
+      .math-graph .notebook-line {
+        stroke: rgba(100, 140, 190, 0.16);
+        stroke-width: 1;
+      }
+
+      .math-graph .axis-line {
+        fill: none;
+        stroke: #1b1b1f;
+        stroke-width: 1.55;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .math-graph .tick {
+        stroke: #1b1b1f;
+        stroke-width: 1.25;
+        stroke-linecap: round;
+      }
+
+      .math-graph .pencil {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .math-graph .pencil.in {
+        stroke: #2f7a58;
+        stroke-width: 1.65;
+      }
+
+      .math-graph .pencil.out {
+        stroke: #b84a56;
+        stroke-width: 1.65;
+      }
+
+      .math-graph .pencil.net {
+        stroke: #6965db;
+        stroke-width: 1.7;
+      }
+
+      .math-graph .plot {
+        fill: #fffefd;
+        stroke: #1b1b1f;
+        stroke-width: 1.25;
+      }
+
+      .math-graph .label {
+        fill: #1b1b1f;
+        font-size: 12px;
+      }
+
+      .math-graph .label.muted {
+        fill: #5b5b5b;
+        font-size: 11px;
+      }
+
+      .math-graph .axis-name {
+        fill: #1b1b1f;
+        font-size: 13px;
+      }
+
+      .pie-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.85rem 1.25rem;
+      }
+
+      .math-pie {
+        width: min(9.5rem, 40vw);
+        height: auto;
+        flex: none;
+        overflow: visible;
+      }
+
+      .math-pie .rim {
+        fill: none;
+        stroke: #1b1b1f;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+      }
+
+      .math-pie .slice-stroke {
+        fill: none;
+        stroke: #1b1b1f;
+        stroke-width: 1.45;
+        stroke-linecap: round;
+      }
+
+      .math-pie .callout {
+        fill: none;
+        stroke: #1b1b1f;
+        stroke-width: 1.2;
+        stroke-linecap: round;
+      }
+
+      .math-pie .callout-text {
+        fill: #1b1b1f;
+        font-family: var(--hand);
+        font-size: 11px;
+      }
+
+      .pie-legend {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-family: var(--hand);
+        font-size: 1.05rem;
+      }
+
+      .pie-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .pie-legend i {
+        width: 0.75rem;
+        height: 0.75rem;
+        border: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
+        border-radius: 25% 40% 35% 45%;
+        display: inline-block;
+      }
+
+      @media (max-width: 820px) {
+        .sketch-charts,
+        .sketch-charts.three {
+          grid-template-columns: 1fr;
+        }
+        .sketch-charts.three .span-2 {
+          grid-column: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="stage">
+<article class="sheet v1">
+          <div class="top">
+            <div>
+              <h2 class="brand">chhan chhan</h2>
+              <nav class="nav" aria-label="Primary">
+                <a class="on" href="#dash">dashboard</a>
+                <a href="#txns">transactions</a>
+                <a href="#studio">studio</a>
+              </nav>
+            </div>
+            <div class="tools">
+              <button class="chip" type="button"><span class="dot"></span> kotak salary</button>
+              <button class="chip" type="button">widgets</button>
+              <button class="chip" type="button">settings</button>
+            </div>
+          </div>
+          <div class="hero-row">
+            <div class="hero-main">
+              <div class="balance-open">
+                <span class="k">balance</span>
+                <span class="v">
+                  <span class="rough-mark is-balance">
+                    <svg class="stroke" viewBox="0 0 320 40" preserveAspectRatio="none" aria-hidden="true">
+                      <path
+                        d="M2 7
+                           L 316 3
+                           L 319 31
+                           L 3 35
+                           Z"
+                        fill="#ffe066"
+                        opacity="0.72"
+                      />
+                      <path
+                        d="M0 9 L 9 5 L 11 34 L 1 35 Z"
+                        fill="#ffe066"
+                        opacity="0.52"
+                      />
+                      <path
+                        d="M310 2 L 320 4 L 320 32 L 308 30 Z"
+                        fill="#ffe066"
+                        opacity="0.48"
+                      />
+                    </svg>
+                    <span class="txt">₹86,481.20</span>
+                  </span>
+                </span>
+                <div class="meta">as of 23 Sep · 3,255 marks</div>
+              </div>
+
+              <div class="flow" aria-label="Month flow">
+                <span class="node">
+                  <span class="rough-mark is-in">
+                    <svg class="stroke" viewBox="0 0 240 36" preserveAspectRatio="none" aria-hidden="true">
+                      <path d="M2 6 L 236 3 L 238 28 L 4 32 Z" fill="#9be7c4" opacity="0.72" />
+                      <path d="M0 8 L 8 5 L 10 30 L 1 31 Z" fill="#9be7c4" opacity="0.55" />
+                      <path d="M232 2 L 240 4 L 239 29 L 230 27 Z" fill="#9be7c4" opacity="0.5" />
+                    </svg>
+                    <span class="txt">in 1.27L</span>
+                  </span>
+                </span>
+                <span class="arrow">→</span>
+                <span class="node">this month</span>
+                <span class="arrow">→</span>
+                <span class="node">
+                  <span class="rough-mark is-out">
+                    <svg class="stroke" viewBox="0 0 240 36" preserveAspectRatio="none" aria-hidden="true">
+                      <path d="M3 4 L 234 8 L 239 31 L 1 27 Z" fill="#ffadad" opacity="0.7" />
+                      <path d="M0 6 L 7 3 L 9 29 L 0 28 Z" fill="#ffadad" opacity="0.5" />
+                      <path d="M228 7 L 240 9 L 240 33 L 227 30 Z" fill="#ffadad" opacity="0.48" />
+                    </svg>
+                    <span class="txt">out 1.52L</span>
+                  </span>
+                </span>
+                <span class="arrow">=</span>
+                <span class="node">
+                  <span class="rough-mark is-net">
+                    <svg class="stroke" viewBox="0 0 240 36" preserveAspectRatio="none" aria-hidden="true">
+                      <path d="M1 9 L 238 2 L 240 26 L 3 34 Z" fill="#d4c5f9" opacity="0.74" />
+                      <path d="M0 10 L 6 7 L 8 33 L 0 34 Z" fill="#d4c5f9" opacity="0.52" />
+                      <path d="M230 1 L 240 0 L 240 27 L 229 28 Z" fill="#d4c5f9" opacity="0.45" />
+                    </svg>
+                    <span class="txt">−24.3k</span>
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            <aside class="stickies-cluster" aria-label="Stuck notes">
+              <div class="taped-sticky">
+                don’t forget
+                <span class="tiny">tag cursor → tools</span>
+              </div>
+              <div class="taped-sticky blue">
+                rent ✓
+                <span class="tiny">already moved</span>
+              </div>
+            </aside>
+          </div>
+
+          <h3 class="section-title">where it went</h3>
+          <div class="pills">
+            <span class="pill pill-blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M4 10h16v9H4z" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+              </svg>
+              food 8.4k
+            </span>
+            <span class="pill pill-purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M5 7h14v12H5z" />
+                <path d="M9 7V5h6v2" />
+              </svg>
+              bills 7k
+            </span>
+            <span class="pill pill-yellow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M4 12h16" />
+                <path d="M14 7l5 5-5 5" />
+              </svg>
+              transfers 10k
+            </span>
+          </div>
+
+          <div class="sketch-charts three">
+            <section class="sketch-chart" aria-label="Monthly trend">
+              <h3>monthly trend · last 6 months</h3>
+              <div class="chart-legend">
+                <span><i style="background: #9be7c4"></i>in</span>
+                <span><i style="background: #ffadad"></i>out</span>
+              </div>
+              <div class="trend-grid">
+                <div class="trend-col">
+                  <div class="trend-bars">
+                    <div class="trend-bar in" style="height: 72%"></div>
+                    <div class="trend-bar out" style="height: 48%"></div>
+                  </div>
+                  <span class="trend-label">Apr</span>
+                </div>
+                <div class="trend-col">
+                  <div class="trend-bars">
+                    <div class="trend-bar in" style="height: 68%"></div>
+                    <div class="trend-bar out" style="height: 62%"></div>
+                  </div>
+                  <span class="trend-label">May</span>
+                </div>
+                <div class="trend-col">
+                  <div class="trend-bars">
+                    <div class="trend-bar in" style="height: 80%"></div>
+                    <div class="trend-bar out" style="height: 55%"></div>
+                  </div>
+                  <span class="trend-label">Jun</span>
+                </div>
+                <div class="trend-col">
+                  <div class="trend-bars">
+                    <div class="trend-bar in" style="height: 76%"></div>
+                    <div class="trend-bar out" style="height: 70%"></div>
+                  </div>
+                  <span class="trend-label">Jul</span>
+                </div>
+                <div class="trend-col">
+                  <div class="trend-bars">
+                    <div class="trend-bar in" style="height: 90%"></div>
+                    <div class="trend-bar out" style="height: 58%"></div>
+                  </div>
+                  <span class="trend-label">Aug</span>
+                </div>
+                <div class="trend-col">
+                  <div class="trend-bars">
+                    <div class="trend-bar in" style="height: 85%"></div>
+                    <div class="trend-bar out" style="height: 95%"></div>
+                  </div>
+                  <span class="trend-label">Sep</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="sketch-chart" aria-label="Category spend">
+              <h3>category spend · this month</h3>
+              <div class="meter-list">
+                <div class="meter-row">
+                  <span class="name">food</span>
+                  <div class="meter-track" aria-hidden="true">
+                    <svg viewBox="0 0 200 16" preserveAspectRatio="none">
+                      <path d="M1 3 L 168 2 L 170 13 L 2 14 Z" fill="#bde0fe" opacity="0.85" />
+                    </svg>
+                  </div>
+                  <span class="amt">8.4k</span>
+                </div>
+                <div class="meter-row">
+                  <span class="name">bills</span>
+                  <div class="meter-track" aria-hidden="true">
+                    <svg viewBox="0 0 200 16" preserveAspectRatio="none">
+                      <path d="M2 4 L 138 1 L 141 12 L 1 14 Z" fill="#d4c5f9" opacity="0.85" />
+                    </svg>
+                  </div>
+                  <span class="amt">7.0k</span>
+                </div>
+                <div class="meter-row">
+                  <span class="name">transfers</span>
+                  <div class="meter-track" aria-hidden="true">
+                    <svg viewBox="0 0 200 16" preserveAspectRatio="none">
+                      <path d="M0 2 L 198 4 L 196 14 L 2 13 Z" fill="#ffe066" opacity="0.8" />
+                    </svg>
+                  </div>
+                  <span class="amt">10k</span>
+                </div>
+                <div class="meter-row">
+                  <span class="name">fun</span>
+                  <div class="meter-track" aria-hidden="true">
+                    <svg viewBox="0 0 200 16" preserveAspectRatio="none">
+                      <path d="M1 3 L 52 2 L 55 13 L 2 14 Z" fill="#ffadad" opacity="0.85" />
+                    </svg>
+                  </div>
+                  <span class="amt">2.1k</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="sketch-chart span-2" aria-label="Math class line graph">
+              <h3>in vs out · drawn like maths class</h3>
+              <div class="chart-legend">
+                <span><i style="background: #9be7c4"></i>in (pencil)</span>
+                <span><i style="background: #ffadad"></i>out (pencil)</span>
+              </div>
+              <svg class="math-graph wide" viewBox="0 0 560 250" role="img" aria-label="Notebook line graph with arrow axes">
+                <!-- faint notebook ruling -->
+                <g aria-hidden="true">
+                  <line class="notebook-line" x1="70" y1="40" x2="500" y2="40" />
+                  <line class="notebook-line" x1="70" y1="70" x2="500" y2="70" />
+                  <line class="notebook-line" x1="70" y1="100" x2="500" y2="100" />
+                  <line class="notebook-line" x1="70" y1="130" x2="500" y2="130" />
+                  <line class="notebook-line" x1="70" y1="160" x2="500" y2="160" />
+                  <line class="notebook-line" x1="100" y1="30" x2="100" y2="190" />
+                  <line class="notebook-line" x1="170" y1="30" x2="170" y2="190" />
+                  <line class="notebook-line" x1="240" y1="30" x2="240" y2="190" />
+                  <line class="notebook-line" x1="310" y1="30" x2="310" y2="190" />
+                  <line class="notebook-line" x1="380" y1="30" x2="380" y2="190" />
+                  <line class="notebook-line" x1="450" y1="30" x2="450" y2="190" />
+                </g>
+
+                <!-- Y axis — pencil wobble + arrow -->
+                <path
+                  class="axis-line"
+                  d="M71 200
+                     C 69 170, 72 140, 70 110
+                     S 69 60, 71 28"
+                />
+                <path d="M71 22 L 64.5 33.5 L 77 34 Z" fill="#1b1b1f" />
+                <text class="axis-name" x="78" y="28">₹</text>
+
+                <!-- X axis — pencil wobble + arrow -->
+                <path
+                  class="axis-line"
+                  d="M70 191
+                     C 160 188, 250 192, 340 189
+                     S 470 191, 510 190"
+                />
+                <path d="M518 190 L 505.5 183.5 L 506.5 196.5 Z" fill="#1b1b1f" />
+                <text class="axis-name" x="500" y="212">months →</text>
+
+                <!-- ticks -->
+                <line class="tick" x1="100" y1="186" x2="100" y2="194" />
+                <line class="tick" x1="170" y1="186" x2="170" y2="194" />
+                <line class="tick" x1="240" y1="186" x2="240" y2="194" />
+                <line class="tick" x1="310" y1="186" x2="310" y2="194" />
+                <line class="tick" x1="380" y1="186" x2="380" y2="194" />
+                <line class="tick" x1="450" y1="186" x2="450" y2="194" />
+                <line class="tick" x1="66" y1="160" x2="74" y2="160" />
+                <line class="tick" x1="66" y1="130" x2="74" y2="130" />
+                <line class="tick" x1="66" y1="100" x2="74" y2="100" />
+                <line class="tick" x1="66" y1="70" x2="74" y2="70" />
+                <line class="tick" x1="66" y1="40" x2="74" y2="40" />
+
+                <text class="label muted" x="90" y="214">Apr</text>
+                <text class="label muted" x="158" y="214">May</text>
+                <text class="label muted" x="230" y="214">Jun</text>
+                <text class="label muted" x="300" y="214">Jul</text>
+                <text class="label muted" x="368" y="214">Aug</text>
+                <text class="label muted" x="438" y="214">Sep</text>
+
+                <!-- pencil lines between plotted points (slightly crooked) -->
+                <path
+                  class="pencil in"
+                  d="M100 142 L 172 128 L 238 108 L 312 98 L 378 78 L 448 70"
+                />
+                <path
+                  class="pencil out"
+                  d="M100 158 L 170 150 L 242 138 L 308 132 L 382 118 L 452 88"
+                />
+
+                <!-- plotted × marks for "in" -->
+                <g stroke="#2f7a58" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M96 138 L 104 146 M 104 138 L 96 146" />
+                  <path d="M168 124 L 176 132 M 176 124 L 168 132" />
+                  <path d="M234 104 L 242 112 M 242 104 L 234 112" />
+                  <path d="M308 94 L 316 102 M 316 94 L 308 102" />
+                  <path d="M374 74 L 382 82 M 382 74 L 374 82" />
+                  <path d="M444 66 L 452 74 M 452 66 L 444 74" />
+                </g>
+                <!-- plotted open circles for "out" -->
+                <circle class="plot" cx="100" cy="158" r="3.4" />
+                <circle class="plot" cx="170" cy="150" r="3.4" />
+                <circle class="plot" cx="242" cy="138" r="3.4" />
+                <circle class="plot" cx="308" cy="132" r="3.4" />
+                <circle class="plot" cx="382" cy="118" r="3.4" />
+                <circle class="plot" cx="452" cy="88" r="3.4" />
+
+                <text class="label" x="456" y="66" fill="#2f7a58">in</text>
+                <text class="label" x="458" y="104" fill="#b84a56">out</text>
+              </svg>
+            </section>
+
+            <section class="sketch-chart" aria-label="Hand drawn pie">
+              <h3>where it went · compass pie</h3>
+              <div class="pie-wrap">
+                <svg class="math-pie" viewBox="0 0 200 160" aria-hidden="true">
+                  <!-- imperfect hand circle (two arc strokes, not perfect) -->
+                  <path
+                    class="rim"
+                    d="M100 28
+                       C 138 30, 156 58, 154 88
+                       C 152 122, 128 144, 98 146
+                       C 66 148, 44 126, 42 90
+                       C 40 56, 62 28, 100 28 Z"
+                    fill="#fffefd"
+                  />
+                  <!-- pastel wedges (under the pencil radii) -->
+                  <path d="M100 88 L 100 30 C 132 32, 150 56, 150 82 Z" fill="#ffe066" opacity="0.7" />
+                  <path d="M100 88 L 150 82 C 152 110, 136 136, 108 144 Z" fill="#bde0fe" opacity="0.7" />
+                  <path d="M100 88 L 108 144 C 78 148, 52 130, 48 100 Z" fill="#d4c5f9" opacity="0.7" />
+                  <path d="M100 88 L 48 100 C 46 68, 66 36, 100 30 Z" fill="#ffadad" opacity="0.65" />
+
+                  <!-- pencil radii from centre (as drawn with a ruler, slightly off) -->
+                  <path class="slice-stroke" d="M100 88 L 101 29" />
+                  <path class="slice-stroke" d="M100 88 L 150 80" />
+                  <path class="slice-stroke" d="M100 88 L 110 144" />
+                  <path class="slice-stroke" d="M100 88 L 47 98" />
+
+                  <!-- redraw rim on top so it looks traced with pencil -->
+                  <path
+                    class="rim"
+                    d="M100 28
+                       C 138 30, 156 58, 154 88
+                       C 152 122, 128 144, 98 146
+                       C 66 148, 44 126, 42 90
+                       C 40 56, 62 28, 100 28"
+                    fill="none"
+                  />
+                  <circle cx="100" cy="88" r="2.2" fill="#1b1b1f" />
+
+                  <!-- annotation arrows -->
+                  <path class="callout" d="M150 70 L 172 52" />
+                  <text class="callout-text" x="174" y="50">transfers</text>
+                  <path class="callout" d="M130 130 L 158 142" />
+                  <text class="callout-text" x="160" y="150">food</text>
+                  <path class="callout" d="M70 130 L 40 148" />
+                  <text class="callout-text" x="8" y="156">bills</text>
+                  <path class="callout" d="M62 55 L 34 40" />
+                  <text class="callout-text" x="8" y="36">fun</text>
+                </svg>
+                <div class="pie-legend">
+                  <span><i style="background: #ffe066"></i>transfers 36%</span>
+                  <span><i style="background: #bde0fe"></i>food 30%</span>
+                  <span><i style="background: #d4c5f9"></i>bills 25%</span>
+                  <span><i style="background: #ffadad"></i>fun 9%</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="sketch-chart" aria-label="Net math graph">
+              <h3>net · single pencil line</h3>
+              <svg class="math-graph" viewBox="0 0 300 200" role="img" aria-label="Net notebook graph">
+                <g aria-hidden="true">
+                  <line class="notebook-line" x1="48" y1="36" x2="260" y2="36" />
+                  <line class="notebook-line" x1="48" y1="66" x2="260" y2="66" />
+                  <line class="notebook-line" x1="48" y1="96" x2="260" y2="96" />
+                  <line class="notebook-line" x1="48" y1="126" x2="260" y2="126" />
+                  <line class="notebook-line" x1="90" y1="28" x2="90" y2="150" />
+                  <line class="notebook-line" x1="140" y1="28" x2="140" y2="150" />
+                  <line class="notebook-line" x1="190" y1="28" x2="190" y2="150" />
+                  <line class="notebook-line" x1="240" y1="28" x2="240" y2="150" />
+                </g>
+
+                <!-- pencil Y -->
+                <path
+                  class="axis-line"
+                  d="M49 155
+                     C 47 120, 50 85, 48 55
+                     S 48 30, 49 24"
+                />
+                <path d="M49 18 L 42.5 29.5 L 55 30 Z" fill="#1b1b1f" />
+                <text class="axis-name" x="56" y="26">net</text>
+
+                <!-- pencil X -->
+                <path
+                  class="axis-line"
+                  d="M48 149
+                     C 110 146, 170 151, 220 147
+                     S 255 149, 268 148"
+                />
+                <path d="M276 148 L 263.5 141.5 L 264.5 154.5 Z" fill="#1b1b1f" />
+                <text class="axis-name" x="250" y="170">t →</text>
+
+                <line class="tick" x1="90" y1="144" x2="90" y2="152" />
+                <line class="tick" x1="140" y1="144" x2="140" y2="152" />
+                <line class="tick" x1="190" y1="144" x2="190" y2="152" />
+                <line class="tick" x1="240" y1="144" x2="240" y2="152" />
+
+                <text class="label muted" x="78" y="172">Apr</text>
+                <text class="label muted" x="128" y="172">Jun</text>
+                <text class="label muted" x="178" y="172">Aug</text>
+                <text class="label muted" x="228" y="172">Sep</text>
+
+                <path class="pencil net" d="M90 118 L 140 102 L 190 88 L 240 76" />
+                <g stroke="#6965db" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M86 114 L 94 122 M 94 114 L 86 122" />
+                  <path d="M136 98 L 144 106 M 144 98 L 136 106" />
+                  <path d="M186 84 L 194 92 M 194 84 L 186 92" />
+                  <path d="M236 72 L 244 80 M 244 72 L 236 80" />
+                </g>
+                <text class="label" x="246" y="72" fill="#6965db">net</text>
+              </svg>
+            </section>
+          </div>
+
+          <ul class="lines">
+            <li><span>food &amp; groceries</span><span class="amt">₹8,420</span></li>
+            <li><span>subscriptions</span><span class="amt">₹3,116</span></li>
+            <li><span>transfers</span><span class="amt">₹10,000</span></li>
+          </ul>
+          <div class="footer-links">
+            <a href="#txns">→ open the ledger</a>
+            <a href="#studio">→ tags · categories · import</a>
+          </div>
+        </article>
+    </main>
+
+    <div class="trial-switcher">
+      <div class="trial-menu" id="trial-menu" data-open="false" role="dialog" aria-label="Font and paper trials">
+        <p class="menu-label">fonts</p>
+        <button type="button" data-fonts="virgil" aria-selected="true">Virgil</button>
+        <button type="button" data-fonts="architects" aria-selected="false">Architects Daughter</button>
+        <button type="button" data-fonts="gaegu" aria-selected="false">Gaegu</button>
+        <button type="button" data-fonts="indie" aria-selected="false">Indie Flower</button>
+        <button type="button" data-fonts="kalam" aria-selected="false">Kalam</button>
+        <button type="button" data-fonts="virgil-kalam" aria-selected="false">Virgil + Kalam</button>
+        <button type="button" data-fonts="architects-gaegu" aria-selected="false">Architects + Gaegu</button>
+        <button type="button" data-fonts="indie-kalam" aria-selected="false">Indie Flower + Kalam</button>
+
+        <p class="menu-label">paper texture</p>
+        <button type="button" data-paper="plain" aria-selected="true">plain</button>
+        <button type="button" data-paper="rough" aria-selected="false">rough (softer)</button>
+        <button type="button" data-paper="lines" aria-selected="false">lines · blue</button>
+        <button type="button" data-paper="lines-gray" aria-selected="false">lines · gray</button>
+        <button type="button" data-paper="grid" aria-selected="false">grid · blue</button>
+        <button type="button" data-paper="grid-gray" aria-selected="false">grid · gray</button>
+        <button type="button" data-paper="dots" aria-selected="false">dots · blue</button>
+        <button type="button" data-paper="dots-gray" aria-selected="false">dots · gray</button>
+      </div>
+      <div class="trial-fab-wrap">
+        <button
+          type="button"
+          class="trial-fab"
+          id="trial-fab"
+          aria-label="Try fonts and paper"
+          aria-expanded="false"
+          aria-controls="trial-menu"
+          title="Fonts &amp; paper"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 7h16M7 12h10M9 17h6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const root = document.documentElement;
+      const fab = document.getElementById("trial-fab");
+      const menu = document.getElementById("trial-menu");
+      const fontBtns = [...menu.querySelectorAll("button[data-fonts]")];
+      const paperBtns = [...menu.querySelectorAll("button[data-paper]")];
+
+      function setOpen(open) {
+        menu.dataset.open = String(open);
+        fab.setAttribute("aria-expanded", String(open));
+      }
+
+      function applyFonts(id) {
+        root.dataset.fonts = id;
+        fontBtns.forEach((b) => b.setAttribute("aria-selected", String(b.dataset.fonts === id)));
+      }
+
+      function applyPaper(id) {
+        root.dataset.paper = id;
+        paperBtns.forEach((b) => b.setAttribute("aria-selected", String(b.dataset.paper === id)));
+      }
+
+      fab.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setOpen(menu.dataset.open !== "true");
+      });
+
+      fontBtns.forEach((b) => b.addEventListener("click", () => applyFonts(b.dataset.fonts)));
+      paperBtns.forEach((b) => b.addEventListener("click", () => applyPaper(b.dataset.paper)));
+
+      document.addEventListener("click", (e) => {
+        if (!e.target.closest(".trial-switcher")) setOpen(false);
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") setOpen(false);
+      });
+
+      // deep-link: #fonts=caveat-assistant&paper=grid
+      const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+      if (params.get("fonts")) applyFonts(params.get("fonts"));
+      if (params.get("paper")) applyPaper(params.get("paper"));
+    </script>
+  </body>
+</html>
