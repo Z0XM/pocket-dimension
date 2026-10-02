@@ -38,6 +38,16 @@ export type ImportResult = {
 
 export type ImportPreviewRowStatus = "will_import" | "duplicate" | "invalid" | "warning";
 
+export type ImportClassificationSuggestion = {
+  categoryId: string | null;
+  categoryName: string | null;
+  tagIds: string[];
+  tagNames: string[];
+  source: "exact" | "fuzzy";
+  matchedMerchant: string;
+  sampleCount: number;
+};
+
 export type ImportPreviewRow = {
   row: number;
   status: ImportPreviewRowStatus;
@@ -50,6 +60,21 @@ export type ImportPreviewRow = {
   notes?: string;
   balanceMinor?: number;
   sortOrder?: number;
+  suggestion?: ImportClassificationSuggestion | null;
+};
+
+export type ImportPreviewTaxonomy = {
+  categories: Array<{
+    id: string;
+    name: string;
+    kind: "expense" | "income" | "transfer";
+    colorHex: string | null;
+  }>;
+  tags: Array<{
+    id: string;
+    name: string;
+    colorHex: string | null;
+  }>;
 };
 
 export type ImportPreview = {
@@ -71,6 +96,12 @@ export type ImportPreview = {
   metadata: Record<string, string>;
   importerId: string;
   fileName: string;
+  taxonomy: ImportPreviewTaxonomy;
+};
+
+export type ImportRowAssignment = {
+  categoryId?: string | null;
+  tagIds?: string[];
 };
 
 export type StatementInput = {

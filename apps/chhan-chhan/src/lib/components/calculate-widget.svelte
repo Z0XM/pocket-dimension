@@ -44,11 +44,11 @@
     align-items: center;
     gap: 0.85rem;
     padding: 0.55rem 0.65rem 0.55rem 0.9rem;
-    background: var(--paper, #fffefd);
+    background: var(--surface-raised);
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
     border-radius: 3px 12px 5px 10px / 10px 4px 12px 5px;
     box-shadow:
-      2px 3px 0 0 color-mix(in srgb, var(--yellow) 55%, #f7f4ea),
+      2px 3px 0 0 color-mix(in srgb, var(--yellow) 55%, var(--shadow-paper)),
       2px 3px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
     max-width: calc(100vw - 2rem);
     font-family: var(--hand);
@@ -112,7 +112,7 @@
   .calc-action {
     appearance: none;
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
-    background: color-mix(in srgb, var(--paper, #fffefd) 70%, white);
+    background: color-mix(in srgb, var(--paper) 70%, var(--mix-wash));
     color: var(--ink);
     font-family: var(--hand);
     font-size: 0.88rem;

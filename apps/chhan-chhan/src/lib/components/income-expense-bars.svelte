@@ -63,7 +63,7 @@
 
   .compare-track {
     height: 0.85rem;
-    background: color-mix(in srgb, var(--paper) 80%, white);
+    background: color-mix(in srgb, var(--paper) 80%, var(--mix-wash));
     border: 1.25px solid color-mix(in srgb, var(--ink) 28%, transparent);
     overflow: hidden;
     border-radius: 2px 7px 3px 6px;

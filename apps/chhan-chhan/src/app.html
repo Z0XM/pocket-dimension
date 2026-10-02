@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-fonts="gaegu" data-paper="dots">
+<html lang="en" data-fonts="gaegu" data-paper="dots" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -14,13 +14,11 @@
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Chhan Chhan" />
     <meta name="twitter:description" content="Personal finance and transaction tracking — beta." />
-    <link rel="icon" href="%sveltekit.assets%/icon.png" type="image/png" media="(prefers-color-scheme: light)" />
-    <link rel="icon" href="%sveltekit.assets%/icon-dark.png" type="image/png" media="(prefers-color-scheme: dark)" />
-    <link rel="icon" href="%sveltekit.assets%/icon.png" type="image/png" />
-    <link rel="apple-touch-icon" href="%sveltekit.assets%/icon.png" />
+    <link rel="icon" href="%sveltekit.assets%/icon-dark.png" type="image/png" />
+    <link rel="apple-touch-icon" href="%sveltekit.assets%/icon-dark.png" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#fffefd" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#fffefd" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -39,15 +37,36 @@
     <script>
       (function () {
         try {
+          var root = document.documentElement;
+          var theme = "light";
           var raw = localStorage.getItem("chhan-appearance");
-          if (!raw) return;
-          var parsed = JSON.parse(raw);
-          if (parsed && typeof parsed.fonts === "string") {
-            document.documentElement.setAttribute("data-fonts", parsed.fonts);
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            if (parsed && typeof parsed.fonts === "string") {
+              root.setAttribute("data-fonts", parsed.fonts);
+            }
+            if (parsed && typeof parsed.paper === "string") {
+              root.setAttribute("data-paper", parsed.paper);
+            }
+            var ver = parsed && typeof parsed.v === "number" ? parsed.v : 1;
+            // v1 defaulted to system (OS). v2+ defaults to light even when OS is dark.
+            if (ver < 2 && (!parsed.theme || parsed.theme === "system")) {
+              theme = "light";
+              parsed.theme = "light";
+              parsed.v = 2;
+              localStorage.setItem("chhan-appearance", JSON.stringify(parsed));
+            } else if (parsed && typeof parsed.theme === "string") {
+              theme = parsed.theme;
+            }
           }
-          if (parsed && typeof parsed.paper === "string") {
-            document.documentElement.setAttribute("data-paper", parsed.paper);
-          }
+          var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var resolved = "light";
+          if (theme === "dark") resolved = "dark";
+          else if (theme === "system") resolved = prefersDark ? "dark" : "light";
+          root.setAttribute("data-theme", resolved);
+          root.style.colorScheme = resolved;
+          var meta = document.querySelector('meta[name="theme-color"]:not([media])');
+          if (meta) meta.setAttribute("content", resolved === "dark" ? "#121212" : "#fffefd");
         } catch (_) {}
       })();
     </script>

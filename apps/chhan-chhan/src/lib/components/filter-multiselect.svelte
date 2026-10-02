@@ -1,5 +1,6 @@
 <script lang="ts">
   import Check from "@lucide/svelte/icons/check";
+  import ListFilter from "@lucide/svelte/icons/list-filter";
 
   type Option = {
     id: string;
@@ -11,9 +12,10 @@
     options: Option[];
     selected: string[];
     onchange: (selected: string[]) => void;
+    variant?: "default" | "icon";
   };
 
-  const { label, options = [], selected = [], onchange }: Props = $props();
+  const { label, options = [], selected = [], onchange, variant = "default" }: Props = $props();
 
   let open = $state(false);
   let root: HTMLDivElement | undefined = $state();
@@ -87,11 +89,39 @@
   });
 </script>
 
-<div class="filter-multi" class:open bind:this={root}>
-  <button type="button" class="filter-multi-btn" class:active={selected.length > 0} aria-expanded={open} aria-haspopup="listbox" onclick={toggleOpen}>
-    <span class="filter-value">{buttonLabel}</span>
-    <span class="filter-caret" aria-hidden="true">▾</span>
-  </button>
+<div class="filter-multi" class:open class:icon={variant === "icon"} bind:this={root}>
+  {#if variant === "icon"}
+    <div class="filter-icon-row">
+      <span class="filter-heading">{label}</span>
+      <button
+        type="button"
+        class="filter-icon-btn"
+        class:active={selected.length > 0}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label="Filter {label.toLowerCase()}"
+        title="Filter {label.toLowerCase()}"
+        onclick={toggleOpen}
+      >
+        <ListFilter size={14} strokeWidth={1.75} aria-hidden="true" />
+        {#if selected.length > 0}
+          <span class="filter-count">{selected.length}</span>
+        {/if}
+      </button>
+    </div>
+  {:else}
+    <button
+      type="button"
+      class="filter-multi-btn"
+      class:active={selected.length > 0}
+      aria-expanded={open}
+      aria-haspopup="listbox"
+      onclick={toggleOpen}
+    >
+      <span class="filter-value">{buttonLabel}</span>
+      <span class="filter-caret" aria-hidden="true">▾</span>
+    </button>
+  {/if}
 
   {#if open}
     <div class="filter-multi-panel" role="listbox" aria-label="{label} filter" aria-multiselectable="true" style={panelStyle}>
@@ -131,6 +161,62 @@
   .filter-multi {
     position: relative;
     min-width: 7.5rem;
+  }
+
+  .filter-multi.icon {
+    min-width: 0;
+  }
+
+  .filter-icon-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .filter-heading {
+    font-family: var(--hand);
+    font-size: 1rem;
+    color: var(--ink-muted);
+    letter-spacing: 0.01em;
+  }
+
+  .filter-icon-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--ink-muted);
+    cursor: pointer;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
+  }
+
+  .filter-icon-btn:hover,
+  .filter-multi.open .filter-icon-btn,
+  .filter-icon-btn.active {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--yellow) 55%, transparent);
+  }
+
+  .filter-count {
+    position: absolute;
+    top: -0.2rem;
+    right: -0.25rem;
+    min-width: 0.95rem;
+    height: 0.95rem;
+    padding: 0 0.18rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--yellow) 78%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    color: var(--ink);
+    font-family: var(--hand);
+    font-size: 0.62rem;
+    line-height: 0.95rem;
+    text-align: center;
   }
 
   .filter-multi-btn {
@@ -181,11 +267,11 @@
     z-index: 100;
     max-height: min(18rem, calc(100vh - 8rem));
     overflow: auto;
-    background: #fffef8;
+    background: var(--surface-raised);
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
     border-radius: 2px 6px 3px 2px;
     box-shadow:
-      2px 2px 0 0 #f7f4ea,
+      2px 2px 0 0 var(--shadow-paper),
       2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
     padding: 0.35rem 0.25rem 0.45rem;
   }

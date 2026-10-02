@@ -4,27 +4,41 @@
     --surface: var(--card);
     --surface2: var(--secondary);
     --table-line: var(--hair);
-    --chrome-line: rgba(27, 27, 31, 0.22);
+    --chrome-line: color-mix(in srgb, var(--ink) 22%, transparent);
     --muted: var(--ink-muted);
     --cyan: var(--hi-cyan);
     --acid: var(--brand);
     --pos: var(--success);
     --neg: var(--danger);
-    min-height: 100vh;
+    min-height: 100dvh;
     background-color: var(--bg);
     color: var(--main-text);
     font-family: var(--hand);
   }
 
   .forge-shell {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .forge .content {
-    padding: 1.5rem clamp(1.25rem, 4vw, 2.5rem) 3rem;
+    flex: 1 1 auto;
+    min-height: 0;
     min-width: 0;
     max-width: 1400px;
+    width: 100%;
     margin: 0 auto;
+    padding: 1.5rem clamp(1.25rem, 4vw, 2.5rem) 1.25rem;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .forge .content.content-lock {
+    overflow: hidden;
   }
 
   .forge .settings {
@@ -68,7 +82,12 @@
     transform: rotate(-1deg) scale(1.04);
   }
 
-  .forge button.settings-icon:hover {
+  .forge button.settings-icon.theme-toggle:hover {
+    color: var(--brand);
+    background: color-mix(in srgb, var(--purple) 55%, transparent);
+  }
+
+  .forge button.settings-icon:not(.theme-toggle):hover {
     color: var(--neg, #c45b6a);
     background: color-mix(in srgb, var(--pink) 55%, transparent);
     transform: rotate(1deg) scale(1.04);
@@ -165,8 +184,11 @@
     width: clamp(1.85rem, 4.2vw, 2.45rem);
     height: clamp(1.85rem, 4.2vw, 2.45rem);
     flex: none;
-    object-fit: contain;
-    transform: rotate(-5deg);
+  }
+
+  .forge .auth-art .brand-mark {
+    width: auto;
+    height: auto;
   }
 
   .forge .brand-word {
@@ -224,7 +246,7 @@
   .forge .cta:hover {
     transform: none;
     background: var(--brand);
-    color: #fff;
+    color: var(--primary-foreground);
     box-shadow: none;
   }
 
@@ -285,7 +307,7 @@
   }
 
   .forge .stat.net {
-    background: color-mix(in srgb, var(--yellow) 42%, white);
+    background: color-mix(in srgb, var(--yellow) 42%, var(--mix-wash));
     color: var(--ink);
     box-shadow: none;
   }
@@ -360,7 +382,7 @@
     min-height: 16rem;
     overflow: hidden;
     background:
-      linear-gradient(to bottom, color-mix(in srgb, var(--paper, #fffefd) 92%, white), var(--paper, #fffefd)),
+      linear-gradient(to bottom, color-mix(in srgb, var(--paper) 92%, var(--mix-wash)), var(--paper)),
       var(--surface);
   }
 
@@ -384,7 +406,7 @@
     letter-spacing: 0.01em;
     color: var(--ink-muted);
     padding: 0.7rem 0.9rem 0.55rem;
-    background: color-mix(in srgb, var(--paper, #fffefd) 88%, var(--yellow) 12%);
+    background: color-mix(in srgb, var(--paper) 88%, var(--yellow) 12%);
     border-top: none;
     border-bottom: 2px solid color-mix(in srgb, var(--ink) 22%, transparent);
     position: sticky;
@@ -429,8 +451,8 @@
     background:
       linear-gradient(
         to bottom,
-        color-mix(in srgb, var(--paper, #fffefd) 96%, white),
-        color-mix(in srgb, var(--paper, #fffefd) 88%, var(--yellow) 8%)
+        color-mix(in srgb, var(--paper) 96%, var(--mix-wash)),
+        color-mix(in srgb, var(--paper) 88%, var(--yellow) 8%)
       );
   }
 
@@ -674,7 +696,7 @@
   }
 
   .forge .tag-add button {
-    background: color-mix(in srgb, var(--green) 55%, white);
+    background: color-mix(in srgb, var(--green) 55%, var(--mix-wash));
     border: 1.5px solid var(--chrome-line);
     color: var(--ink);
     font-weight: 400;

@@ -12,9 +12,9 @@ Includes:
 - Paper white `#fffefd`, hand + UI type, dry-erase pastels · no card chrome
 
 ## Conversion status
-**Converted in-app (this pass):** paper tokens, forge chrome remap, Virgil + Google hand fonts, `data-fonts` / `data-paper` via localStorage (`chhan-appearance`), Control **Customise** panel, dashboards (balance highlighter, flow boxes, pills, taped stickies, notebook charts), transactions / control / auth / shared chrome restyle. Preferences are browser-local only (no DB).
+**Converted in-app (this pass):** paper tokens, forge chrome remap, Virgil + Google hand fonts, `data-fonts` / `data-paper` / `data-theme` via localStorage (`chhan-appearance`), Control **Customise** panel (fonts, paper, light/dark/system theme), dashboards (balance highlighter, flow boxes, pills, taped stickies, notebook charts), transactions / control / auth / shared chrome restyle. Preferences are browser-local only (no DB).
 
-**Defaults:** Gaegu + dots · blue.
+**Defaults:** Gaegu + dots · blue · theme light.
 
 ## User customisation (Control Center)
 **Customise** under `/app/control` lets users pick:

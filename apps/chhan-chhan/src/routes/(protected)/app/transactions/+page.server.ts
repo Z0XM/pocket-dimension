@@ -1,6 +1,4 @@
 import {
-  getAnalytics,
-  getCategorySpend,
   getCurrentBalance,
   getRefundLinkClusterIds,
   getTransactionSummary,
@@ -59,7 +57,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   };
   const dateRange = summarySelectionToDateRange(summarySelection);
 
-  const [transactions, analytics, summary, currentBalance, categorySpendRows] = await Promise.all([
+  const [transactions, summary, currentBalance] = await Promise.all([
     listTransactions(account.id, {
       pageIndex: 0,
       pageSize,
@@ -74,33 +72,11 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       search: searchQuery || undefined,
       linkTransactionId: selectedLinkTransactionId ?? undefined,
     }),
-    getAnalytics(account.id),
     getTransactionSummary(account.id, summarySelection),
     getCurrentBalance(account.id),
-    getCategorySpend(account.id, summarySelection),
   ]);
 
   const savingsRate = summary.incomeMinor > 0 ? summary.netMinor / summary.incomeMinor : 0;
-
-  const budgetUsage = analytics.budgetUsage.map((budget) => ({
-    id: budget.id,
-    name: budget.name,
-    pct: budget.limit_minor > 0 ? Math.min(100, Math.round((budget.spent_minor / budget.limit_minor) * 100)) : 0,
-    color: "#54dbee",
-  }));
-
-  const categorySpend = categorySpendRows.map((row, index) => ({
-    name: row.category_name,
-    pct: summary.expenseMinor > 0 ? Math.min(100, Math.round((Number(row.amount_minor) / summary.expenseMinor) * 100)) : 0,
-    color: ["#bd93f9", "#50fa7b", "#54dbee", "#ee7c02", "#ffb86c"][index % 5],
-  }));
-
-  const meterRows =
-    searchQuery || selectedCategoryFilters.length || selectedTagIds.length
-      ? categorySpend.slice(0, 5)
-      : budgetUsage.length
-        ? budgetUsage
-        : categorySpend.slice(0, 5);
 
   return {
     account,
@@ -128,6 +104,5 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     summaryPrefix: getSummaryPrefix(summarySelection),
     summary: { ...summary, savingsRate },
     currentBalance,
-    budgetUsage: meterRows,
   };
 };

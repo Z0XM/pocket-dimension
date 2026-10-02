@@ -15,12 +15,14 @@
   import {
     FONT_OPTIONS,
     PAPER_OPTIONS,
+    THEME_OPTIONS,
     applyAppearanceToDocument,
     readAppearance,
     setAppearance,
     type Appearance,
     type FontId,
     type PaperId,
+    type ThemeId,
   } from "$lib/appearance";
   import type { ImportPreview, ImportResult } from "$lib/importers/types";
   import SquarePen from "@lucide/svelte/icons/square-pen";
@@ -28,6 +30,7 @@
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import Layers from "@lucide/svelte/icons/layers";
   import Plus from "@lucide/svelte/icons/plus";
+  import Check from "@lucide/svelte/icons/check";
   import X from "@lucide/svelte/icons/x";
   import { onMount } from "svelte";
   import type { PageData, ActionData } from "./$types";
@@ -52,7 +55,7 @@
     groups: "organize",
   };
 
-  let appearance = $state<Appearance>({ fonts: "gaegu", paper: "dots" });
+  let appearance = $state<Appearance>({ fonts: "gaegu", paper: "dots", theme: "light" });
   let activeTab = $state<ControlTabId>("customise");
 
   onMount(() => {
@@ -88,6 +91,10 @@
     appearance = setAppearance({ paper });
   }
 
+  function chooseTheme(theme: ThemeId) {
+    appearance = setAppearance({ theme });
+  }
+
   let importing = $state(false);
   let importProgress = $state(0);
   let importStatus = $state("");
@@ -104,6 +111,7 @@
   let confirmingImport = $state(false);
   let confirmProgress = $state(0);
   let confirmStatus = $state("");
+  let importRowAssignments = $state<Record<number, { categoryId: string | null; tagIds: string[] }>>({});
   let importFormEl = $state<HTMLFormElement | null>(null);
   let addingCategory = $state(false);
   let editingId = $state<string | null>(null);
@@ -240,12 +248,36 @@
     confirmingImport = false;
     confirmProgress = 0;
     confirmStatus = "";
+    importRowAssignments = {};
   }
 
-  function buildImportFormData(file: File, importer: string): FormData {
+  function buildAssignmentsFromPreview(preview: ImportPreview) {
+    const next: Record<number, { categoryId: string | null; tagIds: string[] }> = {};
+    for (const row of preview.rows) {
+      if (row.status !== "will_import" && row.status !== "warning") continue;
+      next[row.row] = {
+        categoryId: row.suggestion?.categoryId ?? null,
+        tagIds: [...(row.suggestion?.tagIds ?? [])],
+      };
+    }
+    return next;
+  }
+
+  function updateImportRowAssignment(row: number, next: { categoryId: string | null; tagIds: string[] }) {
+    importRowAssignments = { ...importRowAssignments, [row]: next };
+  }
+
+  function buildImportFormData(
+    file: File,
+    importer: string,
+    assignments?: Record<number, { categoryId: string | null; tagIds: string[] }>
+  ): FormData {
     const formData = new FormData();
     formData.set("file", file);
     formData.set("importer", importer);
+    if (assignments) {
+      formData.set("assignments", JSON.stringify(assignments));
+    }
     return formData;
   }
 
@@ -289,6 +321,7 @@
       pendingImporter = importer;
       pendingAccountId = accountId;
       importPreview = preview;
+      importRowAssignments = buildAssignmentsFromPreview(preview);
       reviewMode = "preview";
       setTab("data");
     } catch (cause) {
@@ -308,7 +341,7 @@
     importMessage = null;
 
     try {
-      const formData = buildImportFormData(pendingFile, pendingImporter);
+      const formData = buildImportFormData(pendingFile, pendingImporter, importRowAssignments);
       const result = await importStatementWithProgress(pendingAccountId, formData, handleImportEvent);
       confirmProgress = 100;
       confirmStatus = "Import complete";
@@ -318,6 +351,7 @@
       importMessage = `Imported ${result.accepted} transactions (${result.skipped} skipped, ${result.rejected} rejected)`;
       reviewMode = "result";
       importPreview = null;
+      importRowAssignments = {};
       pendingFile = null;
       pendingAccountId = "";
       importFormEl?.reset();
@@ -366,6 +400,8 @@
     confirming={confirmingImport}
     {confirmProgress}
     {confirmStatus}
+    rowAssignments={importRowAssignments}
+    onRowAssignmentChange={updateImportRowAssignment}
     onConfirm={confirmPendingImport}
     onCancel={clearReview}
   />
@@ -403,9 +439,30 @@
     {#if activeTab === "customise"}
       <section class="sheet-panel" id="control-panel-customise" role="tabpanel" aria-labelledby="control-tab-customise">
         <h2>Customise</h2>
-        <p class="panel-copy dim">Fonts and paper texture apply across the app on this browser.</p>
+        <p class="panel-copy dim">Fonts, paper, and theme apply across the app on this browser.</p>
 
         <div class="customise-grid">
+          <div class="customise-block">
+            <p class="customise-label">Theme</p>
+            <ul class="customise-list" role="radiogroup" aria-label="Color theme">
+              {#each THEME_OPTIONS as option (option.id)}
+                <li>
+                  <button
+                    type="button"
+                    class="customise-bullet"
+                    class:active={appearance.theme === option.id}
+                    role="radio"
+                    aria-checked={appearance.theme === option.id}
+                    onclick={() => chooseTheme(option.id)}
+                  >
+                    <span class="dot" aria-hidden="true">•</span>
+                    <span class="mark">{option.label}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </div>
+
           <div class="customise-block">
             <p class="customise-label">Hand fonts</p>
             <ul class="customise-list" role="radiogroup" aria-label="Font pairing">
@@ -767,15 +824,21 @@
                           {/each}
                         </div>
                         <div class="edit-actions">
-                          <button class="organize-submit" type="submit" disabled={savingCategoryId === category.id}>
-                            {savingCategoryId === category.id ? "SAVING…" : "SAVE"}
+                          <button
+                            class="icon-btn ok"
+                            type="submit"
+                            aria-label={savingCategoryId === category.id ? "Saving" : "Save"}
+                            disabled={savingCategoryId === category.id}
+                          >
+                            <Check size={16} strokeWidth={1.6} aria-hidden="true" />
                           </button>
-                          <button type="button" class="ghost" onclick={() => (editingId = null)}>CANCEL</button>
+                          <button type="button" class="icon-btn danger" aria-label="Cancel" onclick={() => (editingId = null)}>
+                            <X size={16} strokeWidth={1.6} aria-hidden="true" />
+                          </button>
                         </div>
                       </form>
                     {:else}
                       <span class="cat">
-                        <span class="sq" style="background:{category.colorHex ?? '#FFB997'}"></span>
                         <span class="mark" style="--item-color: {category.colorHex ?? '#FFB997'}">{category.name}</span>
                       </span>
                       <span class="kind kind-{category.kind}">{category.kind}</span>
@@ -890,10 +953,17 @@
                           {/each}
                         </div>
                         <div class="edit-actions">
-                          <button class="organize-submit" type="submit" disabled={savingTagId === tag.id}>
-                            {savingTagId === tag.id ? "SAVING…" : "SAVE"}
+                          <button
+                            class="icon-btn ok"
+                            type="submit"
+                            aria-label={savingTagId === tag.id ? "Saving" : "Save"}
+                            disabled={savingTagId === tag.id}
+                          >
+                            <Check size={16} strokeWidth={1.6} aria-hidden="true" />
                           </button>
-                          <button type="button" class="ghost" onclick={() => (editingTagId = null)}>CANCEL</button>
+                          <button type="button" class="icon-btn danger" aria-label="Cancel" onclick={() => (editingTagId = null)}>
+                            <X size={16} strokeWidth={1.6} aria-hidden="true" />
+                          </button>
                         </div>
                       </form>
                     {:else}
@@ -976,10 +1046,17 @@
                         <input type="hidden" name="id" value={group.id} />
                         <input class="organize-name" name="name" value={group.name} required />
                         <div class="edit-actions">
-                          <button class="organize-submit" type="submit" disabled={savingGroupId === group.id}>
-                            {savingGroupId === group.id ? "SAVING…" : "SAVE"}
+                          <button
+                            class="icon-btn ok"
+                            type="submit"
+                            aria-label={savingGroupId === group.id ? "Saving" : "Save"}
+                            disabled={savingGroupId === group.id}
+                          >
+                            <Check size={16} strokeWidth={1.6} aria-hidden="true" />
                           </button>
-                          <button type="button" class="ghost" onclick={() => (editingGroupId = null)}>CANCEL</button>
+                          <button type="button" class="icon-btn danger" aria-label="Cancel" onclick={() => (editingGroupId = null)}>
+                            <X size={16} strokeWidth={1.6} aria-hidden="true" />
+                          </button>
                         </div>
                       </form>
                     {:else}
@@ -1068,7 +1145,7 @@
     padding: 0.22rem 0.95rem 0.7rem;
     cursor: pointer;
     position: relative;
-    background: color-mix(in srgb, var(--yellow) 72%, white);
+    background: color-mix(in srgb, var(--yellow) 72%, var(--mix-wash));
     margin-right: -0.2rem;
     /* deeper bookmarks tuck further under the stack */
     z-index: calc(4 - var(--depth));
@@ -1076,16 +1153,16 @@
   }
 
   .paper-tab.tone-yellow {
-    background: color-mix(in srgb, var(--yellow) 78%, white);
+    background: color-mix(in srgb, var(--yellow) 78%, var(--mix-wash));
   }
   .paper-tab.tone-green {
-    background: color-mix(in srgb, var(--green) 72%, white);
+    background: color-mix(in srgb, var(--green) 72%, var(--mix-wash));
   }
   .paper-tab.tone-blue {
-    background: color-mix(in srgb, var(--blue) 74%, white);
+    background: color-mix(in srgb, var(--blue) 74%, var(--mix-wash));
   }
   .paper-tab.tone-orange {
-    background: color-mix(in srgb, var(--orange) 76%, white);
+    background: color-mix(in srgb, var(--orange) 76%, var(--mix-wash));
   }
 
   .paper-tab:hover {
@@ -1100,7 +1177,7 @@
   }
 
   .notebook-sheet {
-    --page: #fffef8;
+    --page: var(--surface-raised);
     position: relative;
     z-index: 6;
     background: var(--page);
@@ -1110,7 +1187,7 @@
     min-height: 18rem;
     /* stacked pages peeking out — bookmarks sit between these layers */
     box-shadow:
-      3px 3px 0 0 #f7f4ea,
+      3px 3px 0 0 var(--shadow-paper),
       3px 3px 0 1.5px color-mix(in srgb, var(--ink) 22%, transparent),
       6px 6px 0 0 #f1ece0,
       6px 6px 0 1.5px color-mix(in srgb, var(--ink) 18%, transparent);
@@ -1218,7 +1295,7 @@
   .organize-submit {
     appearance: none;
     align-self: flex-start;
-    background: color-mix(in srgb, var(--brand-soft) 85%, white);
+    background: color-mix(in srgb, var(--brand-soft) 85%, var(--mix-wash));
     border: 1.5px solid var(--brand);
     color: var(--brand);
     font-family: var(--hand);
@@ -1237,7 +1314,7 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-    background: color-mix(in srgb, var(--yellow) 55%, white);
+    background: color-mix(in srgb, var(--yellow) 55%, var(--mix-wash));
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
     color: var(--ink);
     cursor: pointer;
@@ -1245,7 +1322,7 @@
   }
 
   .organize-plus:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--yellow) 75%, white);
+    background: color-mix(in srgb, var(--yellow) 75%, var(--mix-wash));
   }
 
   .organize-submit:hover:not(:disabled) {
@@ -1281,11 +1358,6 @@
     -webkit-box-decoration-break: clone;
   }
 
-  .organize-list .sq {
-    border-radius: 40% 55% 45% 50% / 50% 40% 55% 45%;
-    border: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
-  }
-
   @media (max-width: 900px) {
     .organize-grid {
       grid-template-columns: 1fr;
@@ -1304,9 +1376,15 @@
 
   .customise-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1.25rem 2rem;
     align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .customise-grid {
+      grid-template-columns: 1fr 1fr;
+    }
   }
 
   @media (max-width: 640px) {
@@ -1384,7 +1462,7 @@
   .flash.error {
     border-color: var(--danger);
     color: var(--danger);
-    background: color-mix(in srgb, var(--pink) 35%, white);
+    background: color-mix(in srgb, var(--pink) 35%, var(--mix-wash));
   }
 
   .flash.report {
@@ -1515,7 +1593,7 @@
   .accounts-action {
     appearance: none;
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
-    background: color-mix(in srgb, var(--yellow) 55%, white);
+    background: color-mix(in srgb, var(--yellow) 55%, var(--mix-wash));
     color: var(--ink);
     width: 2rem;
     height: 2rem;
@@ -1528,7 +1606,7 @@
   }
 
   .accounts-action:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--yellow) 75%, white);
+    background: color-mix(in srgb, var(--yellow) 75%, var(--mix-wash));
   }
 
   .accounts-action:disabled {
@@ -1742,7 +1820,7 @@
     width: 28px;
     height: 28px;
     padding: 0;
-    background: color-mix(in srgb, var(--paper, #fffef8) 80%, white);
+    background: color-mix(in srgb, var(--paper) 80%, var(--mix-wash));
     border: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
     color: var(--ink-muted);
     cursor: pointer;
@@ -1751,7 +1829,7 @@
 
   .icon-btn:hover:not(:disabled) {
     color: var(--ink);
-    background: color-mix(in srgb, var(--yellow) 45%, white);
+    background: color-mix(in srgb, var(--yellow) 45%, var(--mix-wash));
     border-color: color-mix(in srgb, var(--ink) 35%, transparent);
   }
 
@@ -1760,14 +1838,27 @@
     cursor: not-allowed;
   }
 
+  .icon-btn.ok {
+    color: var(--brand-success);
+    background: color-mix(in srgb, var(--green) 45%, var(--mix-wash));
+    border-color: color-mix(in srgb, var(--brand-success) 40%, transparent);
+  }
+
+  .icon-btn.ok:hover:not(:disabled) {
+    color: var(--brand-success);
+    background: color-mix(in srgb, var(--green) 70%, var(--mix-wash));
+    border-color: var(--brand-success);
+  }
+
   .icon-btn.danger {
     color: var(--danger);
+    background: color-mix(in srgb, var(--pink) 40%, var(--mix-wash));
     border-color: color-mix(in srgb, var(--danger) 40%, transparent);
   }
 
   .icon-btn.danger:hover:not(:disabled) {
     color: var(--danger);
-    background: color-mix(in srgb, var(--pink) 35%, white);
+    background: color-mix(in srgb, var(--pink) 65%, var(--mix-wash));
     border-color: var(--danger);
   }
 

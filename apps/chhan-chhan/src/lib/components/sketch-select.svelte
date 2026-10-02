@@ -10,11 +10,22 @@
     value?: string;
     disabled?: boolean;
     compact?: boolean;
+    /** Anchor the menu to the trigger's end edge (opens leftward). Useful near the right side of a clipped container. */
+    alignEnd?: boolean;
     onChange?: (value: string) => void;
     "aria-label"?: string;
   };
 
-  let { name, options, value = $bindable(""), disabled = false, compact = false, onChange, "aria-label": ariaLabel }: Props = $props();
+  let {
+    name,
+    options,
+    value = $bindable(""),
+    disabled = false,
+    compact = false,
+    alignEnd = false,
+    onChange,
+    "aria-label": ariaLabel,
+  }: Props = $props();
 
   let open = $state(false);
   let root: HTMLDivElement | undefined = $state();
@@ -59,7 +70,7 @@
   });
 </script>
 
-<div class="sketch-select" class:open class:disabled class:compact bind:this={root}>
+<div class="sketch-select" class:open class:disabled class:compact class:align-end={alignEnd} class:empty={!value} bind:this={root}>
   <input type="hidden" {name} {value} />
   <button type="button" class="sketch-trigger" aria-expanded={open} aria-haspopup="listbox" aria-label={ariaLabel} {disabled} onclick={toggleOpen}>
     <span class="sketch-value">{selectedLabel}</span>
@@ -71,7 +82,15 @@
       {#each options as option (option.value)}
         {@const selected = option.value === value}
         <li>
-          <button type="button" role="option" class="sketch-option" class:selected aria-selected={selected} onclick={() => choose(option.value)}>
+          <button
+            type="button"
+            role="option"
+            class="sketch-option"
+            class:selected
+            class:empty={!option.value}
+            aria-selected={selected}
+            onclick={() => choose(option.value)}
+          >
             <span class="dot" aria-hidden="true">•</span>
             <span class="mark">{option.label}</span>
           </button>
@@ -123,6 +142,17 @@
     transform: rotate(-0.5deg);
   }
 
+  .sketch-select.compact.empty .sketch-trigger {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    color: var(--ink-muted);
+    transform: none;
+  }
+
+  .sketch-select.compact.empty .sketch-value,
+  .sketch-select.compact.empty .sketch-caret {
+    color: color-mix(in srgb, var(--ink-muted) 78%, transparent);
+  }
+
   .sketch-trigger:hover:not(:disabled),
   .sketch-select.open .sketch-trigger {
     border-bottom-color: var(--brand);
@@ -132,6 +162,12 @@
   .sketch-select.compact.open .sketch-trigger {
     background: color-mix(in srgb, var(--yellow) 78%, transparent);
     border-bottom-color: transparent;
+  }
+
+  .sketch-select.compact.empty .sketch-trigger:hover:not(:disabled),
+  .sketch-select.compact.empty.open .sketch-trigger {
+    background: color-mix(in srgb, var(--ink) 9%, transparent);
+    color: var(--ink-muted);
   }
 
   .sketch-trigger:disabled {
@@ -161,11 +197,11 @@
     left: 0;
     right: 0;
     z-index: 30;
-    background: #fffef8;
+    background: var(--surface-raised);
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
     border-radius: 2px 6px 3px 2px;
     box-shadow:
-      2px 2px 0 0 #f7f4ea,
+      2px 2px 0 0 var(--shadow-paper),
       2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
     max-height: 14rem;
     overflow: auto;
@@ -175,6 +211,11 @@
     right: auto;
     min-width: max(100%, 7.5rem);
     z-index: 40;
+  }
+
+  .sketch-select.align-end .sketch-menu {
+    left: auto;
+    right: 0;
   }
 
   .sketch-option {
@@ -213,5 +254,25 @@
 
   .sketch-option.selected .mark {
     background: color-mix(in srgb, var(--yellow) 62%, transparent);
+  }
+
+  .sketch-option.empty {
+    color: var(--ink-muted);
+  }
+
+  .sketch-option.empty .mark {
+    color: color-mix(in srgb, var(--ink-muted) 85%, transparent);
+  }
+
+  .sketch-option.empty:hover .mark {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+
+  .sketch-option.empty.selected .mark {
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+
+  .sketch-option.empty.selected .dot {
+    color: var(--ink-muted);
   }
 </style>

@@ -20,6 +20,9 @@
   --orange: #ffb997;
   --purple: #d4c5f9;
   --hair: rgba(27, 27, 31, 0.12);
+  --surface-raised: #fffef8;
+  --shadow-paper: #f7f4ea;
+  --mix-wash: #ffffff;
 
   /* Legacy brand aliases → paper (keeps forge/components working) */
   --brand-black: var(--paper);
@@ -63,6 +66,38 @@
   --scrollbar-thumb-hover: color-mix(in srgb, var(--ink) 45%, transparent);
 }
 
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #121212;
+  --ink: #e8e6e3;
+  --ink-muted: #a8a6a1;
+  --ink-soft: #7a7874;
+  --brand: #a8a5ff;
+  --brand-soft: #2a2848;
+  --yellow: #c9a227;
+  --pink: #c97a7a;
+  --green: #5fad8a;
+  --blue: #6a8fb8;
+  --orange: #c98a5a;
+  --purple: #8f7ec4;
+  --hair: rgba(232, 230, 227, 0.12);
+  --surface-raised: #1c1c22;
+  --shadow-paper: #0a0a0c;
+  --mix-wash: #1a1a1e;
+
+  --brand-accent-light: #bbb8ff;
+  --brand-cards: rgba(232, 230, 227, 0.22);
+  --brand-danger: #e08a96;
+  --brand-success: #6ecf9a;
+  --hi-cyan: #7eb0d8;
+
+  --card: #1c1c22;
+  --secondary: #1a1a20;
+  --muted: #232329;
+  --primary-foreground: #121212;
+  --accent-foreground: #121212;
+}
+
 @theme inline {
   --font-sans: var(--ui);
   --font-mono: var(--hand);
@@ -95,6 +130,7 @@
   body {
     @apply min-h-screen bg-background text-text;
     font-family: var(--ui);
+    height: 100%;
   }
 
   body {

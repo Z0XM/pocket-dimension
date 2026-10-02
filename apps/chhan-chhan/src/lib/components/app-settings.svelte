@@ -4,6 +4,7 @@
   import { authClient } from "$lib/auth-client";
   import LogOut from "@lucide/svelte/icons/log-out";
   import Settings from "@lucide/svelte/icons/settings";
+  import ThemeToggle from "$lib/components/theme-toggle.svelte";
 
   const onControl = $derived(page.url.pathname.startsWith("/app/control"));
 
@@ -44,6 +45,7 @@
 </script>
 
 <div class="settings">
+  <ThemeToggle />
   {#if onControl}
     <span class="settings-icon is-current" aria-current="page" title="Control Center">
       <Settings size={17} strokeWidth={2.1} aria-hidden="true" />
@@ -95,7 +97,7 @@
   .logout-dialog {
     width: min(100%, 22rem);
     padding: 1.25rem 1.35rem 1.15rem;
-    background: var(--paper, #fffefd);
+    background: var(--surface-raised);
     border: 1.5px solid var(--chrome-line, rgba(27, 27, 31, 0.22));
     border-radius: 4px 14px 6px 12px / 12px 4px 14px 6px;
     box-shadow: 3px 4px 0 rgba(27, 27, 31, 0.08);
@@ -149,12 +151,12 @@
   }
 
   .logout-actions .danger {
-    background: color-mix(in srgb, var(--pink, #ffadad) 45%, white);
+    background: color-mix(in srgb, var(--pink) 45%, var(--mix-wash));
     border: 1.5px solid color-mix(in srgb, var(--neg, #c45b6a) 70%, transparent);
     color: var(--neg, #c45b6a);
   }
 
   .logout-actions .danger:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--pink, #ffadad) 65%, white);
+    background: color-mix(in srgb, var(--pink) 65%, var(--mix-wash));
   }
 </style>

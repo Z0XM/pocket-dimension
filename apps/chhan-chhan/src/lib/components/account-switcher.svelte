@@ -194,11 +194,11 @@
     left: 0;
     min-width: 100%;
     z-index: 40;
-    background: #fffef8;
+    background: var(--surface-raised);
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
     border-radius: 2px 6px 3px 2px;
     box-shadow:
-      2px 2px 0 0 #f7f4ea,
+      2px 2px 0 0 var(--shadow-paper),
       2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
     max-height: 14rem;
     overflow: auto;

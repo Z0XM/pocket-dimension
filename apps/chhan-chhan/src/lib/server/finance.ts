@@ -1,5 +1,6 @@
 import { normalizeMerchant, rankFuzzyMerchants } from "$lib/finance/merchant-match";
 import { billCategorySqlFilter } from "$lib/finance/bill-categories";
+import { DEFAULT_CATEGORIES, DEFAULT_TAGS } from "$lib/finance/default-taxonomy";
 import { parseSqlMinor } from "$lib/finance/money";
 import { isRefundCategoryName } from "$lib/finance/refunds";
 import { buildSummarySearchFilterSql, buildTransactionSearchCondition } from "$lib/finance/transaction-search";
@@ -435,8 +436,39 @@ export async function createAccount(userId: string, payload: z.infer<typeof impo
       updatedById: userId,
     });
 
+    await seedDefaultTaxonomy(tx, account.id, userId);
+
     return account;
   });
+}
+
+async function seedDefaultTaxonomy(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], accountId: string, userId: string) {
+  await tx
+    .insert(schema.financeCategories)
+    .values(
+      DEFAULT_CATEGORIES.map((category) => ({
+        accountId,
+        name: category.name,
+        kind: category.kind,
+        colorHex: category.colorHex,
+        createdById: userId,
+        updatedById: userId,
+      }))
+    )
+    .onConflictDoNothing();
+
+  await tx
+    .insert(schema.financeTags)
+    .values(
+      DEFAULT_TAGS.map((tag) => ({
+        accountId,
+        name: tag.name,
+        colorHex: tag.colorHex,
+        createdById: userId,
+        updatedById: userId,
+      }))
+    )
+    .onConflictDoNothing();
 }
 
 export async function updateAccount(
@@ -866,7 +898,16 @@ export async function listTransactions(accountId: string, query: TransactionsQue
 
   const whereExpr = and(...conditions);
   const sortColumn = sortMap[query.sortBy];
-  const direction = query.sortDirection === "asc" ? asc(sortColumn) : desc(sortColumn);
+  const ascending = query.sortDirection === "asc";
+  const direction = ascending ? asc(sortColumn) : desc(sortColumn);
+  // Within the same day (or other primary-key ties), keep statement order.
+  // Desc tables show the latest-in-day first so running balances read top→bottom.
+  const tieBreakers =
+    query.sortBy === "occurredOn"
+      ? ascending
+        ? [asc(schema.financeTransactions.sortOrder), asc(schema.financeTransactions.id)]
+        : [desc(schema.financeTransactions.sortOrder), desc(schema.financeTransactions.id)]
+      : [desc(schema.financeTransactions.occurredOn), desc(schema.financeTransactions.sortOrder), desc(schema.financeTransactions.id)];
   const offset = query.pageIndex * query.pageSize;
 
   const [rows, totalRows] = await Promise.all([
@@ -875,6 +916,7 @@ export async function listTransactions(accountId: string, query: TransactionsQue
         id: schema.financeTransactions.id,
         occurredOn: schema.financeTransactions.occurredOn,
         amountMinor: schema.financeTransactions.amountMinor,
+        balanceMinor: schema.financeTransactions.balanceMinor,
         type: schema.financeTransactions.type,
         merchant: schema.financeTransactions.merchant,
         notes: schema.financeTransactions.notes,
@@ -886,7 +928,7 @@ export async function listTransactions(accountId: string, query: TransactionsQue
       .from(schema.financeTransactions)
       .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
       .where(whereExpr)
-      .orderBy(direction, desc(schema.financeTransactions.id))
+      .orderBy(direction, ...tieBreakers)
       .limit(query.pageSize)
       .offset(offset),
     db.select({ total: count() }).from(schema.financeTransactions).where(whereExpr),

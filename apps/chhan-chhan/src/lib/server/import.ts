@@ -2,15 +2,18 @@ import { db, schema } from "@pocket-dimension/db";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { buildImportReportCsv, importIssueFromRow, type ImportIssue } from "$lib/importers/import-report";
 import { transactionDedupKey } from "$lib/importers/transaction-dedup";
-import type { ImportPreview, ImportPreviewRow, ImportResult, ImportRow } from "$lib/importers/types";
+import type { ImportPreview, ImportPreviewRow, ImportResult, ImportRow, ImportRowAssignment } from "$lib/importers/types";
 import { isBalanceSnapshotNewer, latestBalanceFromRows } from "$lib/server/balance";
 import { getCurrentBalance } from "$lib/server/finance";
+import { enrichPreviewRowsWithSuggestions, loadImportTaxonomy, resolveImportAssignments } from "$lib/server/import-suggestions";
 import { csvImportRowSchema } from "$lib/validation/finance";
 
 type ImportOptions = {
   skipDuplicates?: boolean;
   currencyCode?: string;
   onProgress?: (progress: ImportProgress) => void;
+  /** Per-row category/tag overrides keyed by 1-based statement row number. */
+  assignments?: Record<string, ImportRowAssignment>;
 };
 
 type PreviewOptions = {
@@ -367,6 +370,9 @@ export async function previewImportRows(accountId: string, rows: ImportRow[], op
     rejected: invalid,
   });
 
+  await enrichPreviewRowsWithSuggestions(accountId, previewRows);
+  const taxonomy = await loadImportTaxonomy(accountId);
+
   const warningCount = previewRows.filter((row) => row.status === "warning").length;
 
   return {
@@ -381,6 +387,7 @@ export async function previewImportRows(accountId: string, rows: ImportRow[], op
     metadata: options.metadata ?? {},
     importerId: options.importerId ?? "kotak",
     fileName: options.fileName ?? "statement",
+    taxonomy,
   };
 }
 
@@ -393,6 +400,7 @@ export async function importTransactionRows(
   const currencyCode = options.currencyCode ?? "INR";
   const skipDuplicates = options.skipDuplicates ?? true;
   const onProgress = options.onProgress;
+  const assignments = await resolveImportAssignments(accountId, options.assignments);
 
   const existingKeys = new Set<string>();
 
@@ -442,12 +450,13 @@ export async function importTransactionRows(
   };
 
   for (const [index, row] of rows.entries()) {
+    const rowNumber = index + 1;
     const parsed = csvImportRowSchema.safeParse(row);
     if (!parsed.success) {
       rejected += 1;
       const reason = parsed.error.issues[0]?.message ?? "Invalid row";
-      rejectionReasons.push({ row: index + 1, reason });
-      issues.push(importIssueFromRow(index + 1, "rejected", reason, row));
+      rejectionReasons.push({ row: rowNumber, reason });
+      issues.push(importIssueFromRow(rowNumber, "rejected", reason, row));
       reportProgress(index);
       continue;
     }
@@ -456,25 +465,38 @@ export async function importTransactionRows(
 
     if (skipReason) {
       skipped += 1;
-      issues.push(importIssueFromRow(index + 1, "skipped", skipReason, row));
+      issues.push(importIssueFromRow(rowNumber, "skipped", skipReason, row));
       reportProgress(index);
       continue;
     }
 
-    await db.insert(schema.financeTransactions).values({
-      accountId,
-      occurredOn: parsed.data.occurredOn,
-      amountMinor: parsed.data.amountMinor,
-      currencyCode,
-      type: parsed.data.type,
-      merchant: parsed.data.merchant,
-      notes: parsed.data.notes,
-      externalRef: parsed.data.externalRef,
-      balanceMinor: parsed.data.balanceMinor,
-      sortOrder: parsed.data.sortOrder ?? 0,
-      createdById: userId,
-      updatedById: userId,
-    });
+    const assignment = assignments.get(rowNumber);
+
+    const [inserted] = await db
+      .insert(schema.financeTransactions)
+      .values({
+        accountId,
+        occurredOn: parsed.data.occurredOn,
+        amountMinor: parsed.data.amountMinor,
+        currencyCode,
+        type: parsed.data.type,
+        merchant: parsed.data.merchant,
+        notes: parsed.data.notes,
+        externalRef: parsed.data.externalRef,
+        balanceMinor: parsed.data.balanceMinor,
+        sortOrder: parsed.data.sortOrder ?? 0,
+        ...(assignment?.setCategory ? { categoryId: assignment.categoryId } : {}),
+        createdById: userId,
+        updatedById: userId,
+      })
+      .returning({ id: schema.financeTransactions.id });
+
+    if (inserted && assignment?.tagIds.length) {
+      await db
+        .insert(schema.financeTransactionTags)
+        .values(assignment.tagIds.map((tagId) => ({ transactionId: inserted.id, tagId })))
+        .onConflictDoNothing();
+    }
 
     existingKeys.add(transactionDedupKey(parsed.data));
     accepted += 1;

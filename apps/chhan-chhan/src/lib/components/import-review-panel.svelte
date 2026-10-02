@@ -1,8 +1,22 @@
 <script lang="ts">
+  import type { Component } from "svelte";
+  import Check from "@lucide/svelte/icons/check";
+  import Copy from "@lucide/svelte/icons/copy";
+  import Minus from "@lucide/svelte/icons/minus";
+  import Plus from "@lucide/svelte/icons/plus";
+  import Tag from "@lucide/svelte/icons/tag";
+  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
+  import X from "@lucide/svelte/icons/x";
+  import SketchSelect from "$lib/components/sketch-select.svelte";
   import { formatMoney } from "$lib/finance/money";
-  import type { ImportPreview, ImportResult } from "$lib/importers/types";
+  import type { ImportPreview, ImportPreviewRow, ImportResult } from "$lib/importers/types";
 
   type FilterKey = "all" | "will_import" | "duplicate" | "invalid" | "warning" | "accepted" | "skipped" | "rejected";
+
+  type RowAssignment = {
+    categoryId: string | null;
+    tagIds: string[];
+  };
 
   type Props = {
     mode: "preview" | "result";
@@ -12,6 +26,8 @@
     confirming?: boolean;
     confirmProgress?: number;
     confirmStatus?: string;
+    rowAssignments?: Record<number, RowAssignment>;
+    onRowAssignmentChange?: (row: number, next: RowAssignment) => void;
     onConfirm?: () => void;
     onCancel?: () => void;
     onClose?: () => void;
@@ -26,6 +42,8 @@
     confirming = false,
     confirmProgress = 0,
     confirmStatus = "",
+    rowAssignments = {},
+    onRowAssignmentChange,
     onConfirm,
     onCancel,
     onClose,
@@ -33,6 +51,7 @@
   }: Props = $props();
 
   let filter = $state<FilterKey>("all");
+  let openTagMenuRow = $state<number | null>(null);
 
   function formatDisplayDate(iso?: string): string {
     if (!iso) return "—";
@@ -50,6 +69,8 @@
   }
 
   const previewRows = $derived(preview?.rows ?? []);
+  const categories = $derived(preview?.taxonomy.categories ?? []);
+  const tags = $derived(preview?.taxonomy.tags ?? []);
 
   const resultRows = $derived(
     (result?.issues ?? []).map((issue) => ({
@@ -75,6 +96,14 @@
     return resultRows.filter((row) => row.status === filter);
   });
 
+  const autoFilledCount = $derived(
+    previewRows.filter((row) => {
+      if (row.status !== "will_import" && row.status !== "warning") return false;
+      const assignment = rowAssignments[row.row];
+      return Boolean(assignment?.categoryId || assignment?.tagIds.length);
+    }).length
+  );
+
   function statusLabel(status: string): string {
     switch (status) {
       case "will_import":
@@ -94,6 +123,80 @@
       default:
         return status;
     }
+  }
+
+  function statusIcon(status: string): Component {
+    switch (status) {
+      case "will_import":
+      case "accepted":
+        return Check;
+      case "duplicate":
+        return Copy;
+      case "warning":
+        return TriangleAlert;
+      case "skipped":
+        return Minus;
+      case "invalid":
+      case "rejected":
+        return X;
+      default:
+        return TriangleAlert;
+    }
+  }
+
+  function canClassify(row: ImportPreviewRow): boolean {
+    return row.status === "will_import" || row.status === "warning";
+  }
+
+  function assignmentFor(row: ImportPreviewRow): RowAssignment {
+    return rowAssignments[row.row] ?? { categoryId: null, tagIds: [] };
+  }
+
+  function categoriesForType(type: string | undefined, selectedId: string | null) {
+    const kind = type === "income" || type === "transfer" || type === "expense" ? type : "expense";
+    return categories.filter((category) => category.kind === kind || category.id === selectedId);
+  }
+
+  function categoryOptionsFor(row: ImportPreviewRow) {
+    const assignment = assignmentFor(row);
+    return [
+      { value: "", label: "Uncategorized" },
+      ...categoriesForType(row.type, assignment.categoryId).map((category) => ({
+        value: category.id,
+        label: category.name,
+      })),
+    ];
+  }
+
+  function setCategory(row: ImportPreviewRow, categoryId: string | null) {
+    const current = assignmentFor(row);
+    onRowAssignmentChange?.(row.row, { ...current, categoryId });
+  }
+
+  function toggleTag(row: ImportPreviewRow, tagId: string) {
+    const current = assignmentFor(row);
+    const tagIds = current.tagIds.includes(tagId) ? current.tagIds.filter((id) => id !== tagId) : [...current.tagIds, tagId];
+    onRowAssignmentChange?.(row.row, { ...current, tagIds });
+  }
+
+  function availableTagsFor(row: ImportPreviewRow) {
+    const selected = new Set(assignmentFor(row).tagIds);
+    return tags.filter((tag) => !selected.has(tag.id));
+  }
+
+  function tagMeta(tagId: string) {
+    return tags.find((tag) => tag.id === tagId);
+  }
+
+  function isAutoSuggested(row: ImportPreviewRow): boolean {
+    const suggestion = row.suggestion;
+    if (!suggestion) return false;
+    const assignment = assignmentFor(row);
+    const sameCategory = (assignment.categoryId ?? null) === (suggestion.categoryId ?? null);
+    const sameTags =
+      assignment.tagIds.length === suggestion.tagIds.length &&
+      [...assignment.tagIds].sort().every((id, index) => id === [...suggestion.tagIds].sort()[index]);
+    return sameCategory && sameTags && Boolean(suggestion.categoryId || suggestion.tagIds.length);
   }
 </script>
 
@@ -116,29 +219,6 @@
     </header>
 
     {#if mode === "preview" && preview}
-      <section class="summary">
-        <div class="stat">
-          <span class="stat-label">Rows parsed</span>
-          <strong>{preview.totalRows.toLocaleString()}</strong>
-        </div>
-        <div class="stat ok">
-          <span class="stat-label">Will import</span>
-          <strong>{preview.willImport.toLocaleString()}</strong>
-        </div>
-        <div class="stat warn">
-          <span class="stat-label">Duplicates</span>
-          <strong>{preview.duplicates.toLocaleString()}</strong>
-        </div>
-        <div class="stat bad">
-          <span class="stat-label">Invalid</span>
-          <strong>{preview.invalid.toLocaleString()}</strong>
-        </div>
-        <div class="stat warn">
-          <span class="stat-label">Warnings</span>
-          <strong>{preview.warnings.toLocaleString()}</strong>
-        </div>
-      </section>
-
       <section class="balance-card">
         <div>
           <span class="stat-label">Current balance</span>
@@ -166,13 +246,27 @@
         </div>
       </section>
 
-      <div class="filters">
+      <div class="filters" role="tablist" aria-label="Preview filter">
         {#each [["all", `All (${preview.totalRows})`], ["will_import", `Will import (${preview.willImport})`], ["duplicate", `Duplicates (${preview.duplicates})`], ["warning", `Warnings (${preview.warnings})`], ["invalid", `Invalid (${preview.invalid})`]] as [key, label]}
-          <button type="button" class:active={filter === key} onclick={() => (filter = key as FilterKey)} disabled={confirming}>
+          <button
+            type="button"
+            role="tab"
+            class:active={filter === key}
+            aria-selected={filter === key}
+            onclick={() => (filter = key as FilterKey)}
+            disabled={confirming}
+          >
             {label}
           </button>
         {/each}
       </div>
+
+      {#if autoFilledCount > 0}
+        <p class="auto-note dim">
+          Auto-filled category/tags on {autoFilledCount.toLocaleString()} row{autoFilledCount === 1 ? "" : "s"} from past merchants — change any before
+          confirming.
+        </p>
+      {/if}
 
       <div class="table-wrap">
         <table>
@@ -183,23 +277,114 @@
               <th>Date</th>
               <th>Type</th>
               <th>Amount</th>
-              <th>Balance</th>
               <th>Merchant</th>
-              <th>Reference</th>
+              <th>Category</th>
+              <th>Tags</th>
               <th>Notes / issues</th>
             </tr>
           </thead>
           <tbody>
             {#each filteredPreview as row (row.row)}
+              {@const StatusIcon = statusIcon(row.status)}
+              {@const assignment = assignmentFor(row)}
+              {@const editable = canClassify(row)}
               <tr class={row.status}>
                 <td>{row.row}</td>
-                <td><span class="badge {row.status}">{statusLabel(row.status)}</span></td>
+                <td>
+                  <span class="badge {row.status}" title={statusLabel(row.status)} aria-label={statusLabel(row.status)}>
+                    <StatusIcon size={14} strokeWidth={2.1} aria-hidden="true" />
+                  </span>
+                </td>
                 <td>{formatDisplayDate(row.occurredOn)}</td>
                 <td>{row.type ?? "—"}</td>
                 <td class="num">{money(row.amountMinor)}</td>
-                <td class="num">{money(row.balanceMinor)}</td>
-                <td>{row.merchant || "—"}</td>
-                <td class="mono">{row.externalRef || "—"}</td>
+                <td>
+                  <div class="merchant-cell">
+                    <span>{row.merchant || "—"}</span>
+                    {#if editable && isAutoSuggested(row) && row.suggestion}
+                      <span
+                        class="auto-chip"
+                        title="From {row.suggestion.matchedMerchant} ({row.suggestion.source}, {row.suggestion.sampleCount} past)"
+                      >
+                        auto
+                      </span>
+                    {/if}
+                  </div>
+                </td>
+                <td class="classify-cell">
+                  {#if editable}
+                    <SketchSelect
+                      name="import-category-{row.row}"
+                      compact
+                      aria-label="Category for row {row.row}"
+                      value={assignment.categoryId ?? ""}
+                      options={categoryOptionsFor(row)}
+                      disabled={confirming}
+                      onChange={(next) => setCategory(row, next || null)}
+                    />
+                  {:else}
+                    <span class="dim">—</span>
+                  {/if}
+                </td>
+                <td class="classify-cell tags-cell">
+                  {#if editable}
+                    <div class="tag-list">
+                      {#each assignment.tagIds as tagId (tagId)}
+                        {@const tag = tagMeta(tagId)}
+                        {#if tag}
+                          <span class="tag-chip" style="--tag-color: {tag.colorHex ?? 'var(--orange)'}">
+                            <Tag size={11} strokeWidth={1.4} aria-hidden="true" />
+                            {tag.name}
+                            <button
+                              type="button"
+                              class="tag-remove"
+                              aria-label="Remove {tag.name}"
+                              disabled={confirming}
+                              onclick={() => toggleTag(row, tag.id)}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        {/if}
+                      {/each}
+                      {#if availableTagsFor(row).length > 0}
+                        <div class="tag-add-wrap">
+                          <button
+                            type="button"
+                            class="tag-add-btn"
+                            aria-label="Add tag to row {row.row}"
+                            aria-expanded={openTagMenuRow === row.row}
+                            disabled={confirming}
+                            onclick={() => (openTagMenuRow = openTagMenuRow === row.row ? null : row.row)}
+                          >
+                            <Plus size={12} strokeWidth={2} aria-hidden="true" />
+                          </button>
+                          {#if openTagMenuRow === row.row}
+                            <div class="tag-add-menu" role="menu">
+                              {#each availableTagsFor(row) as tag (tag.id)}
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  disabled={confirming}
+                                  onclick={() => {
+                                    toggleTag(row, tag.id);
+                                    openTagMenuRow = null;
+                                  }}
+                                >
+                                  {tag.name}
+                                </button>
+                              {/each}
+                            </div>
+                          {/if}
+                        </div>
+                      {:else if assignment.tagIds.length === 0}
+                        <span class="dim">—</span>
+                      {/if}
+                    </div>
+                  {:else}
+                    <span class="dim">—</span>
+                  {/if}
+                </td>
                 <td class="reasons">
                   {#if row.reasons.length}
                     {row.reasons.join(" · ")}
@@ -239,30 +424,11 @@
             onclick={() => onConfirm?.()}
             disabled={confirming || (preview.willImport === 0 && preview.duplicates === 0)}
           >
-            {confirming ? "IMPORTING…" : "CONFIRM IMPORT"}
+            {confirming ? "Importing…" : "Confirm import"}
           </button>
         </div>
       </footer>
     {:else if mode === "result" && result}
-      <section class="summary">
-        <div class="stat">
-          <span class="stat-label">Total rows</span>
-          <strong>{result.totalRows.toLocaleString()}</strong>
-        </div>
-        <div class="stat ok">
-          <span class="stat-label">Accepted</span>
-          <strong>{result.accepted.toLocaleString()}</strong>
-        </div>
-        <div class="stat warn">
-          <span class="stat-label">Skipped</span>
-          <strong>{result.skipped.toLocaleString()}</strong>
-        </div>
-        <div class="stat bad">
-          <span class="stat-label">Rejected</span>
-          <strong>{result.rejected.toLocaleString()}</strong>
-        </div>
-      </section>
-
       <section class="balance-card">
         <div>
           <span class="stat-label">Balance after import</span>
@@ -276,9 +442,9 @@
       </section>
 
       {#if result.issues.length}
-        <div class="filters">
+        <div class="filters" role="tablist" aria-label="Issue filter">
           {#each [["all", `Issues (${result.issues.length})`], ["skipped", `Skipped (${result.skipped})`], ["rejected", `Rejected (${result.rejected})`]] as [key, label]}
-            <button type="button" class:active={filter === key} onclick={() => (filter = key as FilterKey)}>
+            <button type="button" role="tab" class:active={filter === key} aria-selected={filter === key} onclick={() => (filter = key as FilterKey)}>
               {label}
             </button>
           {/each}
@@ -300,9 +466,14 @@
             </thead>
             <tbody>
               {#each filteredResult as row (row.row + row.status + row.reasons[0])}
+                {@const StatusIcon = statusIcon(row.status)}
                 <tr class={row.status}>
                   <td>{row.row}</td>
-                  <td><span class="badge {row.status}">{statusLabel(row.status)}</span></td>
+                  <td>
+                    <span class="badge {row.status}" title={statusLabel(row.status)} aria-label={statusLabel(row.status)}>
+                      <StatusIcon size={14} strokeWidth={2.1} aria-hidden="true" />
+                    </span>
+                  </td>
                   <td>{formatDisplayDate(row.occurredOn)}</td>
                   <td>{row.type ?? "—"}</td>
                   <td class="num">{money(row.amountMinor)}</td>
@@ -339,7 +510,7 @@
     position: fixed;
     inset: 0;
     z-index: 80;
-    background: color-mix(in srgb, #0b0a12 72%, transparent);
+    background: color-mix(in srgb, var(--ink) 32%, transparent);
     display: grid;
     place-items: center;
     padding: 1rem;
@@ -351,10 +522,16 @@
     display: flex;
     flex-direction: column;
     gap: 0.85rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 0 24px 80px color-mix(in srgb, #000 45%, transparent);
-    padding: 1rem 1.1rem 1.1rem;
+    background: var(--surface-raised);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 4px 18px 8px 14px / 14px 6px 16px 8px;
+    box-shadow:
+      3px 4px 0 0 color-mix(in srgb, var(--yellow) 40%, var(--shadow-paper)),
+      3px 4px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
+    padding: 1.05rem 1.15rem 1.1rem;
+    font-family: var(--hand);
+    color: var(--ink);
+    transform: rotate(-0.15deg);
   }
 
   .sheet-head {
@@ -366,49 +543,65 @@
 
   .eyebrow {
     margin: 0;
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
+    font-family: var(--hand);
+    font-size: 0.85rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--ink-muted);
   }
 
   h2 {
-    margin: 0.15rem 0 0;
+    margin: 0.1rem 0 0;
     font-family: var(--hand);
-    font-size: 1.05rem;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-size: 1.45rem;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    line-height: 1.15;
+    color: var(--ink);
   }
 
   .icon-close,
   .ghost,
   .primary,
   .filters button {
-    font-family: inherit;
+    font-family: var(--hand);
     cursor: pointer;
   }
 
   .icon-close,
   .ghost {
     background: transparent;
-    border: 2px solid var(--chrome-line);
-    color: var(--main-text);
-    padding: 0.4rem 0.7rem;
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    color: var(--ink);
+    padding: 0.32rem 0.7rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    border-radius: 255px 12px 225px 10px / 12px 225px 10px 255px;
+  }
+
+  .icon-close:hover:not(:disabled),
+  .ghost:hover:not(:disabled) {
+    border-color: var(--brand);
+    color: var(--brand);
+    background: var(--brand-soft);
   }
 
   .primary {
-    background: var(--brand-soft);
-    border: 1.5px solid var(--brand);
-    color: var(--brand);
+    background: color-mix(in srgb, var(--blue) 72%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    color: var(--ink);
     font-weight: 400;
-    padding: 0.5rem 0.9rem;
-    font-size: 0.95rem;
+    padding: 0.4rem 0.9rem;
+    font-size: 1rem;
     letter-spacing: 0.01em;
-    font-family: var(--hand);
     border-radius: 255px 12px 225px 10px / 12px 225px 10px 255px;
+    box-shadow: 1.5px 2px 0 0 color-mix(in srgb, var(--ink) 10%, transparent);
+  }
+
+  .primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--blue) 88%, transparent);
   }
 
   .primary:disabled,
@@ -422,39 +615,64 @@
   .summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: 0.55rem;
+    gap: 0.5rem;
   }
 
   .stat {
-    border: 1px solid var(--chrome-line);
-    background: var(--surface2);
-    padding: 0.55rem 0.65rem;
+    border: none;
+    background: color-mix(in srgb, var(--blue) 28%, transparent);
+    padding: 0.5rem 0.65rem;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: 0.15rem;
+    border-radius: 3px 10px 4px 8px / 8px 3px 10px 4px;
+    transform: rotate(-0.3deg);
+  }
+
+  .stat:nth-child(2) {
+    transform: rotate(0.4deg);
+  }
+
+  .stat:nth-child(3) {
+    transform: rotate(-0.5deg);
+  }
+
+  .stat:nth-child(4) {
+    transform: rotate(0.25deg);
+  }
+
+  .stat:nth-child(5) {
+    transform: rotate(-0.2deg);
+  }
+
+  .stat.ok {
+    background: color-mix(in srgb, var(--green) 55%, transparent);
+  }
+
+  .stat.warn {
+    background: color-mix(in srgb, var(--orange) 55%, transparent);
+  }
+
+  .stat.caution {
+    background: color-mix(in srgb, var(--yellow) 62%, transparent);
+  }
+
+  .stat.bad {
+    background: color-mix(in srgb, var(--pink) 55%, transparent);
   }
 
   .stat strong {
-    font-size: 1.05rem;
-  }
-
-  .stat.ok strong {
-    color: color-mix(in srgb, #3ecf8e 85%, white);
-  }
-
-  .stat.warn strong {
-    color: color-mix(in srgb, #f0b429 90%, white);
-  }
-
-  .stat.bad strong {
-    color: color-mix(in srgb, #ff6b6b 90%, white);
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
   }
 
   .stat-label {
-    font-size: 0.64rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
+    font-size: 0.85rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--ink-muted);
   }
 
   .balance-card {
@@ -462,9 +680,11 @@
     flex-wrap: wrap;
     gap: 0.75rem 1.25rem;
     align-items: center;
-    border: 2px solid var(--chrome-line);
-    background: var(--surface2);
-    padding: 0.75rem 0.85rem;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    background: color-mix(in srgb, var(--yellow) 28%, var(--paper));
+    padding: 0.75rem 0.9rem;
+    border-radius: 3px 12px 5px 10px / 10px 4px 12px 5px;
+    box-shadow: 2px 2px 0 0 color-mix(in srgb, var(--ink) 8%, transparent);
   }
 
   .balance-card > div {
@@ -473,66 +693,82 @@
   }
 
   .balance-card strong {
-    display: block;
-    margin-top: 0.15rem;
-    font-size: 1.15rem;
+    display: inline-block;
+    margin-top: 0.2rem;
+    font-size: 1.25rem;
+    font-weight: 400;
+    padding: 0.05rem 0.28rem;
+    background: color-mix(in srgb, var(--blue) 55%, transparent);
+    border-radius: 2px 8px 3px 7px / 7px 2px 8px 2px;
+    transform: rotate(-0.4deg);
   }
 
   .projected {
-    color: var(--hi-cyan);
+    color: var(--ink);
   }
 
   .arrow {
-    color: var(--muted);
-    font-size: 1.2rem;
+    color: var(--brand);
+    font-size: 1.35rem;
   }
 
   .dim {
     display: block;
-    margin-top: 0.15rem;
-    color: var(--muted);
-    font-size: 0.72rem;
+    margin-top: 0.2rem;
+    color: var(--ink-muted);
+    font-size: 0.85rem;
   }
 
   .filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.25rem;
   }
 
   .filters button {
-    background: var(--surface2);
-    border: 1px solid var(--chrome-line);
-    color: var(--muted);
-    padding: 0.3rem 0.55rem;
-    font-size: 0.68rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    background: transparent;
+    border: none;
+    color: var(--muted-foreground);
+    padding: 0.15rem 0.5rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    border-radius: 2px 8px 3px 7px / 7px 3px 8px 2px;
+  }
+
+  .filters button:hover:not(:disabled):not(.active) {
+    color: var(--ink);
   }
 
   .filters button.active {
-    color: var(--main-text);
-    border-color: var(--hi-cyan);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hi-cyan) 35%, transparent);
+    color: var(--ink);
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+  }
+
+  .auto-note {
+    margin: -0.15rem 0 0;
+    font-size: 0.88rem;
   }
 
   .table-wrap {
     flex: 1;
     min-height: 220px;
     overflow: auto;
-    border: 1px solid var(--chrome-line);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 18%, transparent);
+    border-radius: 3px 10px 4px 8px / 8px 3px 10px 4px;
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--paper) 92%, var(--mix-wash)), var(--paper)), var(--surface-raised);
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.74rem;
+    font-size: 0.95rem;
   }
 
   th,
   td {
-    padding: 0.4rem 0.5rem;
-    border-bottom: 1px solid color-mix(in srgb, var(--chrome-line) 70%, transparent);
+    padding: 0.45rem 0.65rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
     text-align: left;
     vertical-align: top;
   }
@@ -540,12 +776,23 @@
   th {
     position: sticky;
     top: 0;
-    background: var(--surface2);
-    font-size: 0.62rem;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--muted);
+    background: color-mix(in srgb, var(--paper) 88%, var(--yellow) 12%);
+    font-family: var(--hand);
+    font-size: 0.9rem;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--ink-muted);
     z-index: 1;
+    border-bottom: 2px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+
+  tbody tr:nth-child(even) td {
+    background: color-mix(in srgb, var(--blue) 8%, transparent);
+  }
+
+  tbody tr:hover td {
+    background: color-mix(in srgb, var(--blue) 18%, transparent);
   }
 
   .num {
@@ -554,61 +801,194 @@
   }
 
   .mono {
-    font-family: "Fira Mono", ui-monospace, monospace;
-    font-size: 0.68rem;
+    font-family: var(--hand);
+    font-size: 0.88rem;
     word-break: break-all;
+    color: var(--ink-muted);
+  }
+
+  .merchant-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+    min-width: 7rem;
+  }
+
+  .auto-chip {
+    display: inline-block;
+    padding: 0.02rem 0.28rem;
+    font-size: 0.72rem;
+    color: var(--ink-muted);
+    background: color-mix(in srgb, var(--blue) 45%, transparent);
+    border-radius: 2px 7px 3px 6px / 6px 2px 7px 2px;
+  }
+
+  .classify-cell {
+    min-width: 8.5rem;
+    vertical-align: middle;
+  }
+
+  .classify-cell :global(.sketch-select.compact) {
+    max-width: 11rem;
+  }
+
+  .tags-cell {
+    min-width: 9rem;
+  }
+
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.18rem;
+    padding: 0.05rem 0.28rem;
+    background: color-mix(in srgb, var(--tag-color, var(--orange)) 45%, transparent);
+    border-radius: 2px 8px 3px 7px / 7px 2px 8px 2px;
+    font-size: 0.82rem;
+    color: var(--ink);
+  }
+
+  .tag-remove {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-muted);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    font-size: 0.9rem;
+  }
+
+  .tag-remove:hover:not(:disabled) {
+    color: var(--danger);
+  }
+
+  .tag-add-wrap {
+    position: relative;
+  }
+
+  .tag-add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 0;
+    border: 1.5px dashed color-mix(in srgb, var(--ink) 28%, transparent);
+    background: transparent;
+    color: var(--ink-muted);
+    cursor: pointer;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
+  }
+
+  .tag-add-btn:hover:not(:disabled) {
+    color: var(--brand);
+    border-color: var(--brand);
+  }
+
+  .tag-add-menu {
+    position: absolute;
+    top: calc(100% + 0.2rem);
+    left: 0;
+    z-index: 5;
+    min-width: 7rem;
+    max-height: 10rem;
+    overflow: auto;
+    padding: 0.25rem;
+    background: var(--surface-raised);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 2px 8px 3px 6px / 6px 2px 8px 3px;
+    box-shadow:
+      2px 2px 0 0 var(--shadow-paper),
+      2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+
+  .tag-add-menu button {
+    appearance: none;
+    display: block;
+    width: 100%;
+    border: none;
+    background: transparent;
+    text-align: left;
+    font-family: var(--hand);
+    font-size: 0.9rem;
+    color: var(--ink);
+    padding: 0.25rem 0.4rem;
+    cursor: pointer;
+    border-radius: 2px 6px 3px 5px / 5px 2px 6px 2px;
+  }
+
+  .tag-add-menu button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--yellow) 45%, transparent);
   }
 
   .reasons {
-    color: var(--muted);
+    color: var(--ink-muted);
     max-width: 280px;
   }
 
   .badge {
-    display: inline-block;
-    padding: 0.12rem 0.35rem;
-    border: 1px solid var(--chrome-line);
-    font-size: 0.62rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    padding: 0;
+    border: none;
     white-space: nowrap;
+    border-radius: 2px 8px 3px 7px / 7px 2px 8px 2px;
+    color: var(--ink);
   }
 
   .badge.will_import,
   .badge.accepted {
-    color: #3ecf8e;
-    border-color: color-mix(in srgb, #3ecf8e 45%, var(--chrome-line));
+    background: color-mix(in srgb, var(--green) 62%, transparent);
   }
 
   .badge.duplicate,
-  .badge.skipped,
+  .badge.skipped {
+    background: color-mix(in srgb, var(--orange) 62%, transparent);
+  }
+
   .badge.warning {
-    color: #f0b429;
-    border-color: color-mix(in srgb, #f0b429 45%, var(--chrome-line));
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
   }
 
   .badge.invalid,
   .badge.rejected {
-    color: #ff6b6b;
-    border-color: color-mix(in srgb, #ff6b6b 45%, var(--chrome-line));
+    background: color-mix(in srgb, var(--pink) 62%, transparent);
   }
 
-  tr.invalid,
-  tr.rejected {
-    background: color-mix(in srgb, #ff6b6b 8%, transparent);
+  tr.invalid td,
+  tr.rejected td {
+    background: color-mix(in srgb, var(--pink) 12%, transparent);
   }
 
-  tr.duplicate,
-  tr.skipped,
-  tr.warning {
-    background: color-mix(in srgb, #f0b429 7%, transparent);
+  tr.duplicate td,
+  tr.skipped td,
+  tr.warning td {
+    background: color-mix(in srgb, var(--yellow) 14%, transparent);
   }
 
   .empty,
   .all-good {
     text-align: center;
-    color: var(--muted);
+    color: var(--ink-muted);
     padding: 1.25rem;
+    font-size: 1rem;
+  }
+
+  .all-good {
+    background: color-mix(in srgb, var(--green) 35%, transparent);
+    border-radius: 3px 10px 4px 8px / 8px 3px 10px 4px;
+    margin: 0;
   }
 
   .confirm-progress {
@@ -618,16 +998,21 @@
   }
 
   .confirm-progress .bar {
-    height: 10px;
-    border: 2px solid var(--chrome-line);
-    background: var(--surface2);
+    height: 0.7rem;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    background: color-mix(in srgb, var(--paper) 80%, var(--mix-wash));
     overflow: hidden;
+    border-radius: 255px 8px 225px 6px / 8px 225px 6px 255px;
   }
 
   .confirm-progress .bar > div {
     height: 100%;
-    background: color-mix(in srgb, var(--green) 70%, var(--brand));
+    background: color-mix(in srgb, var(--green) 70%, var(--yellow));
     transition: width 180ms ease;
+  }
+
+  .confirm-progress .dim {
+    margin: 0;
   }
 
   .sheet-foot {
@@ -636,7 +1021,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     align-items: center;
-    border-top: 1px solid var(--chrome-line);
+    border-top: 1.5px solid color-mix(in srgb, var(--ink) 18%, transparent);
     padding-top: 0.75rem;
   }
 
@@ -644,7 +1029,7 @@
     margin: 0;
     flex: 1;
     min-width: 200px;
-    font-size: 0.74rem;
+    font-size: 0.9rem;
     line-height: 1.4;
   }
 
@@ -655,10 +1040,6 @@
   }
 
   @media (max-width: 720px) {
-    .balance-card {
-      grid-template-columns: 1fr;
-    }
-
     .arrow {
       display: none;
     }
@@ -666,6 +1047,7 @@
     .sheet {
       padding: 0.85rem;
       max-height: 96vh;
+      transform: none;
     }
   }
 </style>

@@ -43,9 +43,20 @@ export async function POST({ locals, params, request }) {
   }
 
   const currencyCode = await getAccountCurrency(params.accountId);
+  let assignments: Record<string, { categoryId?: string | null; tagIds?: string[] }> | undefined;
+  const rawAssignments = body.get("assignments");
+  if (typeof rawAssignments === "string" && rawAssignments.trim()) {
+    try {
+      assignments = JSON.parse(rawAssignments) as Record<string, { categoryId?: string | null; tagIds?: string[] }>;
+    } catch {
+      throw error(400, "Invalid assignments payload");
+    }
+  }
+
   const result = await importTransactionRows(user.id, params.accountId, parsed.rows, {
     skipDuplicates,
     currencyCode,
+    assignments,
   });
 
   return json({

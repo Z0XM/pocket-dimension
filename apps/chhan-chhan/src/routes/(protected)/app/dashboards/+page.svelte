@@ -19,7 +19,8 @@
   import MeterBar from "$lib/components/meter-bar.svelte";
   import MonthlyTrendChart from "$lib/components/monthly-trend-chart.svelte";
   import SketchSelect from "$lib/components/sketch-select.svelte";
-  import icon from "$lib/assets/icon.png";
+  import SpendPieChart from "$lib/components/spend-pie-chart.svelte";
+  import BrandMark from "$lib/components/brand-mark.svelte";
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
@@ -145,13 +146,12 @@
 <header class="topbar">
   <div>
     <h1 class="brand-lockup">
-      <img src={icon} alt="" class="brand-mark" width="44" height="44" />
+      <BrandMark />
       <span class="brand-word"><span>CHHAN</span><span class="acid"> CHHAN</span></span>
     </h1>
     <AppNav />
   </div>
   <div class="actions">
-    <DashboardWidgetPicker enabledWidgets={data.enabledWidgets} onchange={setEnabledWidgets} />
     <AppSettings />
   </div>
 </header>
@@ -225,34 +225,37 @@
         <span class="period-static">All time</span>
       {/if}
     </div>
-    <div class="period-tabs" role="tablist" aria-label="Summary period">
-      <button
-        type="button"
-        role="tab"
-        class:active={data.summaryPeriod === "month"}
-        aria-selected={data.summaryPeriod === "month"}
-        onclick={() => setSummaryPeriod("month")}
-      >
-        Month
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class:active={data.summaryPeriod === "year"}
-        aria-selected={data.summaryPeriod === "year"}
-        onclick={() => setSummaryPeriod("year")}
-      >
-        Year
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class:active={data.summaryPeriod === "all"}
-        aria-selected={data.summaryPeriod === "all"}
-        onclick={() => setSummaryPeriod("all")}
-      >
-        All
-      </button>
+    <div class="head-filters">
+      <DashboardWidgetPicker enabledWidgets={data.enabledWidgets} onchange={setEnabledWidgets} />
+      <div class="period-tabs" role="tablist" aria-label="Summary period">
+        <button
+          type="button"
+          role="tab"
+          class:active={data.summaryPeriod === "month"}
+          aria-selected={data.summaryPeriod === "month"}
+          onclick={() => setSummaryPeriod("month")}
+        >
+          Month
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class:active={data.summaryPeriod === "year"}
+          aria-selected={data.summaryPeriod === "year"}
+          onclick={() => setSummaryPeriod("year")}
+        >
+          Year
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class:active={data.summaryPeriod === "all"}
+          aria-selected={data.summaryPeriod === "all"}
+          onclick={() => setSummaryPeriod("all")}
+        >
+          All
+        </button>
+      </div>
     </div>
   </div>
 
@@ -423,11 +426,7 @@
         {#if data.merchantSpend.length === 0}
           <p class="dim dash-empty">No merchant spend in this period.</p>
         {:else}
-          <div class="dash-meters">
-            {#each data.merchantSpend as row (row.name)}
-              <MeterBar name={row.name} valueLabel={formatMoney(row.amountMinor, data.account.currencyCode)} pct={row.pct} color={row.color} />
-            {/each}
-          </div>
+          <SpendPieChart rows={data.merchantSpend} currencyCode={data.account.currencyCode} ariaLabel="Top merchants spend breakdown" />
         {/if}
       </article>
     {/if}
@@ -643,7 +642,7 @@
     width: 9.5rem;
     padding: 0.85rem 0.7rem 0.75rem;
     margin: 0.2rem 0;
-    background: #fff3a0;
+    background: color-mix(in srgb, var(--yellow) 72%, var(--mix-wash));
     background-image: linear-gradient(135deg, transparent 62%, rgba(0, 0, 0, 0.04) 62%, rgba(0, 0, 0, 0.04) 100%);
     border: 1.25px solid color-mix(in srgb, var(--ink) 22%, transparent);
     box-shadow:
@@ -692,7 +691,7 @@
   }
 
   .taped-sticky.blue {
-    background: color-mix(in srgb, var(--blue) 55%, white);
+    background: color-mix(in srgb, var(--blue) 55%, var(--mix-wash));
     transform: rotate(-2.4deg);
   }
 
@@ -731,6 +730,13 @@
     color: var(--main-text);
     letter-spacing: 0.01em;
     text-transform: none;
+  }
+
+  .head-filters {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .period-tabs {
