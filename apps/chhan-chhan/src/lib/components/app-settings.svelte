@@ -46,16 +46,16 @@
 <div class="settings">
   {#if onControl}
     <span class="settings-icon is-current" aria-current="page" title="Control Center">
-      <Settings size={18} strokeWidth={1.6} aria-hidden="true" />
+      <Settings size={17} strokeWidth={2.1} aria-hidden="true" />
       <span class="sr-only">Control Center</span>
     </span>
   {:else}
     <a class="settings-icon" href="/app/control" title="Control Center" aria-label="Control Center">
-      <Settings size={18} strokeWidth={1.6} aria-hidden="true" />
+      <Settings size={17} strokeWidth={2.1} aria-hidden="true" />
     </a>
   {/if}
   <button type="button" class="settings-icon" title="Log out" aria-label="Log out" onclick={openConfirm}>
-    <LogOut size={18} strokeWidth={1.6} aria-hidden="true" />
+    <LogOut size={17} strokeWidth={2.1} aria-hidden="true" />
   </button>
 </div>
 

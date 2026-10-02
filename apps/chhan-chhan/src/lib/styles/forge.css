@@ -30,36 +30,56 @@
   .forge .settings {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.45rem;
   }
 
   .forge .settings-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.15rem;
-    height: 2.15rem;
+    width: 2.2rem;
+    height: 2.2rem;
     padding: 0;
-    background: transparent;
-    border: 1.5px solid var(--chrome-line);
-    color: var(--main-text);
+    background: color-mix(in srgb, var(--yellow) 42%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    color: var(--ink);
     text-decoration: none;
     cursor: pointer;
-    border-radius: 255px 12px 225px 10px / 12px 225px 10px 255px;
+    border-radius: 42% 58% 48% 52% / 52% 42% 58% 48%;
+    box-shadow: 1.5px 1.5px 0 color-mix(in srgb, var(--ink) 10%, transparent);
+    transform: rotate(-3deg);
+    transition:
+      background 120ms ease,
+      color 120ms ease,
+      border-color 120ms ease,
+      transform 120ms ease;
+  }
+
+  .forge .settings-icon + .settings-icon {
+    transform: rotate(2.5deg);
+    background: color-mix(in srgb, var(--blue) 38%, transparent);
   }
 
   .forge a.settings-icon:hover,
   .forge button.settings-icon:hover {
-    border-color: var(--brand);
+    border-color: color-mix(in srgb, var(--ink) 40%, transparent);
     color: var(--brand);
-    background: var(--brand-soft);
+    background: color-mix(in srgb, var(--purple) 55%, transparent);
+    transform: rotate(-1deg) scale(1.04);
+  }
+
+  .forge button.settings-icon:hover {
+    color: var(--neg, #c45b6a);
+    background: color-mix(in srgb, var(--pink) 55%, transparent);
+    transform: rotate(1deg) scale(1.04);
   }
 
   .forge span.settings-icon.is-current {
-    border-color: var(--brand);
+    border-color: color-mix(in srgb, var(--brand) 55%, var(--ink));
     color: var(--brand);
-    background: var(--brand-soft);
+    background: color-mix(in srgb, var(--purple) 62%, transparent);
     cursor: default;
+    transform: rotate(-2deg);
   }
 
   .forge .settings .sr-only {
