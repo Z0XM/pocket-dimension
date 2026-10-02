@@ -455,7 +455,7 @@ async function seedDefaultTaxonomy(tx: Parameters<Parameters<typeof db.transacti
         updatedById: userId,
       }))
     )
-    .onConflictDoNothing();
+    .onConflictDoNothing({ target: [schema.financeCategories.accountId, schema.financeCategories.name] });
 
   await tx
     .insert(schema.financeTags)
@@ -468,7 +468,34 @@ async function seedDefaultTaxonomy(tx: Parameters<Parameters<typeof db.transacti
         updatedById: userId,
       }))
     )
-    .onConflictDoNothing();
+    .onConflictDoNothing({ target: [schema.financeTags.accountId, schema.financeTags.name] });
+}
+
+/** True when the account is missing any starter category/tag (typical for accounts created before defaults existed). */
+export async function accountNeedsDefaultTaxonomy(accountId: string): Promise<boolean> {
+  const [categories, tags] = await Promise.all([
+    db
+      .select({ name: schema.financeCategories.name })
+      .from(schema.financeCategories)
+      .where(eq(schema.financeCategories.accountId, accountId)),
+    db
+      .select({ name: schema.financeTags.name })
+      .from(schema.financeTags)
+      .where(eq(schema.financeTags.accountId, accountId)),
+  ]);
+
+  const categoryNames = new Set(categories.map((row) => row.name));
+  const tagNames = new Set(tags.map((row) => row.name));
+  const missingCategory = DEFAULT_CATEGORIES.some((category) => !categoryNames.has(category.name));
+  const missingTag = DEFAULT_TAGS.some((tag) => !tagNames.has(tag.name));
+  return missingCategory || missingTag;
+}
+
+/** Idempotent: inserts any missing starter categories/tags for an existing account. */
+export async function configureAccountDefaults(userId: string, accountId: string) {
+  await db.transaction(async (tx) => {
+    await seedDefaultTaxonomy(tx, accountId, userId);
+  });
 }
 
 export async function updateAccount(

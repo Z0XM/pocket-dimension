@@ -22,6 +22,8 @@ import {
   updateCategory as saveCategory,
   updateGroup as saveGroup,
   updateTag as saveTag,
+  accountNeedsDefaultTaxonomy,
+  configureAccountDefaults,
 } from "$lib/server/finance";
 import { SUPPORTED_CURRENCIES } from "$lib/finance/currencies";
 import { parseIndianAmount } from "$lib/finance/money";
@@ -50,13 +52,14 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
   if (!locals.user?.id) redirect(307, "/login");
 
   const { account, accounts } = await parent();
-  const [categories, tags, groups, transactionCount, firstTransactionOn, openingBalance] = await Promise.all([
+  const [categories, tags, groups, transactionCount, firstTransactionOn, openingBalance, needsDefaultTaxonomy] = await Promise.all([
     listCategories(account.id),
     listTags(account.id),
     listGroups(account.id),
     countAccountTransactions(account.id),
     getFirstTransactionDate(account.id),
     getAccountOpeningBalance(account.id),
+    accountNeedsDefaultTaxonomy(account.id),
   ]);
 
   return {
@@ -68,6 +71,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
     categories,
     tags,
     groups,
+    needsDefaultTaxonomy,
     currencies: SUPPORTED_CURRENCIES,
     importers: listImporters().map(({ id, label }) => ({ id, label })),
   };
@@ -469,19 +473,30 @@ export const actions: Actions = {
       try {
         balanceMinor = parseIndianAmount(openingParsed.data.amount);
       } catch {
-        return fail(400, { message: "Invalid opening amount" });
+        return fail(400, { message: "Invalid opening balance amount" });
       }
       if (balanceMinor < 0) {
-        return fail(400, { message: "Opening amount must be zero or positive" });
+        return fail(400, { message: "Opening balance cannot be negative" });
       }
-
       await updateAccountOpeningBalance(user.id, account.id, {
         balanceMinor,
         balanceAsOf: openingParsed.data.balanceAsOf,
       });
     }
 
-    return { success: true, message: `Created account “${account.name}”` };
+    return { success: true, message: "Account created" };
+  },
+
+  configureDefaults: async ({ locals, cookies }) => {
+    const user = requireUser(locals);
+    const { account } = await resolveRequestAccount(user.id, cookies);
+    const membership = await getMembershipOrThrow(user.id, account.id);
+    if (!canEdit(membership.role)) {
+      return fail(403, { message: "You only have read access" });
+    }
+
+    await configureAccountDefaults(user.id, account.id);
+    return { success: true, message: "Default categories and tags added" };
   },
 
   updateAccount: async ({ request, locals, cookies }) => {

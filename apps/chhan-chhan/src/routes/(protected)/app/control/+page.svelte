@@ -128,6 +128,7 @@
   let savingAccount = $state(false);
   let creatingAccount = $state(false);
   let addingAccount = $state(false);
+  let configuringDefaults = $state(false);
   let clearingOpeningBalance = $state(false);
   let clearingTransactions = $state(false);
 
@@ -745,6 +746,29 @@
       <section class="sheet-panel" id="control-panel-organize" role="tabpanel" aria-labelledby="control-tab-organize">
         <h2>Organize</h2>
 
+        {#if data.needsDefaultTaxonomy}
+          <form
+            class="defaults-callout"
+            method="POST"
+            action="?/configureDefaults"
+            use:enhance={() => {
+              configuringDefaults = true;
+              return async ({ update }) => {
+                configuringDefaults = false;
+                await update();
+              };
+            }}
+          >
+            <p>
+              This account is missing starter categories and tags. Configure defaults to add Food, Monthly Bill, Personal, and the rest —
+              existing names stay put.
+            </p>
+            <button type="submit" class="defaults-btn" disabled={configuringDefaults}>
+              {configuringDefaults ? "Configuring…" : "Configure defaults"}
+            </button>
+          </form>
+        {/if}
+
         <div class="organize-grid">
           <div class="organize-col">
             <h3>Categories</h3>
@@ -1255,6 +1279,54 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1rem 1.35rem;
     align-items: start;
+  }
+
+  .defaults-callout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    margin: 0 0 1.15rem;
+    padding: 0.7rem 0.85rem;
+    background: color-mix(in srgb, var(--yellow) 38%, var(--paper));
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 3px 12px 4px 10px / 10px 3px 12px 4px;
+    box-shadow: 2px 2px 0 0 color-mix(in srgb, var(--ink) 10%, transparent);
+    font-family: var(--hand);
+    transform: rotate(-0.2deg);
+  }
+
+  .defaults-callout p {
+    margin: 0;
+    flex: 1 1 14rem;
+    font-size: 0.98rem;
+    line-height: 1.35;
+    color: var(--ink);
+  }
+
+  .defaults-btn {
+    appearance: none;
+    flex: none;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 32%, transparent);
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+    color: var(--ink);
+    font-family: var(--hand);
+    font-size: 0.98rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 255px 10px 225px 8px / 10px 225px 8px 255px;
+    cursor: pointer;
+    transform: rotate(-0.6deg);
+  }
+
+  .defaults-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--yellow) 88%, transparent);
+    border-color: var(--brand);
+  }
+
+  .defaults-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
   }
 
   .organize-col h3 {
