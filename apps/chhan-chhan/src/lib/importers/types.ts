@@ -28,6 +28,80 @@ export type ImportResult = {
   }>;
   reportCsv?: string;
   metadata?: Record<string, string>;
+  /** Account balance after this import completed (when available). */
+  resultingBalance?: {
+    balanceMinor: number;
+    asOf: string;
+    source: "statement" | "unchanged";
+  } | null;
+};
+
+export type ImportPreviewRowStatus = "will_import" | "duplicate" | "invalid" | "warning";
+
+export type ImportClassificationSuggestion = {
+  categoryId: string | null;
+  categoryName: string | null;
+  tagIds: string[];
+  tagNames: string[];
+  source: "exact" | "fuzzy";
+  matchedMerchant: string;
+  sampleCount: number;
+};
+
+export type ImportPreviewRow = {
+  row: number;
+  status: ImportPreviewRowStatus;
+  reasons: string[];
+  occurredOn?: string;
+  amountMinor?: number;
+  type?: string;
+  merchant?: string;
+  externalRef?: string;
+  notes?: string;
+  balanceMinor?: number;
+  sortOrder?: number;
+  suggestion?: ImportClassificationSuggestion | null;
+};
+
+export type ImportPreviewTaxonomy = {
+  categories: Array<{
+    id: string;
+    name: string;
+    kind: "expense" | "income" | "transfer";
+    colorHex: string | null;
+  }>;
+  tags: Array<{
+    id: string;
+    name: string;
+    colorHex: string | null;
+  }>;
+};
+
+export type ImportPreview = {
+  totalRows: number;
+  willImport: number;
+  duplicates: number;
+  invalid: number;
+  warnings: number;
+  rows: ImportPreviewRow[];
+  currentBalance: {
+    balanceMinor: number;
+    asOf: string;
+  } | null;
+  projectedBalance: {
+    balanceMinor: number;
+    asOf: string;
+    willUpdateAccount: boolean;
+  } | null;
+  metadata: Record<string, string>;
+  importerId: string;
+  fileName: string;
+  taxonomy: ImportPreviewTaxonomy;
+};
+
+export type ImportRowAssignment = {
+  categoryId?: string | null;
+  tagIds?: string[];
 };
 
 export type StatementInput = {

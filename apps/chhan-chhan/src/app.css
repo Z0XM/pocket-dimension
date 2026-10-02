@@ -2,60 +2,106 @@
 @plugin "@tailwindcss/forms";
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
-@import "@fontsource/archivo-black";
-@import "@fontsource-variable/archivo";
-@import "@fontsource/fira-mono";
+@import "./lib/styles/appearance.css";
 @import "./lib/styles/forge.css";
 
 :root {
-  /* Locked palette */
-  --brand-black: #060b0f;
-  --brand-white: #e8e4f0;
-  --brand-accent: #ee7c02;
-  --brand-accent-light: #ffb86c;
-  --brand-table: #060b0f;
-  --brand-cards: #4a3010;
-  --brand-danger: #a50036;
-  --brand-success: #00a553;
-  --brand-hi-purple: #bd93f9;
-  --brand-hi-green: #50fa7b;
-  --brand-hi-cyan: #54dbee;
+  /* Marker paper palette */
+  --paper: #fffefd;
+  --ink: #1b1b1f;
+  --ink-muted: #5b5b5b;
+  --ink-soft: #8a8a8a;
+  --brand: #6965db;
+  --brand-soft: #e8e7fb;
+  --yellow: #ffe066;
+  --pink: #ffadad;
+  --green: #9be7c4;
+  --blue: #bde0fe;
+  --orange: #ffb997;
+  --purple: #d4c5f9;
+  --hair: rgba(27, 27, 31, 0.12);
+  --surface-raised: #fffef8;
+  --shadow-paper: #f7f4ea;
+  --mix-wash: #ffffff;
 
-  /* Interactive highlight roles */
-  --hi-purple: var(--brand-hi-purple);
-  --hi-green: var(--brand-hi-green);
-  --hi-cyan: var(--brand-hi-cyan);
-  --hi-hover: var(--brand-hi-green);
-  --hi-focus: var(--brand-accent-light);
-  --hi-select: var(--brand-hi-purple);
+  /* Legacy brand aliases → paper (keeps forge/components working) */
+  --brand-black: var(--paper);
+  --brand-white: var(--ink);
+  --brand-accent: var(--brand);
+  --brand-accent-light: #8b87e8;
+  --brand-table: var(--hair);
+  --brand-cards: rgba(27, 27, 31, 0.22);
+  --brand-danger: #c45b6a;
+  --brand-success: #1f7a52;
+  --brand-hi-purple: var(--purple);
+  --brand-hi-green: var(--green);
+  --brand-hi-cyan: var(--blue);
 
-  /* Derived theme tokens */
-  --background: var(--brand-black);
-  --main-text: var(--brand-white);
-  --foreground: var(--brand-cards);
-  --card: var(--brand-black);
-  --card-foreground: var(--brand-white);
-  --primary: var(--brand-black);
-  --primary-foreground: var(--brand-accent);
-  --secondary: var(--brand-black);
-  --secondary-foreground: var(--brand-white);
-  --muted: var(--brand-black);
-  --muted-foreground: var(--brand-white);
-  --accent: var(--brand-accent);
-  --accent-foreground: var(--brand-black);
-  --border: var(--brand-table);
+  --hi-purple: var(--brand);
+  --hi-green: var(--brand-success);
+  --hi-cyan: #3d7ab8;
+  --hi-hover: var(--brand);
+  --hi-focus: var(--brand);
+  --hi-select: var(--brand-soft);
+
+  --background: var(--paper);
+  --main-text: var(--ink);
+  --foreground: var(--ink);
+  --card: #ffffff;
+  --card-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: #f6f4ef;
+  --secondary-foreground: var(--ink);
+  --muted: #f3f1ec;
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--brand);
+  --accent-foreground: #ffffff;
+  --border: var(--hair);
   --success: var(--brand-success);
   --danger: var(--brand-danger);
-  --ring: var(--hi-focus);
-  --scrollbar-thumb: var(--brand-accent);
-  --scrollbar-track: var(--brand-black);
-  --scrollbar-thumb-hover: var(--brand-accent-light);
+  --ring: var(--brand);
+  --scrollbar-thumb: color-mix(in srgb, var(--ink) 28%, transparent);
+  --scrollbar-track: var(--paper);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #121212;
+  --ink: #e8e6e3;
+  --ink-muted: #a8a6a1;
+  --ink-soft: #7a7874;
+  --brand: #a8a5ff;
+  --brand-soft: #2a2848;
+  --yellow: #c9a227;
+  --pink: #c97a7a;
+  --green: #5fad8a;
+  --blue: #6a8fb8;
+  --orange: #c98a5a;
+  --purple: #8f7ec4;
+  --hair: rgba(232, 230, 227, 0.12);
+  --surface-raised: #1c1c22;
+  --shadow-paper: #0a0a0c;
+  --mix-wash: #1a1a1e;
+
+  --brand-accent-light: #bbb8ff;
+  --brand-cards: rgba(232, 230, 227, 0.22);
+  --brand-danger: #e08a96;
+  --brand-success: #6ecf9a;
+  --hi-cyan: #7eb0d8;
+
+  --card: #1c1c22;
+  --secondary: #1a1a20;
+  --muted: #232329;
+  --primary-foreground: #121212;
+  --accent-foreground: #121212;
 }
 
 @theme inline {
-  --font-sans: "Archivo Variable", sans-serif;
-  --font-mono: "Fira Mono", monospace;
-  --font-heading: "Archivo Black", var(--font-sans);
+  --font-sans: var(--ui);
+  --font-mono: var(--hand);
+  --font-heading: var(--hand);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-text: var(--main-text);
@@ -82,11 +128,14 @@
 
   html,
   body {
-    @apply min-h-screen bg-background text-text font-mono;
+    @apply min-h-screen bg-background text-text;
+    font-family: var(--ui);
+    height: 100%;
   }
 
   body {
     background: var(--background);
+    color: var(--main-text);
   }
 
   h1,
@@ -95,12 +144,13 @@
   h4,
   h5,
   h6 {
-    font-family: var(--font-heading);
+    font-family: var(--hand);
+    font-weight: 400;
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--hi-purple) 38%, transparent);
-    color: var(--main-text);
+    background: color-mix(in srgb, var(--yellow) 55%, transparent);
+    color: var(--ink);
   }
 
   *::-webkit-scrollbar {
@@ -123,5 +173,96 @@
 
   *::-webkit-scrollbar-corner {
     background: var(--scrollbar-track);
+  }
+
+  /* Underline writing-line inputs (app-wide) */
+  input:not([type]),
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="url"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="time"],
+  input[type="week"],
+  textarea,
+  select {
+    appearance: none;
+    background-color: transparent;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 32%, transparent);
+    border-radius: 0;
+    box-shadow: none;
+    color: var(--main-text);
+    font-family: inherit;
+    padding: 0.05rem 0.1rem 0.28rem;
+    outline: none;
+  }
+
+  input:not([type]):focus,
+  input[type="text"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  input[type="search"]:focus,
+  input[type="url"]:focus,
+  input[type="tel"]:focus,
+  input[type="number"]:focus,
+  input[type="date"]:focus,
+  input[type="datetime-local"]:focus,
+  input[type="month"]:focus,
+  input[type="time"]:focus,
+  input[type="week"]:focus,
+  textarea:focus,
+  select:focus {
+    border-bottom-color: var(--brand);
+    box-shadow: none;
+    outline: none;
+  }
+
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  /* Keep label tight to the writing line */
+  label + :is(input, textarea, select),
+  label + * + :is(input, textarea, select) {
+    margin-top: 0;
+  }
+
+  /* Keep non-writing controls boxed */
+  input[type="file"],
+  input[type="color"],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    border: initial;
+    border-radius: initial;
+    background-color: initial;
+    box-shadow: initial;
+    padding: initial;
+  }
+}
+
+@layer utilities {
+  /* Beat Tailwind gap-2 on label→underline field stacks */
+  .flex.flex-col.gap-2:has(> :is(input, textarea, select)),
+  .flex.flex-col.gap-2:has(> div):has(> :is(input, textarea, select)) {
+    gap: 0.1rem;
+  }
+
+  .field-line {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
   }
 }

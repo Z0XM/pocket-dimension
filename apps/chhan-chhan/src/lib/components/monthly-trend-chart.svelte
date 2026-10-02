@@ -24,7 +24,7 @@
   }
 </script>
 
-<div class="trend-chart" role="img" aria-label="Monthly income and expense trend">
+<div class="trend-chart math-notebook" role="img" aria-label="Monthly income and expense trend">
   <div class="trend-legend">
     <span><i class="dot income"></i> In</span>
     <span><i class="dot expense"></i> Out</span>
@@ -53,12 +53,22 @@
     gap: 0.65rem;
   }
 
+  .math-notebook {
+    padding: 0.35rem 0.15rem 0.15rem;
+    background-image:
+      linear-gradient(rgba(90, 130, 180, 0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(90, 130, 180, 0.14) 1px, transparent 1px);
+    background-size: 18px 18px;
+    background-position: 0 0;
+    border-radius: 4px 12px 6px 10px / 10px 4px 12px 6px;
+  }
+
   .trend-legend {
     display: flex;
     gap: 0.85rem;
-    font-size: 0.66rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     color: var(--muted);
   }
 
@@ -77,12 +87,12 @@
 
   .dot.income,
   .trend-bar.income {
-    background: var(--pos);
+    background: color-mix(in srgb, var(--green) 80%, var(--pos));
   }
 
   .dot.expense,
   .trend-bar.expense {
-    background: var(--neg);
+    background: color-mix(in srgb, var(--pink) 75%, var(--neg));
   }
 
   .trend-grid {
@@ -91,6 +101,9 @@
     gap: 0.45rem;
     align-items: end;
     min-height: 9rem;
+    border-left: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
+    padding: 0.35rem 0.25rem 0.15rem 0.45rem;
   }
 
   .trend-col {
@@ -115,13 +128,13 @@
     min-height: 0;
     border-radius: 1px 1px 0 0;
     transition: height 0.15s ease;
+    opacity: 0.9;
   }
 
   .trend-label {
-    font-size: 0.58rem;
-    letter-spacing: 0.04em;
-    color: var(--muted);
-    text-align: center;
+    font-family: var(--hand);
+    font-size: 0.78rem;
+    color: var(--ink-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

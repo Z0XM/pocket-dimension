@@ -79,3 +79,6 @@ cookies.txt
 # Dev Mode local config (contains local account allowlist)
 **/devMode.config.ts
 !**/devMode.config.example.ts
+
+# Local prod backups (do not commit)
+apps/chhan-chhan/backups/

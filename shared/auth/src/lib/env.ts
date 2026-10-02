@@ -11,4 +11,4 @@ const schema = z.object({
   RESEND_FROM_EMAIL: z.string().default("noreply@example.com"),
 });
 
-export const env = validateEnv("auth", schema, Bun.env);
+export const env = validateEnv("auth", schema, typeof Bun !== "undefined" ? Bun.env : process.env);

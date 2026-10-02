@@ -21,13 +21,13 @@ export type DevModeConfig = {
  * This monorepo uses `NODE_ENV` (see shared/utils + app `.env` files).
  * `NODE_ENV` is accepted as an alias if present.
  */
-export function isDevModeEnabled(env: NodeJS.Dict<string | undefined> = Bun.env): boolean {
+export function isDevModeEnabled(env: NodeJS.Dict<string | undefined> = typeof Bun !== "undefined" ? Bun.env : process.env): boolean {
   const nodeEnv = env.NODE_ENV;
   const devMode = env.DEV_MODE === "true" || env.DEV_MODE === "1";
   return nodeEnv === "development" && devMode;
 }
 
-export function assertDevModeEnabled(env: NodeJS.Dict<string | undefined> = Bun.env): void {
+export function assertDevModeEnabled(env: NodeJS.Dict<string | undefined> = typeof Bun !== "undefined" ? Bun.env : process.env): void {
   if (!isDevModeEnabled(env)) {
     throw new Error("Dev Mode endpoints are only available when DEV_MODE=true and NODE_ENV=development");
   }

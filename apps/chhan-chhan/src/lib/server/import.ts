@@ -2,13 +2,25 @@ import { db, schema } from "@pocket-dimension/db";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { buildImportReportCsv, importIssueFromRow, type ImportIssue } from "$lib/importers/import-report";
 import { transactionDedupKey } from "$lib/importers/transaction-dedup";
-import type { ImportResult, ImportRow } from "$lib/importers/types";
+import type { ImportPreview, ImportPreviewRow, ImportResult, ImportRow, ImportRowAssignment } from "$lib/importers/types";
 import { isBalanceSnapshotNewer, latestBalanceFromRows } from "$lib/server/balance";
+import { getCurrentBalance } from "$lib/server/finance";
+import { enrichPreviewRowsWithSuggestions, loadImportTaxonomy, resolveImportAssignments } from "$lib/server/import-suggestions";
 import { csvImportRowSchema } from "$lib/validation/finance";
 
 type ImportOptions = {
   skipDuplicates?: boolean;
   currencyCode?: string;
+  onProgress?: (progress: ImportProgress) => void;
+  /** Per-row category/tag overrides keyed by 1-based statement row number. */
+  assignments?: Record<string, ImportRowAssignment>;
+};
+
+type PreviewOptions = {
+  skipDuplicates?: boolean;
+  metadata?: Record<string, string>;
+  importerId?: string;
+  fileName?: string;
   onProgress?: (progress: ImportProgress) => void;
 };
 
@@ -130,6 +142,255 @@ async function syncImportBalances(userId: string, accountId: string, rows: Impor
     .where(eq(schema.financeAccounts.id, accountId));
 }
 
+function balanceChainIssue(prev: ParsedImportRow, next: ParsedImportRow): string | null {
+  if (prev.balanceMinor == null || next.balanceMinor == null) return null;
+
+  const expected = next.type === "income" ? prev.balanceMinor + next.amountMinor : prev.balanceMinor - next.amountMinor;
+
+  if (expected === next.balanceMinor) return null;
+
+  const gapMinor = next.balanceMinor - expected;
+  return `Balance chain break vs previous row (expected ${expected}, got ${next.balanceMinor}, gap ${gapMinor})`;
+}
+
+async function loadExistingDedupKeys(accountId: string): Promise<Set<string>> {
+  const existing = await db
+    .select({
+      externalRef: schema.financeTransactions.externalRef,
+      occurredOn: schema.financeTransactions.occurredOn,
+      amountMinor: schema.financeTransactions.amountMinor,
+      merchant: schema.financeTransactions.merchant,
+      type: schema.financeTransactions.type,
+    })
+    .from(schema.financeTransactions)
+    .where(eq(schema.financeTransactions.accountId, accountId));
+
+  const keys = new Set<string>();
+  for (const row of existing) {
+    keys.add(transactionDedupKey(row));
+  }
+  return keys;
+}
+
+/** Classify parsed rows without writing. Used for pre-import confirmation. */
+export async function previewImportRows(accountId: string, rows: ImportRow[], options: PreviewOptions = {}): Promise<ImportPreview> {
+  const skipDuplicates = options.skipDuplicates ?? true;
+  const onProgress = options.onProgress;
+
+  onProgress?.({
+    phase: "loading",
+    processed: 0,
+    total: rows.length,
+    accepted: 0,
+    skipped: 0,
+    rejected: 0,
+  });
+
+  const existingKeys = skipDuplicates ? await loadExistingDedupKeys(accountId) : new Set<string>();
+  const seenInFile = new Set<string>();
+  const previewRows: ImportPreviewRow[] = [];
+
+  let willImport = 0;
+  let duplicates = 0;
+  let invalid = 0;
+
+  const validParsed: Array<{ index: number; data: ParsedImportRow }> = [];
+
+  for (const [index, row] of rows.entries()) {
+    const rowNumber = index + 1;
+    const parsed = csvImportRowSchema.safeParse(row);
+
+    if (!parsed.success) {
+      invalid += 1;
+      previewRows.push({
+        row: rowNumber,
+        status: "invalid",
+        reasons: [parsed.error.issues[0]?.message ?? "Invalid row"],
+        occurredOn: row.occurredOn,
+        amountMinor: row.amountMinor,
+        type: row.type,
+        merchant: row.merchant,
+        externalRef: row.externalRef,
+        notes: row.notes,
+        balanceMinor: row.balanceMinor,
+        sortOrder: row.sortOrder,
+      });
+      onProgress?.({
+        phase: "importing",
+        processed: rowNumber,
+        total: rows.length,
+        accepted: willImport,
+        skipped: duplicates,
+        rejected: invalid,
+      });
+      continue;
+    }
+
+    const reasons: string[] = [];
+    const key = transactionDedupKey(parsed.data);
+    const dbDup = skipDuplicates ? duplicateSkipReason(parsed.data, existingKeys) : null;
+    const fileDup = seenInFile.has(key);
+
+    if (dbDup) {
+      reasons.push(dbDup);
+    }
+    if (fileDup) {
+      reasons.push("Duplicate within this statement file");
+    }
+    if (parsed.data.balanceMinor == null) {
+      reasons.push("Missing statement balance on this row");
+    }
+    if (!parsed.data.externalRef) {
+      reasons.push("Missing reference — dedup uses date/amount/merchant only");
+    }
+    if (parsed.data.amountMinor <= 0) {
+      reasons.push("Amount is missing or not positive");
+    }
+
+    seenInFile.add(key);
+
+    if (dbDup || fileDup) {
+      duplicates += 1;
+      previewRows.push({
+        row: rowNumber,
+        status: "duplicate",
+        reasons,
+        occurredOn: parsed.data.occurredOn,
+        amountMinor: parsed.data.amountMinor,
+        type: parsed.data.type,
+        merchant: parsed.data.merchant,
+        externalRef: parsed.data.externalRef,
+        notes: parsed.data.notes,
+        balanceMinor: parsed.data.balanceMinor,
+        sortOrder: parsed.data.sortOrder,
+      });
+    } else {
+      willImport += 1;
+      const hasSoftWarning = reasons.length > 0;
+      previewRows.push({
+        row: rowNumber,
+        status: hasSoftWarning ? "warning" : "will_import",
+        reasons,
+        occurredOn: parsed.data.occurredOn,
+        amountMinor: parsed.data.amountMinor,
+        type: parsed.data.type,
+        merchant: parsed.data.merchant,
+        externalRef: parsed.data.externalRef,
+        notes: parsed.data.notes,
+        balanceMinor: parsed.data.balanceMinor,
+        sortOrder: parsed.data.sortOrder,
+      });
+      validParsed.push({ index, data: parsed.data });
+    }
+
+    onProgress?.({
+      phase: "importing",
+      processed: rowNumber,
+      total: rows.length,
+      accepted: willImport,
+      skipped: duplicates,
+      rejected: invalid,
+    });
+  }
+
+  // Balance-chain checks on statement order (sortOrder, then date)
+  const chainOrder = [...validParsed].sort((a, b) => {
+    const sortA = a.data.sortOrder ?? 0;
+    const sortB = b.data.sortOrder ?? 0;
+    if (sortA !== sortB) return sortA - sortB;
+    return a.data.occurredOn.localeCompare(b.data.occurredOn);
+  });
+
+  for (let i = 1; i < chainOrder.length; i++) {
+    const prev = chainOrder[i - 1]!.data;
+    const next = chainOrder[i]!.data;
+    const issue = balanceChainIssue(prev, next);
+    if (!issue) continue;
+
+    const preview = previewRows[chainOrder[i]!.index]!;
+    if (!preview.reasons.includes(issue)) {
+      preview.reasons.push(issue);
+    }
+    if (preview.status === "will_import") {
+      preview.status = "warning";
+    }
+  }
+
+  // Also flag sort-order gaps among rows that carry sortOrder
+  const withSort = chainOrder.filter((r) => r.data.sortOrder != null);
+  for (let i = 1; i < withSort.length; i++) {
+    const prevSort = withSort[i - 1]!.data.sortOrder!;
+    const nextSort = withSort[i]!.data.sortOrder!;
+    if (nextSort === prevSort + 1) continue;
+    if (nextSort <= prevSort) continue;
+    const gap = nextSort - prevSort - 1;
+    if (gap <= 0) continue;
+    const preview = previewRows[withSort[i]!.index]!;
+    const msg = `Statement serial gap: jumped from ${prevSort} to ${nextSort} (${gap} missing)`;
+    if (!preview.reasons.includes(msg)) {
+      preview.reasons.push(msg);
+    }
+    if (preview.status === "will_import") {
+      preview.status = "warning";
+    }
+  }
+
+  const [currentBalanceRaw, account] = await Promise.all([
+    getCurrentBalance(accountId),
+    db.query.financeAccounts.findFirst({
+      where: eq(schema.financeAccounts.id, accountId),
+      columns: { balanceMinor: true, balanceAsOf: true },
+    }),
+  ]);
+
+  const currentBalance = currentBalanceRaw != null ? { balanceMinor: currentBalanceRaw.balanceMinor, asOf: currentBalanceRaw.asOf } : null;
+
+  const statementLatest = latestBalanceFromRows(rows);
+  const accountSnapshot =
+    account?.balanceMinor != null && account.balanceAsOf
+      ? { balanceMinor: account.balanceMinor, asOf: account.balanceAsOf, sortOrder: 0 }
+      : currentBalance
+        ? { balanceMinor: currentBalance.balanceMinor, asOf: currentBalance.asOf, sortOrder: 0 }
+        : null;
+
+  const projectedBalance = statementLatest
+    ? {
+        balanceMinor: statementLatest.balanceMinor,
+        asOf: statementLatest.asOf,
+        willUpdateAccount: isBalanceSnapshotNewer(statementLatest, accountSnapshot),
+      }
+    : null;
+
+  onProgress?.({
+    phase: "syncing",
+    processed: rows.length,
+    total: rows.length,
+    accepted: willImport,
+    skipped: duplicates,
+    rejected: invalid,
+  });
+
+  await enrichPreviewRowsWithSuggestions(accountId, previewRows);
+  const taxonomy = await loadImportTaxonomy(accountId);
+
+  const warningCount = previewRows.filter((row) => row.status === "warning").length;
+
+  return {
+    totalRows: rows.length,
+    willImport,
+    duplicates,
+    invalid,
+    warnings: warningCount,
+    rows: previewRows,
+    currentBalance,
+    projectedBalance,
+    metadata: options.metadata ?? {},
+    importerId: options.importerId ?? "kotak",
+    fileName: options.fileName ?? "statement",
+    taxonomy,
+  };
+}
+
 export async function importTransactionRows(
   userId: string,
   accountId: string,
@@ -139,6 +400,7 @@ export async function importTransactionRows(
   const currencyCode = options.currencyCode ?? "INR";
   const skipDuplicates = options.skipDuplicates ?? true;
   const onProgress = options.onProgress;
+  const assignments = await resolveImportAssignments(accountId, options.assignments);
 
   const existingKeys = new Set<string>();
 
@@ -188,12 +450,13 @@ export async function importTransactionRows(
   };
 
   for (const [index, row] of rows.entries()) {
+    const rowNumber = index + 1;
     const parsed = csvImportRowSchema.safeParse(row);
     if (!parsed.success) {
       rejected += 1;
       const reason = parsed.error.issues[0]?.message ?? "Invalid row";
-      rejectionReasons.push({ row: index + 1, reason });
-      issues.push(importIssueFromRow(index + 1, "rejected", reason, row));
+      rejectionReasons.push({ row: rowNumber, reason });
+      issues.push(importIssueFromRow(rowNumber, "rejected", reason, row));
       reportProgress(index);
       continue;
     }
@@ -202,25 +465,38 @@ export async function importTransactionRows(
 
     if (skipReason) {
       skipped += 1;
-      issues.push(importIssueFromRow(index + 1, "skipped", skipReason, row));
+      issues.push(importIssueFromRow(rowNumber, "skipped", skipReason, row));
       reportProgress(index);
       continue;
     }
 
-    await db.insert(schema.financeTransactions).values({
-      accountId,
-      occurredOn: parsed.data.occurredOn,
-      amountMinor: parsed.data.amountMinor,
-      currencyCode,
-      type: parsed.data.type,
-      merchant: parsed.data.merchant,
-      notes: parsed.data.notes,
-      externalRef: parsed.data.externalRef,
-      balanceMinor: parsed.data.balanceMinor,
-      sortOrder: parsed.data.sortOrder ?? 0,
-      createdById: userId,
-      updatedById: userId,
-    });
+    const assignment = assignments.get(rowNumber);
+
+    const [inserted] = await db
+      .insert(schema.financeTransactions)
+      .values({
+        accountId,
+        occurredOn: parsed.data.occurredOn,
+        amountMinor: parsed.data.amountMinor,
+        currencyCode,
+        type: parsed.data.type,
+        merchant: parsed.data.merchant,
+        notes: parsed.data.notes,
+        externalRef: parsed.data.externalRef,
+        balanceMinor: parsed.data.balanceMinor,
+        sortOrder: parsed.data.sortOrder ?? 0,
+        ...(assignment?.setCategory ? { categoryId: assignment.categoryId } : {}),
+        createdById: userId,
+        updatedById: userId,
+      })
+      .returning({ id: schema.financeTransactions.id });
+
+    if (inserted && assignment?.tagIds.length) {
+      await db
+        .insert(schema.financeTransactionTags)
+        .values(assignment.tagIds.map((tagId) => ({ transactionId: inserted.id, tagId })))
+        .onConflictDoNothing();
+    }
 
     existingKeys.add(transactionDedupKey(parsed.data));
     accepted += 1;
@@ -238,6 +514,9 @@ export async function importTransactionRows(
 
   await syncImportBalances(userId, accountId, rows);
 
+  const resulting = await getCurrentBalance(accountId);
+  const statementLatest = latestBalanceFromRows(rows);
+
   return {
     totalRows: rows.length,
     accepted,
@@ -246,6 +525,17 @@ export async function importTransactionRows(
     rejectionReasons,
     issues,
     reportCsv: issues.length ? buildImportReportCsv(issues) : undefined,
+    resultingBalance:
+      resulting != null
+        ? {
+            balanceMinor: resulting.balanceMinor,
+            asOf: resulting.asOf,
+            source:
+              statementLatest && resulting.balanceMinor === statementLatest.balanceMinor && resulting.asOf === statementLatest.asOf
+                ? "statement"
+                : "unchanged",
+          }
+        : null,
   };
 }
 

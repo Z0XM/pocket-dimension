@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LayoutGrid } from "@lucide/svelte";
+  import LayoutGrid from "@lucide/svelte/icons/layout-grid";
   import {
     DASHBOARD_WIDGET_CATALOG,
     DEFAULT_DASHBOARD_WIDGETS,
@@ -65,14 +65,14 @@
 
 <div class="widget-picker" class:open bind:this={root}>
   <button type="button" class="widget-picker-btn" aria-expanded={open} aria-haspopup="dialog" onclick={() => (open = !open)}>
-    <LayoutGrid size={16} strokeWidth={1.5} aria-hidden="true" />
+    <LayoutGrid size={15} strokeWidth={1.6} aria-hidden="true" />
     Charts
   </button>
 
   {#if open}
     <div class="widget-picker-panel" role="dialog" aria-label="Configure dashboard charts">
       <div class="widget-picker-head">
-        <h3>Dashboard charts</h3>
+        <h3>Charts</h3>
         <button type="button" class="widget-reset" onclick={resetDefaults}>Reset</button>
       </div>
 
@@ -82,8 +82,9 @@
           <ul>
             {#each DASHBOARD_WIDGET_CATALOG.filter((widget) => widget.category === category) as widget (widget.id)}
               <li>
-                <label>
+                <label class:on={isEnabled(widget.id)}>
                   <input type="checkbox" checked={isEnabled(widget.id)} onchange={() => toggleWidget(widget.id)} />
+                  <span class="tick" aria-hidden="true">{isEnabled(widget.id) ? "✓" : "○"}</span>
                   <span class="widget-copy">
                     <strong>{widget.label}</strong>
                     <span class="dim">{widget.description}</span>
@@ -106,79 +107,102 @@
   .widget-picker-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
-    color: var(--main-text);
-    padding: 0.35rem 0.65rem;
-    font-family: inherit;
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    gap: 0.3rem;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 0.15rem 0.45rem;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     cursor: pointer;
+    border-radius: 2px 8px 3px 7px / 7px 3px 8px 2px;
   }
 
-  .widget-picker-btn:hover,
+  .widget-picker-btn:hover {
+    color: var(--ink);
+  }
+
   .widget-picker.open .widget-picker-btn {
-    border-color: var(--hi-purple);
-    color: var(--hi-purple);
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+    color: var(--ink);
+    transform: rotate(-0.5deg);
   }
 
   .widget-picker-panel {
     position: absolute;
     top: calc(100% + 0.35rem);
     right: 0;
-    z-index: 30;
+    z-index: 40;
     width: min(22rem, calc(100vw - 2rem));
     max-height: min(28rem, calc(100vh - 8rem));
     overflow: auto;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 6px 6px 0 rgba(234, 242, 240, 0.12);
-    padding: 0.85rem;
+    background: var(--surface-raised);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 3px 12px 5px 10px / 10px 4px 12px 5px;
+    box-shadow:
+      2px 3px 0 0 color-mix(in srgb, var(--yellow) 45%, var(--shadow-paper)),
+      2px 3px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
+    padding: 0.75rem 0.7rem 0.85rem;
+    font-family: var(--hand);
+    color: var(--ink);
+    transform: rotate(0.35deg);
   }
 
   .widget-picker-head {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
     gap: 0.5rem;
-    margin-bottom: 0.65rem;
+    margin-bottom: 0.55rem;
+    padding: 0 0.15rem 0.45rem;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 18%, transparent);
   }
 
   .widget-picker-head h3 {
     margin: 0;
-    font-family: "Archivo Black", sans-serif;
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--hi-cyan);
+    font-family: var(--hand);
+    font-size: 1.05rem;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--ink);
   }
 
   .widget-reset {
     background: none;
     border: none;
-    color: var(--hi-purple);
-    font-family: inherit;
-    font-size: 0.66rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--ink-muted);
+    font-family: var(--hand);
+    font-size: 0.9rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     cursor: pointer;
-    padding: 0;
+    padding: 0.05rem 0.2rem;
+    border-radius: 2px 7px 3px 6px / 6px 2px 7px 2px;
+  }
+
+  .widget-reset:hover {
+    color: var(--brand);
+    background: color-mix(in srgb, var(--yellow) 45%, transparent);
   }
 
   .widget-group + .widget-group {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--chrome-line);
+    margin-top: 0.7rem;
+    padding-top: 0.65rem;
+    border-top: 1.5px dashed color-mix(in srgb, var(--ink) 16%, transparent);
   }
 
   .widget-group h4 {
-    margin: 0 0 0.45rem;
-    font-size: 0.62rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--muted);
+    margin: 0 0 0.35rem;
+    padding: 0 0.15rem;
+    font-family: var(--hand);
+    font-size: 0.85rem;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--ink-muted);
   }
 
   .widget-group ul {
@@ -187,35 +211,66 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
+    gap: 0.2rem;
   }
 
   .widget-group label {
     display: flex;
     align-items: flex-start;
-    gap: 0.45rem;
+    gap: 0.4rem;
     cursor: pointer;
+    padding: 0.28rem 0.35rem;
+    border-radius: 2px 8px 3px 7px / 7px 2px 8px 2px;
+  }
+
+  .widget-group label:hover {
+    background: color-mix(in srgb, var(--yellow) 28%, transparent);
+  }
+
+  .widget-group label.on {
+    background: color-mix(in srgb, var(--yellow) 42%, transparent);
   }
 
   .widget-group input {
-    margin-top: 0.15rem;
-    accent-color: var(--hi-purple);
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+
+  .tick {
+    flex: none;
+    width: 1rem;
+    margin-top: 0.05rem;
+    color: var(--ink-muted);
+    font-size: 0.95rem;
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .widget-group label.on .tick {
+    color: var(--ink);
   }
 
   .widget-copy {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    gap: 0.1rem;
     min-width: 0;
   }
 
   .widget-copy strong {
-    font-size: 0.72rem;
-    letter-spacing: 0.04em;
+    font-size: 0.98rem;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+    line-height: 1.2;
   }
 
-  .widget-copy span {
-    font-size: 0.66rem;
+  .widget-copy .dim {
+    font-size: 0.82rem;
     line-height: 1.35;
+    color: var(--ink-muted);
   }
 </style>

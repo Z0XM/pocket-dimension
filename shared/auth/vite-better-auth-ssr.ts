@@ -16,5 +16,5 @@
  */
 export const betterAuthDedupe = ["better-auth", "@better-auth/core", "@better-auth/utils", "better-call"] as const;
 
-/** Externalize the package root; Vite keeps subpath imports external with it. */
-export const betterAuthSsrExternal = ["better-auth"] as const;
+/** Externalize so Bun/Node load a single copy from node_modules (no dual-module hazard). */
+export const betterAuthSsrExternal = ["better-auth", "@pocket-dimension/auth"] as const;

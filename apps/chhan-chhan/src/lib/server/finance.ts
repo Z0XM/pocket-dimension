@@ -1,5 +1,6 @@
 import { normalizeMerchant, rankFuzzyMerchants } from "$lib/finance/merchant-match";
 import { billCategorySqlFilter } from "$lib/finance/bill-categories";
+import { DEFAULT_CATEGORIES, DEFAULT_TAGS } from "$lib/finance/default-taxonomy";
 import { parseSqlMinor } from "$lib/finance/money";
 import { isRefundCategoryName } from "$lib/finance/refunds";
 import { buildSummarySearchFilterSql, buildTransactionSearchCondition } from "$lib/finance/transaction-search";
@@ -380,6 +381,14 @@ const sortMap = {
   createdAt: schema.financeTransactions.createdAt,
 } as const;
 
+export const ACTIVE_ACCOUNT_COOKIE = "chhan_active_account";
+
+const ACCOUNT_COLOR_PRESETS = ["#E85D4C", "#2F6FED", "#0F9F6E", "#C97816", "#7C3AED", "#0D9488", "#DB2777", "#475569"] as const;
+
+export function defaultAccountColor(index = 0): string {
+  return ACCOUNT_COLOR_PRESETS[index % ACCOUNT_COLOR_PRESETS.length]!;
+}
+
 export async function listAccountsForUser(userId: string) {
   return db
     .select({
@@ -387,15 +396,23 @@ export async function listAccountsForUser(userId: string) {
       name: schema.financeAccounts.name,
       currencyCode: schema.financeAccounts.currencyCode,
       timezone: schema.financeAccounts.timezone,
+      colorHex: schema.financeAccounts.colorHex,
+      bankImporterId: schema.financeAccounts.bankImporterId,
+      balanceMinor: schema.financeAccounts.balanceMinor,
+      balanceAsOf: schema.financeAccounts.balanceAsOf,
+      isArchived: schema.financeAccounts.isArchived,
       role: schema.financeAccountMembers.role,
     })
     .from(schema.financeAccountMembers)
     .innerJoin(schema.financeAccounts, eq(schema.financeAccounts.id, schema.financeAccountMembers.accountId))
-    .where(eq(schema.financeAccountMembers.userId, userId))
+    .where(and(eq(schema.financeAccountMembers.userId, userId), eq(schema.financeAccounts.isArchived, false)))
     .orderBy(asc(schema.financeAccounts.name));
 }
 
 export async function createAccount(userId: string, payload: z.infer<typeof import("$lib/validation/finance").createAccountSchema>) {
+  const existing = await listAccountsForUser(userId);
+  const colorHex = payload.colorHex ?? defaultAccountColor(existing.length);
+
   return db.transaction(async (tx) => {
     const [account] = await tx
       .insert(schema.financeAccounts)
@@ -403,6 +420,8 @@ export async function createAccount(userId: string, payload: z.infer<typeof impo
         name: payload.name,
         currencyCode: payload.currencyCode.toUpperCase(),
         timezone: payload.timezone,
+        colorHex,
+        bankImporterId: payload.bankImporterId ?? null,
         ownerUserId: userId,
         createdById: userId,
         updatedById: userId,
@@ -417,27 +436,132 @@ export async function createAccount(userId: string, payload: z.infer<typeof impo
       updatedById: userId,
     });
 
+    await seedDefaultTaxonomy(tx, account.id, userId);
+
     return account;
   });
 }
 
-export async function getOrCreateDefaultAccount(userId: string) {
-  const accounts = await listAccountsForUser(userId);
-  if (accounts.length > 0) return accounts[0];
+async function seedDefaultTaxonomy(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], accountId: string, userId: string) {
+  await tx
+    .insert(schema.financeCategories)
+    .values(
+      DEFAULT_CATEGORIES.map((category) => ({
+        accountId,
+        name: category.name,
+        kind: category.kind,
+        colorHex: category.colorHex,
+        createdById: userId,
+        updatedById: userId,
+      }))
+    )
+    .onConflictDoNothing({ target: [schema.financeCategories.accountId, schema.financeCategories.name] });
 
-  const account = await createAccount(userId, {
+  await tx
+    .insert(schema.financeTags)
+    .values(
+      DEFAULT_TAGS.map((tag) => ({
+        accountId,
+        name: tag.name,
+        colorHex: tag.colorHex,
+        createdById: userId,
+        updatedById: userId,
+      }))
+    )
+    .onConflictDoNothing({ target: [schema.financeTags.accountId, schema.financeTags.name] });
+}
+
+/** True when the account is missing any starter category/tag (typical for accounts created before defaults existed). */
+export async function accountNeedsDefaultTaxonomy(accountId: string): Promise<boolean> {
+  const [categories, tags] = await Promise.all([
+    db
+      .select({ name: schema.financeCategories.name })
+      .from(schema.financeCategories)
+      .where(eq(schema.financeCategories.accountId, accountId)),
+    db
+      .select({ name: schema.financeTags.name })
+      .from(schema.financeTags)
+      .where(eq(schema.financeTags.accountId, accountId)),
+  ]);
+
+  const categoryNames = new Set(categories.map((row) => row.name));
+  const tagNames = new Set(tags.map((row) => row.name));
+  const missingCategory = DEFAULT_CATEGORIES.some((category) => !categoryNames.has(category.name));
+  const missingTag = DEFAULT_TAGS.some((tag) => !tagNames.has(tag.name));
+  return missingCategory || missingTag;
+}
+
+/** Idempotent: inserts any missing starter categories/tags for an existing account. */
+export async function configureAccountDefaults(userId: string, accountId: string) {
+  await db.transaction(async (tx) => {
+    await seedDefaultTaxonomy(tx, accountId, userId);
+  });
+}
+
+export async function updateAccount(
+  userId: string,
+  accountId: string,
+  payload: z.infer<typeof import("$lib/validation/finance").updateAccountSchema>
+) {
+  const patch: {
+    name?: string;
+    currencyCode?: string;
+    timezone?: string;
+    colorHex?: string | null;
+    bankImporterId?: string | null;
+    updatedById: string;
+  } = { updatedById: userId };
+
+  if (payload.name != null) patch.name = payload.name;
+  if (payload.currencyCode != null) patch.currencyCode = payload.currencyCode;
+  if (payload.timezone != null) patch.timezone = payload.timezone;
+  if (payload.colorHex !== undefined) {
+    patch.colorHex = payload.colorHex === "" || payload.colorHex == null ? null : payload.colorHex;
+  }
+  if (payload.bankImporterId !== undefined) {
+    patch.bankImporterId = payload.bankImporterId === "" || payload.bankImporterId == null ? null : payload.bankImporterId;
+  }
+
+  const [account] = await db.update(schema.financeAccounts).set(patch).where(eq(schema.financeAccounts.id, accountId)).returning({
+    id: schema.financeAccounts.id,
+    name: schema.financeAccounts.name,
+    currencyCode: schema.financeAccounts.currencyCode,
+    timezone: schema.financeAccounts.timezone,
+    colorHex: schema.financeAccounts.colorHex,
+    bankImporterId: schema.financeAccounts.bankImporterId,
+    balanceMinor: schema.financeAccounts.balanceMinor,
+    balanceAsOf: schema.financeAccounts.balanceAsOf,
+  });
+
+  return account ?? null;
+}
+
+export async function resolveActiveAccount(userId: string, preferredAccountId?: string | null) {
+  const accounts = await listAccountsForUser(userId);
+
+  if (preferredAccountId) {
+    const preferred = accounts.find((account) => account.id === preferredAccountId);
+    if (preferred) return { account: preferred, accounts };
+  }
+
+  if (accounts.length > 0) {
+    return { account: accounts[0]!, accounts };
+  }
+
+  const created = await createAccount(userId, {
     name: "Personal",
     currencyCode: "INR",
     timezone: "Asia/Kolkata",
   });
 
-  return {
-    id: account.id,
-    name: account.name,
-    currencyCode: account.currencyCode,
-    timezone: account.timezone,
-    role: "owner" as const,
-  };
+  const refreshed = await listAccountsForUser(userId);
+  const account = refreshed.find((row) => row.id === created.id) ?? refreshed[0]!;
+  return { account, accounts: refreshed };
+}
+
+export async function getOrCreateDefaultAccount(userId: string) {
+  const { account } = await resolveActiveAccount(userId);
+  return account;
 }
 
 export async function getAccountCurrency(accountId: string) {
@@ -801,7 +925,16 @@ export async function listTransactions(accountId: string, query: TransactionsQue
 
   const whereExpr = and(...conditions);
   const sortColumn = sortMap[query.sortBy];
-  const direction = query.sortDirection === "asc" ? asc(sortColumn) : desc(sortColumn);
+  const ascending = query.sortDirection === "asc";
+  const direction = ascending ? asc(sortColumn) : desc(sortColumn);
+  // Within the same day (or other primary-key ties), keep statement order.
+  // Desc tables show the latest-in-day first so running balances read top→bottom.
+  const tieBreakers =
+    query.sortBy === "occurredOn"
+      ? ascending
+        ? [asc(schema.financeTransactions.sortOrder), asc(schema.financeTransactions.id)]
+        : [desc(schema.financeTransactions.sortOrder), desc(schema.financeTransactions.id)]
+      : [desc(schema.financeTransactions.occurredOn), desc(schema.financeTransactions.sortOrder), desc(schema.financeTransactions.id)];
   const offset = query.pageIndex * query.pageSize;
 
   const [rows, totalRows] = await Promise.all([
@@ -810,6 +943,7 @@ export async function listTransactions(accountId: string, query: TransactionsQue
         id: schema.financeTransactions.id,
         occurredOn: schema.financeTransactions.occurredOn,
         amountMinor: schema.financeTransactions.amountMinor,
+        balanceMinor: schema.financeTransactions.balanceMinor,
         type: schema.financeTransactions.type,
         merchant: schema.financeTransactions.merchant,
         notes: schema.financeTransactions.notes,
@@ -821,7 +955,7 @@ export async function listTransactions(accountId: string, query: TransactionsQue
       .from(schema.financeTransactions)
       .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
       .where(whereExpr)
-      .orderBy(direction, desc(schema.financeTransactions.id))
+      .orderBy(direction, ...tieBreakers)
       .limit(query.pageSize)
       .offset(offset),
     db.select({ total: count() }).from(schema.financeTransactions).where(whereExpr),

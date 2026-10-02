@@ -4,14 +4,20 @@
   "description": "Personal finance and transaction tracking — beta.",
   "start_url": "/",
   "display": "standalone",
-  "theme_color": "#060b0f",
-  "background_color": "#060b0f",
+  "theme_color": "#fffefd",
+  "background_color": "#fffefd",
   "icons": [
     {
-      "src": "/icon.png",
-      "sizes": "512x512",
+      "src": "/icon-dark.png",
+      "sizes": "1000x1000",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "1000x1000",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

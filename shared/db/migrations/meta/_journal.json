@@ -267,6 +267,13 @@
       "when": 1790524219760,
       "tag": "0037_melodic_vision",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1790800000000,
+      "tag": "0038_finance_account_color_bank",
+      "breakpoints": true
     }
   ]
 }

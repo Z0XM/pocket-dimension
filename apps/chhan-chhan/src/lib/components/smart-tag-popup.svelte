@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Check } from "@lucide/svelte";
+  import Check from "@lucide/svelte/icons/check";
   import type { SmartTagApplyMode, SmartTaggingPreview } from "$lib/server/finance";
 
   export type SmartTagToggle = {
@@ -176,7 +176,7 @@
     flex-direction: column;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 8px 8px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.06);
   }
 
   .smart-tag-head {
@@ -190,7 +190,7 @@
 
   .smart-tag-head h2 {
     margin: 0 0 0.25rem;
-    font-family: "Archivo Black", sans-serif;
+    font-family: var(--hand);
     font-size: 0.82rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -278,7 +278,7 @@
     margin-top: 0.05rem;
     border: 2px solid var(--chrome-line);
     background: var(--surface2);
-    box-shadow: 1px 1px 0 rgba(234, 242, 240, 0.08);
+    box-shadow: 1px 1px 0 rgba(27, 27, 31, 0.05);
     flex-shrink: 0;
     color: var(--background);
   }

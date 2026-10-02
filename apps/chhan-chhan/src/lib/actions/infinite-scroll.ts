@@ -16,7 +16,10 @@ export const infiniteScroll: Action<HTMLElement, InfiniteScrollParams> = (node, 
         }
       }
     },
-    { rootMargin: "200px" }
+    {
+      root: node.parentElement instanceof HTMLElement ? node.parentElement : null,
+      rootMargin: "160px",
+    }
   );
 
   observer.observe(node);

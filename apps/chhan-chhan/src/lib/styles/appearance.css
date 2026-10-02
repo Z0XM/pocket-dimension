@@ -1,0 +1,158 @@
+/* Appearance: fonts + paper textures via html[data-fonts] / html[data-paper] */
+
+@font-face {
+  font-family: "Virgil";
+  src:
+    url("https://excalidraw.com/Virgil.woff2") format("woff2"),
+    local("Virgil");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --hand: "Gaegu", cursive;
+  --ui: "Assistant", system-ui, sans-serif;
+}
+
+html[data-fonts="virgil"] {
+  --hand: "Virgil", "Caveat", cursive;
+  --ui: "Assistant", system-ui, sans-serif;
+}
+html[data-fonts="architects"] {
+  --hand: "Architects Daughter", cursive;
+  --ui: "Assistant", system-ui, sans-serif;
+}
+html[data-fonts="gaegu"] {
+  --hand: "Gaegu", cursive;
+  --ui: "Assistant", system-ui, sans-serif;
+}
+html[data-fonts="indie"] {
+  --hand: "Indie Flower", cursive;
+  --ui: "Assistant", system-ui, sans-serif;
+}
+html[data-fonts="kalam"] {
+  --hand: "Kalam", cursive;
+  --ui: "Assistant", system-ui, sans-serif;
+}
+html[data-fonts="virgil-kalam"] {
+  --hand: "Virgil", cursive;
+  --ui: "Kalam", cursive;
+}
+html[data-fonts="architects-gaegu"] {
+  --hand: "Architects Daughter", cursive;
+  --ui: "Gaegu", cursive;
+}
+html[data-fonts="indie-kalam"] {
+  --hand: "Indie Flower", cursive;
+  --ui: "Kalam", cursive;
+}
+
+/* Paper textures apply to .forge shell */
+html[data-paper="plain"] .forge {
+  background-image: none;
+  background-blend-mode: normal;
+}
+
+html[data-paper="rough"] .forge {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.2 0 0 0 0 0.2 0 0 0 0 0.2 0 0 0 0.28 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+  background-blend-mode: multiply;
+}
+
+html[data-theme="dark"][data-paper="rough"] .forge {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.85 0 0 0 0 0.85 0 0 0 0 0.82 0 0 0 0.18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-blend-mode: soft-light;
+}
+
+html[data-paper="lines"] .forge {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 26px,
+    rgba(90, 130, 180, 0.38) 26px,
+    rgba(90, 130, 180, 0.38) 27px
+  );
+  background-size: auto;
+  background-blend-mode: normal;
+}
+
+html[data-theme="dark"][data-paper="lines"] .forge {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 26px,
+    rgba(140, 175, 220, 0.22) 26px,
+    rgba(140, 175, 220, 0.22) 27px
+  );
+}
+
+html[data-paper="lines-gray"] .forge {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 26px,
+    rgba(40, 40, 40, 0.22) 26px,
+    rgba(40, 40, 40, 0.22) 27px
+  );
+  background-size: auto;
+  background-blend-mode: normal;
+}
+
+html[data-theme="dark"][data-paper="lines-gray"] .forge {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 26px,
+    rgba(220, 218, 214, 0.16) 26px,
+    rgba(220, 218, 214, 0.16) 27px
+  );
+}
+
+html[data-paper="grid"] .forge {
+  background-image:
+    linear-gradient(rgba(90, 130, 180, 0.32) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(90, 130, 180, 0.32) 1px, transparent 1px);
+  background-size: 26px 26px;
+  background-blend-mode: normal;
+}
+
+html[data-theme="dark"][data-paper="grid"] .forge {
+  background-image:
+    linear-gradient(rgba(140, 175, 220, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(140, 175, 220, 0.18) 1px, transparent 1px);
+}
+
+html[data-paper="grid-gray"] .forge {
+  background-image:
+    linear-gradient(rgba(40, 40, 40, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(40, 40, 40, 0.18) 1px, transparent 1px);
+  background-size: 26px 26px;
+  background-blend-mode: normal;
+}
+
+html[data-theme="dark"][data-paper="grid-gray"] .forge {
+  background-image:
+    linear-gradient(rgba(220, 218, 214, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(220, 218, 214, 0.12) 1px, transparent 1px);
+}
+
+html[data-paper="dots"] .forge {
+  background-image: radial-gradient(rgba(90, 130, 180, 0.4) 1.1px, transparent 1.25px);
+  background-size: 12px 12px;
+  background-blend-mode: normal;
+}
+
+html[data-theme="dark"][data-paper="dots"] .forge {
+  background-image: radial-gradient(rgba(140, 175, 220, 0.28) 1.1px, transparent 1.25px);
+}
+
+html[data-paper="dots-gray"] .forge {
+  background-image: radial-gradient(rgba(40, 40, 40, 0.28) 1.1px, transparent 1.25px);
+  background-size: 12px 12px;
+  background-blend-mode: normal;
+}
+
+html[data-theme="dark"][data-paper="dots-gray"] .forge {
+  background-image: radial-gradient(rgba(220, 218, 214, 0.2) 1.1px, transparent 1.25px);
+}

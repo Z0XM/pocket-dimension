@@ -126,21 +126,11 @@
       <p class="text-balance text-sm text-muted-foreground">Log in to Chhan Chhan</p>
     </div>
 
-    <div class="flex flex-col gap-2">
+    <div class="field-line">
       <div class="flex items-center gap-3 text-sm">
-        <button
-          type="button"
-          class="font-medium {loginBy === 'email' ? 'text-primary-foreground' : 'text-muted-foreground'}"
-          onclick={() => (loginBy = "email")}
-        >
-          Email
-        </button>
+        <button type="button" class="login-tab {loginBy === 'email' ? 'login-tab-active' : ''}" onclick={() => (loginBy = "email")}> Email </button>
         <span class="text-muted-foreground">·</span>
-        <button
-          type="button"
-          class="font-medium {loginBy === 'username' ? 'text-primary-foreground' : 'text-muted-foreground'}"
-          onclick={() => (loginBy = "username")}
-        >
+        <button type="button" class="login-tab {loginBy === 'username' ? 'login-tab-active' : ''}" onclick={() => (loginBy = "username")}>
           Username
         </button>
       </div>
@@ -152,7 +142,7 @@
           bind:value={email}
           required
           disabled={loading}
-          class="w-full rounded border border-border bg-background px-3 py-2 text-sm"
+          class="w-full bg-transparent px-1 text-sm"
         />
       {:else}
         <input
@@ -162,30 +152,23 @@
           bind:value={username}
           required
           disabled={loading}
-          class="w-full rounded border border-border bg-background px-3 py-2 text-sm"
+          class="w-full bg-transparent px-1 text-sm"
         />
       {/if}
     </div>
 
-    <div class="flex flex-col gap-2">
+    <div class="field-line">
       <div class="flex items-center gap-2">
         <label for="password-{id}" class="text-sm font-medium">Password</label>
-        <a href="/forgot-password" class="ms-auto text-sm text-primary-foreground underline-offset-2 hover:underline">Forgot password?</a>
+        <a href="/forgot-password" class="ms-auto text-sm text-[var(--brand)] underline-offset-2 hover:underline">Forgot password?</a>
       </div>
-      <input
-        id="password-{id}"
-        type="password"
-        bind:value={password}
-        required
-        disabled={loading}
-        class="w-full rounded border border-border bg-background px-3 py-2 text-sm"
-      />
+      <input id="password-{id}" type="password" bind:value={password} required disabled={loading} class="w-full bg-transparent px-1 text-sm" />
     </div>
 
     <button
       type="submit"
       disabled={loading}
-      class="border-2 border-foreground bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-[3px_3px_0_var(--foreground)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_var(--foreground)] disabled:opacity-50"
+      class="rounded border border-[var(--brand)] bg-[var(--brand-soft)] px-4 py-2 text-sm font-normal text-[var(--brand)] transition-colors hover:bg-[var(--brand)] hover:text-white disabled:opacity-50"
     >
       {#if loading}
         Please wait…
@@ -196,7 +179,29 @@
 
     <p class="text-center text-sm text-muted-foreground">
       No account?
-      <a href="/sign-up" class="text-primary-foreground underline-offset-2 hover:underline">Sign up</a>
+      <a href="/sign-up" class="text-[var(--brand)] underline-offset-2 hover:underline">Sign up</a>
     </p>
   </div>
 </form>
+
+<style>
+  .login-tab {
+    font-family: var(--hand);
+    font-weight: 400;
+    color: var(--ink-muted);
+    background: transparent;
+    border: none;
+    padding: 0.05em 0.22em;
+    cursor: pointer;
+    border-radius: 2px 8px 3px 7px / 7px 3px 8px 2px;
+  }
+
+  .login-tab:hover {
+    color: var(--ink);
+  }
+
+  .login-tab-active {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+  }
+</style>

@@ -1,6 +1,17 @@
 <script lang="ts">
   import { goto, invalidateAll } from "$app/navigation";
-  import { Tag, Plus, MessageSquare, Link, Layers, Eye, EyeOff, ArrowLeftRight, TriangleAlert, Check, X, Calculator } from "@lucide/svelte";
+  import Tag from "@lucide/svelte/icons/tag";
+  import Plus from "@lucide/svelte/icons/plus";
+  import StickyNote from "@lucide/svelte/icons/sticky-note";
+  import Link from "@lucide/svelte/icons/link";
+  import Layers from "@lucide/svelte/icons/layers";
+  import Eye from "@lucide/svelte/icons/eye";
+  import EyeOff from "@lucide/svelte/icons/eye-off";
+  import ArrowLeftRight from "@lucide/svelte/icons/arrow-left-right";
+  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
+  import Check from "@lucide/svelte/icons/check";
+  import X from "@lucide/svelte/icons/x";
+  import Calculator from "@lucide/svelte/icons/calculator";
   import { formatMoney } from "$lib/finance/money";
   import { isRefundCategoryName } from "$lib/finance/refunds";
   import { buildSummarySelection, formatMonthKeyShort, summarySelectionToDateRange, type SummaryPeriod } from "$lib/finance/summary";
@@ -12,6 +23,8 @@
   import SmartCategorizePopup, { type SmartCategoryToggle } from "$lib/components/smart-categorize-popup.svelte";
   import SmartTagPopup, { type SmartTagToggle } from "$lib/components/smart-tag-popup.svelte";
   import CalculateWidget from "$lib/components/calculate-widget.svelte";
+  import SketchSelect from "$lib/components/sketch-select.svelte";
+  import BrandMark from "$lib/components/brand-mark.svelte";
   import type { SmartCategorizationPreview, SmartTagApplyMode, SmartTaggingPreview } from "$lib/server/finance";
   import type { PageData } from "./$types";
 
@@ -284,7 +297,7 @@
     if (linkFilter) params.set("link", linkFilter);
 
     const query = params.toString();
-    return query ? `/app?${query}` : "/app";
+    return query ? `/app/transactions?${query}` : "/app/transactions";
   }
 
   function setSummaryPeriod(period: SummaryPeriod) {
@@ -1116,81 +1129,82 @@
 
 <svelte:head><title>Chhan Chhan</title></svelte:head>
 
-<header class="topbar">
-  <div>
-    <h1><span>CHHAN</span><span class="acid"> CHHAN</span></h1>
-    <AppNav />
-  </div>
-  <div class="actions">
-    <input
-      type="search"
-      placeholder="search…"
-      aria-label="Search transactions"
-      value={searchInput}
-      oninput={(e) => handleSearchInput(e.currentTarget.value)}
-    />
-    <button
-      type="button"
-      class="calc-mode-btn"
-      class:active={calculateModeActive}
-      aria-pressed={calculateModeActive}
-      aria-label="Calculate mode (Ctrl+X)"
-      title="Calculate mode (Ctrl+X)"
-      onclick={() => toggleCalculateMode()}
-    >
-      <Calculator size={14} strokeWidth={2} aria-hidden="true" />
-      CALC
-    </button>
-    <a class="cta" href="/app/control">IMPORT</a>
-    <AppSettings />
-  </div>
-</header>
-
-{#if data.currentBalance}
-  <section class="balance-card" class:stale={data.currentBalance.isStale}>
-    <span class="balance-k">Balance</span>
-    <div class="balance-value-wrap">
-      <span class="balance-v">{formatMoney(data.currentBalance.balanceMinor, data.account.currencyCode)}</span>
-      <span class="balance-txn-count">{data.currentBalance.transactionCount.toLocaleString()} txns</span>
+<div class="tx-page">
+  <header class="topbar">
+    <div>
+      <h1 class="brand-lockup">
+        <BrandMark />
+        <span class="brand-word"><span>CHHAN</span><span class="acid"> CHHAN</span></span>
+      </h1>
+      <AppNav />
     </div>
-    <span class="balance-asof dim">
-      {#if data.currentBalance.isStale}
-        as of {data.currentBalance.asOf} · latest txn {data.currentBalance.latestTransactionOn} —
-        <a href="/app/control">re-import statement</a> to refresh
-      {:else}
-        as of {data.currentBalance.asOf}
-      {/if}
-    </span>
-  </section>
-{/if}
+    <div class="actions">
+      <AppSettings />
+    </div>
+  </header>
 
-<section class="stats-block">
-  <div class="stats-head">
-    <div class="stats-label">
-      <span>Summary</span>
-      {#if data.summaryPeriod === "month"}
-        <select class="period-select" aria-label="Select month" value={data.selectedMonth} onchange={(e) => setSummaryMonth(e.currentTarget.value)}>
-          {#each data.summaryMonths as monthKey}
-            <option value={monthKey}>{formatMonthKeyShort(monthKey)}</option>
-          {/each}
-        </select>
-      {:else if data.summaryPeriod === "year"}
-        <select
-          class="period-select"
-          aria-label="Select year"
-          value={String(data.selectedYear)}
-          onchange={(e) => setSummaryYear(Number(e.currentTarget.value))}
-        >
-          {#each data.summaryYears as year (year)}
-            <option value={String(year)}>{year}</option>
-          {/each}
-        </select>
+  <section class="balance-combo">
+    <div class="balance-open" class:stale={data.currentBalance?.isStale}>
+      {#if data.currentBalance}
+        <span class="k">balance</span>
+        <div class="balance-value-wrap">
+          <span class="v">
+            <span class="rough-mark is-balance">
+              <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+                <rect x="1" y="3" width="118" height="20" rx="2" fill="color-mix(in srgb, var(--yellow) 78%, transparent)" />
+              </svg>
+              <span class="txt">{formatMoney(data.currentBalance.balanceMinor, data.account.currencyCode)}</span>
+            </span>
+          </span>
+          <span class="balance-txn-count">{data.currentBalance.transactionCount.toLocaleString()} txns</span>
+        </div>
+        <span class="meta">
+          {#if data.currentBalance.isStale}
+            as of {data.currentBalance.asOf} · latest txn {data.currentBalance.latestTransactionOn} —
+            <a href="/app/control">re-import statement</a> to refresh
+          {:else}
+            as of {data.currentBalance.asOf}
+          {/if}
+        </span>
       {:else}
-        <span class="period-static">All time</span>
+        <span class="k">balance</span>
+        <span class="meta">No balance yet — import a statement to start</span>
       {/if}
     </div>
-    <div class="head-filters">
-      <div class="period-tabs" role="tablist" aria-label="Summary period">
+
+    <div class="stats-controls">
+      <div class="stats-label">
+        <span>Summary</span>
+        {#if data.summaryPeriod === "month"}
+          {#if data.summaryMonths.length}
+            <SketchSelect
+              name="summary-month"
+              compact
+              alignEnd
+              aria-label="Select month"
+              value={data.selectedMonth}
+              options={data.summaryMonths.map((monthKey) => ({ value: monthKey, label: formatMonthKeyShort(monthKey) }))}
+              onChange={setSummaryMonth}
+            />
+          {/if}
+        {:else if data.summaryPeriod === "year"}
+          {#if data.summaryYears.length}
+            <SketchSelect
+              name="summary-year"
+              compact
+              alignEnd
+              aria-label="Select year"
+              value={String(data.selectedYear)}
+              options={data.summaryYears.map((year) => ({ value: String(year), label: String(year) }))}
+              onChange={(next) => setSummaryYear(Number(next))}
+            />
+          {/if}
+        {:else}
+          <span class="period-static">All time</span>
+        {/if}
+      </div>
+
+      <div class="summary-tabs" role="tablist" aria-label="Summary period">
         <button
           type="button"
           role="tab"
@@ -1219,380 +1233,455 @@
           All
         </button>
       </div>
+
       {#if data.groups.length > 0}
-        <div class="period-tabs group-filter-wrap">
-          <select
-            class="group-filter"
-            aria-label="Filter by group"
-            value={data.selectedGroupId ?? ""}
-            onchange={(e) => setGroupFilter(e.currentTarget.value || null)}
-          >
-            <option value="">All groups</option>
-            {#each data.groups as group (group.id)}
-              <option value={group.id}>{group.name}</option>
-            {/each}
-          </select>
-        </div>
-      {/if}
-      <div class="period-tabs filter-multi-wrap">
-        <FilterMultiselect label="Categories" options={categoryFilterOptions} selected={data.selectedCategoryFilters} onchange={setCategoryFilters} />
-      </div>
-      {#if data.tags.length > 0}
-        <div class="period-tabs filter-multi-wrap">
-          <FilterMultiselect label="Tags" options={tagFilterOptions} selected={data.selectedTagIds} onchange={setTagFilters} />
+        <div class="flow-tools">
+          <div class="period-tabs group-filter-wrap">
+            <select
+              class="group-filter"
+              aria-label="Filter by group"
+              value={data.selectedGroupId ?? ""}
+              onchange={(e) => setGroupFilter(e.currentTarget.value || null)}
+            >
+              <option value="">All groups</option>
+              {#each data.groups as group (group.id)}
+                <option value={group.id}>{group.name}</option>
+              {/each}
+            </select>
+          </div>
         </div>
       {/if}
     </div>
-  </div>
-  <section class="stats">
-    <button
-      type="button"
-      class="stat net"
-      class:active={!data.transactionTypeFilter}
-      aria-pressed={!data.transactionTypeFilter}
-      onclick={() => setTypeFilter(null)}
-    >
-      <span class="k">{data.summaryPrefix} NET</span>
-      <span class="v">{formatMoney(data.summary.netMinor, data.account.currencyCode)}</span>
-    </button>
-    <button
-      type="button"
-      class="stat"
-      class:active={data.transactionTypeFilter === "income"}
-      aria-pressed={data.transactionTypeFilter === "income"}
-      onclick={() => setTypeFilter("income")}
-    >
-      <span class="k">{data.summaryPrefix} IN</span>
-      <span class="v pos">{formatMoney(data.summary.incomeMinor, data.account.currencyCode)}</span>
-    </button>
-    <button
-      type="button"
-      class="stat"
-      class:active={data.transactionTypeFilter === "expense"}
-      aria-pressed={data.transactionTypeFilter === "expense"}
-      onclick={() => setTypeFilter("expense")}
-    >
-      <span class="k">{data.summaryPrefix} OUT</span>
-      <span class="v neg">{formatMoney(-data.summary.expenseMinor, data.account.currencyCode)}</span>
-    </button>
-    <article class="stat">
-      <span class="k">{data.summaryPrefix} SAVED</span>
-      <span class="v">{Math.round(data.summary.savingsRate * 100)}%</span>
-    </article>
   </section>
-</section>
 
-{#if data.budgetUsage.length}
-  <section class="meters">
-    {#each data.budgetUsage as b}
-      <div class="meter">
-        <div class="meter-top"><span>{b.name}</span><span>{b.pct}%</span></div>
-        <div class="track"><div class="fill" style="width:{b.pct}%; background:{b.color}"></div></div>
+  <section class="stats-block">
+    <div class="table-toolbar">
+      <div class="flow" aria-label="Period flow">
+        <button
+          type="button"
+          class="node"
+          class:active={data.transactionTypeFilter === "income"}
+          aria-pressed={data.transactionTypeFilter === "income"}
+          onclick={() => setTypeFilter("income")}
+        >
+          <span class="node-k">in</span>
+          <span class="node-v pos">
+            <span class="rough-mark is-in">
+              <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+                <rect x="1" y="4" width="118" height="18" rx="2" fill="color-mix(in srgb, var(--green) 72%, transparent)" />
+              </svg>
+              <span class="txt">{formatMoney(data.summary.incomeMinor, data.account.currencyCode)}</span>
+            </span>
+          </span>
+        </button>
+        <span class="arrow" aria-hidden="true">→</span>
+        <span class="node period-node">{data.summaryLabel.toLowerCase()}</span>
+        <span class="arrow" aria-hidden="true">→</span>
+        <button
+          type="button"
+          class="node"
+          class:active={data.transactionTypeFilter === "expense"}
+          aria-pressed={data.transactionTypeFilter === "expense"}
+          onclick={() => setTypeFilter("expense")}
+        >
+          <span class="node-k">out</span>
+          <span class="node-v neg">
+            <span class="rough-mark is-out">
+              <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+                <rect x="1" y="5" width="118" height="17" rx="2" fill="color-mix(in srgb, var(--pink) 70%, transparent)" />
+              </svg>
+              <span class="txt">{formatMoney(-data.summary.expenseMinor, data.account.currencyCode)}</span>
+            </span>
+          </span>
+        </button>
+        <span class="arrow" aria-hidden="true">=</span>
+        <button
+          type="button"
+          class="node net-node"
+          class:active={!data.transactionTypeFilter}
+          aria-pressed={!data.transactionTypeFilter}
+          onclick={() => setTypeFilter(null)}
+        >
+          <span class="node-k">net</span>
+          <span class="node-v">
+            <span class="rough-mark is-net">
+              <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+                <rect x="1" y="3" width="118" height="20" rx="2" fill="color-mix(in srgb, var(--purple) 75%, transparent)" />
+              </svg>
+              <span class="txt">{formatMoney(data.summary.netMinor, data.account.currencyCode)}</span>
+            </span>
+          </span>
+        </button>
+        <span class="saved-chip" title="Savings rate">{Math.round(data.summary.savingsRate * 100)}% saved</span>
       </div>
-    {/each}
+
+      <div class="stats-tools">
+        <input
+          type="search"
+          class="stats-search"
+          placeholder="search…"
+          aria-label="Search transactions"
+          value={searchInput}
+          oninput={(e) => handleSearchInput(e.currentTarget.value)}
+        />
+        <button
+          type="button"
+          class="calc-mode-btn"
+          class:active={calculateModeActive}
+          aria-pressed={calculateModeActive}
+          aria-label="Calculate mode (Ctrl+X)"
+          title="Calculate mode (Ctrl+X)"
+          onclick={() => toggleCalculateMode()}
+        >
+          <Calculator size={18} strokeWidth={1.6} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
   </section>
-{/if}
 
-{#if calculateModeActive}
-  <div class="calc-mode-banner">
-    <span>Calculate mode — click rows to add or remove from sum</span>
-    <button type="button" class="calc-mode-exit-btn" aria-label="Exit calculate mode" onclick={() => exitCalculateMode()}>
-      <X size={14} strokeWidth={2} aria-hidden="true" />
-    </button>
-  </div>
-{/if}
-
-{#if refundLinkModeAnchorId}
-  <div class="link-mode-banner">
-    <span>Link mode — click rows to link or unlink</span>
-    <div class="link-mode-banner-actions">
-      <button type="button" class="link-mode-cancel-btn" aria-label="Exit link mode" onclick={() => exitRefundLinkMode()}>
+  {#if calculateModeActive}
+    <div class="calc-mode-banner">
+      <span>Calculate mode — click rows to add or remove from sum</span>
+      <button type="button" class="calc-mode-exit-btn" aria-label="Exit calculate mode" onclick={() => exitCalculateMode()}>
         <X size={14} strokeWidth={2} aria-hidden="true" />
       </button>
-      <button type="button" class="link-mode-exit-btn" aria-label="Done linking" onclick={() => exitRefundLinkMode()}>
-        <Check size={14} strokeWidth={2} aria-hidden="true" />
-      </button>
     </div>
-  </div>
-{/if}
+  {/if}
 
-{#if data.selectedLinkTransactionId}
-  <div class="link-filter-banner">
-    <span>
-      Showing {data.linkClusterSize} linked refund{data.linkClusterSize === 1 ? "" : "s"}
-      <span class="dim">· period filter ignored</span>
-    </span>
-    <button type="button" class="link-filter-clear" onclick={clearLinkClusterFilter}>Show all</button>
-  </div>
-{/if}
+  {#if refundLinkModeAnchorId}
+    <div class="link-mode-banner">
+      <span>Link mode — click rows to link or unlink</span>
+      <div class="link-mode-banner-actions">
+        <button type="button" class="link-mode-cancel-btn" aria-label="Exit link mode" onclick={() => exitRefundLinkMode()}>
+          <X size={14} strokeWidth={2} aria-hidden="true" />
+        </button>
+        <button type="button" class="link-mode-exit-btn" aria-label="Done linking" onclick={() => exitRefundLinkMode()}>
+          <Check size={14} strokeWidth={2} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  {/if}
 
-<section class="table-block" class:calc-mode-on={calculateModeActive}>
-  <table>
-    <thead>
-      <tr>
-        <th>
-          <button
-            type="button"
-            class="sort-btn"
-            aria-label="Sort by date, {data.sortDirection === 'desc' ? 'newest first' : 'oldest first'}"
-            onclick={toggleDateSort}
-          >
-            Date
-            <span class="sort-mark" aria-hidden="true">{data.sortDirection === "desc" ? "↓" : "↑"}</span>
-          </button>
-        </th>
-        <th>Merchant</th>
-        <th>Category</th>
-        <th>Tags</th>
-        <th class="right">Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#if rows.length === 0}
-        <tr>
-          <td colspan="5" class="dim empty-row">
-            {#if data.searchQuery?.trim()}
-              No transactions match “{data.searchQuery}”.
-            {:else if data.selectedLinkTransactionId}
-              No linked transactions found for this refund set.
-            {:else if data.selectedGroupId}
-              No transactions in this group for the selected period.
-            {:else if data.selectedCategoryFilters.length}
-              No transactions in {selectedCategoryLabels()} for the selected period.
-            {:else if data.selectedTagIds.length}
-              No transactions tagged {selectedTagLabels()} for the selected period.
-            {:else if data.transactionTypeFilter === "income"}
-              No credits match this filter.
-            {:else if data.transactionTypeFilter === "expense"}
-              No debits match this filter.
-            {:else}
-              No transactions yet. Import a bank statement from Control.
-            {/if}
-          </td>
-        </tr>
-      {:else}
-        {#each rows as t (t.id)}
-          <tr
-            class:group-hidden={Boolean(data.selectedGroupId && t.groupHidden)}
-            class:calc-mode-active={calculateModeActive}
-            class:calc-mode-selected={isCalculateSelected(t.id)}
-            class:link-mode-anchor={refundLinkModeAnchorId === t.id}
-            class:link-mode-target={isLinkModeTarget(t)}
-            class:link-mode-linked={isLinkedToAnchor(t)}
-            class:link-mode-busy={savingRefundLinkId !== null}
-            onclick={(event) => {
-              handleCalculateRowClick(event, t);
-              void handleLinkModeRowClick(event, t);
-            }}
-          >
-            <td class="mono dim">{t.occurredOn}</td>
-            <td class="merchant-cell">
-              <div class="merchant-row">
-                <span class="merchant">{t.merchant ?? "—"}</span>
-                {#if t.refundLinks.length > 0}
-                  <div class="refund-cluster-wrap">
-                    <button
-                      type="button"
-                      class="refund-cluster-btn"
-                      class:active={Boolean(data.selectedLinkTransactionId)}
-                      aria-label={data.selectedLinkTransactionId ? "Show all transactions" : "Show linked transactions only"}
-                      aria-pressed={Boolean(data.selectedLinkTransactionId)}
-                      onclick={() => toggleLinkClusterFilter(t.id)}
-                    >
-                      <ArrowLeftRight size={12} strokeWidth={1.5} aria-hidden="true" />
-                    </button>
-                    <span class="refund-cluster-preview" role="tooltip">
-                      {t.refundLinks.length} linked · click to {data.selectedLinkTransactionId ? "show all" : "filter"}
-                    </span>
-                  </div>
-                {/if}
-                {#if t.warnings.length > 0}
-                  <div class="warning-wrap">
-                    <span class="warning-btn" aria-label="Transaction warning">
-                      <TriangleAlert size={12} strokeWidth={1.5} aria-hidden="true" />
-                    </span>
-                    <span class="warning-preview" role="tooltip">{warningPreview(t)}</span>
-                  </div>
-                {/if}
-                {#if canUseRefundLinkMode(t)}
-                  <div class="refund-link-wrap">
-                    <button
-                      type="button"
-                      class="refund-link-btn"
-                      class:has-links={t.refundLinks.length > 0}
-                      class:active={refundLinkModeAnchorId === t.id}
-                      aria-label="{refundLinkModeAnchorId === t.id
-                        ? 'Exit link mode'
-                        : t.refundLinks.length
-                          ? 'Edit refund links'
-                          : 'Link to expenses'} for {t.merchant ?? 'transaction'}"
-                      aria-pressed={refundLinkModeAnchorId === t.id}
-                      disabled={savingRefundLinkId === t.id}
-                      onclick={() => toggleRefundLinkMode(t)}
-                    >
-                      <Link size={12} strokeWidth={1.5} aria-hidden="true" />
-                    </button>
-                    {#if t.refundLinks.length > 0 && refundLinkModeAnchorId !== t.id}
-                      <span class="refund-link-preview" role="tooltip">
-                        {t.refundLinks.map((link) => refundLinkLabel(link)).join(", ")}
-                      </span>
-                    {/if}
-                  </div>
-                {/if}
-                {#if data.selectedGroupId}
-                  <button
-                    type="button"
-                    class="group-hidden-btn"
-                    class:is-hidden={t.groupHidden}
-                    aria-label="{t.groupHidden ? 'Show in group' : 'Hide in group'} for {t.merchant ?? 'transaction'}"
-                    disabled={savingGroupHiddenId === t.id}
-                    onclick={() => toggleGroupHidden(t.id, !t.groupHidden)}
-                  >
-                    {#if t.groupHidden}
-                      <EyeOff size={12} strokeWidth={1.5} aria-hidden="true" />
-                    {:else}
-                      <Eye size={12} strokeWidth={1.5} aria-hidden="true" />
-                    {/if}
-                  </button>
-                {/if}
-                <div class="note-wrap">
-                  <button
-                    type="button"
-                    class="note-btn"
-                    class:has-note={Boolean(t.notes)}
-                    aria-label="{t.notes ? 'Edit note' : 'Add note'} for {t.merchant ?? 'transaction'}"
-                    aria-expanded={openNoteTxId === t.id}
-                    disabled={savingNotesId === t.id}
-                    onclick={() => openNoteEditor(t)}
-                  >
-                    <MessageSquare size={12} strokeWidth={1.5} aria-hidden="true" />
-                  </button>
-                  {#if openNoteTxId === t.id}
-                    <div class="note-popup" role="dialog" aria-label="Transaction note">
-                      <textarea
-                        class="note-textarea"
-                        bind:value={noteDraft}
-                        placeholder="Add a note…"
-                        disabled={savingNotesId === t.id}
-                        rows="3"
-                        onkeydown={(e) => handleNoteKeydown(e, t)}
-                      ></textarea>
-                    </div>
-                  {:else if t.notes}
-                    <span class="note-preview" role="tooltip">{t.notes}</span>
-                  {/if}
-                </div>
-                {#if data.groups.length > 0}
-                  <div class="group-link-wrap">
-                    <button
-                      type="button"
-                      class="group-link-btn"
-                      class:has-group={t.groups.length > 0}
-                      aria-label="{t.groups.length ? `Linked to ${groupLabelFor(t)}` : 'Link to group'} for {t.merchant ?? 'transaction'}"
-                      aria-expanded={openGroupTxId === t.id}
-                      disabled={savingGroupTxId === t.id}
-                      onclick={() => (openGroupTxId = openGroupTxId === t.id ? null : t.id)}
-                    >
-                      <Layers size={12} strokeWidth={1.5} aria-hidden="true" />
-                    </button>
-                    {#if openGroupTxId === t.id}
-                      <div class="group-popup" role="dialog" aria-label="Transaction group">
-                        <select
-                          id="group-{t.id}"
-                          class="group-select"
-                          aria-label="Link transaction to group"
-                          value={primaryGroupId(t)}
-                          disabled={savingGroupTxId === t.id}
-                          onchange={(e) => setTransactionGroup(t.id, e.currentTarget.value ? e.currentTarget.value : null)}
-                        >
-                          <option value="">None</option>
-                          {#each data.groups as group (group.id)}
-                            <option value={group.id}>{group.name}</option>
-                          {/each}
-                        </select>
-                      </div>
-                    {:else if t.groups.length > 0}
-                      <span class="group-preview" role="tooltip">{groupLabelFor(t)}</span>
-                    {/if}
-                  </div>
-                {/if}
-              </div>
-            </td>
-            <td class="category-cell">
-              <label class="sr-only" for="category-{t.id}">Category for {t.merchant ?? "transaction"}</label>
-              <div class="cat-picker">
-                <span class="cat-bar" style="background:{t.categoryColor ?? 'var(--chrome-line)'}" aria-hidden="true"></span>
-                <select
-                  id="category-{t.id}"
-                  class="cat-select"
-                  value={t.categoryId ?? ""}
-                  disabled={savingCategoryId === t.id}
-                  onchange={(e) => handleCategoryChange(t, e.currentTarget.value ? e.currentTarget.value : null)}
-                >
-                  <option value="">Uncategorized</option>
-                  {#each categoriesForType(t.type, t.categoryId) as category (category.id)}
-                    <option value={category.id}>{category.name}</option>
-                  {/each}
-                </select>
-              </div>
-            </td>
-            <td class="tags">
-              <div class="tag-list">
-                {#each t.tags as tag (tag.id)}
-                  <span class="tag tx-tag" style="--tag-color: {tag.colorHex ?? '#ee7c02'}">
-                    <Tag size={12} strokeWidth={1.25} class="tag-icon" aria-hidden="true" />
-                    {tag.name}
-                    <button
-                      type="button"
-                      class="tag-remove"
-                      aria-label="Remove {tag.name}"
-                      disabled={savingTagTxId === t.id}
-                      onclick={() => removeTransactionTag(t.id, tag.id)}
-                    >
-                      ×
-                    </button>
-                  </span>
-                {/each}
-                {#if data.tags.length > 0 && availableTagsFor(t).length > 0}
-                  <div class="tag-add-wrap">
-                    <button
-                      type="button"
-                      class="tag-add-btn"
-                      aria-label="Add tag to {t.merchant ?? 'transaction'}"
-                      aria-expanded={openTagMenuTxId === t.id}
-                      disabled={savingTagTxId === t.id}
-                      onclick={() => (openTagMenuTxId = openTagMenuTxId === t.id ? null : t.id)}
-                    >
-                      <Plus size={12} strokeWidth={2} aria-hidden="true" />
-                    </button>
-                    {#if openTagMenuTxId === t.id}
-                      <div class="tag-add-menu" role="menu">
-                        {#each availableTagsFor(t) as tag (tag.id)}
-                          <button type="button" role="menuitem" onclick={() => handleAddTag(t, tag.id)}>
-                            {tag.name}
-                          </button>
-                        {/each}
-                      </div>
-                    {/if}
-                  </div>
-                {:else if t.tags.length === 0}
-                  <span class="dim">—</span>
-                {/if}
-              </div>
-            </td>
-            <td class="right mono amt" class:pos={t.type === "income"} class:neg={t.type === "expense"}>
-              {formatMoney(displayAmount(t.type, t.amountMinor), data.account.currencyCode)}
-            </td>
+  {#if data.selectedLinkTransactionId}
+    <div class="link-filter-banner">
+      <span>
+        Showing {data.linkClusterSize} linked refund{data.linkClusterSize === 1 ? "" : "s"}
+        <span class="dim">· period filter ignored</span>
+      </span>
+      <button type="button" class="link-filter-clear" onclick={clearLinkClusterFilter}>Show all</button>
+    </div>
+  {/if}
+
+  <section class="table-block table-sheet" class:calc-mode-on={calculateModeActive}>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>
+              <button
+                type="button"
+                class="sort-btn"
+                aria-label="Sort by date, {data.sortDirection === 'desc' ? 'newest first' : 'oldest first'}"
+                onclick={toggleDateSort}
+              >
+                Date
+                <span class="sort-mark" aria-hidden="true">{data.sortDirection === "desc" ? "↓" : "↑"}</span>
+              </button>
+            </th>
+            <th>Merchant</th>
+            <th class="th-filter">
+              <FilterMultiselect
+                variant="icon"
+                label="Category"
+                options={categoryFilterOptions}
+                selected={data.selectedCategoryFilters}
+                onchange={setCategoryFilters}
+              />
+            </th>
+            <th class="th-filter">
+              {#if data.tags.length > 0}
+                <FilterMultiselect variant="icon" label="Tags" options={tagFilterOptions} selected={data.selectedTagIds} onchange={setTagFilters} />
+              {:else}
+                Tags
+              {/if}
+            </th>
+            <th class="right">Amount</th>
+            <th class="right">Balance</th>
           </tr>
-        {/each}
-      {/if}
-    </tbody>
-  </table>
-
-  <div class="sentinel" use:infiniteScroll={{ onLoad: loadMore, disabled: loading || !hasMore }}>
-    {#if loading}■ LOADING ■{:else if !hasMore}— END —{:else}↓ SCROLL ↓{/if}
-  </div>
-</section>
+        </thead>
+        <tbody>
+          {#if rows.length === 0}
+            <tr>
+              <td colspan="6" class="dim empty-row">
+                {#if data.searchQuery?.trim()}
+                  No transactions match “{data.searchQuery}”.
+                {:else if data.selectedLinkTransactionId}
+                  No linked transactions found for this refund set.
+                {:else if data.selectedGroupId}
+                  No transactions in this group for the selected period.
+                {:else if data.selectedCategoryFilters.length}
+                  No transactions in {selectedCategoryLabels()} for the selected period.
+                {:else if data.selectedTagIds.length}
+                  No transactions tagged {selectedTagLabels()} for the selected period.
+                {:else if data.transactionTypeFilter === "income"}
+                  No credits match this filter.
+                {:else if data.transactionTypeFilter === "expense"}
+                  No debits match this filter.
+                {:else}
+                  No transactions yet. Import a bank statement from Control.
+                {/if}
+              </td>
+            </tr>
+          {:else}
+            {#each rows as t (t.id)}
+              <tr
+                class:group-hidden={Boolean(data.selectedGroupId && t.groupHidden)}
+                class:calc-mode-active={calculateModeActive}
+                class:calc-mode-selected={isCalculateSelected(t.id)}
+                class:link-mode-anchor={refundLinkModeAnchorId === t.id}
+                class:link-mode-target={isLinkModeTarget(t)}
+                class:link-mode-linked={isLinkedToAnchor(t)}
+                class:link-mode-busy={savingRefundLinkId !== null}
+                onclick={(event) => {
+                  handleCalculateRowClick(event, t);
+                  void handleLinkModeRowClick(event, t);
+                }}
+              >
+                <td class="mono dim">{t.occurredOn}</td>
+                <td class="merchant-cell">
+                  <div class="merchant-row">
+                    <span class="merchant">{t.merchant ?? "—"}</span>
+                    {#if t.refundLinks.length > 0}
+                      <div class="refund-cluster-wrap">
+                        <button
+                          type="button"
+                          class="refund-cluster-btn"
+                          class:active={Boolean(data.selectedLinkTransactionId)}
+                          aria-label={data.selectedLinkTransactionId ? "Show all transactions" : "Show linked transactions only"}
+                          aria-pressed={Boolean(data.selectedLinkTransactionId)}
+                          onclick={() => toggleLinkClusterFilter(t.id)}
+                        >
+                          <ArrowLeftRight size={12} strokeWidth={1.5} aria-hidden="true" />
+                        </button>
+                        <span class="refund-cluster-preview" role="tooltip">
+                          {t.refundLinks.length} linked · click to {data.selectedLinkTransactionId ? "show all" : "filter"}
+                        </span>
+                      </div>
+                    {/if}
+                    {#if t.warnings.length > 0}
+                      <div class="warning-wrap">
+                        <span class="warning-btn" aria-label="Transaction warning">
+                          <TriangleAlert size={12} strokeWidth={1.5} aria-hidden="true" />
+                        </span>
+                        <span class="warning-preview" role="tooltip">{warningPreview(t)}</span>
+                      </div>
+                    {/if}
+                    {#if canUseRefundLinkMode(t)}
+                      <div class="refund-link-wrap">
+                        <button
+                          type="button"
+                          class="refund-link-btn"
+                          class:has-links={t.refundLinks.length > 0}
+                          class:active={refundLinkModeAnchorId === t.id}
+                          aria-label="{refundLinkModeAnchorId === t.id
+                            ? 'Exit link mode'
+                            : t.refundLinks.length
+                              ? 'Edit refund links'
+                              : 'Link to expenses'} for {t.merchant ?? 'transaction'}"
+                          aria-pressed={refundLinkModeAnchorId === t.id}
+                          disabled={savingRefundLinkId === t.id}
+                          onclick={() => toggleRefundLinkMode(t)}
+                        >
+                          <Link size={12} strokeWidth={1.5} aria-hidden="true" />
+                        </button>
+                        {#if t.refundLinks.length > 0 && refundLinkModeAnchorId !== t.id}
+                          <span class="refund-link-preview" role="tooltip">
+                            {t.refundLinks.map((link) => refundLinkLabel(link)).join(", ")}
+                          </span>
+                        {/if}
+                      </div>
+                    {/if}
+                    {#if data.selectedGroupId}
+                      <button
+                        type="button"
+                        class="group-hidden-btn"
+                        class:is-hidden={t.groupHidden}
+                        aria-label="{t.groupHidden ? 'Show in group' : 'Hide in group'} for {t.merchant ?? 'transaction'}"
+                        disabled={savingGroupHiddenId === t.id}
+                        onclick={() => toggleGroupHidden(t.id, !t.groupHidden)}
+                      >
+                        {#if t.groupHidden}
+                          <EyeOff size={12} strokeWidth={1.5} aria-hidden="true" />
+                        {:else}
+                          <Eye size={12} strokeWidth={1.5} aria-hidden="true" />
+                        {/if}
+                      </button>
+                    {/if}
+                    <div class="note-wrap">
+                      <button
+                        type="button"
+                        class="note-btn"
+                        class:has-note={Boolean(t.notes)}
+                        aria-label="{t.notes ? 'Edit note' : 'Add note'} for {t.merchant ?? 'transaction'}"
+                        aria-expanded={openNoteTxId === t.id}
+                        disabled={savingNotesId === t.id}
+                        onclick={() => openNoteEditor(t)}
+                      >
+                        <StickyNote size={12} strokeWidth={1.6} aria-hidden="true" />
+                      </button>
+                      {#if openNoteTxId === t.id}
+                        <div class="note-popup" role="dialog" aria-label="Transaction note">
+                          <span class="note-popup-label" aria-hidden="true">note</span>
+                          <textarea
+                            class="note-textarea"
+                            bind:value={noteDraft}
+                            placeholder="Scribble a note…"
+                            disabled={savingNotesId === t.id}
+                            rows="3"
+                            onkeydown={(e) => handleNoteKeydown(e, t)}
+                          ></textarea>
+                          <p class="note-hint dim">Enter to save · Esc to cancel</p>
+                        </div>
+                      {:else if t.notes}
+                        <span class="note-preview" role="tooltip">{t.notes}</span>
+                      {/if}
+                    </div>
+                    {#if data.groups.length > 0}
+                      <div class="group-link-wrap">
+                        <button
+                          type="button"
+                          class="group-link-btn"
+                          class:has-group={t.groups.length > 0}
+                          aria-label="{t.groups.length ? `Linked to ${groupLabelFor(t)}` : 'Link to group'} for {t.merchant ?? 'transaction'}"
+                          aria-expanded={openGroupTxId === t.id}
+                          disabled={savingGroupTxId === t.id}
+                          onclick={() => (openGroupTxId = openGroupTxId === t.id ? null : t.id)}
+                        >
+                          <Layers size={12} strokeWidth={1.5} aria-hidden="true" />
+                        </button>
+                        {#if openGroupTxId === t.id}
+                          <div class="group-popup" role="dialog" aria-label="Transaction group">
+                            <select
+                              id="group-{t.id}"
+                              class="group-select"
+                              aria-label="Link transaction to group"
+                              value={primaryGroupId(t)}
+                              disabled={savingGroupTxId === t.id}
+                              onchange={(e) => setTransactionGroup(t.id, e.currentTarget.value ? e.currentTarget.value : null)}
+                            >
+                              <option value="">None</option>
+                              {#each data.groups as group (group.id)}
+                                <option value={group.id}>{group.name}</option>
+                              {/each}
+                            </select>
+                          </div>
+                        {:else if t.groups.length > 0}
+                          <span class="group-preview" role="tooltip">{groupLabelFor(t)}</span>
+                        {/if}
+                      </div>
+                    {/if}
+                  </div>
+                </td>
+                <td class="category-cell">
+                  <div class="cat-picker">
+                    {#if t.categoryColor}
+                      <span class="cat-dot" style="background:{t.categoryColor}" aria-hidden="true"></span>
+                    {/if}
+                    <SketchSelect
+                      name="category-{t.id}"
+                      compact
+                      aria-label="Category for {t.merchant ?? 'transaction'}"
+                      value={t.categoryId ?? ""}
+                      disabled={savingCategoryId === t.id}
+                      options={[
+                        { value: "", label: "Uncategorized" },
+                        ...categoriesForType(t.type, t.categoryId).map((category) => ({
+                          value: category.id,
+                          label: category.name,
+                        })),
+                      ]}
+                      onChange={(next) => handleCategoryChange(t, next || null)}
+                    />
+                  </div>
+                </td>
+                <td class="tags">
+                  <div class="tag-list">
+                    {#each t.tags as tag (tag.id)}
+                      <span class="tag tx-tag" style="--tag-color: {tag.colorHex ?? 'var(--orange)'}">
+                        <Tag size={11} strokeWidth={1.4} class="tag-icon" aria-hidden="true" />
+                        {tag.name}
+                        <button
+                          type="button"
+                          class="tag-remove"
+                          aria-label="Remove {tag.name}"
+                          disabled={savingTagTxId === t.id}
+                          onclick={() => removeTransactionTag(t.id, tag.id)}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    {/each}
+                    {#if data.tags.length > 0 && availableTagsFor(t).length > 0}
+                      <div class="tag-add-wrap">
+                        <button
+                          type="button"
+                          class="tag-add-btn"
+                          aria-label="Add tag to {t.merchant ?? 'transaction'}"
+                          aria-expanded={openTagMenuTxId === t.id}
+                          disabled={savingTagTxId === t.id}
+                          onclick={() => (openTagMenuTxId = openTagMenuTxId === t.id ? null : t.id)}
+                        >
+                          <Plus size={12} strokeWidth={2} aria-hidden="true" />
+                        </button>
+                        {#if openTagMenuTxId === t.id}
+                          <div class="tag-add-menu" role="menu">
+                            {#each availableTagsFor(t) as tag (tag.id)}
+                              <button
+                                type="button"
+                                role="menuitem"
+                                disabled={savingTagTxId === t.id}
+                                onclick={() => {
+                                  handleAddTag(t, tag.id);
+                                  openTagMenuTxId = null;
+                                }}
+                              >
+                                {tag.name}
+                              </button>
+                            {/each}
+                          </div>
+                        {/if}
+                      </div>
+                    {:else if t.tags.length === 0}
+                      <span class="dim">—</span>
+                    {/if}
+                  </div>
+                </td>
+                <td class="right mono amt" class:pos={t.type === "income"} class:neg={t.type === "expense"}>
+                  {formatMoney(displayAmount(t.type, t.amountMinor), data.account.currencyCode)}
+                </td>
+                <td class="right mono balance-cell">
+                  {#if t.balanceMinor != null}
+                    {formatMoney(t.balanceMinor, data.account.currencyCode)}
+                  {:else}
+                    <span class="dim">—</span>
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          {/if}
+        </tbody>
+      </table>
+      <div class="load-hit" use:infiniteScroll={{ onLoad: loadMore, disabled: loading || !hasMore }} aria-hidden="true"></div>
+    </div>
+    <footer class="sheet-foot">
+      <span class="sheet-foot-rule" aria-hidden="true"></span>
+      <span class="sheet-foot-mark">
+        {#if loading}loading…{:else if !hasMore}end of page{:else}keep scrolling ↓{/if}
+      </span>
+      <span class="sheet-foot-rule" aria-hidden="true"></span>
+    </footer>
+  </section>
+</div>
 
 <SmartCategorizePopup
   open={smartCatOpen}
@@ -1629,26 +1718,47 @@
 {/if}
 
 <style>
+  .tx-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .tx-page .table-block.table-sheet {
+    flex: 1 1 auto;
+    min-height: 12rem;
+    max-height: none;
+    margin-bottom: 0;
+  }
+
   .calc-mode-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    border: 2px solid var(--chrome-line);
-    background: var(--surface2);
-    color: var(--main-text);
-    font-family: inherit;
-    font-size: 0.62rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    padding: 0.4rem 0.55rem;
+    justify-content: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    padding: 0;
+    border: 1.5px dashed color-mix(in srgb, var(--ink) 28%, transparent);
+    background: transparent;
+    color: var(--ink-muted);
     cursor: pointer;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
   }
 
-  .calc-mode-btn:hover,
+  .calc-mode-btn:hover {
+    color: var(--brand);
+    border-color: var(--brand);
+    background: transparent;
+  }
+
   .calc-mode-btn.active {
-    color: var(--hi-cyan);
-    border-color: color-mix(in srgb, var(--hi-cyan) 55%, var(--chrome-line));
-    background: color-mix(in srgb, var(--hi-cyan) 8%, var(--surface2));
+    color: var(--ink);
+    border-style: solid;
+    border-color: transparent;
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+    transform: rotate(-1deg);
   }
 
   .calc-mode-banner {
@@ -1657,28 +1767,38 @@
     justify-content: space-between;
     gap: 0.75rem;
     margin-bottom: 0.65rem;
-    padding: 0.55rem 0.75rem;
-    background: color-mix(in srgb, var(--hi-cyan) 12%, var(--surface));
-    border: 2px solid color-mix(in srgb, var(--hi-cyan) 45%, var(--chrome-line));
-    font-size: 0.74rem;
+    padding: 0.5rem 0.8rem;
+    background: color-mix(in srgb, var(--yellow) 55%, var(--paper));
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 3px 10px 4px 8px / 8px 3px 10px 4px;
+    box-shadow: 2px 2px 0 0 color-mix(in srgb, var(--ink) 10%, transparent);
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    color: var(--ink);
+    transform: rotate(-0.25deg);
   }
 
   .calc-mode-exit-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.15rem;
+    padding: 0.2rem;
     border: none;
     background: transparent;
-    color: var(--muted);
+    color: var(--ink-muted);
     cursor: pointer;
+    border-radius: 4px;
   }
 
   .calc-mode-exit-btn:hover {
-    color: var(--brand-accent);
+    color: var(--brand);
   }
 
   .table-block.calc-mode-on {
+    padding-bottom: 0;
+  }
+
+  .table-block.calc-mode-on .table-scroll {
     padding-bottom: 4.5rem;
   }
 
@@ -1686,88 +1806,301 @@
     cursor: pointer;
   }
 
-  tr.calc-mode-selected {
-    background: color-mix(in srgb, var(--hi-cyan) 12%, transparent);
-    outline: 2px solid color-mix(in srgb, var(--hi-cyan) 55%, var(--chrome-line));
-    outline-offset: -2px;
+  tr.calc-mode-selected td {
+    background: color-mix(in srgb, var(--yellow) 42%, transparent);
+    box-shadow: inset 0 -1.5px 0 color-mix(in srgb, var(--ink) 12%, transparent);
   }
 
-  tr.calc-mode-active:not(.calc-mode-selected):hover {
-    background: color-mix(in srgb, var(--hi-cyan) 6%, transparent);
+  tr.calc-mode-selected td:first-child {
+    box-shadow:
+      inset 3px 0 0 color-mix(in srgb, var(--yellow) 85%, var(--ink)),
+      inset 0 -1.5px 0 color-mix(in srgb, var(--ink) 12%, transparent);
   }
 
-  .balance-card {
+  tr.calc-mode-active:not(.calc-mode-selected):hover td {
+    background: color-mix(in srgb, var(--yellow) 18%, transparent);
+  }
+
+  .table-block.calc-mode-on tbody tr.calc-mode-selected:nth-child(even) td {
+    background: color-mix(in srgb, var(--yellow) 48%, transparent);
+  }
+
+  .table-block.calc-mode-on tbody tr.calc-mode-active:not(.calc-mode-selected):hover:nth-child(even) td {
+    background: color-mix(in srgb, var(--yellow) 24%, transparent);
+  }
+
+  .balance-combo {
     display: flex;
-    align-items: baseline;
-    gap: 0.65rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem 1.75rem;
     flex-wrap: wrap;
-    margin-bottom: 0.85rem;
-    padding: 0.75rem 0.9rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+    margin: 0.15rem 0 0.85rem;
   }
 
-  .balance-k {
-    font-size: 0.66rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--muted);
+  .balance-open {
+    margin: 0;
+    min-width: 0;
+    flex: 1 1 14rem;
   }
 
-  .balance-v {
-    font-family: "Archivo Black", sans-serif;
-    font-size: 1.35rem;
+  .balance-combo .stats-controls {
+    flex: 0 1 auto;
+    align-items: flex-end;
+  }
+
+  .balance-combo .stats-label,
+  .balance-combo .summary-tabs,
+  .balance-combo .flow-tools {
+    justify-content: flex-end;
+  }
+
+  .balance-combo .stats-label {
+    display: inline-flex;
+  }
+
+  .balance-open .k {
+    display: block;
+    font-family: var(--hand);
+    color: var(--ink-muted);
+    font-size: 1.05rem;
+  }
+
+  .balance-open .v {
+    display: inline-block;
+    font-family: var(--hand);
+    font-size: clamp(2.4rem, 7vw, 3.8rem);
+    line-height: 0.95;
     font-variant-numeric: tabular-nums;
-    color: var(--main-text);
   }
 
   .balance-value-wrap {
     display: inline-flex;
     align-items: baseline;
     gap: 0.45rem;
+    flex-wrap: wrap;
   }
 
   .balance-txn-count {
-    font-size: 0.62rem;
-    letter-spacing: 0.05em;
-    color: var(--muted);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
     font-variant-numeric: tabular-nums;
   }
 
-  .balance-card.stale {
-    border-color: color-mix(in srgb, var(--hi-purple) 55%, var(--chrome-line));
-  }
-
-  .balance-asof {
-    font-size: 0.72rem;
-    margin-left: auto;
-    text-align: right;
+  .balance-open .meta {
+    display: block;
+    margin-top: 0.35rem;
+    color: var(--ink-soft);
+    font-size: 0.82rem;
     line-height: 1.4;
   }
 
-  .balance-asof a {
-    color: var(--hi-cyan);
+  .balance-open .meta a {
+    color: var(--brand);
+  }
+
+  .rough-mark.is-balance > .stroke {
+    left: -6%;
+    top: 18%;
+    width: 114%;
+    height: 62%;
+    transform: rotate(-0.9deg);
   }
 
   .stats-block {
     margin-bottom: 0.85rem;
+    flex: none;
   }
 
-  .stats-head {
+  .table-toolbar {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 0.45rem;
+    align-items: center;
+    gap: 0.75rem 1rem;
     flex-wrap: wrap;
+    margin: 0;
   }
 
-  .head-filters {
+  .table-toolbar .flow {
+    flex: 0 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+    margin-right: auto;
+  }
+
+  .table-toolbar .stats-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex: none;
+    margin-left: 0;
+  }
+
+  .tx-page .topbar,
+  .tx-page .balance-combo,
+  .tx-page .stats-block,
+  .tx-page .calc-mode-banner,
+  .tx-page .link-filter-banner {
+    flex: none;
+  }
+
+  .stats-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.05rem;
+    min-width: 0;
+  }
+
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.55rem;
+    margin: 0;
+    font-family: var(--hand);
+    font-size: 1.1rem;
+    min-width: 0;
+  }
+
+  .flow-tools {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+  }
+
+  .th-filter {
+    vertical-align: middle;
+  }
+
+  .th-filter :global(.filter-multi) {
+    min-width: 0;
+    width: auto;
+    max-width: none;
+  }
+
+  .flow .arrow {
+    color: var(--brand);
+    font-size: 1.25rem;
+  }
+
+  .flow .node {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.4rem;
+    border: none;
+    padding: 0.05rem 0.15rem;
+    border-radius: 0;
+    background: transparent;
+    text-decoration: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .flow .node:nth-child(3) {
+    transform: rotate(0.5deg);
+  }
+
+  .flow .node:nth-child(5) {
+    transform: rotate(-0.5deg);
+  }
+
+  .flow button.node:hover {
+    color: var(--brand);
+  }
+
+  .flow button.node.active {
+    outline: none;
+  }
+
+  .flow button.node.active .node-k,
+  .flow button.node.active .node-v {
+    font-weight: 700;
+  }
+
+  .flow button.node.active .node-k {
+    font-size: 1.1rem;
+    color: var(--ink);
+  }
+
+  .flow button.node.active .node-v {
+    font-size: 1.45rem;
+  }
+
+  .node-k {
+    font-size: 0.95rem;
+    color: var(--ink-muted);
+    line-height: 1;
+  }
+
+  .node-v {
+    font-size: 1.15rem;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .period-node {
+    color: var(--ink-muted);
+    cursor: default;
+  }
+
+  .saved-chip {
+    margin-left: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    background: color-mix(in srgb, var(--green) 55%, transparent);
+    border-radius: 3px 9px 4px 8px / 8px 3px 9px 2px;
+    font-size: 0.95rem;
+    color: var(--ink);
+  }
+
+  .rough-mark {
+    position: relative;
+    display: inline-block;
+    padding: 0.02em 0.08em;
+    isolation: isolate;
+  }
+
+  .rough-mark > .txt {
+    position: relative;
+    z-index: 1;
+  }
+
+  .rough-mark > .stroke {
+    position: absolute;
+    z-index: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .rough-mark > .stroke rect {
+    mix-blend-mode: multiply;
+  }
+
+  .rough-mark.is-in > .stroke {
+    left: -10%;
+    top: 12%;
+    width: 118%;
+    height: 72%;
+    transform: rotate(-1.4deg);
+  }
+
+  .rough-mark.is-out > .stroke {
+    left: -8%;
+    top: 18%;
+    width: 122%;
+    height: 68%;
+    transform: rotate(1.8deg);
+  }
+
+  .rough-mark.is-net > .stroke {
+    left: -14%;
+    top: 8%;
+    width: 128%;
+    height: 78%;
+    transform: rotate(-2.6deg);
   }
 
   .group-filter-wrap {
@@ -1778,11 +2111,10 @@
   .filter-multi-wrap {
     padding: 0;
     overflow: visible;
+    min-width: 7.5rem;
   }
 
-  .period-tabs button,
-  .group-filter,
-  :global(.filter-multi-btn) {
+  .group-filter {
     --period-tab-height: 1.625rem;
     box-sizing: border-box;
     height: var(--period-tab-height);
@@ -1823,57 +2155,100 @@
     align-items: center;
     gap: 0.4rem;
     margin: 0;
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .period-select {
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
-    color: var(--main-text);
-    padding: 0.35rem 0.45rem;
-    font-family: inherit;
-    font-size: 0.68rem;
-    line-height: 1;
-    letter-spacing: 0.04em;
+    font-size: 1rem;
+    letter-spacing: 0.01em;
     text-transform: none;
-    min-width: 0;
-    width: auto;
-    cursor: pointer;
-    vertical-align: middle;
+    color: var(--ink-muted);
+    font-family: var(--hand);
   }
 
-  .period-select:focus {
+  .stats-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .stats-search {
+    width: 9.5rem;
+    max-width: 36vw;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 32%, transparent);
+    color: var(--main-text);
+    padding: 0.05rem 0.1rem 0.2rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .stats-search:focus {
     outline: none;
-    border-color: var(--hi-focus);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
+    border-bottom-color: var(--brand);
+  }
+
+  .stats-tools .calc-mode-btn {
+    flex: none;
   }
 
   .period-static {
-    font-size: 0.68rem;
+    font-size: 0.9rem;
     line-height: 1;
     color: var(--main-text);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.01em;
     text-transform: none;
+  }
+
+  .summary-tabs {
+    display: inline-flex;
+    gap: 0.25rem;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  .summary-tabs button {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 0.15rem 0.45rem;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    cursor: pointer;
+    border-radius: 2px 8px 3px 7px / 7px 3px 8px 2px;
+  }
+
+  .summary-tabs button.active {
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+    color: var(--ink);
+  }
+
+  .summary-tabs button:hover:not(.active) {
+    color: var(--ink);
   }
 
   .period-tabs {
     display: inline-flex;
-    border: 2px solid var(--chrome-line);
+    border: 1.5px solid var(--chrome-line);
+    border-radius: 255px 12px 225px 10px / 12px 225px 10px 255px;
+    overflow: hidden;
   }
 
   .period-tabs button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: var(--surface2);
+    background: transparent;
     border: none;
-    border-right: 2px solid var(--chrome-line);
+    border-right: 1px solid var(--hair);
     color: var(--muted);
     padding: 0 0.65rem;
-    text-transform: uppercase;
+    text-transform: none;
+    font-family: var(--hand);
     cursor: pointer;
   }
 
@@ -1882,12 +2257,12 @@
   }
 
   .period-tabs button.active {
-    background: var(--hi-purple);
-    color: var(--background);
+    background: var(--brand-soft);
+    color: var(--brand);
   }
 
   .period-tabs button:hover:not(.active) {
-    color: var(--hi-purple);
+    color: var(--brand);
   }
 
   .empty-row {
@@ -1921,17 +2296,35 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
     padding: 0;
-    border: none;
+    border: 1.5px dashed color-mix(in srgb, var(--ink) 28%, transparent);
     background: transparent;
-    color: var(--muted);
+    color: var(--ink-muted);
     cursor: pointer;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
   }
 
-  .note-btn.has-note,
-  .note-btn:hover,
+  .note-btn.has-note {
+    border-style: solid;
+    border-color: transparent;
+    background: color-mix(in srgb, var(--yellow) 62%, transparent);
+    color: var(--ink);
+    transform: rotate(-1.2deg);
+  }
+
+  .note-btn:hover:not(:disabled),
   .note-btn[aria-expanded="true"] {
-    color: var(--hi-cyan);
+    color: var(--brand);
+    border-color: var(--brand);
+  }
+
+  .note-btn.has-note:hover:not(:disabled),
+  .note-btn.has-note[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--yellow) 82%, transparent);
+    border-color: transparent;
+    color: var(--ink);
   }
 
   .note-btn:disabled {
@@ -1941,20 +2334,27 @@
 
   .note-preview {
     position: absolute;
-    left: calc(100% + 0.35rem);
+    left: calc(100% + 0.4rem);
     top: 50%;
-    transform: translateY(-50%);
+    transform: translateY(-50%) rotate(-0.4deg);
     z-index: 15;
     width: max-content;
-    max-width: 16rem;
-    padding: 0.45rem 0.55rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 3px 3px 0 rgba(234, 242, 240, 0.12);
-    color: var(--main-text);
-    font-size: 0.72rem;
+    max-width: 15rem;
+    padding: 0.4rem 0.55rem;
+    background:
+      linear-gradient(transparent 0, transparent calc(100% - 1px), color-mix(in srgb, var(--ink) 10%, transparent) calc(100% - 1px)) 0 0 / 100%
+        1.15rem,
+      color-mix(in srgb, var(--yellow) 28%, var(--surface-raised));
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 2px 10px 3px 8px / 8px 2px 10px 3px;
+    box-shadow:
+      2px 2px 0 0 var(--shadow-paper),
+      2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
+    color: var(--ink);
+    font-family: var(--hand);
+    font-size: 0.88rem;
     line-height: 1.35;
-    white-space: normal;
+    white-space: pre-wrap;
     pointer-events: none;
     opacity: 0;
     visibility: hidden;
@@ -1967,33 +2367,61 @@
 
   .note-popup {
     position: absolute;
-    left: calc(100% + 0.35rem);
-    top: 50%;
-    transform: translateY(-50%);
+    left: calc(100% + 0.4rem);
+    top: -0.35rem;
     z-index: 25;
-    width: 14rem;
-    padding: 0.45rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+    width: 14.5rem;
+    padding: 0.45rem 0.55rem 0.4rem;
+    background:
+      linear-gradient(transparent 0, transparent calc(100% - 1px), color-mix(in srgb, var(--ink) 10%, transparent) calc(100% - 1px)) 0 0.15rem / 100%
+        1.25rem,
+      color-mix(in srgb, var(--yellow) 22%, var(--surface-raised));
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 2px 10px 3px 8px / 8px 2px 10px 3px;
+    box-shadow:
+      2px 2px 0 0 var(--shadow-paper),
+      2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+
+  .note-popup-label {
+    display: block;
+    margin: 0 0 0.2rem;
+    font-family: var(--hand);
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+    letter-spacing: 0.02em;
   }
 
   .note-textarea {
     width: 100%;
     min-height: 4.5rem;
     resize: vertical;
-    background: var(--surface2);
+    background: transparent;
     border: none;
-    color: var(--main-text);
-    padding: 0.4rem 0.45rem;
-    font-family: inherit;
-    font-size: 0.72rem;
-    line-height: 1.35;
+    border-radius: 0;
+    color: var(--ink);
+    caret-color: var(--ink);
+    padding: 0.1rem 0.05rem 0.2rem;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    line-height: 1.25rem;
+    box-shadow: none;
   }
 
   .note-textarea:focus {
     outline: none;
-    box-shadow: inset 0 0 0 1px var(--hi-focus);
+    box-shadow: none;
+  }
+
+  .note-textarea::placeholder {
+    color: color-mix(in srgb, var(--ink-muted) 75%, transparent);
+  }
+
+  .note-hint {
+    margin: 0.2rem 0 0;
+    font-family: var(--hand);
+    font-size: 0.75rem;
+    line-height: 1.2;
   }
 
   .group-link-wrap {
@@ -2030,7 +2458,8 @@
   }
 
   tr.group-hidden .merchant,
-  tr.group-hidden .amt {
+  tr.group-hidden .amt,
+  tr.group-hidden .balance-cell {
     color: var(--muted);
   }
 
@@ -2199,7 +2628,7 @@
     padding: 0.45rem 0.55rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 3px 3px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
     color: var(--main-text);
     font-size: 0.72rem;
     line-height: 1.35;
@@ -2226,7 +2655,7 @@
     padding: 0.45rem 0.55rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 3px 3px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
     color: var(--main-text);
     font-size: 0.72rem;
     line-height: 1.35;
@@ -2251,7 +2680,7 @@
     padding: 0.45rem;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
   }
 
   .group-select {
@@ -2313,66 +2742,64 @@
 
   .category-cell {
     min-width: 9rem;
+    vertical-align: middle;
+  }
+
+  .balance-cell {
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+  }
+
+  .category-cell :global(.sketch-select.compact) {
+    max-width: 11rem;
   }
 
   .cat-picker {
-    display: flex;
-    align-items: stretch;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     max-width: 12rem;
-    background: var(--surface2);
   }
 
-  .cat-bar {
-    width: 4px;
-    flex-shrink: 0;
-  }
-
-  .cat-select {
-    flex: 1;
-    min-width: 0;
-    width: 100%;
-    background: var(--surface2);
-    border: none;
-    color: var(--main-text);
-    padding: 0.3rem 0.45rem;
-    font-family: inherit;
-    font-size: 0.78rem;
-    cursor: pointer;
-    appearance: none;
-  }
-
-  .cat-select:focus {
-    outline: none;
-    box-shadow: inset 0 0 0 1px var(--hi-focus);
-  }
-
-  .cat-select option {
-    background: var(--surface2);
-    color: var(--main-text);
-  }
-
-  .cat-select:disabled {
-    opacity: 0.55;
-    cursor: wait;
+  .cat-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    flex: none;
+    border-radius: 2px 6px 3px 5px / 5px 2px 6px 2px;
+    box-shadow: 0.5px 0.5px 0 color-mix(in srgb, var(--ink) 18%, transparent);
   }
 
   .tx-tag {
-    gap: 0.25rem;
+    gap: 0.18rem;
+    padding: 0.05rem 0.28rem;
+    border: none;
+    border-radius: 2px 8px 3px 7px / 7px 2px 8px 2px;
+    background: color-mix(in srgb, var(--tag-color, var(--orange)) 45%, transparent);
+    color: var(--ink);
+    font-size: 0.82rem;
+  }
+
+  .tx-tag :global(.tag-icon) {
+    color: color-mix(in srgb, var(--tag-color, var(--orange)) 70%, var(--ink));
   }
 
   .tag-remove {
+    appearance: none;
     border: none;
     background: transparent;
-    color: var(--muted);
+    color: var(--ink-muted);
     cursor: pointer;
     padding: 0;
-    margin-left: 0.1rem;
+    margin-left: 0.05rem;
     line-height: 1;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
   }
 
   .tag-remove:hover:not(:disabled) {
-    color: var(--main-text);
+    color: var(--danger);
   }
 
   .tag-remove:disabled {
@@ -2392,17 +2819,18 @@
     justify-content: center;
     width: 1.35rem;
     height: 1.35rem;
-    background: var(--surface2);
-    border: 1px solid color-mix(in srgb, var(--hi-purple) 32%, transparent);
-    color: var(--muted);
     padding: 0;
+    border: 1.5px dashed color-mix(in srgb, var(--ink) 28%, transparent);
+    background: transparent;
+    color: var(--ink-muted);
     cursor: pointer;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
   }
 
   .tag-add-btn:hover:not(:disabled),
   .tag-add-wrap:has(.tag-add-menu) .tag-add-btn {
-    color: var(--hi-green);
-    border-color: var(--hi-green);
+    color: var(--brand);
+    border-color: var(--brand);
   }
 
   .tag-add-btn:disabled {
@@ -2412,35 +2840,50 @@
 
   .tag-add-menu {
     position: absolute;
-    top: calc(100% + 0.25rem);
-    left: 0;
-    min-width: 8rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 3px 3px 0 color-mix(in srgb, var(--hi-purple) 25%, transparent);
-    z-index: 15;
+    top: calc(100% + 0.2rem);
+    right: 0;
+    left: auto;
+    z-index: 20;
+    min-width: 7rem;
+    max-height: 10rem;
+    overflow: auto;
+    padding: 0.25rem;
+    background: var(--surface-raised);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 2px 8px 3px 6px / 6px 2px 8px 3px;
+    box-shadow:
+      2px 2px 0 0 var(--shadow-paper),
+      2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
     display: flex;
     flex-direction: column;
   }
 
   .tag-add-menu button {
-    background: none;
+    appearance: none;
+    display: block;
+    width: 100%;
     border: none;
-    border-bottom: 1px solid var(--table-line);
-    color: var(--main-text);
-    font-family: inherit;
-    font-size: 0.68rem;
-    padding: 0.45rem 0.55rem;
+    background: transparent;
     text-align: left;
+    font-family: var(--hand);
+    font-size: 0.9rem;
+    color: var(--ink);
+    padding: 0.25rem 0.4rem;
     cursor: pointer;
+    border-radius: 2px 6px 3px 5px / 5px 2px 6px 2px;
   }
 
   .tag-add-menu button:last-child {
     border-bottom: none;
   }
 
-  .tag-add-menu button:hover {
-    background: color-mix(in srgb, var(--hi-cyan) 10%, var(--surface2));
-    color: var(--hi-green);
+  .tag-add-menu button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--yellow) 45%, transparent);
+    color: var(--ink);
+  }
+
+  .tag-add-menu button:disabled {
+    opacity: 0.55;
+    cursor: wait;
   }
 </style>

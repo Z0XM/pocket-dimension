@@ -131,7 +131,7 @@
     flex-direction: column;
     background: var(--surface);
     border: 2px solid var(--chrome-line);
-    box-shadow: 8px 8px 0 rgba(234, 242, 240, 0.12);
+    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.06);
   }
 
   .smart-cat-head {
@@ -145,7 +145,7 @@
 
   .smart-cat-head h2 {
     margin: 0 0 0.25rem;
-    font-family: "Archivo Black", sans-serif;
+    font-family: var(--hand);
     font-size: 0.82rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;

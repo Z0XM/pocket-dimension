@@ -18,6 +18,9 @@
   import IncomeExpenseBars from "$lib/components/income-expense-bars.svelte";
   import MeterBar from "$lib/components/meter-bar.svelte";
   import MonthlyTrendChart from "$lib/components/monthly-trend-chart.svelte";
+  import SketchSelect from "$lib/components/sketch-select.svelte";
+  import SpendPieChart from "$lib/components/spend-pie-chart.svelte";
+  import BrandMark from "$lib/components/brand-mark.svelte";
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
@@ -95,7 +98,7 @@
     }
     if (type) params.set("type", type);
     const query = params.toString();
-    return query ? `/app?${query}` : "/app";
+    return query ? `/app/transactions?${query}` : "/app/transactions";
   }
 
   onMount(() => {
@@ -134,37 +137,62 @@
   const showBillingRow = $derived(
     isDashboardWidgetEnabled(data.enabledWidgets, "monthly-bills") || isDashboardWidgetEnabled(data.enabledWidgets, "yearly-bills")
   );
+
+  const PILL_TONES = ["blue", "purple", "yellow", "green", "pink", "orange"] as const;
 </script>
 
 <svelte:head><title>Dashboards · Chhan Chhan</title></svelte:head>
 
 <header class="topbar">
   <div>
-    <h1><span>CHHAN</span><span class="acid"> CHHAN</span></h1>
+    <h1 class="brand-lockup">
+      <BrandMark />
+      <span class="brand-word"><span>CHHAN</span><span class="acid"> CHHAN</span></span>
+    </h1>
     <AppNav />
   </div>
   <div class="actions">
-    <DashboardWidgetPicker enabledWidgets={data.enabledWidgets} onchange={setEnabledWidgets} />
     <AppSettings />
   </div>
 </header>
 
 {#if data.currentBalance}
-  <section class="balance-card" class:stale={data.currentBalance.isStale}>
-    <span class="balance-k">Balance</span>
-    <div class="balance-value-wrap">
-      <span class="balance-v">{formatMoney(data.currentBalance.balanceMinor, data.account.currencyCode)}</span>
-      <span class="balance-txn-count">{data.currentBalance.transactionCount.toLocaleString()} txns</span>
+  <div class="hero-row">
+    <div class="hero-main">
+      <section class="balance-open" class:stale={data.currentBalance.isStale}>
+        <span class="k">balance</span>
+        <div class="balance-value-wrap">
+          <span class="v">
+            <span class="rough-mark is-balance">
+              <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+                <rect x="1" y="3" width="118" height="20" rx="2" fill="color-mix(in srgb, var(--yellow) 78%, transparent)" />
+              </svg>
+              <span class="txt">{formatMoney(data.currentBalance.balanceMinor, data.account.currencyCode)}</span>
+            </span>
+          </span>
+          <span class="balance-txn-count">{data.currentBalance.transactionCount.toLocaleString()} txns</span>
+        </div>
+        <span class="meta">
+          {#if data.currentBalance.isStale}
+            as of {data.currentBalance.asOf} · latest txn {data.currentBalance.latestTransactionOn} —
+            <a href="/app/control">re-import statement</a> to refresh
+          {:else}
+            as of {data.currentBalance.asOf}
+          {/if}
+        </span>
+      </section>
     </div>
-    <span class="balance-asof dim">
-      {#if data.currentBalance.isStale}
-        as of {data.currentBalance.asOf} · latest txn {data.currentBalance.latestTransactionOn} —
-        <a href="/app/control">re-import statement</a> to refresh
-      {:else}
-        as of {data.currentBalance.asOf}
-      {/if}
-    </span>
-  </section>
+    <aside class="sticky-stack" aria-label="Tips">
+      <div class="taped-sticky">
+        Tip: tap In / Out to jump into filtered transactions.
+        <span class="tiny">marker paper</span>
+      </div>
+      <div class="taped-sticky blue">
+        Customise fonts & paper in Control.
+        <span class="tiny">your notebook</span>
+      </div>
+    </aside>
+  </div>
 {/if}
 
 <section class="stats-block">
@@ -172,74 +200,118 @@
     <div class="stats-label">
       <span>Summary</span>
       {#if data.summaryPeriod === "month"}
-        <select class="period-select" aria-label="Select month" value={data.selectedMonth} onchange={(e) => setSummaryMonth(e.currentTarget.value)}>
-          {#each data.summaryMonths as monthKey}
-            <option value={monthKey}>{formatMonthKeyShort(monthKey)}</option>
-          {/each}
-        </select>
+        {#if data.summaryMonths.length}
+          <SketchSelect
+            name="summary-month"
+            compact
+            aria-label="Select month"
+            value={data.selectedMonth}
+            options={data.summaryMonths.map((monthKey) => ({ value: monthKey, label: formatMonthKeyShort(monthKey) }))}
+            onChange={setSummaryMonth}
+          />
+        {/if}
       {:else if data.summaryPeriod === "year"}
-        <select
-          class="period-select"
-          aria-label="Select year"
-          value={String(data.selectedYear)}
-          onchange={(e) => setSummaryYear(Number(e.currentTarget.value))}
-        >
-          {#each data.summaryYears as year (year)}
-            <option value={String(year)}>{year}</option>
-          {/each}
-        </select>
+        {#if data.summaryYears.length}
+          <SketchSelect
+            name="summary-year"
+            compact
+            aria-label="Select year"
+            value={String(data.selectedYear)}
+            options={data.summaryYears.map((year) => ({ value: String(year), label: String(year) }))}
+            onChange={(next) => setSummaryYear(Number(next))}
+          />
+        {/if}
       {:else}
         <span class="period-static">All time</span>
       {/if}
     </div>
-    <div class="period-tabs" role="tablist" aria-label="Summary period">
-      <button
-        type="button"
-        role="tab"
-        class:active={data.summaryPeriod === "month"}
-        aria-selected={data.summaryPeriod === "month"}
-        onclick={() => setSummaryPeriod("month")}
-      >
-        Month
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class:active={data.summaryPeriod === "year"}
-        aria-selected={data.summaryPeriod === "year"}
-        onclick={() => setSummaryPeriod("year")}
-      >
-        Year
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class:active={data.summaryPeriod === "all"}
-        aria-selected={data.summaryPeriod === "all"}
-        onclick={() => setSummaryPeriod("all")}
-      >
-        All
-      </button>
+    <div class="head-filters">
+      <DashboardWidgetPicker enabledWidgets={data.enabledWidgets} onchange={setEnabledWidgets} />
+      <div class="period-tabs" role="tablist" aria-label="Summary period">
+        <button
+          type="button"
+          role="tab"
+          class:active={data.summaryPeriod === "month"}
+          aria-selected={data.summaryPeriod === "month"}
+          onclick={() => setSummaryPeriod("month")}
+        >
+          Month
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class:active={data.summaryPeriod === "year"}
+          aria-selected={data.summaryPeriod === "year"}
+          onclick={() => setSummaryPeriod("year")}
+        >
+          Year
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class:active={data.summaryPeriod === "all"}
+          aria-selected={data.summaryPeriod === "all"}
+          onclick={() => setSummaryPeriod("all")}
+        >
+          All
+        </button>
+      </div>
     </div>
   </div>
-  <section class="stats">
-    <a class="stat net" href={transactionsUrl()}>
-      <span class="k">{data.summaryPrefix} NET</span>
-      <span class="v">{formatMoney(data.summary.netMinor, data.account.currencyCode)}</span>
+
+  <div class="flow" aria-label="Period flow">
+    <a class="node" href={transactionsUrl("income")}>
+      <span class="node-k">in</span>
+      <span class="node-v pos">
+        <span class="rough-mark is-in">
+          <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="1" y="4" width="118" height="18" rx="2" fill="color-mix(in srgb, var(--green) 72%, transparent)" />
+          </svg>
+          <span class="txt">{formatMoney(data.summary.incomeMinor, data.account.currencyCode)}</span>
+        </span>
+      </span>
     </a>
-    <a class="stat" href={transactionsUrl("income")}>
-      <span class="k">{data.summaryPrefix} IN</span>
-      <span class="v pos">{formatMoney(data.summary.incomeMinor, data.account.currencyCode)}</span>
+    <span class="arrow" aria-hidden="true">→</span>
+    <span class="node period-node">{data.summaryLabel.toLowerCase()}</span>
+    <span class="arrow" aria-hidden="true">→</span>
+    <a class="node" href={transactionsUrl("expense")}>
+      <span class="node-k">out</span>
+      <span class="node-v neg">
+        <span class="rough-mark is-out">
+          <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="1" y="5" width="118" height="17" rx="2" fill="color-mix(in srgb, var(--pink) 70%, transparent)" />
+          </svg>
+          <span class="txt">{formatMoney(-data.summary.expenseMinor, data.account.currencyCode)}</span>
+        </span>
+      </span>
     </a>
-    <a class="stat" href={transactionsUrl("expense")}>
-      <span class="k">{data.summaryPrefix} OUT</span>
-      <span class="v neg">{formatMoney(-data.summary.expenseMinor, data.account.currencyCode)}</span>
+    <span class="arrow" aria-hidden="true">=</span>
+    <a class="node net-node" href={transactionsUrl()}>
+      <span class="node-k">net</span>
+      <span class="node-v">
+        <span class="rough-mark is-net">
+          <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="1" y="3" width="118" height="20" rx="2" fill="color-mix(in srgb, var(--purple) 75%, transparent)" />
+          </svg>
+          <span class="txt">{formatMoney(data.summary.netMinor, data.account.currencyCode)}</span>
+        </span>
+      </span>
     </a>
-    <article class="stat">
-      <span class="k">{data.summaryPrefix} SAVED</span>
-      <span class="v">{Math.round(data.summary.savingsRate * 100)}%</span>
-    </article>
-  </section>
+    <span class="saved-chip" title="Savings rate">{Math.round(data.summary.savingsRate * 100)}% saved</span>
+  </div>
+
+  {#if data.categorySpend.length}
+    <div class="pills" aria-label="Top categories">
+      {#each data.categorySpend.slice(0, 6) as row, i (row.name)}
+        <span class="pill pill-{PILL_TONES[i % PILL_TONES.length]}">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3 12.5 L8 3.5 L13 12.5 Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+          </svg>
+          {row.name}
+        </span>
+      {/each}
+    </div>
+  {/if}
 </section>
 
 {#if showSummaryRow}
@@ -354,11 +426,7 @@
         {#if data.merchantSpend.length === 0}
           <p class="dim dash-empty">No merchant spend in this period.</p>
         {:else}
-          <div class="dash-meters">
-            {#each data.merchantSpend as row (row.name)}
-              <MeterBar name={row.name} valueLabel={formatMoney(row.amountMinor, data.account.currencyCode)} pct={row.pct} color={row.color} />
-            {/each}
-          </div>
+          <SpendPieChart rows={data.merchantSpend} currencyCode={data.account.currencyCode} ariaLabel="Top merchants spend breakdown" />
         {/if}
       </article>
     {/if}
@@ -448,58 +516,187 @@
 {/if}
 
 <style>
-  .balance-card {
+  .hero-row {
     display: flex;
-    align-items: baseline;
-    gap: 0.65rem;
     flex-wrap: wrap;
-    margin-bottom: 0.85rem;
-    padding: 0.75rem 0.9rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+    margin-bottom: 0.35rem;
   }
 
-  .balance-k {
-    font-size: 0.66rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--muted);
+  .hero-main {
+    min-width: min(100%, 18rem);
+    flex: 1 1 18rem;
   }
 
-  .balance-v {
-    font-family: "Archivo Black", sans-serif;
-    font-size: 1.35rem;
+  .balance-open {
+    margin: 0.15rem 0 1rem;
+  }
+
+  .balance-open .k {
+    display: block;
+    font-family: var(--hand);
+    color: var(--ink-muted);
+    font-size: 1.05rem;
+  }
+
+  .balance-open .v {
+    display: inline-block;
+    font-family: var(--hand);
+    font-size: clamp(2.4rem, 7vw, 3.8rem);
+    line-height: 0.95;
     font-variant-numeric: tabular-nums;
-    color: var(--main-text);
   }
 
   .balance-value-wrap {
     display: inline-flex;
     align-items: baseline;
     gap: 0.45rem;
+    flex-wrap: wrap;
   }
 
   .balance-txn-count {
-    font-size: 0.62rem;
-    letter-spacing: 0.05em;
-    color: var(--muted);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
     font-variant-numeric: tabular-nums;
   }
 
-  .balance-card.stale {
-    border-color: color-mix(in srgb, var(--hi-purple) 55%, var(--chrome-line));
+  .balance-open.stale .meta a,
+  .balance-open .meta a {
+    color: var(--brand);
   }
 
-  .balance-asof {
-    font-size: 0.72rem;
-    margin-left: auto;
-    text-align: right;
+  .balance-open .meta {
+    display: block;
+    margin-top: 0.35rem;
+    color: var(--ink-soft);
+    font-size: 0.82rem;
     line-height: 1.4;
   }
 
-  .balance-asof a {
-    color: var(--hi-cyan);
+  .rough-mark {
+    position: relative;
+    display: inline-block;
+    padding: 0.02em 0.08em;
+    isolation: isolate;
+  }
+
+  .rough-mark > .txt {
+    position: relative;
+    z-index: 1;
+  }
+
+  .rough-mark > .stroke {
+    position: absolute;
+    z-index: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .rough-mark > .stroke rect {
+    mix-blend-mode: multiply;
+  }
+
+  .rough-mark.is-balance > .stroke {
+    left: -6%;
+    top: 18%;
+    width: 114%;
+    height: 62%;
+    transform: rotate(-0.9deg);
+  }
+
+  .rough-mark.is-in > .stroke {
+    left: -10%;
+    top: 12%;
+    width: 118%;
+    height: 72%;
+    transform: rotate(-1.4deg);
+  }
+
+  .rough-mark.is-out > .stroke {
+    left: -8%;
+    top: 18%;
+    width: 122%;
+    height: 68%;
+    transform: rotate(1.8deg);
+  }
+
+  .rough-mark.is-net > .stroke {
+    left: -14%;
+    top: 8%;
+    width: 128%;
+    height: 78%;
+    transform: rotate(-2.6deg);
+  }
+
+  .sticky-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: flex-start;
+  }
+
+  .taped-sticky {
+    position: relative;
+    width: 9.5rem;
+    padding: 0.85rem 0.7rem 0.75rem;
+    margin: 0.2rem 0;
+    background: color-mix(in srgb, var(--yellow) 72%, var(--mix-wash));
+    background-image: linear-gradient(135deg, transparent 62%, rgba(0, 0, 0, 0.04) 62%, rgba(0, 0, 0, 0.04) 100%);
+    border: 1.25px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    box-shadow:
+      1px 2px 0 rgba(27, 27, 31, 0.05),
+      3px 5px 10px rgba(27, 27, 31, 0.06);
+    transform: rotate(3.2deg);
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    line-height: 1.3;
+    color: var(--ink);
+    flex: none;
+  }
+
+  .taped-sticky::before {
+    content: "";
+    position: absolute;
+    top: -0.45rem;
+    left: 50%;
+    width: 3.1rem;
+    height: 0.85rem;
+    transform: translateX(-50%) rotate(-2deg);
+    background: color-mix(in srgb, #f5e6b8 70%, rgba(255, 255, 255, 0.55));
+    border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+    opacity: 0.92;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  }
+
+  .taped-sticky::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 0 0.85rem 0.85rem;
+    border-color: transparent transparent #e6d56a transparent;
+    filter: drop-shadow(-0.5px -0.5px 0 rgba(27, 27, 31, 0.12));
+  }
+
+  .taped-sticky .tiny {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--ink-muted);
+    font-size: 0.82rem;
+  }
+
+  .taped-sticky.blue {
+    background: color-mix(in srgb, var(--blue) 55%, var(--mix-wash));
+    transform: rotate(-2.4deg);
+  }
+
+  .taped-sticky.blue::after {
+    border-color: transparent transparent color-mix(in srgb, var(--blue) 70%, #8a9bb0) transparent;
   }
 
   .stats-block {
@@ -511,7 +708,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    margin-bottom: 0.45rem;
+    margin-bottom: 0.55rem;
     flex-wrap: wrap;
   }
 
@@ -520,58 +717,48 @@
     align-items: center;
     gap: 0.4rem;
     margin: 0;
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .period-select {
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
-    color: var(--main-text);
-    padding: 0.35rem 0.45rem;
-    font-family: inherit;
-    font-size: 0.68rem;
-    line-height: 1;
-    letter-spacing: 0.04em;
+    font-size: 1rem;
+    letter-spacing: 0.01em;
     text-transform: none;
-    min-width: 0;
-    width: auto;
-    cursor: pointer;
-    vertical-align: middle;
-  }
-
-  .period-select:focus {
-    outline: none;
-    border-color: var(--hi-focus);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
+    color: var(--ink-muted);
+    font-family: var(--hand);
   }
 
   .period-static {
-    font-size: 0.68rem;
+    font-size: 0.9rem;
     line-height: 1;
     color: var(--main-text);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.01em;
     text-transform: none;
+  }
+
+  .head-filters {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .period-tabs {
     display: inline-flex;
-    border: 2px solid var(--chrome-line);
+    gap: 0.25rem;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
   }
 
   .period-tabs button {
-    background: var(--surface2);
+    background: transparent;
     border: none;
-    border-right: 2px solid var(--chrome-line);
+    border-right: none;
     color: var(--muted);
-    padding: 0.35rem 0.65rem;
-    font-family: inherit;
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    padding: 0.15rem 0.45rem;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     cursor: pointer;
+    border-radius: 2px 8px 3px 7px / 7px 3px 8px 2px;
   }
 
   .period-tabs button:last-child {
@@ -579,17 +766,119 @@
   }
 
   .period-tabs button.active {
-    background: var(--hi-purple);
-    color: var(--background);
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+    color: var(--ink);
   }
 
   .period-tabs button:hover:not(.active) {
-    color: var(--hi-purple);
+    color: var(--ink);
   }
 
-  .stats a.stat {
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.55rem;
+    margin: 0 0 1rem;
+    font-family: var(--hand);
+    font-size: 1.1rem;
+  }
+
+  .flow .arrow {
+    color: var(--brand);
+    font-size: 1.25rem;
+  }
+
+  .flow .node {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.4rem;
+    border: none;
+    padding: 0.05rem 0.15rem;
+    border-radius: 0;
+    background: transparent;
     text-decoration: none;
     color: inherit;
+  }
+
+  .flow .node:nth-child(3) {
+    transform: rotate(0.5deg);
+  }
+
+  .flow .node:nth-child(5) {
+    transform: rotate(-0.5deg);
+  }
+
+  .flow a.node:hover {
+    color: var(--brand);
+  }
+
+  .node-k {
+    font-size: 0.95rem;
+    color: var(--ink-muted);
+    line-height: 1;
+  }
+
+  .node-v {
+    font-size: 1.15rem;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .period-node {
+    color: var(--ink-muted);
+  }
+
+  .saved-chip {
+    margin-left: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    background: color-mix(in srgb, var(--green) 55%, transparent);
+    border-radius: 3px 9px 4px 8px / 8px 3px 9px 2px;
+    font-size: 0.95rem;
+    color: var(--ink);
+  }
+
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.6rem;
+    margin: 0 0 1.15rem;
+    font-family: var(--hand);
+    font-size: 1.05rem;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.18rem 0.55rem;
+    border-radius: 3px 9px 4px 8px / 8px 3px 9px 2px;
+  }
+
+  .pill svg {
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+  }
+
+  .pill-blue {
+    background: color-mix(in srgb, var(--blue) 72%, transparent);
+  }
+  .pill-purple {
+    background: color-mix(in srgb, var(--purple) 72%, transparent);
+  }
+  .pill-yellow {
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+  }
+  .pill-green {
+    background: color-mix(in srgb, var(--green) 72%, transparent);
+  }
+  .pill-pink {
+    background: color-mix(in srgb, var(--pink) 70%, transparent);
+  }
+  .pill-orange {
+    background: color-mix(in srgb, var(--orange) 72%, transparent);
   }
 
   .actions {
@@ -601,8 +890,8 @@
   .dash-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.85rem;
-    margin-bottom: 1.25rem;
+    gap: 1.5rem 2rem;
+    margin-bottom: 1.75rem;
   }
 
   .dash-grid-spending {
@@ -618,57 +907,83 @@
   }
 
   .dash-panel {
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    padding: 0.9rem 1rem;
-    box-shadow: 4px 4px 0 rgba(234, 242, 240, 0.12);
+    background: transparent;
+    border: none;
+    padding: 0;
+    box-shadow: none;
+    border-radius: 0;
   }
 
   .dash-panel h2 {
-    margin: 0 0 0.75rem;
-    font-family: "Archivo Black", sans-serif;
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--hi-cyan);
+    margin: 0 0 0.65rem;
+    font-family: var(--hand);
+    font-size: 1.15rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--ink-muted);
+    font-weight: 400;
   }
 
   .dash-kv {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: 0.75rem 1.25rem;
     margin: 0;
   }
 
   .dash-kv div {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.1rem;
   }
 
   .dash-kv dt {
-    font-size: 0.66rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     color: var(--muted);
   }
 
   .dash-kv dd {
     margin: 0;
-    font-family: "Archivo Black", sans-serif;
-    font-size: 1.05rem;
+    font-family: var(--hand);
+    font-size: 1.25rem;
     font-variant-numeric: tabular-nums;
   }
 
   .dash-meters {
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
+    gap: 0.75rem;
   }
 
   .dash-empty {
     margin: 0;
-    font-size: 0.78rem;
+    font-size: 0.95rem;
+  }
+
+  /* Soft notebook lines instead of meter card tracks */
+  .dash-panel :global(.track) {
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 18%, transparent);
+    border-radius: 0;
+    height: 8px;
+  }
+
+  .dash-panel :global(.fill) {
+    border-radius: 0;
+  }
+
+  .dash-panel :global(.math-notebook) {
+    background-image: none;
+    border-radius: 0;
+    padding: 0.15rem 0;
+  }
+
+  .dash-panel :global(.trend-grid) {
+    border-left: 1.25px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-bottom: 1.25px solid color-mix(in srgb, var(--ink) 28%, transparent);
   }
 
   @media (max-width: 900px) {

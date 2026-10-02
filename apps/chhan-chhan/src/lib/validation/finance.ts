@@ -43,8 +43,40 @@ export const transactionsQuerySchema = paginationQuerySchema.extend({
 
 export const createAccountSchema = z.object({
   name: z.string().trim().min(2).max(120),
-  currencyCode: z.string().trim().length(3).default("USD"),
-  timezone: z.string().trim().min(2).max(120).default("UTC"),
+  currencyCode: z.string().trim().length(3).default("INR"),
+  timezone: z.string().trim().min(2).max(120).default("Asia/Kolkata"),
+  colorHex: z
+    .string()
+    .trim()
+    .regex(/^#([0-9A-Fa-f]{6})$/)
+    .optional(),
+  bankImporterId: z.enum(["kotak", "icici", "hdfc", "generic"]).optional(),
+});
+
+export const updateAccountSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  currencyCode: z
+    .string()
+    .trim()
+    .length(3)
+    .transform((value) => value.toUpperCase())
+    .optional(),
+  timezone: z.string().trim().min(2).max(120).optional(),
+  colorHex: z
+    .union([
+      z
+        .string()
+        .trim()
+        .regex(/^#([0-9A-Fa-f]{6})$/),
+      z.literal(""),
+      z.null(),
+    ])
+    .optional(),
+  bankImporterId: z.union([z.enum(["kotak", "icici", "hdfc", "generic"]), z.literal(""), z.null()]).optional(),
+});
+
+export const switchAccountSchema = z.object({
+  accountId: z.string().uuid(),
 });
 
 export const updateAccountCurrencySchema = z.object({

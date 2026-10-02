@@ -14,7 +14,7 @@
   const expensePct = $derived(Math.round((expenseMinor / maxMinor) * 100));
 </script>
 
-<div class="compare-chart" role="img" aria-label="Income versus expense comparison">
+<div class="compare-chart math-notebook" role="img" aria-label="Income versus expense comparison">
   <div class="compare-row">
     <span class="compare-k">In</span>
     <div class="compare-track">
@@ -38,25 +38,35 @@
     gap: 0.75rem;
   }
 
+  .math-notebook {
+    padding: 0.55rem 0.45rem;
+    background-image:
+      linear-gradient(rgba(90, 130, 180, 0.16) 1px, transparent 1px), linear-gradient(90deg, rgba(90, 130, 180, 0.12) 1px, transparent 1px);
+    background-size: 16px 16px;
+    border-radius: 4px 12px 6px 10px / 10px 4px 12px 6px;
+  }
+
   .compare-row {
     display: grid;
-    grid-template-columns: 2rem 1fr auto;
+    grid-template-columns: 2.2rem 1fr auto;
     gap: 0.55rem;
     align-items: center;
   }
 
   .compare-k {
-    font-size: 0.66rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     color: var(--muted);
   }
 
   .compare-track {
     height: 0.85rem;
-    background: var(--surface2);
-    border: 1px solid var(--chrome-line);
+    background: color-mix(in srgb, var(--paper) 80%, var(--mix-wash));
+    border: 1.25px solid color-mix(in srgb, var(--ink) 28%, transparent);
     overflow: hidden;
+    border-radius: 2px 7px 3px 6px;
   }
 
   .compare-fill {
@@ -65,15 +75,16 @@
   }
 
   .compare-fill.income {
-    background: var(--pos);
+    background: color-mix(in srgb, var(--green) 80%, var(--pos));
   }
 
   .compare-fill.expense {
-    background: var(--neg);
+    background: color-mix(in srgb, var(--pink) 75%, var(--neg));
   }
 
   .compare-v {
-    font-size: 0.72rem;
+    font-family: var(--hand);
+    font-size: 0.95rem;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
