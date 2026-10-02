@@ -71,7 +71,7 @@
 
 <div class="p-6 md:p-8">
   <div class="flex flex-col items-center gap-6 text-center">
-    <div class="flex flex-col gap-2">
+    <div class="field-line">
       <h1 class="font-heading text-2xl font-bold">{title}</h1>
       <p class="text-balance text-sm text-muted-foreground">{description}</p>
     </div>

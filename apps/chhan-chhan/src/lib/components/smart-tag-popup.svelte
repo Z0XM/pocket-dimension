@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Check } from "@lucide/svelte";
+  import Check from "@lucide/svelte/icons/check";
   import type { SmartTagApplyMode, SmartTaggingPreview } from "$lib/server/finance";
 
   export type SmartTagToggle = {

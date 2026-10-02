@@ -450,6 +450,37 @@ export const actions: Actions = {
 
     const account = await createAccount(user.id, parsed.data);
     setActiveAccountCookie(cookies, account.id);
+
+    const balanceAsOfRaw = form.get("balanceAsOf");
+    const amountRaw = form.get("amount");
+    const hasOpeningDate = typeof balanceAsOfRaw === "string" && balanceAsOfRaw.trim() !== "";
+    const hasOpeningAmount = typeof amountRaw === "string" && amountRaw.trim() !== "";
+
+    if (hasOpeningDate || hasOpeningAmount) {
+      const openingParsed = updateAccountOpeningBalanceSchema.safeParse({
+        balanceAsOf: balanceAsOfRaw,
+        amount: amountRaw,
+      });
+      if (!openingParsed.success) {
+        return fail(400, { message: openingParsed.error.issues[0]?.message ?? "Invalid opening balance" });
+      }
+
+      let balanceMinor: number;
+      try {
+        balanceMinor = parseIndianAmount(openingParsed.data.amount);
+      } catch {
+        return fail(400, { message: "Invalid opening amount" });
+      }
+      if (balanceMinor < 0) {
+        return fail(400, { message: "Opening amount must be zero or positive" });
+      }
+
+      await updateAccountOpeningBalance(user.id, account.id, {
+        balanceMinor,
+        balanceAsOf: openingParsed.data.balanceAsOf,
+      });
+    }
+
     return { success: true, message: `Created account “${account.name}”` };
   },
 
@@ -475,6 +506,39 @@ export const actions: Actions = {
     const updated = await updateAccount(user.id, account.id, parsed.data);
     if (!updated) {
       return fail(404, { message: "Account not found" });
+    }
+
+    const balanceAsOfRaw = form.get("balanceAsOf");
+    const amountRaw = form.get("amount");
+    const hasOpeningDate = typeof balanceAsOfRaw === "string" && balanceAsOfRaw.trim() !== "";
+    const hasOpeningAmount = typeof amountRaw === "string" && amountRaw.trim() !== "";
+
+    if (hasOpeningDate || hasOpeningAmount) {
+      const openingParsed = updateAccountOpeningBalanceSchema.safeParse({
+        balanceAsOf: balanceAsOfRaw,
+        amount: amountRaw,
+      });
+      if (!openingParsed.success) {
+        return fail(400, { message: openingParsed.error.issues[0]?.message ?? "Invalid opening balance" });
+      }
+
+      let balanceMinor: number;
+      try {
+        balanceMinor = parseIndianAmount(openingParsed.data.amount);
+      } catch {
+        return fail(400, { message: "Invalid opening amount" });
+      }
+      if (balanceMinor < 0) {
+        return fail(400, { message: "Opening amount must be zero or positive" });
+      }
+
+      const openingUpdated = await updateAccountOpeningBalance(user.id, account.id, {
+        balanceMinor,
+        balanceAsOf: openingParsed.data.balanceAsOf,
+      });
+      if (!openingUpdated) {
+        return fail(404, { message: "Account not found" });
+      }
     }
 
     return { success: true, message: `Updated account “${updated.name}”` };

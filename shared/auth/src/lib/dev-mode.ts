@@ -44,7 +44,7 @@ export async function loadDevModeConfig(options?: { forceReload?: boolean }): Pr
   let lastError: unknown;
   for (const configPath of uniqueCandidates) {
     try {
-      const mod = await import(configPath);
+      const mod = await import(/* @vite-ignore */ configPath);
       const config = (mod.default ?? mod) as DevModeConfig;
       if (!config?.defaultAccount || !Array.isArray(config.allowedAccounts) || config.allowedAccounts.length === 0) {
         console.error("[dev-mode] Invalid config: need defaultAccount and non-empty allowedAccounts");

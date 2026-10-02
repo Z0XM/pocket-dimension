@@ -26,7 +26,7 @@
 <div class="p-6 md:p-8">
   <div class="flex flex-col items-center gap-6 text-center">
     {#if hasError}
-      <div class="flex flex-col gap-2">
+      <div class="field-line">
         <h1 class="font-heading text-2xl font-bold">Verification failed</h1>
         <p class="text-balance text-sm text-muted-foreground">{errorMessage}</p>
       </div>
@@ -47,7 +47,7 @@
         </button>
       </div>
     {:else}
-      <div class="flex flex-col gap-2">
+      <div class="field-line">
         <h1 class="font-heading text-2xl font-bold">Email verified</h1>
         <p class="text-balance text-sm text-muted-foreground">You can continue to Chhan Chhan.</p>
       </div>

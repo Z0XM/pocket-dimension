@@ -14,6 +14,8 @@ Includes:
 ## Conversion status
 **Converted in-app (this pass):** paper tokens, forge chrome remap, Virgil + Google hand fonts, `data-fonts` / `data-paper` via localStorage (`chhan-appearance`), Control **Customise** panel, dashboards (balance highlighter, flow boxes, pills, taped stickies, notebook charts), transactions / control / auth / shared chrome restyle. Preferences are browser-local only (no DB).
 
+**Defaults:** Gaegu + dots · blue.
+
 ## User customisation (Control Center)
 **Customise** under `/app/control` lets users pick:
 

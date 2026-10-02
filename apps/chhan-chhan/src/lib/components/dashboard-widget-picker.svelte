@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LayoutGrid } from "@lucide/svelte";
+  import LayoutGrid from "@lucide/svelte/icons/layout-grid";
   import {
     DASHBOARD_WIDGET_CATALOG,
     DEFAULT_DASHBOARD_WIDGETS,

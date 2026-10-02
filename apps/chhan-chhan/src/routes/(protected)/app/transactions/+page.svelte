@@ -1,6 +1,17 @@
 <script lang="ts">
   import { goto, invalidateAll } from "$app/navigation";
-  import { Tag, Plus, MessageSquare, Link, Layers, Eye, EyeOff, ArrowLeftRight, TriangleAlert, Check, X, Calculator } from "@lucide/svelte";
+  import Tag from "@lucide/svelte/icons/tag";
+  import Plus from "@lucide/svelte/icons/plus";
+  import MessageSquare from "@lucide/svelte/icons/message-square";
+  import Link from "@lucide/svelte/icons/link";
+  import Layers from "@lucide/svelte/icons/layers";
+  import Eye from "@lucide/svelte/icons/eye";
+  import EyeOff from "@lucide/svelte/icons/eye-off";
+  import ArrowLeftRight from "@lucide/svelte/icons/arrow-left-right";
+  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
+  import Check from "@lucide/svelte/icons/check";
+  import X from "@lucide/svelte/icons/x";
+  import Calculator from "@lucide/svelte/icons/calculator";
   import { formatMoney } from "$lib/finance/money";
   import { isRefundCategoryName } from "$lib/finance/refunds";
   import { buildSummarySelection, formatMonthKeyShort, summarySelectionToDateRange, type SummaryPeriod } from "$lib/finance/summary";
@@ -12,6 +23,8 @@
   import SmartCategorizePopup, { type SmartCategoryToggle } from "$lib/components/smart-categorize-popup.svelte";
   import SmartTagPopup, { type SmartTagToggle } from "$lib/components/smart-tag-popup.svelte";
   import CalculateWidget from "$lib/components/calculate-widget.svelte";
+  import SketchSelect from "$lib/components/sketch-select.svelte";
+  import icon from "$lib/assets/icon.png";
   import type { SmartCategorizationPreview, SmartTagApplyMode, SmartTaggingPreview } from "$lib/server/finance";
   import type { PageData } from "./$types";
 
@@ -1118,42 +1131,32 @@
 
 <header class="topbar">
   <div>
-    <h1><span>CHHAN</span><span class="acid"> CHHAN</span></h1>
+    <h1 class="brand-lockup">
+      <img src={icon} alt="" class="brand-mark" width="44" height="44" />
+      <span class="brand-word"><span>CHHAN</span><span class="acid"> CHHAN</span></span>
+    </h1>
     <AppNav />
   </div>
   <div class="actions">
-    <input
-      type="search"
-      placeholder="search…"
-      aria-label="Search transactions"
-      value={searchInput}
-      oninput={(e) => handleSearchInput(e.currentTarget.value)}
-    />
-    <button
-      type="button"
-      class="calc-mode-btn"
-      class:active={calculateModeActive}
-      aria-pressed={calculateModeActive}
-      aria-label="Calculate mode (Ctrl+X)"
-      title="Calculate mode (Ctrl+X)"
-      onclick={() => toggleCalculateMode()}
-    >
-      <Calculator size={14} strokeWidth={2} aria-hidden="true" />
-      CALC
-    </button>
-    <a class="cta" href="/app/control">IMPORT</a>
     <AppSettings />
   </div>
 </header>
 
 {#if data.currentBalance}
-  <section class="balance-card" class:stale={data.currentBalance.isStale}>
-    <span class="balance-k">Balance</span>
+  <section class="balance-open" class:stale={data.currentBalance.isStale}>
+    <span class="k">balance</span>
     <div class="balance-value-wrap">
-      <span class="balance-v">{formatMoney(data.currentBalance.balanceMinor, data.account.currencyCode)}</span>
+      <span class="v">
+        <span class="rough-mark is-balance">
+          <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="1" y="3" width="118" height="20" rx="2" fill="color-mix(in srgb, var(--yellow) 78%, transparent)" />
+          </svg>
+          <span class="txt">{formatMoney(data.currentBalance.balanceMinor, data.account.currencyCode)}</span>
+        </span>
+      </span>
       <span class="balance-txn-count">{data.currentBalance.transactionCount.toLocaleString()} txns</span>
     </div>
-    <span class="balance-asof dim">
+    <span class="meta">
       {#if data.currentBalance.isStale}
         as of {data.currentBalance.asOf} · latest txn {data.currentBalance.latestTransactionOn} —
         <a href="/app/control">re-import statement</a> to refresh
@@ -1169,28 +1172,54 @@
     <div class="stats-label">
       <span>Summary</span>
       {#if data.summaryPeriod === "month"}
-        <select class="period-select" aria-label="Select month" value={data.selectedMonth} onchange={(e) => setSummaryMonth(e.currentTarget.value)}>
-          {#each data.summaryMonths as monthKey}
-            <option value={monthKey}>{formatMonthKeyShort(monthKey)}</option>
-          {/each}
-        </select>
+        {#if data.summaryMonths.length}
+          <SketchSelect
+            name="summary-month"
+            compact
+            aria-label="Select month"
+            value={data.selectedMonth}
+            options={data.summaryMonths.map((monthKey) => ({ value: monthKey, label: formatMonthKeyShort(monthKey) }))}
+            onChange={setSummaryMonth}
+          />
+        {/if}
       {:else if data.summaryPeriod === "year"}
-        <select
-          class="period-select"
-          aria-label="Select year"
-          value={String(data.selectedYear)}
-          onchange={(e) => setSummaryYear(Number(e.currentTarget.value))}
-        >
-          {#each data.summaryYears as year (year)}
-            <option value={String(year)}>{year}</option>
-          {/each}
-        </select>
+        {#if data.summaryYears.length}
+          <SketchSelect
+            name="summary-year"
+            compact
+            aria-label="Select year"
+            value={String(data.selectedYear)}
+            options={data.summaryYears.map((year) => ({ value: String(year), label: String(year) }))}
+            onChange={(next) => setSummaryYear(Number(next))}
+          />
+        {/if}
       {:else}
         <span class="period-static">All time</span>
       {/if}
     </div>
     <div class="head-filters">
-      <div class="period-tabs" role="tablist" aria-label="Summary period">
+      <div class="stats-tools">
+        <input
+          type="search"
+          class="stats-search"
+          placeholder="search…"
+          aria-label="Search transactions"
+          value={searchInput}
+          oninput={(e) => handleSearchInput(e.currentTarget.value)}
+        />
+        <button
+          type="button"
+          class="calc-mode-btn"
+          class:active={calculateModeActive}
+          aria-pressed={calculateModeActive}
+          aria-label="Calculate mode (Ctrl+X)"
+          title="Calculate mode (Ctrl+X)"
+          onclick={() => toggleCalculateMode()}
+        >
+          <Calculator size={18} strokeWidth={1.6} aria-hidden="true" />
+        </button>
+      </div>
+      <div class="summary-tabs" role="tablist" aria-label="Summary period">
         <button
           type="button"
           role="tab"
@@ -1234,52 +1263,74 @@
           </select>
         </div>
       {/if}
-      <div class="period-tabs filter-multi-wrap">
+      <div class="filter-multi-wrap">
         <FilterMultiselect label="Categories" options={categoryFilterOptions} selected={data.selectedCategoryFilters} onchange={setCategoryFilters} />
       </div>
       {#if data.tags.length > 0}
-        <div class="period-tabs filter-multi-wrap">
+        <div class="filter-multi-wrap">
           <FilterMultiselect label="Tags" options={tagFilterOptions} selected={data.selectedTagIds} onchange={setTagFilters} />
         </div>
       {/if}
     </div>
   </div>
-  <section class="stats">
+  <div class="flow" aria-label="Period flow">
     <button
       type="button"
-      class="stat net"
-      class:active={!data.transactionTypeFilter}
-      aria-pressed={!data.transactionTypeFilter}
-      onclick={() => setTypeFilter(null)}
-    >
-      <span class="k">{data.summaryPrefix} NET</span>
-      <span class="v">{formatMoney(data.summary.netMinor, data.account.currencyCode)}</span>
-    </button>
-    <button
-      type="button"
-      class="stat"
+      class="node"
       class:active={data.transactionTypeFilter === "income"}
       aria-pressed={data.transactionTypeFilter === "income"}
       onclick={() => setTypeFilter("income")}
     >
-      <span class="k">{data.summaryPrefix} IN</span>
-      <span class="v pos">{formatMoney(data.summary.incomeMinor, data.account.currencyCode)}</span>
+      <span class="node-k">in</span>
+      <span class="node-v pos">
+        <span class="rough-mark is-in">
+          <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="1" y="4" width="118" height="18" rx="2" fill="color-mix(in srgb, var(--green) 72%, transparent)" />
+          </svg>
+          <span class="txt">{formatMoney(data.summary.incomeMinor, data.account.currencyCode)}</span>
+        </span>
+      </span>
     </button>
+    <span class="arrow" aria-hidden="true">→</span>
+    <span class="node period-node">{data.summaryLabel.toLowerCase()}</span>
+    <span class="arrow" aria-hidden="true">→</span>
     <button
       type="button"
-      class="stat"
+      class="node"
       class:active={data.transactionTypeFilter === "expense"}
       aria-pressed={data.transactionTypeFilter === "expense"}
       onclick={() => setTypeFilter("expense")}
     >
-      <span class="k">{data.summaryPrefix} OUT</span>
-      <span class="v neg">{formatMoney(-data.summary.expenseMinor, data.account.currencyCode)}</span>
+      <span class="node-k">out</span>
+      <span class="node-v neg">
+        <span class="rough-mark is-out">
+          <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="1" y="5" width="118" height="17" rx="2" fill="color-mix(in srgb, var(--pink) 70%, transparent)" />
+          </svg>
+          <span class="txt">{formatMoney(-data.summary.expenseMinor, data.account.currencyCode)}</span>
+        </span>
+      </span>
     </button>
-    <article class="stat">
-      <span class="k">{data.summaryPrefix} SAVED</span>
-      <span class="v">{Math.round(data.summary.savingsRate * 100)}%</span>
-    </article>
-  </section>
+    <span class="arrow" aria-hidden="true">=</span>
+    <button
+      type="button"
+      class="node net-node"
+      class:active={!data.transactionTypeFilter}
+      aria-pressed={!data.transactionTypeFilter}
+      onclick={() => setTypeFilter(null)}
+    >
+      <span class="node-k">net</span>
+      <span class="node-v">
+        <span class="rough-mark is-net">
+          <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="1" y="3" width="118" height="20" rx="2" fill="color-mix(in srgb, var(--purple) 75%, transparent)" />
+          </svg>
+          <span class="txt">{formatMoney(data.summary.netMinor, data.account.currencyCode)}</span>
+        </span>
+      </span>
+    </button>
+    <span class="saved-chip" title="Savings rate">{Math.round(data.summary.savingsRate * 100)}% saved</span>
+  </div>
 </section>
 
 {#if data.budgetUsage.length}
@@ -1326,272 +1377,278 @@
   </div>
 {/if}
 
-<section class="table-block" class:calc-mode-on={calculateModeActive}>
-  <table>
-    <thead>
-      <tr>
-        <th>
-          <button
-            type="button"
-            class="sort-btn"
-            aria-label="Sort by date, {data.sortDirection === 'desc' ? 'newest first' : 'oldest first'}"
-            onclick={toggleDateSort}
-          >
-            Date
-            <span class="sort-mark" aria-hidden="true">{data.sortDirection === "desc" ? "↓" : "↑"}</span>
-          </button>
-        </th>
-        <th>Merchant</th>
-        <th>Category</th>
-        <th>Tags</th>
-        <th class="right">Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#if rows.length === 0}
+<section class="table-block table-sheet" class:calc-mode-on={calculateModeActive}>
+  <div class="table-scroll">
+    <table>
+      <thead>
         <tr>
-          <td colspan="5" class="dim empty-row">
-            {#if data.searchQuery?.trim()}
-              No transactions match “{data.searchQuery}”.
-            {:else if data.selectedLinkTransactionId}
-              No linked transactions found for this refund set.
-            {:else if data.selectedGroupId}
-              No transactions in this group for the selected period.
-            {:else if data.selectedCategoryFilters.length}
-              No transactions in {selectedCategoryLabels()} for the selected period.
-            {:else if data.selectedTagIds.length}
-              No transactions tagged {selectedTagLabels()} for the selected period.
-            {:else if data.transactionTypeFilter === "income"}
-              No credits match this filter.
-            {:else if data.transactionTypeFilter === "expense"}
-              No debits match this filter.
-            {:else}
-              No transactions yet. Import a bank statement from Control.
-            {/if}
-          </td>
+          <th>
+            <button
+              type="button"
+              class="sort-btn"
+              aria-label="Sort by date, {data.sortDirection === 'desc' ? 'newest first' : 'oldest first'}"
+              onclick={toggleDateSort}
+            >
+              Date
+              <span class="sort-mark" aria-hidden="true">{data.sortDirection === "desc" ? "↓" : "↑"}</span>
+            </button>
+          </th>
+          <th>Merchant</th>
+          <th>Category</th>
+          <th>Tags</th>
+          <th class="right">Amount</th>
         </tr>
-      {:else}
-        {#each rows as t (t.id)}
-          <tr
-            class:group-hidden={Boolean(data.selectedGroupId && t.groupHidden)}
-            class:calc-mode-active={calculateModeActive}
-            class:calc-mode-selected={isCalculateSelected(t.id)}
-            class:link-mode-anchor={refundLinkModeAnchorId === t.id}
-            class:link-mode-target={isLinkModeTarget(t)}
-            class:link-mode-linked={isLinkedToAnchor(t)}
-            class:link-mode-busy={savingRefundLinkId !== null}
-            onclick={(event) => {
-              handleCalculateRowClick(event, t);
-              void handleLinkModeRowClick(event, t);
-            }}
-          >
-            <td class="mono dim">{t.occurredOn}</td>
-            <td class="merchant-cell">
-              <div class="merchant-row">
-                <span class="merchant">{t.merchant ?? "—"}</span>
-                {#if t.refundLinks.length > 0}
-                  <div class="refund-cluster-wrap">
-                    <button
-                      type="button"
-                      class="refund-cluster-btn"
-                      class:active={Boolean(data.selectedLinkTransactionId)}
-                      aria-label={data.selectedLinkTransactionId ? "Show all transactions" : "Show linked transactions only"}
-                      aria-pressed={Boolean(data.selectedLinkTransactionId)}
-                      onclick={() => toggleLinkClusterFilter(t.id)}
-                    >
-                      <ArrowLeftRight size={12} strokeWidth={1.5} aria-hidden="true" />
-                    </button>
-                    <span class="refund-cluster-preview" role="tooltip">
-                      {t.refundLinks.length} linked · click to {data.selectedLinkTransactionId ? "show all" : "filter"}
-                    </span>
-                  </div>
-                {/if}
-                {#if t.warnings.length > 0}
-                  <div class="warning-wrap">
-                    <span class="warning-btn" aria-label="Transaction warning">
-                      <TriangleAlert size={12} strokeWidth={1.5} aria-hidden="true" />
-                    </span>
-                    <span class="warning-preview" role="tooltip">{warningPreview(t)}</span>
-                  </div>
-                {/if}
-                {#if canUseRefundLinkMode(t)}
-                  <div class="refund-link-wrap">
-                    <button
-                      type="button"
-                      class="refund-link-btn"
-                      class:has-links={t.refundLinks.length > 0}
-                      class:active={refundLinkModeAnchorId === t.id}
-                      aria-label="{refundLinkModeAnchorId === t.id
-                        ? 'Exit link mode'
-                        : t.refundLinks.length
-                          ? 'Edit refund links'
-                          : 'Link to expenses'} for {t.merchant ?? 'transaction'}"
-                      aria-pressed={refundLinkModeAnchorId === t.id}
-                      disabled={savingRefundLinkId === t.id}
-                      onclick={() => toggleRefundLinkMode(t)}
-                    >
-                      <Link size={12} strokeWidth={1.5} aria-hidden="true" />
-                    </button>
-                    {#if t.refundLinks.length > 0 && refundLinkModeAnchorId !== t.id}
-                      <span class="refund-link-preview" role="tooltip">
-                        {t.refundLinks.map((link) => refundLinkLabel(link)).join(", ")}
-                      </span>
-                    {/if}
-                  </div>
-                {/if}
-                {#if data.selectedGroupId}
-                  <button
-                    type="button"
-                    class="group-hidden-btn"
-                    class:is-hidden={t.groupHidden}
-                    aria-label="{t.groupHidden ? 'Show in group' : 'Hide in group'} for {t.merchant ?? 'transaction'}"
-                    disabled={savingGroupHiddenId === t.id}
-                    onclick={() => toggleGroupHidden(t.id, !t.groupHidden)}
-                  >
-                    {#if t.groupHidden}
-                      <EyeOff size={12} strokeWidth={1.5} aria-hidden="true" />
-                    {:else}
-                      <Eye size={12} strokeWidth={1.5} aria-hidden="true" />
-                    {/if}
-                  </button>
-                {/if}
-                <div class="note-wrap">
-                  <button
-                    type="button"
-                    class="note-btn"
-                    class:has-note={Boolean(t.notes)}
-                    aria-label="{t.notes ? 'Edit note' : 'Add note'} for {t.merchant ?? 'transaction'}"
-                    aria-expanded={openNoteTxId === t.id}
-                    disabled={savingNotesId === t.id}
-                    onclick={() => openNoteEditor(t)}
-                  >
-                    <MessageSquare size={12} strokeWidth={1.5} aria-hidden="true" />
-                  </button>
-                  {#if openNoteTxId === t.id}
-                    <div class="note-popup" role="dialog" aria-label="Transaction note">
-                      <textarea
-                        class="note-textarea"
-                        bind:value={noteDraft}
-                        placeholder="Add a note…"
-                        disabled={savingNotesId === t.id}
-                        rows="3"
-                        onkeydown={(e) => handleNoteKeydown(e, t)}
-                      ></textarea>
-                    </div>
-                  {:else if t.notes}
-                    <span class="note-preview" role="tooltip">{t.notes}</span>
-                  {/if}
-                </div>
-                {#if data.groups.length > 0}
-                  <div class="group-link-wrap">
-                    <button
-                      type="button"
-                      class="group-link-btn"
-                      class:has-group={t.groups.length > 0}
-                      aria-label="{t.groups.length ? `Linked to ${groupLabelFor(t)}` : 'Link to group'} for {t.merchant ?? 'transaction'}"
-                      aria-expanded={openGroupTxId === t.id}
-                      disabled={savingGroupTxId === t.id}
-                      onclick={() => (openGroupTxId = openGroupTxId === t.id ? null : t.id)}
-                    >
-                      <Layers size={12} strokeWidth={1.5} aria-hidden="true" />
-                    </button>
-                    {#if openGroupTxId === t.id}
-                      <div class="group-popup" role="dialog" aria-label="Transaction group">
-                        <select
-                          id="group-{t.id}"
-                          class="group-select"
-                          aria-label="Link transaction to group"
-                          value={primaryGroupId(t)}
-                          disabled={savingGroupTxId === t.id}
-                          onchange={(e) => setTransactionGroup(t.id, e.currentTarget.value ? e.currentTarget.value : null)}
-                        >
-                          <option value="">None</option>
-                          {#each data.groups as group (group.id)}
-                            <option value={group.id}>{group.name}</option>
-                          {/each}
-                        </select>
-                      </div>
-                    {:else if t.groups.length > 0}
-                      <span class="group-preview" role="tooltip">{groupLabelFor(t)}</span>
-                    {/if}
-                  </div>
-                {/if}
-              </div>
-            </td>
-            <td class="category-cell">
-              <label class="sr-only" for="category-{t.id}">Category for {t.merchant ?? "transaction"}</label>
-              <div class="cat-picker">
-                <span class="cat-bar" style="background:{t.categoryColor ?? 'var(--chrome-line)'}" aria-hidden="true"></span>
-                <select
-                  id="category-{t.id}"
-                  class="cat-select"
-                  value={t.categoryId ?? ""}
-                  disabled={savingCategoryId === t.id}
-                  onchange={(e) => handleCategoryChange(t, e.currentTarget.value ? e.currentTarget.value : null)}
-                >
-                  <option value="">Uncategorized</option>
-                  {#each categoriesForType(t.type, t.categoryId) as category (category.id)}
-                    <option value={category.id}>{category.name}</option>
-                  {/each}
-                </select>
-              </div>
-            </td>
-            <td class="tags">
-              <div class="tag-list">
-                {#each t.tags as tag (tag.id)}
-                  <span class="tag tx-tag" style="--tag-color: {tag.colorHex ?? '#ee7c02'}">
-                    <Tag size={12} strokeWidth={1.25} class="tag-icon" aria-hidden="true" />
-                    {tag.name}
-                    <button
-                      type="button"
-                      class="tag-remove"
-                      aria-label="Remove {tag.name}"
-                      disabled={savingTagTxId === t.id}
-                      onclick={() => removeTransactionTag(t.id, tag.id)}
-                    >
-                      ×
-                    </button>
-                  </span>
-                {/each}
-                {#if data.tags.length > 0 && availableTagsFor(t).length > 0}
-                  <div class="tag-add-wrap">
-                    <button
-                      type="button"
-                      class="tag-add-btn"
-                      aria-label="Add tag to {t.merchant ?? 'transaction'}"
-                      aria-expanded={openTagMenuTxId === t.id}
-                      disabled={savingTagTxId === t.id}
-                      onclick={() => (openTagMenuTxId = openTagMenuTxId === t.id ? null : t.id)}
-                    >
-                      <Plus size={12} strokeWidth={2} aria-hidden="true" />
-                    </button>
-                    {#if openTagMenuTxId === t.id}
-                      <div class="tag-add-menu" role="menu">
-                        {#each availableTagsFor(t) as tag (tag.id)}
-                          <button type="button" role="menuitem" onclick={() => handleAddTag(t, tag.id)}>
-                            {tag.name}
-                          </button>
-                        {/each}
-                      </div>
-                    {/if}
-                  </div>
-                {:else if t.tags.length === 0}
-                  <span class="dim">—</span>
-                {/if}
-              </div>
-            </td>
-            <td class="right mono amt" class:pos={t.type === "income"} class:neg={t.type === "expense"}>
-              {formatMoney(displayAmount(t.type, t.amountMinor), data.account.currencyCode)}
+      </thead>
+      <tbody>
+        {#if rows.length === 0}
+          <tr>
+            <td colspan="5" class="dim empty-row">
+              {#if data.searchQuery?.trim()}
+                No transactions match “{data.searchQuery}”.
+              {:else if data.selectedLinkTransactionId}
+                No linked transactions found for this refund set.
+              {:else if data.selectedGroupId}
+                No transactions in this group for the selected period.
+              {:else if data.selectedCategoryFilters.length}
+                No transactions in {selectedCategoryLabels()} for the selected period.
+              {:else if data.selectedTagIds.length}
+                No transactions tagged {selectedTagLabels()} for the selected period.
+              {:else if data.transactionTypeFilter === "income"}
+                No credits match this filter.
+              {:else if data.transactionTypeFilter === "expense"}
+                No debits match this filter.
+              {:else}
+                No transactions yet. Import a bank statement from Control.
+              {/if}
             </td>
           </tr>
-        {/each}
-      {/if}
-    </tbody>
-  </table>
-
-  <div class="sentinel" use:infiniteScroll={{ onLoad: loadMore, disabled: loading || !hasMore }}>
-    {#if loading}■ LOADING ■{:else if !hasMore}— END —{:else}↓ SCROLL ↓{/if}
+        {:else}
+          {#each rows as t (t.id)}
+            <tr
+              class:group-hidden={Boolean(data.selectedGroupId && t.groupHidden)}
+              class:calc-mode-active={calculateModeActive}
+              class:calc-mode-selected={isCalculateSelected(t.id)}
+              class:link-mode-anchor={refundLinkModeAnchorId === t.id}
+              class:link-mode-target={isLinkModeTarget(t)}
+              class:link-mode-linked={isLinkedToAnchor(t)}
+              class:link-mode-busy={savingRefundLinkId !== null}
+              onclick={(event) => {
+                handleCalculateRowClick(event, t);
+                void handleLinkModeRowClick(event, t);
+              }}
+            >
+              <td class="mono dim">{t.occurredOn}</td>
+              <td class="merchant-cell">
+                <div class="merchant-row">
+                  <span class="merchant">{t.merchant ?? "—"}</span>
+                  {#if t.refundLinks.length > 0}
+                    <div class="refund-cluster-wrap">
+                      <button
+                        type="button"
+                        class="refund-cluster-btn"
+                        class:active={Boolean(data.selectedLinkTransactionId)}
+                        aria-label={data.selectedLinkTransactionId ? "Show all transactions" : "Show linked transactions only"}
+                        aria-pressed={Boolean(data.selectedLinkTransactionId)}
+                        onclick={() => toggleLinkClusterFilter(t.id)}
+                      >
+                        <ArrowLeftRight size={12} strokeWidth={1.5} aria-hidden="true" />
+                      </button>
+                      <span class="refund-cluster-preview" role="tooltip">
+                        {t.refundLinks.length} linked · click to {data.selectedLinkTransactionId ? "show all" : "filter"}
+                      </span>
+                    </div>
+                  {/if}
+                  {#if t.warnings.length > 0}
+                    <div class="warning-wrap">
+                      <span class="warning-btn" aria-label="Transaction warning">
+                        <TriangleAlert size={12} strokeWidth={1.5} aria-hidden="true" />
+                      </span>
+                      <span class="warning-preview" role="tooltip">{warningPreview(t)}</span>
+                    </div>
+                  {/if}
+                  {#if canUseRefundLinkMode(t)}
+                    <div class="refund-link-wrap">
+                      <button
+                        type="button"
+                        class="refund-link-btn"
+                        class:has-links={t.refundLinks.length > 0}
+                        class:active={refundLinkModeAnchorId === t.id}
+                        aria-label="{refundLinkModeAnchorId === t.id
+                          ? 'Exit link mode'
+                          : t.refundLinks.length
+                            ? 'Edit refund links'
+                            : 'Link to expenses'} for {t.merchant ?? 'transaction'}"
+                        aria-pressed={refundLinkModeAnchorId === t.id}
+                        disabled={savingRefundLinkId === t.id}
+                        onclick={() => toggleRefundLinkMode(t)}
+                      >
+                        <Link size={12} strokeWidth={1.5} aria-hidden="true" />
+                      </button>
+                      {#if t.refundLinks.length > 0 && refundLinkModeAnchorId !== t.id}
+                        <span class="refund-link-preview" role="tooltip">
+                          {t.refundLinks.map((link) => refundLinkLabel(link)).join(", ")}
+                        </span>
+                      {/if}
+                    </div>
+                  {/if}
+                  {#if data.selectedGroupId}
+                    <button
+                      type="button"
+                      class="group-hidden-btn"
+                      class:is-hidden={t.groupHidden}
+                      aria-label="{t.groupHidden ? 'Show in group' : 'Hide in group'} for {t.merchant ?? 'transaction'}"
+                      disabled={savingGroupHiddenId === t.id}
+                      onclick={() => toggleGroupHidden(t.id, !t.groupHidden)}
+                    >
+                      {#if t.groupHidden}
+                        <EyeOff size={12} strokeWidth={1.5} aria-hidden="true" />
+                      {:else}
+                        <Eye size={12} strokeWidth={1.5} aria-hidden="true" />
+                      {/if}
+                    </button>
+                  {/if}
+                  <div class="note-wrap">
+                    <button
+                      type="button"
+                      class="note-btn"
+                      class:has-note={Boolean(t.notes)}
+                      aria-label="{t.notes ? 'Edit note' : 'Add note'} for {t.merchant ?? 'transaction'}"
+                      aria-expanded={openNoteTxId === t.id}
+                      disabled={savingNotesId === t.id}
+                      onclick={() => openNoteEditor(t)}
+                    >
+                      <MessageSquare size={12} strokeWidth={1.5} aria-hidden="true" />
+                    </button>
+                    {#if openNoteTxId === t.id}
+                      <div class="note-popup" role="dialog" aria-label="Transaction note">
+                        <textarea
+                          class="note-textarea"
+                          bind:value={noteDraft}
+                          placeholder="Add a note…"
+                          disabled={savingNotesId === t.id}
+                          rows="3"
+                          onkeydown={(e) => handleNoteKeydown(e, t)}
+                        ></textarea>
+                      </div>
+                    {:else if t.notes}
+                      <span class="note-preview" role="tooltip">{t.notes}</span>
+                    {/if}
+                  </div>
+                  {#if data.groups.length > 0}
+                    <div class="group-link-wrap">
+                      <button
+                        type="button"
+                        class="group-link-btn"
+                        class:has-group={t.groups.length > 0}
+                        aria-label="{t.groups.length ? `Linked to ${groupLabelFor(t)}` : 'Link to group'} for {t.merchant ?? 'transaction'}"
+                        aria-expanded={openGroupTxId === t.id}
+                        disabled={savingGroupTxId === t.id}
+                        onclick={() => (openGroupTxId = openGroupTxId === t.id ? null : t.id)}
+                      >
+                        <Layers size={12} strokeWidth={1.5} aria-hidden="true" />
+                      </button>
+                      {#if openGroupTxId === t.id}
+                        <div class="group-popup" role="dialog" aria-label="Transaction group">
+                          <select
+                            id="group-{t.id}"
+                            class="group-select"
+                            aria-label="Link transaction to group"
+                            value={primaryGroupId(t)}
+                            disabled={savingGroupTxId === t.id}
+                            onchange={(e) => setTransactionGroup(t.id, e.currentTarget.value ? e.currentTarget.value : null)}
+                          >
+                            <option value="">None</option>
+                            {#each data.groups as group (group.id)}
+                              <option value={group.id}>{group.name}</option>
+                            {/each}
+                          </select>
+                        </div>
+                      {:else if t.groups.length > 0}
+                        <span class="group-preview" role="tooltip">{groupLabelFor(t)}</span>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
+              </td>
+              <td class="category-cell">
+                <label class="sr-only" for="category-{t.id}">Category for {t.merchant ?? "transaction"}</label>
+                <div class="cat-picker">
+                  <span class="cat-bar" style="background:{t.categoryColor ?? 'var(--chrome-line)'}" aria-hidden="true"></span>
+                  <select
+                    id="category-{t.id}"
+                    class="cat-select"
+                    value={t.categoryId ?? ""}
+                    disabled={savingCategoryId === t.id}
+                    onchange={(e) => handleCategoryChange(t, e.currentTarget.value ? e.currentTarget.value : null)}
+                  >
+                    <option value="">Uncategorized</option>
+                    {#each categoriesForType(t.type, t.categoryId) as category (category.id)}
+                      <option value={category.id}>{category.name}</option>
+                    {/each}
+                  </select>
+                </div>
+              </td>
+              <td class="tags">
+                <div class="tag-list">
+                  {#each t.tags as tag (tag.id)}
+                    <span class="tag tx-tag" style="--tag-color: {tag.colorHex ?? '#ee7c02'}">
+                      <Tag size={12} strokeWidth={1.25} class="tag-icon" aria-hidden="true" />
+                      {tag.name}
+                      <button
+                        type="button"
+                        class="tag-remove"
+                        aria-label="Remove {tag.name}"
+                        disabled={savingTagTxId === t.id}
+                        onclick={() => removeTransactionTag(t.id, tag.id)}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  {/each}
+                  {#if data.tags.length > 0 && availableTagsFor(t).length > 0}
+                    <div class="tag-add-wrap">
+                      <button
+                        type="button"
+                        class="tag-add-btn"
+                        aria-label="Add tag to {t.merchant ?? 'transaction'}"
+                        aria-expanded={openTagMenuTxId === t.id}
+                        disabled={savingTagTxId === t.id}
+                        onclick={() => (openTagMenuTxId = openTagMenuTxId === t.id ? null : t.id)}
+                      >
+                        <Plus size={12} strokeWidth={2} aria-hidden="true" />
+                      </button>
+                      {#if openTagMenuTxId === t.id}
+                        <div class="tag-add-menu" role="menu">
+                          {#each availableTagsFor(t) as tag (tag.id)}
+                            <button type="button" role="menuitem" onclick={() => handleAddTag(t, tag.id)}>
+                              {tag.name}
+                            </button>
+                          {/each}
+                        </div>
+                      {/if}
+                    </div>
+                  {:else if t.tags.length === 0}
+                    <span class="dim">—</span>
+                  {/if}
+                </div>
+              </td>
+              <td class="right mono amt" class:pos={t.type === "income"} class:neg={t.type === "expense"}>
+                {formatMoney(displayAmount(t.type, t.amountMinor), data.account.currencyCode)}
+              </td>
+            </tr>
+          {/each}
+        {/if}
+      </tbody>
+    </table>
+    <div class="load-hit" use:infiniteScroll={{ onLoad: loadMore, disabled: loading || !hasMore }} aria-hidden="true"></div>
   </div>
+  <footer class="sheet-foot">
+    <span class="sheet-foot-rule" aria-hidden="true"></span>
+    <span class="sheet-foot-mark">
+      {#if loading}loading…{:else if !hasMore}end of page{:else}keep scrolling ↓{/if}
+    </span>
+    <span class="sheet-foot-rule" aria-hidden="true"></span>
+  </footer>
 </section>
 
 <SmartCategorizePopup
@@ -1632,23 +1689,22 @@
   .calc-mode-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    border: 2px solid var(--chrome-line);
-    background: var(--surface2);
+    justify-content: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    padding: 0;
+    border: none;
+    background: transparent;
     color: var(--main-text);
-    font-family: inherit;
-    font-size: 0.62rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    padding: 0.4rem 0.55rem;
     cursor: pointer;
+    border-radius: 0;
   }
 
   .calc-mode-btn:hover,
   .calc-mode-btn.active {
-    color: var(--hi-cyan);
-    border-color: color-mix(in srgb, var(--hi-cyan) 55%, var(--chrome-line));
-    background: color-mix(in srgb, var(--hi-cyan) 8%, var(--surface2));
+    color: var(--brand);
+    background: transparent;
+    border: none;
   }
 
   .calc-mode-banner {
@@ -1657,28 +1713,38 @@
     justify-content: space-between;
     gap: 0.75rem;
     margin-bottom: 0.65rem;
-    padding: 0.55rem 0.75rem;
-    background: color-mix(in srgb, var(--hi-cyan) 12%, var(--surface));
-    border: 2px solid color-mix(in srgb, var(--hi-cyan) 45%, var(--chrome-line));
-    font-size: 0.74rem;
+    padding: 0.5rem 0.8rem;
+    background: color-mix(in srgb, var(--yellow) 55%, var(--paper, #fffefd));
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 3px 10px 4px 8px / 8px 3px 10px 4px;
+    box-shadow: 2px 2px 0 0 color-mix(in srgb, var(--ink) 10%, transparent);
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    color: var(--ink);
+    transform: rotate(-0.25deg);
   }
 
   .calc-mode-exit-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.15rem;
+    padding: 0.2rem;
     border: none;
     background: transparent;
-    color: var(--muted);
+    color: var(--ink-muted);
     cursor: pointer;
+    border-radius: 4px;
   }
 
   .calc-mode-exit-btn:hover {
-    color: var(--brand-accent);
+    color: var(--brand);
   }
 
   .table-block.calc-mode-on {
+    padding-bottom: 0;
+  }
+
+  .table-block.calc-mode-on .table-scroll {
     padding-bottom: 4.5rem;
   }
 
@@ -1696,60 +1762,56 @@
     background: color-mix(in srgb, var(--hi-cyan) 6%, transparent);
   }
 
-  .balance-card {
-    display: flex;
-    align-items: baseline;
-    gap: 0.65rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.85rem;
-    padding: 0.75rem 0.9rem;
-    background: color-mix(in srgb, var(--yellow) 28%, transparent);
-    border: 1.5px solid var(--chrome-line);
-    box-shadow: none;
-    border-radius: 255px 16px 225px 12px / 16px 225px 12px 255px;
+  .balance-open {
+    margin: 0.15rem 0 1rem;
   }
 
-  .balance-k {
-    font-size: 0.95rem;
-    letter-spacing: 0.01em;
-    text-transform: none;
-    color: var(--muted);
+  .balance-open .k {
+    display: block;
     font-family: var(--hand);
+    color: var(--ink-muted);
+    font-size: 1.05rem;
   }
 
-  .balance-v {
+  .balance-open .v {
+    display: inline-block;
     font-family: var(--hand);
-    font-size: 1.55rem;
+    font-size: clamp(2.4rem, 7vw, 3.8rem);
+    line-height: 0.95;
     font-variant-numeric: tabular-nums;
-    color: var(--main-text);
   }
 
   .balance-value-wrap {
     display: inline-flex;
     align-items: baseline;
     gap: 0.45rem;
+    flex-wrap: wrap;
   }
 
   .balance-txn-count {
-    font-size: 0.82rem;
-    letter-spacing: 0.01em;
-    color: var(--muted);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
     font-variant-numeric: tabular-nums;
   }
 
-  .balance-card.stale {
-    border-color: color-mix(in srgb, var(--brand) 55%, var(--chrome-line));
-  }
-
-  .balance-asof {
-    font-size: 0.85rem;
-    margin-left: auto;
-    text-align: right;
+  .balance-open .meta {
+    display: block;
+    margin-top: 0.35rem;
+    color: var(--ink-soft);
+    font-size: 0.82rem;
     line-height: 1.4;
   }
 
-  .balance-asof a {
+  .balance-open .meta a {
     color: var(--brand);
+  }
+
+  .rough-mark.is-balance > .stroke {
+    left: -6%;
+    top: 18%;
+    width: 114%;
+    height: 62%;
+    transform: rotate(-0.9deg);
   }
 
   .stats-block {
@@ -1763,6 +1825,139 @@
     gap: 0.75rem;
     margin-bottom: 0.45rem;
     flex-wrap: wrap;
+  }
+
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.55rem;
+    margin: 0.15rem 0 0.35rem;
+    font-family: var(--hand);
+    font-size: 1.1rem;
+  }
+
+  .flow .arrow {
+    color: var(--brand);
+    font-size: 1.25rem;
+  }
+
+  .flow .node {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.4rem;
+    border: none;
+    padding: 0.05rem 0.15rem;
+    border-radius: 0;
+    background: transparent;
+    text-decoration: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .flow .node:nth-child(3) {
+    transform: rotate(0.5deg);
+  }
+
+  .flow .node:nth-child(5) {
+    transform: rotate(-0.5deg);
+  }
+
+  .flow button.node:hover {
+    color: var(--brand);
+  }
+
+  .flow button.node.active {
+    outline: none;
+  }
+
+  .flow button.node.active .node-k,
+  .flow button.node.active .node-v {
+    font-weight: 700;
+  }
+
+  .flow button.node.active .node-k {
+    font-size: 1.1rem;
+    color: var(--ink);
+  }
+
+  .flow button.node.active .node-v {
+    font-size: 1.45rem;
+  }
+
+  .node-k {
+    font-size: 0.95rem;
+    color: var(--ink-muted);
+    line-height: 1;
+  }
+
+  .node-v {
+    font-size: 1.15rem;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .period-node {
+    color: var(--ink-muted);
+    cursor: default;
+  }
+
+  .saved-chip {
+    margin-left: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    background: color-mix(in srgb, var(--green) 55%, transparent);
+    border-radius: 3px 9px 4px 8px / 8px 3px 9px 2px;
+    font-size: 0.95rem;
+    color: var(--ink);
+  }
+
+  .rough-mark {
+    position: relative;
+    display: inline-block;
+    padding: 0.02em 0.08em;
+    isolation: isolate;
+  }
+
+  .rough-mark > .txt {
+    position: relative;
+    z-index: 1;
+  }
+
+  .rough-mark > .stroke {
+    position: absolute;
+    z-index: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .rough-mark > .stroke rect {
+    mix-blend-mode: multiply;
+  }
+
+  .rough-mark.is-in > .stroke {
+    left: -10%;
+    top: 12%;
+    width: 118%;
+    height: 72%;
+    transform: rotate(-1.4deg);
+  }
+
+  .rough-mark.is-out > .stroke {
+    left: -8%;
+    top: 18%;
+    width: 122%;
+    height: 68%;
+    transform: rotate(1.8deg);
+  }
+
+  .rough-mark.is-net > .stroke {
+    left: -14%;
+    top: 8%;
+    width: 128%;
+    height: 78%;
+    transform: rotate(-2.6deg);
   }
 
   .head-filters {
@@ -1780,11 +1975,10 @@
   .filter-multi-wrap {
     padding: 0;
     overflow: visible;
+    min-width: 7.5rem;
   }
 
-  .period-tabs button,
-  .group-filter,
-  :global(.filter-multi-btn) {
+  .group-filter {
     --period-tab-height: 1.625rem;
     box-sizing: border-box;
     height: var(--period-tab-height);
@@ -1825,40 +2019,80 @@
     align-items: center;
     gap: 0.4rem;
     margin: 0;
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .period-select {
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
-    color: var(--main-text);
-    padding: 0.35rem 0.45rem;
-    font-family: inherit;
-    font-size: 0.68rem;
-    line-height: 1;
-    letter-spacing: 0.04em;
+    font-size: 1rem;
+    letter-spacing: 0.01em;
     text-transform: none;
-    min-width: 0;
-    width: auto;
-    cursor: pointer;
-    vertical-align: middle;
+    color: var(--ink-muted);
+    font-family: var(--hand);
   }
 
-  .period-select:focus {
+  .stats-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .stats-search {
+    width: 9.5rem;
+    max-width: 36vw;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 32%, transparent);
+    color: var(--main-text);
+    padding: 0.05rem 0.1rem 0.2rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .stats-search:focus {
     outline: none;
-    border-color: var(--hi-focus);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi-focus) 45%, transparent);
+    border-bottom-color: var(--brand);
+  }
+
+  .stats-tools .calc-mode-btn {
+    flex: none;
   }
 
   .period-static {
-    font-size: 0.68rem;
+    font-size: 0.9rem;
     line-height: 1;
     color: var(--main-text);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.01em;
     text-transform: none;
+  }
+
+  .summary-tabs {
+    display: inline-flex;
+    gap: 0.25rem;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  .summary-tabs button {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 0.15rem 0.45rem;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    cursor: pointer;
+    border-radius: 2px 8px 3px 7px / 7px 3px 8px 2px;
+  }
+
+  .summary-tabs button.active {
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+    color: var(--ink);
+  }
+
+  .summary-tabs button:hover:not(.active) {
+    color: var(--ink);
   }
 
   .period-tabs {
@@ -1987,18 +2221,22 @@
     width: 100%;
     min-height: 4.5rem;
     resize: vertical;
-    background: var(--surface2);
+    background: transparent;
     border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 32%, transparent);
+    border-radius: 0;
     color: var(--main-text);
-    padding: 0.4rem 0.45rem;
+    padding: 0.05rem 0.1rem 0.28rem;
     font-family: inherit;
     font-size: 0.72rem;
     line-height: 1.35;
+    box-shadow: none;
   }
 
   .note-textarea:focus {
     outline: none;
-    box-shadow: inset 0 0 0 1px var(--hi-focus);
+    border-bottom-color: var(--brand);
+    box-shadow: none;
   }
 
   .group-link-wrap {

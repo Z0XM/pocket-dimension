@@ -13,8 +13,8 @@ export type Appearance = {
 };
 
 export const DEFAULT_APPEARANCE: Appearance = {
-  fonts: "virgil",
-  paper: "plain",
+  fonts: "gaegu",
+  paper: "dots",
 };
 
 export const FONT_OPTIONS: ReadonlyArray<{ id: FontId; label: string }> = [
@@ -30,13 +30,13 @@ export const FONT_OPTIONS: ReadonlyArray<{ id: FontId; label: string }> = [
 
 export const PAPER_OPTIONS: ReadonlyArray<{ id: PaperId; label: string }> = [
   { id: "plain", label: "plain" },
-  { id: "rough", label: "rough (softer)" },
-  { id: "lines", label: "lines · blue" },
-  { id: "lines-gray", label: "lines · gray" },
-  { id: "grid", label: "grid · blue" },
-  { id: "grid-gray", label: "grid · gray" },
-  { id: "dots", label: "dots · blue" },
-  { id: "dots-gray", label: "dots · gray" },
+  { id: "rough", label: "rough" },
+  { id: "lines", label: "blue lines" },
+  { id: "lines-gray", label: "gray lines" },
+  { id: "grid", label: "blue grid" },
+  { id: "grid-gray", label: "gray grid" },
+  { id: "dots", label: "blue dots" },
+  { id: "dots-gray", label: "gray dots" },
 ];
 
 function isFontId(value: unknown): value is FontId {

@@ -18,6 +18,8 @@
   import IncomeExpenseBars from "$lib/components/income-expense-bars.svelte";
   import MeterBar from "$lib/components/meter-bar.svelte";
   import MonthlyTrendChart from "$lib/components/monthly-trend-chart.svelte";
+  import SketchSelect from "$lib/components/sketch-select.svelte";
+  import icon from "$lib/assets/icon.png";
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
@@ -142,7 +144,10 @@
 
 <header class="topbar">
   <div>
-    <h1><span>CHHAN</span><span class="acid"> CHHAN</span></h1>
+    <h1 class="brand-lockup">
+      <img src={icon} alt="" class="brand-mark" width="44" height="44" />
+      <span class="brand-word"><span>CHHAN</span><span class="acid"> CHHAN</span></span>
+    </h1>
     <AppNav />
   </div>
   <div class="actions">
@@ -195,22 +200,27 @@
     <div class="stats-label">
       <span>Summary</span>
       {#if data.summaryPeriod === "month"}
-        <select class="period-select" aria-label="Select month" value={data.selectedMonth} onchange={(e) => setSummaryMonth(e.currentTarget.value)}>
-          {#each data.summaryMonths as monthKey}
-            <option value={monthKey}>{formatMonthKeyShort(monthKey)}</option>
-          {/each}
-        </select>
+        {#if data.summaryMonths.length}
+          <SketchSelect
+            name="summary-month"
+            compact
+            aria-label="Select month"
+            value={data.selectedMonth}
+            options={data.summaryMonths.map((monthKey) => ({ value: monthKey, label: formatMonthKeyShort(monthKey) }))}
+            onChange={setSummaryMonth}
+          />
+        {/if}
       {:else if data.summaryPeriod === "year"}
-        <select
-          class="period-select"
-          aria-label="Select year"
-          value={String(data.selectedYear)}
-          onchange={(e) => setSummaryYear(Number(e.currentTarget.value))}
-        >
-          {#each data.summaryYears as year (year)}
-            <option value={String(year)}>{year}</option>
-          {/each}
-        </select>
+        {#if data.summaryYears.length}
+          <SketchSelect
+            name="summary-year"
+            compact
+            aria-label="Select year"
+            value={String(data.selectedYear)}
+            options={data.summaryYears.map((year) => ({ value: String(year), label: String(year) }))}
+            onChange={(next) => setSummaryYear(Number(next))}
+          />
+        {/if}
       {:else}
         <span class="period-static">All time</span>
       {/if}
@@ -715,29 +725,6 @@
     font-family: var(--hand);
   }
 
-  .period-select {
-    background: var(--surface);
-    border: 1.5px solid var(--chrome-line);
-    color: var(--main-text);
-    padding: 0.3rem 0.45rem;
-    font-family: inherit;
-    font-size: 0.9rem;
-    line-height: 1;
-    letter-spacing: 0.01em;
-    text-transform: none;
-    min-width: 0;
-    width: auto;
-    cursor: pointer;
-    vertical-align: middle;
-    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
-  }
-
-  .period-select:focus {
-    outline: none;
-    border-color: var(--brand);
-    box-shadow: 0 0 0 2px var(--brand-soft);
-  }
-
   .period-static {
     font-size: 0.9rem;
     line-height: 1;
@@ -748,22 +735,24 @@
 
   .period-tabs {
     display: inline-flex;
-    border: 1.5px solid var(--chrome-line);
-    border-radius: 255px 12px 225px 10px / 12px 225px 10px 255px;
-    overflow: hidden;
+    gap: 0.25rem;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
   }
 
   .period-tabs button {
     background: transparent;
     border: none;
-    border-right: 1px solid var(--hair);
+    border-right: none;
     color: var(--muted);
-    padding: 0.35rem 0.7rem;
+    padding: 0.15rem 0.45rem;
     font-family: var(--hand);
     font-size: 0.95rem;
     letter-spacing: 0.01em;
     text-transform: none;
     cursor: pointer;
+    border-radius: 2px 8px 3px 7px / 7px 3px 8px 2px;
   }
 
   .period-tabs button:last-child {
@@ -771,19 +760,19 @@
   }
 
   .period-tabs button.active {
-    background: var(--brand-soft);
-    color: var(--brand);
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+    color: var(--ink);
   }
 
   .period-tabs button:hover:not(.active) {
-    color: var(--brand);
+    color: var(--ink);
   }
 
   .flow {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.35rem 0.45rem;
+    gap: 0.35rem 0.55rem;
     margin: 0 0 1rem;
     font-family: var(--hand);
     font-size: 1.1rem;
@@ -796,12 +785,13 @@
 
   .flow .node {
     display: inline-flex;
-    flex-direction: column;
-    gap: 0.05rem;
-    border: 1.5px solid var(--ink);
-    padding: 0.3rem 0.7rem;
-    border-radius: 255px 16px 225px / 16px 225px 16px 255px;
-    background: var(--paper);
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.4rem;
+    border: none;
+    padding: 0.05rem 0.15rem;
+    border-radius: 0;
+    background: transparent;
     text-decoration: none;
     color: inherit;
   }
@@ -815,11 +805,11 @@
   }
 
   .flow a.node:hover {
-    border-color: var(--brand);
+    color: var(--brand);
   }
 
   .node-k {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     color: var(--ink-muted);
     line-height: 1;
   }
@@ -894,8 +884,8 @@
   .dash-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.85rem;
-    margin-bottom: 1.25rem;
+    gap: 1.5rem 2rem;
+    margin-bottom: 1.75rem;
   }
 
   .dash-grid-spending {
@@ -912,16 +902,16 @@
 
   .dash-panel {
     background: transparent;
-    border: 1.5px solid var(--hair);
-    padding: 0.95rem 1rem;
+    border: none;
+    padding: 0;
     box-shadow: none;
-    border-radius: 4px 16px 6px 14px / 14px 4px 16px 6px;
+    border-radius: 0;
   }
 
   .dash-panel h2 {
-    margin: 0 0 0.75rem;
+    margin: 0 0 0.65rem;
     font-family: var(--hand);
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     letter-spacing: 0.01em;
     text-transform: none;
     color: var(--ink-muted);
@@ -931,18 +921,18 @@
   .dash-kv {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: 0.75rem 1.25rem;
     margin: 0;
   }
 
   .dash-kv div {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.1rem;
   }
 
   .dash-kv dt {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     letter-spacing: 0.01em;
     text-transform: none;
     color: var(--muted);
@@ -951,19 +941,43 @@
   .dash-kv dd {
     margin: 0;
     font-family: var(--hand);
-    font-size: 1.2rem;
+    font-size: 1.25rem;
     font-variant-numeric: tabular-nums;
   }
 
   .dash-meters {
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
+    gap: 0.75rem;
   }
 
   .dash-empty {
     margin: 0;
     font-size: 0.95rem;
+  }
+
+  /* Soft notebook lines instead of meter card tracks */
+  .dash-panel :global(.track) {
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 18%, transparent);
+    border-radius: 0;
+    height: 8px;
+  }
+
+  .dash-panel :global(.fill) {
+    border-radius: 0;
+  }
+
+  .dash-panel :global(.math-notebook) {
+    background-image: none;
+    border-radius: 0;
+    padding: 0.15rem 0;
+  }
+
+  .dash-panel :global(.trend-grid) {
+    border-left: 1.25px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-bottom: 1.25px solid color-mix(in srgb, var(--ink) 28%, transparent);
   }
 
   @media (max-width: 900px) {

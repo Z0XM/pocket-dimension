@@ -138,4 +138,95 @@
   *::-webkit-scrollbar-corner {
     background: var(--scrollbar-track);
   }
+
+  /* Underline writing-line inputs (app-wide) */
+  input:not([type]),
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="url"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="time"],
+  input[type="week"],
+  textarea,
+  select {
+    appearance: none;
+    background-color: transparent;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 32%, transparent);
+    border-radius: 0;
+    box-shadow: none;
+    color: var(--main-text);
+    font-family: inherit;
+    padding: 0.05rem 0.1rem 0.28rem;
+    outline: none;
+  }
+
+  input:not([type]):focus,
+  input[type="text"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  input[type="search"]:focus,
+  input[type="url"]:focus,
+  input[type="tel"]:focus,
+  input[type="number"]:focus,
+  input[type="date"]:focus,
+  input[type="datetime-local"]:focus,
+  input[type="month"]:focus,
+  input[type="time"]:focus,
+  input[type="week"]:focus,
+  textarea:focus,
+  select:focus {
+    border-bottom-color: var(--brand);
+    box-shadow: none;
+    outline: none;
+  }
+
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  /* Keep label tight to the writing line */
+  label + :is(input, textarea, select),
+  label + * + :is(input, textarea, select) {
+    margin-top: 0;
+  }
+
+  /* Keep non-writing controls boxed */
+  input[type="file"],
+  input[type="color"],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    border: initial;
+    border-radius: initial;
+    background-color: initial;
+    box-shadow: initial;
+    padding: initial;
+  }
+}
+
+@layer utilities {
+  /* Beat Tailwind gap-2 on label→underline field stacks */
+  .flex.flex-col.gap-2:has(> :is(input, textarea, select)),
+  .flex.flex-col.gap-2:has(> div):has(> :is(input, textarea, select)) {
+    gap: 0.1rem;
+  }
+
+  .field-line {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
 }

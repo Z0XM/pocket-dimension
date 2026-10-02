@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Check } from "@lucide/svelte";
+  import Check from "@lucide/svelte/icons/check";
 
   type Option = {
     id: string;
@@ -13,7 +13,7 @@
     onchange: (selected: string[]) => void;
   };
 
-  const { label, options, selected, onchange }: Props = $props();
+  const { label, options = [], selected = [], onchange }: Props = $props();
 
   let open = $state(false);
   let root: HTMLDivElement | undefined = $state();
@@ -30,8 +30,9 @@
   function syncPanelPosition() {
     if (!root) return;
     const rect = root.getBoundingClientRect();
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - 272));
-    panelStyle = `top:${rect.bottom + 4}px;left:${left}px;`;
+    const width = Math.max(rect.width, 12 * 16);
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+    panelStyle = `top:${rect.bottom + 4}px;left:${left}px;width:${width}px;`;
   }
 
   function toggleOpen() {
@@ -88,7 +89,8 @@
 
 <div class="filter-multi" class:open bind:this={root}>
   <button type="button" class="filter-multi-btn" class:active={selected.length > 0} aria-expanded={open} aria-haspopup="listbox" onclick={toggleOpen}>
-    {buttonLabel}
+    <span class="filter-value">{buttonLabel}</span>
+    <span class="filter-caret" aria-hidden="true">▾</span>
   </button>
 
   {#if open}
@@ -128,49 +130,64 @@
 <style>
   .filter-multi {
     position: relative;
+    min-width: 7.5rem;
   }
 
   .filter-multi-btn {
-    display: block;
-    min-width: 7rem;
+    appearance: none;
     width: 100%;
-    height: 1.625rem;
-    box-sizing: border-box;
-    padding: 0.35rem 0.65rem;
-    background: var(--surface2);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    background: transparent;
     border: none;
-    color: var(--muted);
-    font-family: inherit;
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 32%, transparent);
+    border-radius: 0;
+    color: var(--ink);
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    padding: 0.05rem 0.1rem 0.28rem;
     cursor: pointer;
     text-align: left;
-    white-space: nowrap;
+  }
+
+  .filter-multi-btn:hover,
+  .filter-multi.open .filter-multi-btn,
+  .filter-multi-btn.active {
+    border-bottom-color: var(--brand);
+    color: var(--ink);
+    background: transparent;
+  }
+
+  .filter-value {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .filter-multi-btn.active,
-  .filter-multi.open .filter-multi-btn {
-    color: var(--background);
-    background: var(--hi-purple);
-  }
-
-  .filter-multi-btn:hover:not(.active) {
-    color: var(--hi-purple);
+  .filter-caret {
+    flex: none;
+    color: var(--ink-muted);
+    font-size: 0.85rem;
+    line-height: 1;
   }
 
   .filter-multi-panel {
     position: fixed;
     z-index: 100;
-    width: min(16rem, calc(100vw - 1rem));
     max-height: min(18rem, calc(100vh - 8rem));
     overflow: auto;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.06);
-    padding: 0.65rem;
+    background: #fffef8;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 2px 6px 3px 2px;
+    box-shadow:
+      2px 2px 0 0 #f7f4ea,
+      2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
+    padding: 0.35rem 0.25rem 0.45rem;
   }
 
   .filter-multi-head {
@@ -178,21 +195,22 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    margin-bottom: 0.45rem;
-    font-size: 0.62rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--muted);
+    margin: 0.15rem 0.45rem 0.4rem;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--ink-muted);
   }
 
   .filter-multi-clear {
     background: none;
     border: none;
-    color: var(--hi-purple);
-    font-family: inherit;
-    font-size: 0.62rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--brand);
+    font-family: var(--hand);
+    font-size: 0.9rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
     cursor: pointer;
     padding: 0;
   }
@@ -203,28 +221,33 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
   }
 
   .filter-option {
+    appearance: none;
     display: flex;
-    align-items: center;
-    gap: 0.55rem;
+    align-items: baseline;
+    gap: 0.4rem;
     width: 100%;
-    padding: 0.35rem 0.25rem;
+    padding: 0.28rem 0.45rem;
     border: none;
     background: transparent;
-    color: var(--main-text);
-    font-family: inherit;
-    font-size: 0.72rem;
-    letter-spacing: 0.04em;
+    color: var(--ink);
+    font-family: var(--hand);
+    font-size: 1.02rem;
+    letter-spacing: 0.01em;
     text-align: left;
     cursor: pointer;
   }
 
-  .filter-option:hover,
-  .filter-option.selected {
-    background: color-mix(in srgb, var(--hi-purple) 10%, transparent);
+  .filter-option:hover {
+    background: color-mix(in srgb, var(--yellow) 45%, transparent);
+  }
+
+  .filter-option.selected .filter-label {
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+    border-radius: 2px 7px 3px 6px / 6px 2px 7px 2px;
+    padding: 0.05rem 0.15rem;
   }
 
   .filter-mark {
@@ -233,24 +256,21 @@
     justify-content: center;
     width: 0.95rem;
     height: 0.95rem;
-    border: 2px solid var(--chrome-line);
-    background: var(--surface2);
-    box-shadow: 1px 1px 0 rgba(27, 27, 31, 0.05);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    background: transparent;
     flex-shrink: 0;
-    color: var(--background);
+    color: var(--ink);
+    border-radius: 2px;
+    transform: translateY(0.1rem);
   }
 
   .filter-option.selected .filter-mark {
-    background: var(--hi-purple);
-    border-color: var(--hi-purple);
-  }
-
-  .filter-option:hover .filter-mark {
-    border-color: color-mix(in srgb, var(--hi-purple) 55%, var(--chrome-line));
+    background: color-mix(in srgb, var(--yellow) 72%, transparent);
+    border-color: color-mix(in srgb, var(--ink) 40%, transparent);
   }
 
   .filter-label {
     min-width: 0;
-    line-height: 1.35;
+    line-height: 1.25;
   }
 </style>

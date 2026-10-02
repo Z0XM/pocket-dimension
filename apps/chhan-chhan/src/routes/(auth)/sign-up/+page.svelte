@@ -67,7 +67,7 @@
       <p class="text-balance text-sm text-muted-foreground">Sign up for Chhan Chhan</p>
     </div>
 
-    <div class="flex flex-col gap-2">
+    <div class="field-line">
       <label for="email-{id}" class="text-sm font-medium">Email</label>
       <input
         id="email-{id}"
@@ -76,49 +76,28 @@
         required
         bind:value={email}
         disabled={loading}
-        class="w-full rounded border border-border bg-background px-3 py-2 text-sm"
+        class="w-full bg-transparent px-1 text-sm"
       />
       <p class="text-xs text-muted-foreground">We use this for account recovery and verification.</p>
     </div>
 
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div class="flex flex-col gap-2">
+      <div class="field-line">
         <label for="name-{id}" class="text-sm font-medium">Name</label>
-        <input
-          id="name-{id}"
-          type="text"
-          required
-          bind:value={name}
-          disabled={loading}
-          class="w-full rounded border border-border bg-background px-3 py-2 text-sm"
-        />
+        <input id="name-{id}" type="text" required bind:value={name} disabled={loading} class="w-full bg-transparent px-1 text-sm" />
       </div>
-      <div class="flex flex-col gap-2">
+      <div class="field-line">
         <label for="username-{id}" class="text-sm font-medium">Username</label>
-        <input
-          id="username-{id}"
-          type="text"
-          required
-          bind:value={username}
-          disabled={loading}
-          class="w-full rounded border border-border bg-background px-3 py-2 text-sm"
-        />
+        <input id="username-{id}" type="text" required bind:value={username} disabled={loading} class="w-full bg-transparent px-1 text-sm" />
       </div>
     </div>
 
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div class="flex flex-col gap-2">
+      <div class="field-line">
         <label for="password-{id}" class="text-sm font-medium">Password</label>
-        <input
-          id="password-{id}"
-          type="password"
-          required
-          bind:value={password}
-          disabled={loading}
-          class="w-full rounded border border-border bg-background px-3 py-2 text-sm"
-        />
+        <input id="password-{id}" type="password" required bind:value={password} disabled={loading} class="w-full bg-transparent px-1 text-sm" />
       </div>
-      <div class="flex flex-col gap-2">
+      <div class="field-line">
         <label for="confirm-password-{id}" class="text-sm font-medium">Confirm password</label>
         <input
           id="confirm-password-{id}"
@@ -126,7 +105,7 @@
           required
           bind:value={confirmPassword}
           disabled={loading}
-          class="w-full rounded border border-border bg-background px-3 py-2 text-sm"
+          class="w-full bg-transparent px-1 text-sm"
         />
       </div>
     </div>
@@ -135,7 +114,7 @@
     <button
       type="submit"
       disabled={loading}
-      class="rounded border border-border bg-secondary px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+      class="rounded border border-[var(--brand)] bg-[var(--brand-soft)] px-4 py-2 text-sm font-normal text-[var(--brand)] transition-colors hover:bg-[var(--brand)] hover:text-white disabled:opacity-50"
     >
       {#if loading}
         Please wait…
@@ -146,7 +125,7 @@
 
     <p class="text-center text-sm text-muted-foreground">
       Already registered?
-      <a href="/login" class="text-primary-foreground underline-offset-2 hover:underline">Sign in</a>
+      <a href="/login" class="text-[var(--brand)] underline-offset-2 hover:underline">Sign in</a>
     </p>
   </div>
 </form>

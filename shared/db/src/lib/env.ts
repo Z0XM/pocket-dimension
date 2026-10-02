@@ -10,7 +10,7 @@ let _env: z.infer<typeof schema> | null = null;
 export const env = new Proxy({} as z.infer<typeof schema>, {
   get(_, prop: string) {
     if (!_env) {
-      _env = validateEnv("db", schema, Bun.env);
+      _env = validateEnv("db", schema, typeof Bun !== "undefined" ? Bun.env : process.env);
     }
     return _env[prop as keyof typeof _env];
   },

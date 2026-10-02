@@ -11,7 +11,7 @@
   } from "$lib/import-stream";
   import AppSettings from "$lib/components/app-settings.svelte";
   import ImportReviewPanel from "$lib/components/import-review-panel.svelte";
-  import AccountSwitcher from "$lib/components/account-switcher.svelte";
+  import SketchSelect from "$lib/components/sketch-select.svelte";
   import {
     FONT_OPTIONS,
     PAPER_OPTIONS,
@@ -22,19 +22,63 @@
     type FontId,
     type PaperId,
   } from "$lib/appearance";
-  import { formatMoney } from "$lib/finance/money";
   import type { ImportPreview, ImportResult } from "$lib/importers/types";
-  import { SquarePen, Tag, Trash2, Layers } from "@lucide/svelte";
+  import SquarePen from "@lucide/svelte/icons/square-pen";
+  import Tag from "@lucide/svelte/icons/tag";
+  import Trash2 from "@lucide/svelte/icons/trash-2";
+  import Layers from "@lucide/svelte/icons/layers";
+  import Plus from "@lucide/svelte/icons/plus";
+  import X from "@lucide/svelte/icons/x";
   import { onMount } from "svelte";
   import type { PageData, ActionData } from "./$types";
 
   const { data, form }: { data: PageData; form: ActionData } = $props();
 
-  let appearance = $state<Appearance>({ fonts: "virgil", paper: "plain" });
+  const CONTROL_TABS = [
+    { id: "customise", label: "customise", tone: "yellow" },
+    { id: "accounts", label: "accounts", tone: "green" },
+    { id: "data", label: "data", tone: "blue" },
+    { id: "organize", label: "organize", tone: "orange" },
+  ] as const;
+
+  type ControlTabId = (typeof CONTROL_TABS)[number]["id"];
+  const CONTROL_TAB_STORAGE_KEY = "chhan-control-tab";
+  const LEGACY_TAB_MAP: Record<string, ControlTabId> = {
+    look: "customise",
+    import: "data",
+    export: "data",
+    categories: "organize",
+    tags: "organize",
+    groups: "organize",
+  };
+
+  let appearance = $state<Appearance>({ fonts: "gaegu", paper: "dots" });
+  let activeTab = $state<ControlTabId>("customise");
 
   onMount(() => {
     appearance = applyAppearanceToDocument(readAppearance());
+    try {
+      const stored = localStorage.getItem(CONTROL_TAB_STORAGE_KEY);
+      if (!stored) return;
+      if (CONTROL_TABS.some((tab) => tab.id === stored)) {
+        activeTab = stored as ControlTabId;
+      } else if (LEGACY_TAB_MAP[stored]) {
+        activeTab = LEGACY_TAB_MAP[stored]!;
+        localStorage.setItem(CONTROL_TAB_STORAGE_KEY, activeTab);
+      }
+    } catch {
+      /* ignore */
+    }
   });
+
+  function setTab(id: ControlTabId) {
+    activeTab = id;
+    try {
+      localStorage.setItem(CONTROL_TAB_STORAGE_KEY, id);
+    } catch {
+      /* ignore */
+    }
+  }
 
   function chooseFonts(fonts: FontId) {
     appearance = setAppearance({ fonts });
@@ -52,6 +96,8 @@
   let importReportCsv = $state<string | null>(null);
   let pendingFile = $state<File | null>(null);
   let pendingImporter = $state("kotak");
+  let pendingAccountId = $state("");
+  let importAccountId = $state("");
   let importPreview = $state<ImportPreview | null>(null);
   let importResult = $state<(ImportResult & { metadata?: Record<string, string> }) | null>(null);
   let reviewMode = $state<"preview" | "result" | null>(null);
@@ -73,18 +119,48 @@
   let deletingGroupId = $state<string | null>(null);
   let savingAccount = $state(false);
   let creatingAccount = $state(false);
-  let showCreateAccount = $state(false);
-  let savingOpeningBalance = $state(false);
+  let addingAccount = $state(false);
   let clearingOpeningBalance = $state(false);
   let clearingTransactions = $state(false);
 
-  const ACCOUNT_COLOR_PRESETS = ["#E85D4C", "#2F6FED", "#0F9F6E", "#C97816", "#7C3AED", "#0D9488", "#DB2777", "#475569"] as const;
-  let draftColorHex = $state("#2F6FED");
+  const COLOR_PRESETS = ["#FFADAD", "#BDE0FE", "#9BE7C4", "#FFB997", "#D4C5F9", "#FFE066", "#C8E7E0", "#E8D5C4"] as const;
+  let draftColorHex = $state("#FFADAD");
+  let draftName = $state("");
+  let draftBankImporterId = $state("");
+  let draftCurrencyCode = $state("INR");
+  let draftOpeningDate = $state("");
+  let draftOpeningAmount = $state("");
+
   $effect(() => {
-    draftColorHex = data.account.colorHex ?? ACCOUNT_COLOR_PRESETS[0]!;
+    if (addingAccount) return;
+    draftColorHex = data.account.colorHex ?? COLOR_PRESETS[0]!;
+    draftName = data.account.name;
+    draftBankImporterId = data.account.bankImporterId ?? "";
+    draftCurrencyCode = data.account.currencyCode;
+    draftOpeningDate = data.openingBalance?.balanceAsOf ?? data.firstTransactionOn ?? new Date().toISOString().slice(0, 10);
+    draftOpeningAmount = data.openingBalance?.balanceMinor != null ? (data.openingBalance.balanceMinor / 100).toFixed(2) : "";
+    if (!importAccountId || !data.accounts.some((account) => account.id === importAccountId)) {
+      importAccountId = data.account.id;
+    }
   });
-  const defaultImporterId = $derived(data.account.bankImporterId ?? data.importers[0]?.id ?? "kotak");
-  let createColorHex = $state<string>(ACCOUNT_COLOR_PRESETS[0]!);
+
+  const bankSelectOptions = $derived([
+    { value: "", label: "Not set" },
+    ...data.importers.map((importer) => ({ value: importer.id, label: importer.label })),
+  ]);
+  const currencySelectOptions = $derived([
+    ...data.currencies.map((currency) => ({ value: currency.code, label: currency.label })),
+    ...(!data.currencies.some((currency) => currency.code === data.account.currencyCode)
+      ? [{ value: data.account.currencyCode, label: data.account.currencyCode }]
+      : []),
+  ]);
+  const importAccountOptions = $derived(data.accounts.map((account) => ({ value: account.id, label: account.name })));
+  const importTargetAccount = $derived(data.accounts.find((account) => account.id === importAccountId) ?? data.account);
+  const importImporterId = $derived(importTargetAccount.bankImporterId ?? "");
+  const importImporterLabel = $derived(data.importers.find((importer) => importer.id === importImporterId)?.label ?? (importImporterId || "Not set"));
+  const importReviewCurrencyCode = $derived(
+    data.accounts.find((account) => account.id === (pendingAccountId || importAccountId))?.currencyCode ?? data.account.currencyCode
+  );
 
   function formatDisplayDate(iso: string): string {
     const [year, month, day] = iso.split("-").map(Number);
@@ -95,8 +171,45 @@
     });
   }
 
-  const openingBalanceAsOfDefault = $derived(data.openingBalance?.balanceAsOf ?? data.firstTransactionOn ?? new Date().toISOString().slice(0, 10));
-  const openingBalanceAmountDefault = $derived(data.openingBalance?.balanceMinor != null ? (data.openingBalance.balanceMinor / 100).toFixed(2) : "");
+  function startAddAccount() {
+    addingAccount = true;
+    draftName = "";
+    draftCurrencyCode = "INR";
+    draftBankImporterId = data.importers[0]?.id ?? "";
+    draftColorHex = COLOR_PRESETS[data.accounts.length % COLOR_PRESETS.length]!;
+    draftOpeningDate = new Date().toISOString().slice(0, 10);
+    draftOpeningAmount = "";
+  }
+
+  function cancelAddAccount() {
+    addingAccount = false;
+  }
+
+  const formBusy = $derived(savingAccount || creatingAccount);
+
+  const KIND_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: "expense", label: "Expense" },
+    { value: "income", label: "Income" },
+    { value: "transfer", label: "Transfer" },
+  ];
+
+  let draftCategoryKind = $state("expense");
+  let draftCategoryColor = $state("#FFB997");
+  let draftTagColor = $state("#FFADAD");
+  let editCategoryKind = $state("expense");
+  let editCategoryColor = $state("#FFB997");
+  let editTagColor = $state("#FFADAD");
+
+  function beginEditCategory(category: (typeof data.categories)[number]) {
+    editingId = category.id;
+    editCategoryKind = category.kind;
+    editCategoryColor = category.colorHex ?? COLOR_PRESETS[0]!;
+  }
+
+  function beginEditTag(tag: (typeof data.tags)[number]) {
+    editingTagId = tag.id;
+    editTagColor = tag.colorHex ?? COLOR_PRESETS[0]!;
+  }
 
   function downloadImportReport(csv: string) {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -123,6 +236,7 @@
     importPreview = null;
     importResult = null;
     pendingFile = null;
+    pendingAccountId = "";
     confirmingImport = false;
     confirmProgress = 0;
     confirmStatus = "";
@@ -140,10 +254,18 @@
     const formEl = event.currentTarget as HTMLFormElement;
     const formData = new FormData(formEl);
     const file = formData.get("file");
-    const importer = String(formData.get("importer") ?? "kotak");
+    const accountId = String(formData.get("accountId") ?? importAccountId);
+    const target = data.accounts.find((account) => account.id === accountId) ?? data.account;
+    const importer = target.bankImporterId ?? "";
 
     if (!(file instanceof File) || file.size === 0) {
       importMessage = "Choose a statement file to import";
+      importSuccess = false;
+      return;
+    }
+
+    if (!importer) {
+      importMessage = `Set a linked bank on “${target.name}” in Accounts before importing`;
       importSuccess = false;
       return;
     }
@@ -160,13 +282,15 @@
 
     try {
       const previewPayload = buildImportFormData(file, importer);
-      const preview = await previewStatementWithProgress(data.account.id, previewPayload, handlePreviewEvent);
+      const preview = await previewStatementWithProgress(accountId, previewPayload, handlePreviewEvent);
       importProgress = 100;
       importStatus = "Preview ready";
       pendingFile = file;
       pendingImporter = importer;
+      pendingAccountId = accountId;
       importPreview = preview;
       reviewMode = "preview";
+      setTab("data");
     } catch (cause) {
       importMessage = cause instanceof Error ? cause.message : "Failed to preview statement";
       importSuccess = false;
@@ -176,7 +300,7 @@
   }
 
   async function confirmPendingImport() {
-    if (!pendingFile || !importPreview) return;
+    if (!pendingFile || !importPreview || !pendingAccountId) return;
 
     confirmingImport = true;
     confirmProgress = 4;
@@ -185,7 +309,7 @@
 
     try {
       const formData = buildImportFormData(pendingFile, pendingImporter);
-      const result = await importStatementWithProgress(data.account.id, formData, handleImportEvent);
+      const result = await importStatementWithProgress(pendingAccountId, formData, handleImportEvent);
       confirmProgress = 100;
       confirmStatus = "Import complete";
       importResult = result;
@@ -195,6 +319,7 @@
       reviewMode = "result";
       importPreview = null;
       pendingFile = null;
+      pendingAccountId = "";
       importFormEl?.reset();
       await invalidateAll();
     } catch (cause) {
@@ -210,56 +335,13 @@
 
 <header class="topbar">
   <div>
-    <h1>CONTROL</h1>
-    <p class="sub">Import · export · categories · tags · groups</p>
+    <h1>Control Center</h1>
+    <a class="back-link" href="/app/dashboards">← Back</a>
   </div>
   <div class="actions">
-    <AccountSwitcher accounts={data.accounts} activeAccountId={data.account.id} />
-    <a class="back" href="/app/dashboards">← Dashboard</a>
     <AppSettings />
   </div>
 </header>
-
-<section class="panel customise-panel span-all">
-  <h2>Customise</h2>
-  <p class="panel-copy dim">Fonts and paper texture apply across the app on this browser.</p>
-
-  <div class="customise-block">
-    <p class="customise-label">Hand fonts</p>
-    <div class="customise-options" role="radiogroup" aria-label="Font pairing">
-      {#each FONT_OPTIONS as option (option.id)}
-        <button
-          type="button"
-          class="customise-chip"
-          class:active={appearance.fonts === option.id}
-          role="radio"
-          aria-checked={appearance.fonts === option.id}
-          onclick={() => chooseFonts(option.id)}
-        >
-          {option.label}
-        </button>
-      {/each}
-    </div>
-  </div>
-
-  <div class="customise-block">
-    <p class="customise-label">Paper texture</p>
-    <div class="customise-options" role="radiogroup" aria-label="Paper texture">
-      {#each PAPER_OPTIONS as option (option.id)}
-        <button
-          type="button"
-          class="customise-chip"
-          class:active={appearance.paper === option.id}
-          role="radio"
-          aria-checked={appearance.paper === option.id}
-          onclick={() => choosePaper(option.id)}
-        >
-          {option.label}
-        </button>
-      {/each}
-    </div>
-  </div>
-</section>
 
 {#if importMessage}
   <p class="flash" class:error={!importSuccess}>{importMessage}</p>
@@ -279,7 +361,7 @@
 {#if reviewMode === "preview" && importPreview}
   <ImportReviewPanel
     mode="preview"
-    currencyCode={data.account.currencyCode}
+    currencyCode={importReviewCurrencyCode}
     preview={importPreview}
     confirming={confirmingImport}
     {confirmProgress}
@@ -290,579 +372,947 @@
 {:else if reviewMode === "result" && importResult}
   <ImportReviewPanel
     mode="result"
-    currencyCode={data.account.currencyCode}
+    currencyCode={importReviewCurrencyCode}
     result={importResult}
     onClose={clearReview}
     onDownloadReport={importReportCsv ? () => downloadImportReport(importReportCsv!) : undefined}
   />
 {/if}
 
-<div class="cols">
-  <section class="panel">
-    <h2>Import</h2>
-    <p class="panel-copy dim">
-      Upload a bank statement as CSV or PDF (Kotak, ICICI, HDFC, or Generic CSV). You'll review every row and the projected balance before anything is
-      written. Imports use <strong>{data.account.currencyCode}</strong>.
-    </p>
-    <form class="import-form" enctype="multipart/form-data" bind:this={importFormEl} onsubmit={submitImport}>
-      <label class="field">
-        <span>Bank</span>
-        <select name="importer" disabled={importing || confirmingImport}>
-          {#each data.importers as importer}
-            <option value={importer.id} selected={importer.id === defaultImporterId}>{importer.label}</option>
-          {/each}
-        </select>
-      </label>
-      <label class="field">
-        <span>Statement file</span>
-        <input name="file" type="file" accept=".csv,.pdf,text/csv,application/pdf" required disabled={importing || confirmingImport} />
-      </label>
-
-      {#if importing}
-        <div class="import-progress" aria-hidden="true">
-          <div class="import-progress-bar" style="width: {importProgress}%"></div>
-        </div>
-        <p class="import-status dim">{importStatus}</p>
-      {/if}
-
-      <button class="add" type="submit" disabled={importing || confirmingImport}>
-        {importing ? "ANALYZING…" : "IMPORT STATEMENT"}
-      </button>
-    </form>
-  </section>
-
-  <section class="panel">
-    <h2>Accounts</h2>
-    <p class="panel-copy dim">
-      Active:
-      <span class="account-pill">
-        <span class="swatch" style="background: {draftColorHex}" aria-hidden="true"></span>
-        <strong>{data.account.name}</strong>
-      </span>
-      · first transaction
-      <strong>{data.firstTransactionOn ? formatDisplayDate(data.firstTransactionOn) : "None yet"}</strong>
-    </p>
-
-    <form
-      method="POST"
-      action="?/updateAccount"
-      use:enhance={() => {
-        savingAccount = true;
-        return async ({ update }) => {
-          savingAccount = false;
-          await update();
-          await invalidateAll();
-        };
-      }}
-    >
-      <label class="field">
-        <span>Account name</span>
-        <input name="name" type="text" value={data.account.name} required maxlength="120" disabled={savingAccount} />
-      </label>
-      <label class="field">
-        <span>Linked bank (default importer)</span>
-        <select name="bankImporterId" disabled={savingAccount}>
-          <option value="" selected={!data.account.bankImporterId}>Not set</option>
-          {#each data.importers as importer}
-            <option value={importer.id} selected={importer.id === data.account.bankImporterId}>{importer.label}</option>
-          {/each}
-        </select>
-      </label>
-      <label class="field">
-        <span>Currency</span>
-        <select name="currencyCode" disabled={savingAccount}>
-          {#each data.currencies as currency}
-            <option value={currency.code} selected={currency.code === data.account.currencyCode}>
-              {currency.label}
-            </option>
-          {/each}
-          {#if !data.currencies.some((currency) => currency.code === data.account.currencyCode)}
-            <option value={data.account.currencyCode} selected>{data.account.currencyCode}</option>
-          {/if}
-        </select>
-      </label>
-      <label class="field">
-        <span>Account color</span>
-        <input type="hidden" name="colorHex" value={draftColorHex} />
-        <div class="color-row">
-          {#each ACCOUNT_COLOR_PRESETS as color}
-            <button
-              type="button"
-              class="color-option"
-              class:selected={draftColorHex.toUpperCase() === color.toUpperCase()}
-              aria-label="Use color {color}"
-              disabled={savingAccount}
-              onclick={() => (draftColorHex = color)}
-            >
-              <span class="swatch lg" style="background: {color}"></span>
-            </button>
-          {/each}
-          <label class="color-custom field">
-            <span>Custom</span>
-            <input
-              type="color"
-              value={draftColorHex}
-              disabled={savingAccount}
-              oninput={(e) => (draftColorHex = (e.currentTarget as HTMLInputElement).value)}
-            />
-          </label>
-        </div>
-      </label>
-      <button class="add" type="submit" disabled={savingAccount}>
-        {savingAccount ? "SAVING…" : "SAVE ACCOUNT"}
-      </button>
-    </form>
-
-    <div class="opening-balance">
-      <h3>Opening balance</h3>
-      <p class="panel-copy dim">
-        {#if data.openingBalance}
-          Current:
-          <strong>{formatMoney(data.openingBalance.balanceMinor, data.account.currencyCode)}</strong>
-          as of {formatDisplayDate(data.openingBalance.balanceAsOf)}. Used when statement imports need a starting balance.
-        {:else}
-          Set the account balance as of a date—typically the day before your first transaction or your statement opening balance.
-        {/if}
-      </p>
-      <form
-        method="POST"
-        action="?/updateOpeningBalance"
-        use:enhance={() => {
-          savingOpeningBalance = true;
-          return async ({ update }) => {
-            savingOpeningBalance = false;
-            await update();
-            await invalidateAll();
-          };
-        }}
+<div class="control-notebook">
+  <div class="paper-tabs" role="tablist" aria-label="Control sections">
+    {#each CONTROL_TABS as tab, i (tab.id)}
+      <button
+        type="button"
+        role="tab"
+        class="paper-tab tone-{tab.tone}"
+        class:active={activeTab === tab.id}
+        id="control-tab-{tab.id}"
+        aria-selected={activeTab === tab.id}
+        aria-controls="control-panel-{tab.id}"
+        tabindex={activeTab === tab.id ? 0 : -1}
+        style="--depth: {i}"
+        onclick={() => setTab(tab.id)}
       >
-        <label class="field">
-          <span>As of date</span>
-          <input name="balanceAsOf" type="date" value={openingBalanceAsOfDefault} required disabled={savingOpeningBalance} />
-        </label>
-        <label class="field">
-          <span>Amount</span>
-          <input
-            name="amount"
-            type="text"
-            inputmode="decimal"
-            placeholder="0.00"
-            value={openingBalanceAmountDefault}
-            required
-            disabled={savingOpeningBalance}
-          />
-        </label>
-        <button class="add" type="submit" disabled={savingOpeningBalance}>
-          {savingOpeningBalance ? "SAVING…" : "SAVE OPENING BALANCE"}
-        </button>
-      </form>
-      {#if data.openingBalance}
+        {tab.label}
+      </button>
+    {/each}
+  </div>
+
+  <div class="notebook-sheet" data-tone={activeTab}>
+    {#if activeTab === "customise"}
+      <section class="sheet-panel" id="control-panel-customise" role="tabpanel" aria-labelledby="control-tab-customise">
+        <h2>Customise</h2>
+        <p class="panel-copy dim">Fonts and paper texture apply across the app on this browser.</p>
+
+        <div class="customise-grid">
+          <div class="customise-block">
+            <p class="customise-label">Hand fonts</p>
+            <ul class="customise-list" role="radiogroup" aria-label="Font pairing">
+              {#each FONT_OPTIONS as option (option.id)}
+                <li>
+                  <button
+                    type="button"
+                    class="customise-bullet"
+                    class:active={appearance.fonts === option.id}
+                    role="radio"
+                    aria-checked={appearance.fonts === option.id}
+                    onclick={() => chooseFonts(option.id)}
+                  >
+                    <span class="dot" aria-hidden="true">•</span>
+                    <span class="mark">{option.label}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </div>
+
+          <div class="customise-block">
+            <p class="customise-label">Paper texture</p>
+            <ul class="customise-list" role="radiogroup" aria-label="Paper texture">
+              {#each PAPER_OPTIONS as option (option.id)}
+                <li>
+                  <button
+                    type="button"
+                    class="customise-bullet"
+                    class:active={appearance.paper === option.id}
+                    role="radio"
+                    aria-checked={appearance.paper === option.id}
+                    onclick={() => choosePaper(option.id)}
+                  >
+                    <span class="dot" aria-hidden="true">•</span>
+                    <span class="mark">{option.label}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        </div>
+      </section>
+    {:else if activeTab === "accounts"}
+      <section class="sheet-panel" id="control-panel-accounts" role="tabpanel" aria-labelledby="control-tab-accounts">
+        <div class="accounts-head">
+          <h2 id="control-tab-accounts-heading">{addingAccount ? "New account" : "Accounts"}</h2>
+          {#if addingAccount}
+            <button type="button" class="accounts-action" aria-label="Cancel new account" disabled={formBusy} onclick={cancelAddAccount}>
+              <X size={18} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+          {:else}
+            <button type="button" class="accounts-action" aria-label="Add account" onclick={startAddAccount}>
+              <Plus size={18} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+          {/if}
+        </div>
+
+        {#if !addingAccount}
+          <p class="panel-copy dim">
+            Active:
+            <span class="account-pill">
+              <strong class="mark" style="--account-color: {draftColorHex}">{data.account.name}</strong>
+            </span>
+            · first transaction
+            <strong>{data.firstTransactionOn ? formatDisplayDate(data.firstTransactionOn) : "None yet"}</strong>
+          </p>
+        {:else}
+          <p class="panel-copy dim">Fill in the details below, then create the account.</p>
+        {/if}
+
         <form
-          class="clear-opening-form"
+          class="account-form"
           method="POST"
-          action="?/updateOpeningBalance"
+          action={addingAccount ? "?/createAccount" : "?/updateAccount"}
           use:enhance={() => {
+            if (addingAccount) {
+              creatingAccount = true;
+              return async ({ update, result }) => {
+                creatingAccount = false;
+                await update();
+                if (result.type === "success") {
+                  addingAccount = false;
+                  await invalidateAll();
+                }
+              };
+            }
+            savingAccount = true;
             return async ({ update }) => {
-              if (!confirm("Clear the opening balance for this account?")) {
-                return;
-              }
-              clearingOpeningBalance = true;
+              savingAccount = false;
               await update();
-              clearingOpeningBalance = false;
               await invalidateAll();
             };
           }}
         >
-          <input type="hidden" name="clear" value="1" />
-          <button class="ghost danger" type="submit" disabled={clearingOpeningBalance || savingOpeningBalance}>
-            {clearingOpeningBalance ? "CLEARING…" : "CLEAR OPENING BALANCE"}
+          <div class="account-grid">
+            <label class="field">
+              <span>Account name</span>
+              <input
+                name="name"
+                type="text"
+                bind:value={draftName}
+                required
+                maxlength="120"
+                disabled={formBusy}
+                placeholder={addingAccount ? "Kotak salary" : undefined}
+              />
+            </label>
+            <label class="field">
+              <span>Currency</span>
+              <SketchSelect
+                name="currencyCode"
+                bind:value={draftCurrencyCode}
+                options={currencySelectOptions}
+                disabled={formBusy}
+                aria-label="Currency"
+              />
+            </label>
+            <label class="field field-span">
+              <span>Linked bank (default importer)</span>
+              <SketchSelect
+                name="bankImporterId"
+                bind:value={draftBankImporterId}
+                options={bankSelectOptions}
+                disabled={formBusy}
+                aria-label="Linked bank"
+              />
+            </label>
+            <label class="field">
+              <span>Opening date</span>
+              <input name="balanceAsOf" type="date" bind:value={draftOpeningDate} disabled={formBusy} />
+            </label>
+            <label class="field">
+              <span>Opening amount</span>
+              <input name="amount" type="text" inputmode="decimal" placeholder="0.00" bind:value={draftOpeningAmount} disabled={formBusy} />
+            </label>
+            <div class="field field-color">
+              <span>Account color</span>
+              <input type="hidden" name="colorHex" value={draftColorHex} />
+              <div class="color-row">
+                {#each COLOR_PRESETS as color}
+                  <button
+                    type="button"
+                    class="color-option"
+                    class:selected={draftColorHex.toUpperCase() === color.toUpperCase()}
+                    aria-label="Use color {color}"
+                    disabled={formBusy}
+                    onclick={() => (draftColorHex = color)}
+                  >
+                    <span class="swatch lg" style="background: {color}"></span>
+                  </button>
+                {/each}
+                <label class="color-custom">
+                  <span>Custom</span>
+                  <input
+                    type="color"
+                    value={draftColorHex}
+                    disabled={formBusy}
+                    oninput={(e) => (draftColorHex = (e.currentTarget as HTMLInputElement).value)}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+          <button class="add" type="submit" disabled={formBusy}>
+            {#if addingAccount}
+              {creatingAccount ? "CREATING…" : "CREATE ACCOUNT"}
+            {:else}
+              {savingAccount ? "SAVING…" : "SAVE ACCOUNT"}
+            {/if}
           </button>
         </form>
-      {/if}
-    </div>
 
-    <div class="create-account">
-      <h3>Add another account</h3>
-      {#if !showCreateAccount}
-        <button
-          class="ghost"
-          type="button"
-          onclick={() => {
-            createColorHex = ACCOUNT_COLOR_PRESETS[data.accounts.length % ACCOUNT_COLOR_PRESETS.length]!;
-            showCreateAccount = true;
-          }}>NEW ACCOUNT</button
-        >
-      {:else}
-        <form
-          method="POST"
-          action="?/createAccount"
-          use:enhance={() => {
-            creatingAccount = true;
-            return async ({ update, result }) => {
-              creatingAccount = false;
-              await update();
-              if (result.type === "success") {
-                showCreateAccount = false;
+        {#if !addingAccount && data.openingBalance}
+          <form
+            class="clear-opening-form"
+            method="POST"
+            action="?/updateOpeningBalance"
+            use:enhance={() => {
+              return async ({ update }) => {
+                if (!confirm("Clear the opening balance for this account?")) {
+                  return;
+                }
+                clearingOpeningBalance = true;
+                await update();
+                clearingOpeningBalance = false;
                 await invalidateAll();
-              }
-            };
-          }}
-        >
-          <label class="field">
-            <span>Name</span>
-            <input name="name" type="text" placeholder="Kotak salary" required maxlength="120" disabled={creatingAccount} />
-          </label>
-          <label class="field">
-            <span>Bank</span>
-            <select name="bankImporterId" disabled={creatingAccount}>
-              {#each data.importers as importer}
-                <option value={importer.id}>{importer.label}</option>
-              {/each}
-            </select>
-          </label>
-          <label class="field">
-            <span>Currency</span>
-            <select name="currencyCode" disabled={creatingAccount}>
-              {#each data.currencies as currency}
-                <option value={currency.code} selected={currency.code === "INR"}>{currency.label}</option>
-              {/each}
-            </select>
-          </label>
-          <fieldset class="color-field">
-            <legend>Color</legend>
-            <input type="hidden" name="colorHex" value={createColorHex} />
-            <div class="color-row">
-              {#each ACCOUNT_COLOR_PRESETS as color}
-                <button
-                  type="button"
-                  class="color-option"
-                  class:selected={createColorHex.toUpperCase() === color.toUpperCase()}
-                  aria-label="Use color {color}"
-                  disabled={creatingAccount}
-                  onclick={() => (createColorHex = color)}
-                >
-                  <span class="swatch lg" style="background: {color}"></span>
-                </button>
-              {/each}
-            </div>
-          </fieldset>
-          <div class="create-actions">
-            <button class="ghost" type="button" onclick={() => (showCreateAccount = false)} disabled={creatingAccount}>Cancel</button>
-            <button class="add" type="submit" disabled={creatingAccount}>
-              {creatingAccount ? "CREATING…" : "CREATE ACCOUNT"}
+              };
+            }}
+          >
+            <input type="hidden" name="clear" value="1" />
+            <button class="ghost danger" type="submit" disabled={clearingOpeningBalance || formBusy}>
+              {clearingOpeningBalance ? "CLEARING…" : "CLEAR OPENING BALANCE"}
             </button>
-          </div>
+          </form>
+        {/if}
+      </section>
+    {:else if activeTab === "data"}
+      <section class="sheet-panel" id="control-panel-data" role="tabpanel" aria-labelledby="control-tab-data">
+        <h2>Data</h2>
+        <h3>Import</h3>
+        <p class="panel-copy dim">
+          Choose the account to import into, then upload a CSV or PDF statement. The statement format comes from that account’s linked bank. You'll
+          review every row and the projected balance before anything is written. Imports use
+          <strong>{importTargetAccount.currencyCode}</strong>.
+        </p>
+        <form class="import-form" enctype="multipart/form-data" bind:this={importFormEl} onsubmit={submitImport}>
+          <label class="field">
+            <span>Account</span>
+            <SketchSelect
+              name="accountId"
+              bind:value={importAccountId}
+              options={importAccountOptions}
+              disabled={importing || confirmingImport}
+              aria-label="Account"
+            />
+          </label>
+          <p class="panel-copy dim import-bank-hint">
+            {#if importImporterId}
+              Statement format: <strong>{importImporterLabel}</strong>
+            {:else}
+              No linked bank on this account — set one under Accounts first.
+            {/if}
+          </p>
+          <label class="field">
+            <span>Statement file</span>
+            <input name="file" type="file" accept=".csv,.pdf,text/csv,application/pdf" required disabled={importing || confirmingImport} />
+          </label>
+
+          {#if importing}
+            <div class="import-progress" aria-hidden="true">
+              <div class="import-progress-bar" style="width: {importProgress}%"></div>
+            </div>
+            <p class="import-status dim">{importStatus}</p>
+          {/if}
+
+          <button class="add" type="submit" disabled={importing || confirmingImport || !importImporterId}>
+            {importing ? "ANALYZING…" : "IMPORT STATEMENT"}
+          </button>
         </form>
-      {/if}
-    </div>
-  </section>
 
-  <section class="panel">
-    <h2>Export</h2>
-    <p class="panel-copy dim">Download all transactions for this account as CSV.</p>
-    <a class="add export-link" href="/api/accounts/{data.account.id}/transactions/export">EXPORT CSV</a>
-  </section>
+        <h3>Export</h3>
+        <p class="panel-copy dim">Download all transactions for this account as CSV.</p>
+        <a class="add export-link" href="/api/accounts/{data.account.id}/transactions/export">EXPORT CSV</a>
 
-  <section class="panel danger-panel">
-    <h2>Danger zone</h2>
-    <p class="panel-copy dim">
-      Permanently delete every transaction for this account ({data.transactionCount.toLocaleString()} now). Categories, tags, and groups are kept. Account
-      balance is cleared.
-    </p>
-    <form
-      method="POST"
-      action="?/clearAllTransactions"
-      use:enhance={() => {
-        return async ({ cancel, update }) => {
-          const countLabel = data.transactionCount.toLocaleString();
-          if (!confirm(`Delete all ${countLabel} transactions? This cannot be undone. Tag, group, and refund links on those rows will be removed.`)) {
-            cancel();
-            return;
-          }
-          clearingTransactions = true;
-          await update();
-          clearingTransactions = false;
-          await invalidateAll();
-        };
-      }}
-    >
-      <button class="add danger" type="submit" disabled={clearingTransactions || data.transactionCount === 0}>
-        {clearingTransactions ? "DELETING…" : "CLEAR ALL TRANSACTIONS"}
-      </button>
-    </form>
-  </section>
+        <div class="danger-block">
+          <h3>Danger zone</h3>
+          <p class="panel-copy dim">
+            Permanently delete every transaction for this account ({data.transactionCount.toLocaleString()} now). Categories, tags, and groups are kept.
+            Account balance is cleared.
+          </p>
+          <form
+            method="POST"
+            action="?/clearAllTransactions"
+            use:enhance={() => {
+              return async ({ cancel, update }) => {
+                const countLabel = data.transactionCount.toLocaleString();
+                if (
+                  !confirm(
+                    `Delete all ${countLabel} transactions? This cannot be undone. Tag, group, and refund links on those rows will be removed.`
+                  )
+                ) {
+                  cancel();
+                  return;
+                }
+                clearingTransactions = true;
+                await update();
+                clearingTransactions = false;
+                await invalidateAll();
+              };
+            }}
+          >
+            <button class="add danger" type="submit" disabled={clearingTransactions || data.transactionCount === 0}>
+              {clearingTransactions ? "DELETING…" : "CLEAR ALL TRANSACTIONS"}
+            </button>
+          </form>
+        </div>
+      </section>
+    {:else if activeTab === "organize"}
+      <section class="sheet-panel" id="control-panel-organize" role="tabpanel" aria-labelledby="control-tab-organize">
+        <h2>Organize</h2>
 
-  <section class="panel span-all">
-    <h2>Categories</h2>
-    <form
-      class="category-add"
-      method="POST"
-      action="?/createCategory"
-      use:enhance={() => {
-        addingCategory = true;
-        return async ({ update }) => {
-          addingCategory = false;
-          await update();
-        };
-      }}
-    >
-      <input name="name" placeholder="Category name" required />
-      <select name="kind">
-        <option value="expense">Expense</option>
-        <option value="income">Income</option>
-        <option value="transfer">Transfer</option>
-      </select>
-      <input name="colorHex" type="color" value="#ee7c02" aria-label="Category color" />
-      <button type="submit" disabled={addingCategory}>{addingCategory ? "ADDING…" : "ADD"}</button>
-    </form>
-    <ul class="list">
-      {#if data.categories.length === 0}
-        <li class="dim empty">No categories yet.</li>
-      {:else}
-        {#each data.categories as category (category.id)}
-          <li class:editing={editingId === category.id}>
-            {#if editingId === category.id}
-              <form
-                class="category-edit"
-                method="POST"
-                action="?/updateCategory"
-                use:enhance={() => {
-                  savingCategoryId = category.id;
-                  return async ({ update, result }) => {
-                    savingCategoryId = null;
-                    if (result.type === "success") editingId = null;
-                    await update();
-                  };
-                }}
-              >
-                <input type="hidden" name="id" value={category.id} />
-                <input name="name" value={category.name} required />
-                <select name="kind">
-                  <option value="expense" selected={category.kind === "expense"}>Expense</option>
-                  <option value="income" selected={category.kind === "income"}>Income</option>
-                  <option value="transfer" selected={category.kind === "transfer"}>Transfer</option>
-                </select>
-                <input name="colorHex" type="color" value={category.colorHex ?? "#ee7c02"} aria-label="Category color" />
-                <div class="edit-actions">
-                  <button type="submit" disabled={savingCategoryId === category.id}>
-                    {savingCategoryId === category.id ? "SAVING…" : "SAVE"}
+        <div class="organize-grid">
+          <div class="organize-col">
+            <h3>Categories</h3>
+            <form
+              class="organize-add"
+              method="POST"
+              action="?/createCategory"
+              use:enhance={() => {
+                addingCategory = true;
+                return async ({ update, result }) => {
+                  addingCategory = false;
+                  await update();
+                  if (result.type === "success") {
+                    draftCategoryKind = "expense";
+                    draftCategoryColor = "#FFB997";
+                  }
+                };
+              }}
+            >
+              <input class="organize-name" name="name" placeholder="Category name" required />
+              <SketchSelect name="kind" bind:value={draftCategoryKind} options={KIND_OPTIONS} aria-label="Category kind" />
+              <input type="hidden" name="colorHex" value={draftCategoryColor} />
+              <div class="color-row compact">
+                {#each COLOR_PRESETS as color}
+                  <button
+                    type="button"
+                    class="color-option"
+                    class:selected={draftCategoryColor.toUpperCase() === color.toUpperCase()}
+                    aria-label="Use color {color}"
+                    disabled={addingCategory}
+                    onclick={() => (draftCategoryColor = color)}
+                  >
+                    <span class="swatch" style="background: {color}"></span>
                   </button>
-                  <button type="button" class="ghost" onclick={() => (editingId = null)}>CANCEL</button>
-                </div>
-              </form>
-            {:else}
-              <span class="cat"><span class="sq" style="background:{category.colorHex ?? '#ee7c02'}"></span>{category.name}</span>
-              <span class="kind kind-{category.kind}">{category.kind}</span>
-              <div class="row-actions">
-                <button type="button" class="icon-btn" aria-label="Edit {category.name}" onclick={() => (editingId = category.id)}>
-                  <SquarePen size={16} strokeWidth={1.25} aria-hidden="true" />
-                </button>
-                <form
-                  method="POST"
-                  action="?/deleteCategory"
-                  use:enhance={() => {
-                    return async ({ cancel, update }) => {
-                      if (!confirm(`Delete “${category.name}”? Linked transactions will become uncategorized.`)) {
-                        cancel();
-                        return;
-                      }
-                      deletingCategoryId = category.id;
-                      await update();
-                      deletingCategoryId = null;
-                      if (editingId === category.id) editingId = null;
-                    };
-                  }}
-                >
-                  <input type="hidden" name="id" value={category.id} />
-                  <button type="submit" class="icon-btn danger" aria-label="Delete {category.name}" disabled={deletingCategoryId === category.id}>
-                    <Trash2 size={16} strokeWidth={1.25} aria-hidden="true" />
-                  </button>
-                </form>
+                {/each}
               </div>
-            {/if}
-          </li>
-        {/each}
-      {/if}
-    </ul>
-  </section>
+              <button class="organize-plus" type="submit" disabled={addingCategory} aria-label={addingCategory ? "Adding category" : "Add category"}>
+                <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
+              </button>
+            </form>
+            <ul class="list organize-list">
+              {#if data.categories.length === 0}
+                <li class="dim empty">No categories yet.</li>
+              {:else}
+                {#each data.categories as category (category.id)}
+                  <li class:editing={editingId === category.id}>
+                    {#if editingId === category.id}
+                      <form
+                        class="organize-edit"
+                        method="POST"
+                        action="?/updateCategory"
+                        use:enhance={() => {
+                          savingCategoryId = category.id;
+                          return async ({ update, result }) => {
+                            savingCategoryId = null;
+                            if (result.type === "success") editingId = null;
+                            await update();
+                          };
+                        }}
+                      >
+                        <input type="hidden" name="id" value={category.id} />
+                        <input class="organize-name" name="name" value={category.name} required />
+                        <SketchSelect name="kind" bind:value={editCategoryKind} options={KIND_OPTIONS} aria-label="Category kind" />
+                        <input type="hidden" name="colorHex" value={editCategoryColor} />
+                        <div class="color-row compact">
+                          {#each COLOR_PRESETS as color}
+                            <button
+                              type="button"
+                              class="color-option"
+                              class:selected={editCategoryColor.toUpperCase() === color.toUpperCase()}
+                              aria-label="Use color {color}"
+                              disabled={savingCategoryId === category.id}
+                              onclick={() => (editCategoryColor = color)}
+                            >
+                              <span class="swatch" style="background: {color}"></span>
+                            </button>
+                          {/each}
+                        </div>
+                        <div class="edit-actions">
+                          <button class="organize-submit" type="submit" disabled={savingCategoryId === category.id}>
+                            {savingCategoryId === category.id ? "SAVING…" : "SAVE"}
+                          </button>
+                          <button type="button" class="ghost" onclick={() => (editingId = null)}>CANCEL</button>
+                        </div>
+                      </form>
+                    {:else}
+                      <span class="cat">
+                        <span class="sq" style="background:{category.colorHex ?? '#FFB997'}"></span>
+                        <span class="mark" style="--item-color: {category.colorHex ?? '#FFB997'}">{category.name}</span>
+                      </span>
+                      <span class="kind kind-{category.kind}">{category.kind}</span>
+                      <div class="row-actions">
+                        <button type="button" class="icon-btn" aria-label="Edit {category.name}" onclick={() => beginEditCategory(category)}>
+                          <SquarePen size={16} strokeWidth={1.25} aria-hidden="true" />
+                        </button>
+                        <form
+                          method="POST"
+                          action="?/deleteCategory"
+                          use:enhance={() => {
+                            return async ({ cancel, update }) => {
+                              if (!confirm(`Delete “${category.name}”? Linked transactions will become uncategorized.`)) {
+                                cancel();
+                                return;
+                              }
+                              deletingCategoryId = category.id;
+                              await update();
+                              deletingCategoryId = null;
+                              if (editingId === category.id) editingId = null;
+                            };
+                          }}
+                        >
+                          <input type="hidden" name="id" value={category.id} />
+                          <button
+                            type="submit"
+                            class="icon-btn danger"
+                            aria-label="Delete {category.name}"
+                            disabled={deletingCategoryId === category.id}
+                          >
+                            <Trash2 size={16} strokeWidth={1.25} aria-hidden="true" />
+                          </button>
+                        </form>
+                      </div>
+                    {/if}
+                  </li>
+                {/each}
+              {/if}
+            </ul>
+          </div>
 
-  <section class="panel span-all">
-    <h2>Tags</h2>
-    <form
-      class="tag-add-form"
-      method="POST"
-      action="?/createTag"
-      use:enhance={() => {
-        addingTag = true;
-        return async ({ update }) => {
-          addingTag = false;
-          await update();
-        };
-      }}
-    >
-      <input name="name" placeholder="Tag name" required />
-      <input name="colorHex" type="color" value="#ee7c02" aria-label="Tag color" />
-      <button type="submit" disabled={addingTag}>{addingTag ? "ADDING…" : "ADD"}</button>
-    </form>
-    <ul class="list">
-      {#if data.tags.length === 0}
-        <li class="dim empty">No tags yet.</li>
-      {:else}
-        {#each data.tags as tag (tag.id)}
-          <li class:editing={editingTagId === tag.id}>
-            {#if editingTagId === tag.id}
-              <form
-                class="tag-edit"
-                method="POST"
-                action="?/updateTag"
-                use:enhance={() => {
-                  savingTagId = tag.id;
-                  return async ({ update, result }) => {
-                    savingTagId = null;
-                    if (result.type === "success") editingTagId = null;
-                    await update();
-                  };
-                }}
-              >
-                <input type="hidden" name="id" value={tag.id} />
-                <input name="name" value={tag.name} required />
-                <input name="colorHex" type="color" value={tag.colorHex ?? "#ee7c02"} aria-label="Tag color" />
-                <div class="edit-actions">
-                  <button type="submit" disabled={savingTagId === tag.id}>
-                    {savingTagId === tag.id ? "SAVING…" : "SAVE"}
+          <div class="organize-col">
+            <h3>Tags</h3>
+            <form
+              class="organize-add"
+              method="POST"
+              action="?/createTag"
+              use:enhance={() => {
+                addingTag = true;
+                return async ({ update, result }) => {
+                  addingTag = false;
+                  await update();
+                  if (result.type === "success") draftTagColor = "#FFADAD";
+                };
+              }}
+            >
+              <input class="organize-name" name="name" placeholder="Tag name" required />
+              <input type="hidden" name="colorHex" value={draftTagColor} />
+              <div class="color-row compact">
+                {#each COLOR_PRESETS as color}
+                  <button
+                    type="button"
+                    class="color-option"
+                    class:selected={draftTagColor.toUpperCase() === color.toUpperCase()}
+                    aria-label="Use color {color}"
+                    disabled={addingTag}
+                    onclick={() => (draftTagColor = color)}
+                  >
+                    <span class="swatch" style="background: {color}"></span>
                   </button>
-                  <button type="button" class="ghost" onclick={() => (editingTagId = null)}>CANCEL</button>
-                </div>
-              </form>
-            {:else}
-              <span class="tag-chip">
-                <Tag size={14} strokeWidth={1.25} class="tag-icon" style="color: {tag.colorHex ?? '#ee7c02'}" aria-hidden="true" />
-                {tag.name}
-              </span>
-              <div class="row-actions">
-                <button type="button" class="icon-btn" aria-label="Edit {tag.name}" onclick={() => (editingTagId = tag.id)}>
-                  <SquarePen size={16} strokeWidth={1.25} aria-hidden="true" />
-                </button>
-                <form
-                  method="POST"
-                  action="?/deleteTag"
-                  use:enhance={() => {
-                    return async ({ cancel, update }) => {
-                      if (!confirm(`Delete “${tag.name}”? It will be removed from linked transactions.`)) {
-                        cancel();
-                        return;
-                      }
-                      deletingTagId = tag.id;
-                      await update();
-                      deletingTagId = null;
-                      if (editingTagId === tag.id) editingTagId = null;
-                    };
-                  }}
-                >
-                  <input type="hidden" name="id" value={tag.id} />
-                  <button type="submit" class="icon-btn danger" aria-label="Delete {tag.name}" disabled={deletingTagId === tag.id}>
-                    <Trash2 size={16} strokeWidth={1.25} aria-hidden="true" />
-                  </button>
-                </form>
+                {/each}
               </div>
-            {/if}
-          </li>
-        {/each}
-      {/if}
-    </ul>
-  </section>
+              <button class="organize-plus" type="submit" disabled={addingTag} aria-label={addingTag ? "Adding tag" : "Add tag"}>
+                <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
+              </button>
+            </form>
+            <ul class="list organize-list">
+              {#if data.tags.length === 0}
+                <li class="dim empty">No tags yet.</li>
+              {:else}
+                {#each data.tags as tag (tag.id)}
+                  <li class:editing={editingTagId === tag.id}>
+                    {#if editingTagId === tag.id}
+                      <form
+                        class="organize-edit"
+                        method="POST"
+                        action="?/updateTag"
+                        use:enhance={() => {
+                          savingTagId = tag.id;
+                          return async ({ update, result }) => {
+                            savingTagId = null;
+                            if (result.type === "success") editingTagId = null;
+                            await update();
+                          };
+                        }}
+                      >
+                        <input type="hidden" name="id" value={tag.id} />
+                        <input class="organize-name" name="name" value={tag.name} required />
+                        <input type="hidden" name="colorHex" value={editTagColor} />
+                        <div class="color-row compact">
+                          {#each COLOR_PRESETS as color}
+                            <button
+                              type="button"
+                              class="color-option"
+                              class:selected={editTagColor.toUpperCase() === color.toUpperCase()}
+                              aria-label="Use color {color}"
+                              disabled={savingTagId === tag.id}
+                              onclick={() => (editTagColor = color)}
+                            >
+                              <span class="swatch" style="background: {color}"></span>
+                            </button>
+                          {/each}
+                        </div>
+                        <div class="edit-actions">
+                          <button class="organize-submit" type="submit" disabled={savingTagId === tag.id}>
+                            {savingTagId === tag.id ? "SAVING…" : "SAVE"}
+                          </button>
+                          <button type="button" class="ghost" onclick={() => (editingTagId = null)}>CANCEL</button>
+                        </div>
+                      </form>
+                    {:else}
+                      <span class="tag-chip">
+                        <Tag size={14} strokeWidth={1.25} class="tag-icon" style="color: {tag.colorHex ?? '#FFADAD'}" aria-hidden="true" />
+                        <span class="mark" style="--item-color: {tag.colorHex ?? '#FFADAD'}">{tag.name}</span>
+                      </span>
+                      <div class="row-actions">
+                        <button type="button" class="icon-btn" aria-label="Edit {tag.name}" onclick={() => beginEditTag(tag)}>
+                          <SquarePen size={16} strokeWidth={1.25} aria-hidden="true" />
+                        </button>
+                        <form
+                          method="POST"
+                          action="?/deleteTag"
+                          use:enhance={() => {
+                            return async ({ cancel, update }) => {
+                              if (!confirm(`Delete “${tag.name}”? It will be removed from linked transactions.`)) {
+                                cancel();
+                                return;
+                              }
+                              deletingTagId = tag.id;
+                              await update();
+                              deletingTagId = null;
+                              if (editingTagId === tag.id) editingTagId = null;
+                            };
+                          }}
+                        >
+                          <input type="hidden" name="id" value={tag.id} />
+                          <button type="submit" class="icon-btn danger" aria-label="Delete {tag.name}" disabled={deletingTagId === tag.id}>
+                            <Trash2 size={16} strokeWidth={1.25} aria-hidden="true" />
+                          </button>
+                        </form>
+                      </div>
+                    {/if}
+                  </li>
+                {/each}
+              {/if}
+            </ul>
+          </div>
 
-  <section class="panel span-all">
-    <h2>Groups</h2>
-    <form
-      class="tag-add-form"
-      method="POST"
-      action="?/createGroup"
-      use:enhance={() => {
-        addingGroup = true;
-        return async ({ update }) => {
-          addingGroup = false;
-          await update();
-        };
-      }}
-    >
-      <input name="name" placeholder="Group name" required />
-      <button type="submit" disabled={addingGroup}>{addingGroup ? "ADDING…" : "ADD"}</button>
-    </form>
-    <ul class="list">
-      {#if data.groups.length === 0}
-        <li class="dim empty">No groups yet.</li>
-      {:else}
-        {#each data.groups as group (group.id)}
-          <li class:editing={editingGroupId === group.id}>
-            {#if editingGroupId === group.id}
-              <form
-                class="tag-edit"
-                method="POST"
-                action="?/updateGroup"
-                use:enhance={() => {
-                  savingGroupId = group.id;
-                  return async ({ update, result }) => {
-                    savingGroupId = null;
-                    if (result.type === "success") editingGroupId = null;
-                    await update();
-                  };
-                }}
-              >
-                <input type="hidden" name="id" value={group.id} />
-                <input name="name" value={group.name} required />
-                <div class="row-actions">
-                  <button type="submit" disabled={savingGroupId === group.id}>
-                    {savingGroupId === group.id ? "SAVING…" : "SAVE"}
-                  </button>
-                  <button type="button" onclick={() => (editingGroupId = null)}>CANCEL</button>
-                </div>
-              </form>
-            {:else}
-              <span class="tag-chip group-chip">
-                <Layers size={14} strokeWidth={1.25} class="tag-icon" aria-hidden="true" />
-                {group.name}
-              </span>
-              <div class="row-actions">
-                <button type="button" class="icon-btn" aria-label="Edit {group.name}" onclick={() => (editingGroupId = group.id)}>
-                  <SquarePen size={16} strokeWidth={1.25} aria-hidden="true" />
-                </button>
-                <form
-                  method="POST"
-                  action="?/deleteGroup"
-                  use:enhance={() => {
-                    return async ({ update }) => {
-                      if (!confirm(`Delete “${group.name}”? It will be removed from linked transactions.`)) {
-                        return;
-                      }
-                      deletingGroupId = group.id;
-                      await update();
-                      deletingGroupId = null;
-                      if (editingGroupId === group.id) editingGroupId = null;
-                    };
-                  }}
-                >
-                  <input type="hidden" name="id" value={group.id} />
-                  <button type="submit" class="icon-btn danger" aria-label="Delete {group.name}" disabled={deletingGroupId === group.id}>
-                    <Trash2 size={16} strokeWidth={1.25} aria-hidden="true" />
-                  </button>
-                </form>
-              </div>
-            {/if}
-          </li>
-        {/each}
-      {/if}
-    </ul>
-  </section>
+          <div class="organize-col">
+            <h3>Groups</h3>
+            <form
+              class="organize-add"
+              method="POST"
+              action="?/createGroup"
+              use:enhance={() => {
+                addingGroup = true;
+                return async ({ update }) => {
+                  addingGroup = false;
+                  await update();
+                };
+              }}
+            >
+              <input class="organize-name" name="name" placeholder="Group name" required />
+              <button class="organize-plus" type="submit" disabled={addingGroup} aria-label={addingGroup ? "Adding group" : "Add group"}>
+                <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
+              </button>
+            </form>
+            <ul class="list organize-list">
+              {#if data.groups.length === 0}
+                <li class="dim empty">No groups yet.</li>
+              {:else}
+                {#each data.groups as group (group.id)}
+                  <li class:editing={editingGroupId === group.id}>
+                    {#if editingGroupId === group.id}
+                      <form
+                        class="organize-edit"
+                        method="POST"
+                        action="?/updateGroup"
+                        use:enhance={() => {
+                          savingGroupId = group.id;
+                          return async ({ update, result }) => {
+                            savingGroupId = null;
+                            if (result.type === "success") editingGroupId = null;
+                            await update();
+                          };
+                        }}
+                      >
+                        <input type="hidden" name="id" value={group.id} />
+                        <input class="organize-name" name="name" value={group.name} required />
+                        <div class="edit-actions">
+                          <button class="organize-submit" type="submit" disabled={savingGroupId === group.id}>
+                            {savingGroupId === group.id ? "SAVING…" : "SAVE"}
+                          </button>
+                          <button type="button" class="ghost" onclick={() => (editingGroupId = null)}>CANCEL</button>
+                        </div>
+                      </form>
+                    {:else}
+                      <span class="tag-chip group-chip">
+                        <Layers size={14} strokeWidth={1.25} class="tag-icon" aria-hidden="true" />
+                        {group.name}
+                      </span>
+                      <div class="row-actions">
+                        <button type="button" class="icon-btn" aria-label="Edit {group.name}" onclick={() => (editingGroupId = group.id)}>
+                          <SquarePen size={16} strokeWidth={1.25} aria-hidden="true" />
+                        </button>
+                        <form
+                          method="POST"
+                          action="?/deleteGroup"
+                          use:enhance={() => {
+                            return async ({ update }) => {
+                              if (!confirm(`Delete “${group.name}”? It will be removed from linked transactions.`)) {
+                                return;
+                              }
+                              deletingGroupId = group.id;
+                              await update();
+                              deletingGroupId = null;
+                              if (editingGroupId === group.id) editingGroupId = null;
+                            };
+                          }}
+                        >
+                          <input type="hidden" name="id" value={group.id} />
+                          <button type="submit" class="icon-btn danger" aria-label="Delete {group.name}" disabled={deletingGroupId === group.id}>
+                            <Trash2 size={16} strokeWidth={1.25} aria-hidden="true" />
+                          </button>
+                        </form>
+                      </div>
+                    {/if}
+                  </li>
+                {/each}
+              {/if}
+            </ul>
+          </div>
+        </div>
+      </section>
+    {/if}
+  </div>
 </div>
 
 <style>
-  .customise-panel {
-    margin-bottom: 1rem;
+  .back-link {
+    display: inline-block;
+    margin-top: 0.45rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-family: var(--hand);
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
+  }
+
+  .back-link:hover {
+    color: var(--ink);
+  }
+
+  .control-notebook {
+    margin-top: 0.35rem;
+    position: relative;
+  }
+
+  .paper-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0;
+    padding: 0 0.65rem;
+    position: relative;
+    z-index: 1;
+    /* sit under the page edge */
+    margin-bottom: -1.5px;
+  }
+
+  .paper-tab {
+    --depth: 0;
+    appearance: none;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    border-bottom: none;
+    border-radius: 3px 3px 0 0;
+    font-family: var(--hand);
+    font-size: 1.02rem;
+    color: var(--ink);
+    padding: 0.22rem 0.95rem 0.7rem;
+    cursor: pointer;
+    position: relative;
+    background: color-mix(in srgb, var(--yellow) 72%, white);
+    margin-right: -0.2rem;
+    /* deeper bookmarks tuck further under the stack */
+    z-index: calc(4 - var(--depth));
+    transform: translate(calc(var(--depth) * 2px), calc(var(--depth) * 3px));
+  }
+
+  .paper-tab.tone-yellow {
+    background: color-mix(in srgb, var(--yellow) 78%, white);
+  }
+  .paper-tab.tone-green {
+    background: color-mix(in srgb, var(--green) 72%, white);
+  }
+  .paper-tab.tone-blue {
+    background: color-mix(in srgb, var(--blue) 74%, white);
+  }
+  .paper-tab.tone-orange {
+    background: color-mix(in srgb, var(--orange) 76%, white);
+  }
+
+  .paper-tab:hover {
+    filter: brightness(0.98);
+  }
+
+  .paper-tab.active {
+    z-index: 5;
+    transform: translate(0, 0);
+    padding-bottom: 0.85rem;
+    filter: none;
+  }
+
+  .notebook-sheet {
+    --page: #fffef8;
+    position: relative;
+    z-index: 6;
+    background: var(--page);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 1px 4px 3px 1px;
+    padding: 1.2rem 1.35rem 1.55rem 1.55rem;
+    min-height: 18rem;
+    /* stacked pages peeking out — bookmarks sit between these layers */
+    box-shadow:
+      3px 3px 0 0 #f7f4ea,
+      3px 3px 0 1.5px color-mix(in srgb, var(--ink) 22%, transparent),
+      6px 6px 0 0 #f1ece0,
+      6px 6px 0 1.5px color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+
+  /* binding edge / margin gutter */
+  .notebook-sheet::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0.85rem;
+    background: color-mix(in srgb, var(--page) 88%, #e8e0d0);
+    border-right: 1.5px solid color-mix(in srgb, var(--pink) 55%, #e85d4c);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* faint ruled lines on the page */
+  .notebook-sheet::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 1.65rem,
+      color-mix(in srgb, var(--blue) 36%, #9ec9e8) 1.65rem,
+      color-mix(in srgb, var(--blue) 36%, #9ec9e8) calc(1.65rem + 1px)
+    );
+    background-position: 0 0.35rem;
+    opacity: 0.58;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
+  }
+
+  .sheet-panel {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    position: relative;
+    z-index: 1;
+  }
+
+  .sheet-panel h2 {
+    margin: 0 0 0.55rem;
+    font-family: var(--hand);
+    font-size: 1.35rem;
+    font-weight: 400;
+    color: var(--ink-muted);
+  }
+
+  .sheet-panel h3 {
+    margin: 1.1rem 0 0.35rem;
+    font-family: var(--hand);
+    font-size: 1.05rem;
+    font-weight: 400;
+    color: var(--ink-muted);
+  }
+
+  .organize-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem 1.35rem;
+    align-items: start;
+  }
+
+  .organize-col h3 {
+    margin-top: 0;
+  }
+
+  .organize-col .list li {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.35rem;
+  }
+
+  .organize-add,
+  .organize-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .organize-name {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 32%, transparent);
+    border-radius: 0;
+    color: var(--ink);
+    font-family: var(--hand);
+    font-size: 1rem;
+    padding: 0.05rem 0.1rem 0.28rem;
+    box-shadow: none;
+  }
+
+  .organize-name:focus {
+    outline: none;
+    border-bottom-color: var(--brand);
+  }
+
+  .organize-submit {
+    appearance: none;
+    align-self: flex-start;
+    background: color-mix(in srgb, var(--brand-soft) 85%, white);
+    border: 1.5px solid var(--brand);
+    color: var(--brand);
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    padding: 0.28rem 0.85rem;
+    cursor: pointer;
+    border-radius: 255px 10px 225px 8px / 10px 225px 8px 255px;
+  }
+
+  .organize-plus {
+    appearance: none;
+    align-self: flex-start;
+    width: 1.85rem;
+    height: 1.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: color-mix(in srgb, var(--yellow) 55%, white);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    color: var(--ink);
+    cursor: pointer;
+    border-radius: 4px 10px 5px 9px / 9px 4px 10px 5px;
+  }
+
+  .organize-plus:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--yellow) 75%, white);
+  }
+
+  .organize-submit:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--brand-soft) 70%, var(--yellow));
+    border-color: color-mix(in srgb, var(--brand) 75%, var(--ink));
+    color: color-mix(in srgb, var(--brand) 70%, var(--ink));
+  }
+
+  .organize-submit:disabled,
+  .organize-plus:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .color-row.compact {
+    gap: 0.35rem 0.4rem;
+  }
+
+  .color-row.compact .swatch {
+    width: 0.95rem;
+    height: 0.85rem;
+  }
+
+  .organize-list .cat,
+  .organize-list .tag-chip {
+    min-width: 0;
+  }
+
+  .organize-list .mark {
+    padding: 0.02rem 0.12rem;
+    background: color-mix(in srgb, var(--item-color, var(--yellow)) 45%, transparent);
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  .organize-list .sq {
+    border-radius: 40% 55% 45% 50% / 50% 40% 55% 45%;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+
+  @media (max-width: 900px) {
+    .organize-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .danger-block {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px dashed color-mix(in srgb, var(--danger) 45%, transparent);
   }
 
   .customise-block + .customise-block {
-    margin-top: 0.85rem;
+    margin-top: 0;
+  }
+
+  .customise-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem 2rem;
+    align-items: start;
+  }
+
+  @media (max-width: 640px) {
+    .customise-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   .customise-label {
@@ -872,32 +1322,54 @@
     color: var(--ink-muted);
   }
 
-  .customise-options {
+  .customise-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
+    flex-direction: column;
+    gap: 0.15rem;
   }
 
-  .customise-chip {
+  .customise-bullet {
     appearance: none;
-    border: 1.5px solid var(--chrome-line);
-    background: color-mix(in srgb, var(--blue) 28%, transparent);
+    border: none;
+    background: transparent;
     color: var(--ink);
     font-family: var(--hand);
-    font-size: 0.95rem;
-    padding: 0.28rem 0.65rem;
+    font-size: 1.05rem;
+    padding: 0.1rem 0;
     cursor: pointer;
-    border-radius: 3px 9px 4px 8px / 8px 3px 9px 2px;
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    width: 100%;
+    text-align: left;
   }
 
-  .customise-chip:hover {
-    border-color: var(--brand);
+  .customise-bullet .dot {
+    color: var(--ink-muted);
+    line-height: 1;
+    flex: none;
   }
 
-  .customise-chip.active {
-    background: var(--brand-soft);
-    border-color: var(--brand);
-    color: var(--brand);
+  .customise-bullet .mark {
+    line-height: 1.25;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    padding: 0.05rem 0.15rem;
+  }
+
+  .customise-bullet:hover .mark {
+    background: color-mix(in srgb, var(--yellow) 28%, transparent);
+  }
+
+  .customise-bullet.active .dot {
+    color: var(--ink);
+  }
+
+  .customise-bullet.active .mark {
+    background: color-mix(in srgb, var(--yellow) 62%, transparent);
   }
 
   .flash {
@@ -941,6 +1413,10 @@
     gap: 0.15rem;
   }
 
+  .import-bank-hint {
+    margin: 0.1rem 0 0.35rem;
+  }
+
   .import-progress {
     height: 10px;
     margin: 0.35rem 0 0.15rem;
@@ -970,7 +1446,7 @@
   .field {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.1rem;
     margin-bottom: 0.75rem;
     font-size: 0.9rem;
     letter-spacing: 0.01em;
@@ -979,9 +1455,22 @@
   }
 
   .field select,
-  .field input[type="file"],
   .field input[type="date"],
   .field input[type="text"] {
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 32%, transparent);
+    color: var(--main-text);
+    padding: 0.05rem 0.1rem 0.28rem;
+    font-family: inherit;
+    font-size: 0.95rem;
+    text-transform: none;
+    letter-spacing: normal;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .field input[type="file"] {
     background: var(--surface);
     border: 1.5px solid var(--chrome-line);
     color: var(--main-text);
@@ -994,77 +1483,188 @@
   }
 
   .field select:focus,
-  .field input[type="file"]:focus-visible,
   .field input[type="date"]:focus-visible,
   .field input[type="text"]:focus-visible {
+    outline: none;
+    border-bottom-color: var(--brand);
+    box-shadow: none;
+  }
+
+  .field input[type="file"]:focus-visible {
     outline: none;
     border-color: var(--brand);
     box-shadow: 0 0 0 2px var(--brand-soft);
   }
 
-  .opening-balance {
-    margin-top: 1.25rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--hair);
+  .account-form .add {
+    margin-top: 0.35rem;
   }
 
-  .opening-balance h3,
-  .create-account h3 {
-    margin: 0 0 0.35rem;
-    font-family: var(--hand);
-    font-size: 1rem;
-    letter-spacing: 0.01em;
-    text-transform: none;
-    font-weight: 400;
-    color: var(--ink-muted);
+  .accounts-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.55rem;
   }
 
-  .create-account {
-    margin-top: 1.25rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--hair);
+  .accounts-head h2 {
+    margin: 0;
+  }
+
+  .accounts-action {
+    appearance: none;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    background: color-mix(in srgb, var(--yellow) 55%, white);
+    color: var(--ink);
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 4px 10px 5px 9px / 9px 4px 10px 5px;
+    padding: 0;
+  }
+
+  .accounts-action:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--yellow) 75%, white);
+  }
+
+  .accounts-action:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .account-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem 1.5rem;
+    align-items: start;
+  }
+
+  .account-grid .field {
+    margin-bottom: 0.35rem;
+  }
+
+  .account-grid .field-color,
+  .account-grid .field-span {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 640px) {
+    .account-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .clear-opening-form {
+    margin-top: 0.65rem;
   }
 
   .account-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+  }
+
+  .account-pill .mark {
+    font-weight: 400;
+    padding: 0.05rem 0.2rem;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--account-color, var(--yellow)) 55%, transparent);
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
   }
 
   .swatch {
     display: inline-block;
-    width: 0.7rem;
-    height: 0.7rem;
-    border: 1px solid color-mix(in srgb, var(--chrome-line) 65%, transparent);
+    width: 0.85rem;
+    height: 0.75rem;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 40% 55% 45% 50% / 50% 40% 55% 45%;
     vertical-align: middle;
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
   }
 
   .swatch.lg {
-    width: 1.15rem;
-    height: 1.15rem;
+    width: 1.35rem;
+    height: 1.2rem;
+    border-radius: 42% 58% 48% 52% / 55% 42% 58% 45%;
   }
 
   .color-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.45rem;
+    gap: 0.55rem 0.65rem;
     align-items: center;
   }
 
   .color-option {
-    border: 2px solid transparent;
+    appearance: none;
+    border: none;
     background: transparent;
-    padding: 0.15rem;
+    padding: 0.2rem;
     cursor: pointer;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
+    line-height: 0;
+  }
+
+  .color-option:hover .swatch {
+    transform: rotate(-3deg) scale(1.05);
   }
 
   .color-option.selected {
-    border-color: var(--hi-cyan);
+    background: transparent;
+  }
+
+  .color-option.selected .swatch {
+    border-color: var(--ink);
+    border-width: 2.5px;
+    box-shadow: none;
   }
 
   .color-custom {
     margin: 0;
-    min-width: 5rem;
+    min-width: auto;
+    display: flex;
+    flex-direction: row;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .color-custom > span {
+    font-family: var(--hand);
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .color-custom input[type="color"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 2.6rem;
+    height: 1.35rem;
+    padding: 0;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 4px 10px 5px 9px / 9px 4px 10px 5px;
+    background: transparent;
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .color-custom input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+
+  .color-custom input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
+  }
+
+  .color-custom input[type="color"]::-moz-color-swatch {
+    border: none;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
   }
 
   .color-field {
@@ -1074,10 +1674,11 @@
   }
 
   .color-field legend {
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--muted);
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-muted);
     margin-bottom: 0.35rem;
   }
 
@@ -1123,118 +1724,9 @@
     text-decoration: none;
   }
 
-  .category-add {
-    display: grid;
-    grid-template-columns: 1fr auto auto auto;
-    gap: 0.5rem;
-    margin-bottom: 0.9rem;
-  }
-
-  .category-add input,
-  .category-add select,
-  .category-add button {
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
-    color: var(--main-text);
-    padding: 0.45rem 0.6rem;
-    font-family: inherit;
-    font-size: 0.8rem;
-  }
-
-  .category-add button {
-    background: var(--accent);
-    color: var(--background);
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .category-add input[type="color"],
-  .category-edit input[type="color"],
-  .tag-add-form input[type="color"],
-  .tag-edit input[type="color"] {
-    width: 42px;
-    height: 42px;
-    min-width: 42px;
-    min-height: 42px;
-    padding: 0.2rem;
-    box-sizing: border-box;
-    flex-shrink: 0;
-  }
-
-  .category-add input[type="color"]::-webkit-color-swatch-wrapper,
-  .category-edit input[type="color"]::-webkit-color-swatch-wrapper,
-  .tag-add-form input[type="color"]::-webkit-color-swatch-wrapper,
-  .tag-edit input[type="color"]::-webkit-color-swatch-wrapper {
-    padding: 0;
-  }
-
-  .category-add input[type="color"]::-webkit-color-swatch,
-  .category-edit input[type="color"]::-webkit-color-swatch,
-  .tag-add-form input[type="color"]::-webkit-color-swatch,
-  .tag-edit input[type="color"]::-webkit-color-swatch {
-    border: none;
-  }
-
   .list li.editing {
     display: block;
     padding: 0.65rem 0;
-  }
-
-  .category-edit {
-    display: grid;
-    grid-template-columns: 1fr auto auto auto auto;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .category-edit input,
-  .category-edit select,
-  .category-edit button {
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
-    color: var(--main-text);
-    padding: 0.45rem 0.6rem;
-    font-family: inherit;
-    font-size: 0.8rem;
-  }
-
-  .category-edit button[type="submit"] {
-    background: var(--accent);
-    color: var(--background);
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .edit-actions {
-    display: flex;
-    gap: 0.35rem;
-  }
-
-  .ghost {
-    background: none;
-    border: 1px solid var(--chrome-line);
-    color: var(--muted);
-    font-family: inherit;
-    font-size: 0.68rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    padding: 0.35rem 0.55rem;
-    cursor: pointer;
-  }
-
-  .ghost:hover {
-    color: var(--hi-green);
-    border-color: var(--hi-purple);
-  }
-
-  .ghost.danger {
-    color: var(--danger);
-    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
-  }
-
-  .ghost.danger:hover {
-    color: var(--danger);
-    border-color: var(--danger);
   }
 
   .row-actions {
@@ -1250,15 +1742,17 @@
     width: 28px;
     height: 28px;
     padding: 0;
-    background: none;
-    border: 1px solid var(--chrome-line);
-    color: var(--muted);
+    background: color-mix(in srgb, var(--paper, #fffef8) 80%, white);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    color: var(--ink-muted);
     cursor: pointer;
+    border-radius: 4px 9px 5px 8px / 8px 4px 9px 5px;
   }
 
   .icon-btn:hover:not(:disabled) {
-    color: var(--hi-green);
-    border-color: var(--hi-cyan);
+    color: var(--ink);
+    background: color-mix(in srgb, var(--yellow) 45%, white);
+    border-color: color-mix(in srgb, var(--ink) 35%, transparent);
   }
 
   .icon-btn:disabled {
@@ -1268,12 +1762,47 @@
 
   .icon-btn.danger {
     color: var(--danger);
-    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+    border-color: color-mix(in srgb, var(--danger) 40%, transparent);
   }
 
   .icon-btn.danger:hover:not(:disabled) {
     color: var(--danger);
+    background: color-mix(in srgb, var(--pink) 35%, white);
     border-color: var(--danger);
+  }
+
+  .ghost {
+    appearance: none;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    color: var(--ink-muted);
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    padding: 0.1rem 0.15rem;
+    cursor: pointer;
+  }
+
+  .ghost:hover {
+    color: var(--ink);
+    border-bottom-color: var(--brand);
+  }
+
+  .ghost.danger {
+    color: var(--danger);
+    border-bottom-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  }
+
+  .ghost.danger:hover {
+    color: var(--danger);
+    border-bottom-color: var(--danger);
+  }
+
+  .edit-actions {
+    display: flex;
+    gap: 0.55rem;
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .span-all {
@@ -1285,76 +1814,23 @@
     padding: 0.5rem 0;
   }
 
-  .tag-add-form {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 0.5rem;
-    margin-bottom: 0.9rem;
-  }
-
-  .tag-add-form input,
-  .tag-add-form button {
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
-    color: var(--main-text);
-    padding: 0.45rem 0.6rem;
-    font-family: inherit;
-    font-size: 0.8rem;
-  }
-
-  .tag-add-form button {
-    background: var(--accent);
-    color: var(--background);
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .tag-edit {
-    display: grid;
-    grid-template-columns: 1fr auto auto auto;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .tag-edit input,
-  .tag-edit button {
-    background: var(--surface2);
-    border: 2px solid var(--chrome-line);
-    color: var(--main-text);
-    padding: 0.45rem 0.6rem;
-    font-family: inherit;
-    font-size: 0.8rem;
-  }
-
-  .tag-edit button[type="submit"] {
-    background: var(--accent);
-    color: var(--background);
-    font-weight: 700;
-    cursor: pointer;
-  }
-
   .tag-chip {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    font-size: 0.8rem;
-    color: var(--main-text);
+    font-size: 0.95rem;
+    color: var(--ink);
+    min-width: 0;
   }
 
   .tag-chip :global(.tag-icon) {
     flex-shrink: 0;
   }
 
-  @media (max-width: 760px) {
-    .category-add,
-    .category-edit,
-    .tag-add-form,
-    .tag-edit {
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .edit-actions {
-      grid-column: 1 / -1;
-    }
+  .cat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
   }
 </style>

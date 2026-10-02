@@ -86,7 +86,7 @@
 {#if !token || hasErrorFromParam}
   <div class="p-6 md:p-8">
     <div class="flex flex-col items-center gap-6 text-center">
-      <div class="flex flex-col gap-2">
+      <div class="field-line">
         <h1 class="font-heading text-2xl font-bold">Invalid reset link</h1>
         <p class="text-balance text-sm text-muted-foreground">
           {hasErrorFromParam && errorMessage ? errorMessage : "This link is invalid or has expired. Request a new one."}
@@ -107,7 +107,7 @@
 {:else if success}
   <div class="p-6 md:p-8">
     <div class="flex flex-col items-center gap-6 text-center">
-      <div class="flex flex-col gap-2">
+      <div class="field-line">
         <h1 class="font-heading text-2xl font-bold">Password updated</h1>
         <p class="text-balance text-sm text-muted-foreground">Redirecting to sign in…</p>
       </div>
@@ -134,19 +134,12 @@
         <p class="text-balance text-sm text-muted-foreground">Choose a new password for your account.</p>
       </div>
 
-      <div class="flex flex-col gap-2">
+      <div class="field-line">
         <label for="password-{id}" class="text-sm font-medium">New password</label>
-        <input
-          id="password-{id}"
-          type="password"
-          bind:value={password}
-          required
-          disabled={loading}
-          class="w-full rounded border border-border bg-background px-3 py-2 text-sm"
-        />
+        <input id="password-{id}" type="password" bind:value={password} required disabled={loading} class="w-full bg-transparent px-1 text-sm" />
       </div>
 
-      <div class="flex flex-col gap-2">
+      <div class="field-line">
         <label for="confirm-password-{id}" class="text-sm font-medium">Confirm password</label>
         <input
           id="confirm-password-{id}"
@@ -154,7 +147,7 @@
           bind:value={confirmPassword}
           required
           disabled={loading}
-          class="w-full rounded border border-border bg-background px-3 py-2 text-sm"
+          class="w-full bg-transparent px-1 text-sm"
         />
         <p class="text-xs text-muted-foreground">8+ characters with upper, lower, number, and special character.</p>
       </div>
