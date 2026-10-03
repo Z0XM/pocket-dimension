@@ -12,6 +12,9 @@ DROP TABLE IF EXISTS "chhanchhan"."finance_budgets" CASCADE;
 DROP TABLE IF EXISTS "chhanchhan"."finance_transaction_tags" CASCADE;
 DROP TABLE IF EXISTS "chhanchhan"."finance_tags" CASCADE;
 DROP TABLE IF EXISTS "chhanchhan"."finance_categories" CASCADE;
+DROP TABLE IF EXISTS "chhanchhan"."finance_space_allocations" CASCADE;
+DROP TABLE IF EXISTS "chhanchhan"."finance_space_transactions" CASCADE;
+DROP TABLE IF EXISTS "chhanchhan"."finance_spaces" CASCADE;
 
 ALTER TABLE "chhanchhan"."finance_transactions" DROP COLUMN IF EXISTS "category_id";
 DROP INDEX IF EXISTS "chhanchhan"."finance_transactions_account_id_category_id_idx";
@@ -20,8 +23,8 @@ CREATE TABLE "chhanchhan"."finance_tags" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"created_by" uuid,
-	"updated_by" uuid,
+	"created_by_id" uuid NOT NULL,
+	"updated_by_id" uuid,
 	"account_id" uuid NOT NULL,
 	"name" text NOT NULL,
 	"color_hex" text,
@@ -38,8 +41,8 @@ CREATE TABLE "chhanchhan"."finance_spaces" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"created_by" uuid,
-	"updated_by" uuid,
+	"created_by_id" uuid NOT NULL,
+	"updated_by_id" uuid,
 	"account_id" uuid NOT NULL,
 	"name" text NOT NULL,
 	"color_hex" text,
@@ -56,8 +59,8 @@ CREATE TABLE "chhanchhan"."finance_space_allocations" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"created_by" uuid,
-	"updated_by" uuid,
+	"created_by_id" uuid NOT NULL,
+	"updated_by_id" uuid,
 	"space_id" uuid NOT NULL,
 	"left_transaction_id" uuid NOT NULL,
 	"right_transaction_id" uuid NOT NULL,
@@ -68,8 +71,8 @@ CREATE TABLE "chhanchhan"."finance_budgets" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"created_by" uuid,
-	"updated_by" uuid,
+	"created_by_id" uuid NOT NULL,
+	"updated_by_id" uuid,
 	"account_id" uuid NOT NULL,
 	"tag_id" uuid,
 	"name" text NOT NULL,
@@ -80,11 +83,19 @@ CREATE TABLE "chhanchhan"."finance_budgets" (
 	"is_active" boolean DEFAULT true NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "chhanchhan"."finance_tags" ADD CONSTRAINT "finance_tags_created_by_id_user_id_fk" FOREIGN KEY ("created_by_id") REFERENCES "auth"."user"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+ALTER TABLE "chhanchhan"."finance_tags" ADD CONSTRAINT "finance_tags_updated_by_id_user_id_fk" FOREIGN KEY ("updated_by_id") REFERENCES "auth"."user"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
 ALTER TABLE "chhanchhan"."finance_tags" ADD CONSTRAINT "finance_tags_account_id_finance_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "chhanchhan"."finance_accounts"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE "chhanchhan"."finance_transaction_tags" ADD CONSTRAINT "finance_transaction_tags_transaction_id_finance_transactions_id_fk" FOREIGN KEY ("transaction_id") REFERENCES "chhanchhan"."finance_transactions"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE "chhanchhan"."finance_transaction_tags" ADD CONSTRAINT "finance_transaction_tags_tag_id_finance_tags_id_fk" FOREIGN KEY ("tag_id") REFERENCES "chhanchhan"."finance_tags"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+ALTER TABLE "chhanchhan"."finance_spaces" ADD CONSTRAINT "finance_spaces_created_by_id_user_id_fk" FOREIGN KEY ("created_by_id") REFERENCES "auth"."user"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+ALTER TABLE "chhanchhan"."finance_spaces" ADD CONSTRAINT "finance_spaces_updated_by_id_user_id_fk" FOREIGN KEY ("updated_by_id") REFERENCES "auth"."user"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE "chhanchhan"."finance_spaces" ADD CONSTRAINT "finance_spaces_account_id_finance_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "chhanchhan"."finance_accounts"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
@@ -92,11 +103,19 @@ ALTER TABLE "chhanchhan"."finance_space_transactions" ADD CONSTRAINT "finance_sp
 --> statement-breakpoint
 ALTER TABLE "chhanchhan"."finance_space_transactions" ADD CONSTRAINT "finance_space_transactions_transaction_id_finance_transactions_id_fk" FOREIGN KEY ("transaction_id") REFERENCES "chhanchhan"."finance_transactions"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
+ALTER TABLE "chhanchhan"."finance_space_allocations" ADD CONSTRAINT "finance_space_allocations_created_by_id_user_id_fk" FOREIGN KEY ("created_by_id") REFERENCES "auth"."user"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+ALTER TABLE "chhanchhan"."finance_space_allocations" ADD CONSTRAINT "finance_space_allocations_updated_by_id_user_id_fk" FOREIGN KEY ("updated_by_id") REFERENCES "auth"."user"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
 ALTER TABLE "chhanchhan"."finance_space_allocations" ADD CONSTRAINT "finance_space_allocations_space_id_finance_spaces_id_fk" FOREIGN KEY ("space_id") REFERENCES "chhanchhan"."finance_spaces"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE "chhanchhan"."finance_space_allocations" ADD CONSTRAINT "finance_space_allocations_left_transaction_id_finance_transactions_id_fk" FOREIGN KEY ("left_transaction_id") REFERENCES "chhanchhan"."finance_transactions"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE "chhanchhan"."finance_space_allocations" ADD CONSTRAINT "finance_space_allocations_right_transaction_id_finance_transactions_id_fk" FOREIGN KEY ("right_transaction_id") REFERENCES "chhanchhan"."finance_transactions"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+ALTER TABLE "chhanchhan"."finance_budgets" ADD CONSTRAINT "finance_budgets_created_by_id_user_id_fk" FOREIGN KEY ("created_by_id") REFERENCES "auth"."user"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+ALTER TABLE "chhanchhan"."finance_budgets" ADD CONSTRAINT "finance_budgets_updated_by_id_user_id_fk" FOREIGN KEY ("updated_by_id") REFERENCES "auth"."user"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE "chhanchhan"."finance_budgets" ADD CONSTRAINT "finance_budgets_account_id_finance_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "chhanchhan"."finance_accounts"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
