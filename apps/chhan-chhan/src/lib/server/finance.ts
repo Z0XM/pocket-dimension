@@ -542,6 +542,7 @@ export async function listSpaceAllocations(accountId: string, spaceId: string) {
     .select({
       id: schema.financeSpaceAllocations.id,
       spaceId: schema.financeSpaceAllocations.spaceId,
+      batchId: schema.financeSpaceAllocations.batchId,
       leftTransactionId: schema.financeSpaceAllocations.leftTransactionId,
       rightTransactionId: schema.financeSpaceAllocations.rightTransactionId,
       amountMinor: schema.financeSpaceAllocations.amountMinor,
@@ -550,6 +551,25 @@ export async function listSpaceAllocations(accountId: string, spaceId: string) {
     .from(schema.financeSpaceAllocations)
     .where(eq(schema.financeSpaceAllocations.spaceId, spaceId))
     .orderBy(asc(schema.financeSpaceAllocations.createdAt));
+}
+
+export async function listSpaceSettlementBatches(accountId: string, spaceId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  return db
+    .select({
+      id: schema.financeSpaceSettlementBatches.id,
+      spaceId: schema.financeSpaceSettlementBatches.spaceId,
+      amountMinor: schema.financeSpaceSettlementBatches.amountMinor,
+      incomingTransactionIds: schema.financeSpaceSettlementBatches.incomingTransactionIds,
+      outgoingTransactionIds: schema.financeSpaceSettlementBatches.outgoingTransactionIds,
+      notes: schema.financeSpaceSettlementBatches.notes,
+      createdAt: schema.financeSpaceSettlementBatches.createdAt,
+    })
+    .from(schema.financeSpaceSettlementBatches)
+    .where(eq(schema.financeSpaceSettlementBatches.spaceId, spaceId))
+    .orderBy(asc(schema.financeSpaceSettlementBatches.createdAt));
 }
 
 export async function listSpacePeople(accountId: string, spaceId: string) {
@@ -848,6 +868,7 @@ export async function listSpaceItemPayments(accountId: string, spaceId: string) 
       transactionId: schema.financeSpaceItemPayments.transactionId,
       coversPersonId: schema.financeSpaceItemPayments.coversPersonId,
       amountMinor: schema.financeSpaceItemPayments.amountMinor,
+      notes: schema.financeSpaceItemPayments.notes,
       createdAt: schema.financeSpaceItemPayments.createdAt,
     })
     .from(schema.financeSpaceItemPayments)
@@ -859,7 +880,7 @@ export async function createSpaceItemPayment(
   userId: string,
   accountId: string,
   spaceId: string,
-  payload: { itemId: string; transactionId: string; coversPersonId: string; amountMinor: number }
+  payload: { itemId: string; transactionId: string; coversPersonId: string; amountMinor: number; notes?: string }
 ) {
   if (!Number.isInteger(payload.amountMinor) || payload.amountMinor <= 0) return null;
 
@@ -880,6 +901,8 @@ export async function createSpaceItemPayment(
   const itemOpen = itemOpenMinor(item.amountMinor, coveredByItem(detail.itemPayments, item.id));
   if (payload.amountMinor > maxItemPaymentMinor(txnOpen, shareOpen, itemOpen)) return null;
 
+  const notes = payload.notes?.trim() ? payload.notes.trim() : null;
+
   const [created] = await db
     .insert(schema.financeSpaceItemPayments)
     .values({
@@ -888,6 +911,7 @@ export async function createSpaceItemPayment(
       transactionId: payload.transactionId,
       coversPersonId: payload.coversPersonId,
       amountMinor: payload.amountMinor,
+      notes,
       createdById: userId,
       updatedById: userId,
     })
@@ -910,9 +934,10 @@ export async function getSpaceDetail(accountId: string, spaceId: string) {
   const space = await getSpace(accountId, spaceId);
   if (!space) return null;
 
-  const [transactions, allocations, people, items, itemPayments] = await Promise.all([
+  const [transactions, allocations, settlementBatches, people, items, itemPayments] = await Promise.all([
     listSpaceTransactions(accountId, spaceId),
     listSpaceAllocations(accountId, spaceId),
+    listSpaceSettlementBatches(accountId, spaceId),
     listSpacePeople(accountId, spaceId),
     listSpaceItems(accountId, spaceId),
     listSpaceItemPayments(accountId, spaceId),
@@ -920,6 +945,7 @@ export async function getSpaceDetail(accountId: string, spaceId: string) {
 
   const txns = transactions ?? [];
   const allocs = allocations ?? [];
+  const batches = settlementBatches ?? [];
   const peopleRows = people ?? [];
   const itemRows = items ?? [];
   const paymentRows = itemPayments ?? [];
@@ -934,6 +960,7 @@ export async function getSpaceDetail(accountId: string, spaceId: string) {
     space,
     transactions: txns,
     allocations: allocs,
+    settlementBatches: batches,
     people: peopleRows,
     items: itemRows,
     itemPayments: paymentRows,
@@ -976,18 +1003,141 @@ export async function createSpaceAllocation(userId: string, accountId: string, s
   const rightOpen = remainders.find((row) => row.transactionId === right.id)?.remainderMinor ?? 0;
   if (payload.amountMinor > maxAllocationMinor(leftOpen, rightOpen)) return null;
 
-  const [created] = await db
-    .insert(schema.financeSpaceAllocations)
-    .values({
-      spaceId,
-      leftTransactionId: payload.leftTransactionId,
-      rightTransactionId: payload.rightTransactionId,
+  const amountMinor = payload.amountMinor;
+  const incomeId = left.type === "income" ? left.id : right.id;
+  const expenseId = left.type === "expense" ? left.id : right.id;
+
+  return db.transaction(async (tx) => {
+    const batchId = crypto.randomUUID();
+    const [batch] = await tx
+      .insert(schema.financeSpaceSettlementBatches)
+      .values({
+        id: batchId,
+        spaceId,
+        amountMinor,
+        incomingTransactionIds: [incomeId],
+        outgoingTransactionIds: [expenseId],
+        notes: null,
+        createdById: userId,
+        updatedById: userId,
+      })
+      .returning();
+    if (!batch) return null;
+
+    const [created] = await tx
+      .insert(schema.financeSpaceAllocations)
+      .values({
+        spaceId,
+        batchId,
+        leftTransactionId: incomeId,
+        rightTransactionId: expenseId,
+        amountMinor,
+        createdById: userId,
+        updatedById: userId,
+      })
+      .returning();
+    return created ?? null;
+  });
+}
+
+/** Create many income↔expense edges in one request, validating opens sequentially. */
+export async function createSpaceAllocationsBatch(
+  userId: string,
+  accountId: string,
+  spaceId: string,
+  payloads: SpaceAllocationPayload[],
+  selection: { incomingTransactionIds: string[]; outgoingTransactionIds: string[]; notes?: string }
+) {
+  if (payloads.length === 0) return null;
+  if (selection.incomingTransactionIds.length === 0 || selection.outgoingTransactionIds.length === 0) return null;
+
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  const detail = await getSpaceDetail(accountId, spaceId);
+  if (!detail) return null;
+
+  const txnById = new Map(detail.transactions.map((row) => [row.id, row]));
+  const openById = new Map(
+    spaceRemainders(detail.transactions, detail.allocations, detail.itemPayments).map((row) => [row.transactionId, row.remainderMinor])
+  );
+
+  for (const id of selection.incomingTransactionIds) {
+    const txn = txnById.get(id);
+    if (!txn || txn.type !== "income") return null;
+  }
+  for (const id of selection.outgoingTransactionIds) {
+    const txn = txnById.get(id);
+    if (!txn || txn.type !== "expense") return null;
+  }
+
+  const prepared: SpaceAllocationPayload[] = [];
+  for (const payload of payloads) {
+    if (payload.leftTransactionId === payload.rightTransactionId) return null;
+    if (!Number.isInteger(payload.amountMinor) || payload.amountMinor <= 0) return null;
+
+    const left = txnById.get(payload.leftTransactionId);
+    const right = txnById.get(payload.rightTransactionId);
+    if (!left || !right) return null;
+    if (!canAllocateTransactionTypes(left.type, right.type)) return null;
+    // Normalize so left is income for storage consistency with UI plan
+    const incomeId = left.type === "income" ? left.id : right.id;
+    const expenseId = left.type === "expense" ? left.id : right.id;
+    if (!selection.incomingTransactionIds.includes(incomeId) || !selection.outgoingTransactionIds.includes(expenseId)) {
+      return null;
+    }
+    const incomeOpen = openById.get(incomeId) ?? 0;
+    const expenseOpen = openById.get(expenseId) ?? 0;
+    if (payload.amountMinor > maxAllocationMinor(incomeOpen, expenseOpen)) return null;
+
+    prepared.push({
+      leftTransactionId: incomeId,
+      rightTransactionId: expenseId,
       amountMinor: payload.amountMinor,
-      createdById: userId,
-      updatedById: userId,
-    })
-    .returning();
-  return created;
+    });
+    openById.set(incomeId, incomeOpen - payload.amountMinor);
+    openById.set(expenseId, expenseOpen - payload.amountMinor);
+  }
+
+  const amountMinor = prepared.reduce((sum, row) => sum + row.amountMinor, 0);
+  const notes = selection.notes?.trim() ? selection.notes.trim() : null;
+
+  return db.transaction(async (tx) => {
+    const batchId = crypto.randomUUID();
+    const [batch] = await tx
+      .insert(schema.financeSpaceSettlementBatches)
+      .values({
+        id: batchId,
+        spaceId,
+        amountMinor,
+        incomingTransactionIds: selection.incomingTransactionIds,
+        outgoingTransactionIds: selection.outgoingTransactionIds,
+        notes,
+        createdById: userId,
+        updatedById: userId,
+      })
+      .returning();
+    if (!batch) return null;
+
+    const created = [];
+    for (const payload of prepared) {
+      const [row] = await tx
+        .insert(schema.financeSpaceAllocations)
+        .values({
+          spaceId,
+          batchId,
+          leftTransactionId: payload.leftTransactionId,
+          rightTransactionId: payload.rightTransactionId,
+          amountMinor: payload.amountMinor,
+          createdById: userId,
+          updatedById: userId,
+        })
+        .returning();
+      if (!row) return null;
+      created.push(row);
+    }
+    return { batch, allocations: created };
+  });
 }
 
 export async function updateSpaceAllocation(userId: string, accountId: string, spaceId: string, allocationId: string, amountMinor: number) {
@@ -1008,10 +1158,20 @@ export async function deleteSpaceAllocation(accountId: string, spaceId: string, 
   const space = await getSpace(accountId, spaceId);
   if (!space) return false;
 
-  const [removed] = await db
-    .delete(schema.financeSpaceAllocations)
+  const [existing] = await db
+    .select({
+      id: schema.financeSpaceAllocations.id,
+      batchId: schema.financeSpaceAllocations.batchId,
+    })
+    .from(schema.financeSpaceAllocations)
     .where(and(eq(schema.financeSpaceAllocations.id, allocationId), eq(schema.financeSpaceAllocations.spaceId, spaceId)))
-    .returning({ id: schema.financeSpaceAllocations.id });
+    .limit(1);
+  if (!existing) return false;
+
+  const [removed] = await db
+    .delete(schema.financeSpaceSettlementBatches)
+    .where(and(eq(schema.financeSpaceSettlementBatches.id, existing.batchId), eq(schema.financeSpaceSettlementBatches.spaceId, spaceId)))
+    .returning({ id: schema.financeSpaceSettlementBatches.id });
   return Boolean(removed);
 }
 

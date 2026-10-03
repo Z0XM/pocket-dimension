@@ -8,11 +8,15 @@
     name: string;
     options: Option[];
     value?: string;
+    /** When `multiple`, bind selected values here instead of `value`. */
+    values?: string[];
     disabled?: boolean;
     compact?: boolean;
+    multiple?: boolean;
     /** Show a filter field in the menu (matches option labels). */
     searchable?: boolean;
     searchPlaceholder?: string;
+    emptyLabel?: string;
     /** Optional highlight color for compact trigger (e.g. category color). */
     accent?: string | null;
     /** Anchor the menu to the trigger's end edge (opens leftward). Useful near the right side of a clipped container. */
@@ -25,10 +29,13 @@
     name,
     options,
     value = $bindable(""),
+    values = $bindable<string[]>([]),
     disabled = false,
     compact = false,
+    multiple = false,
     searchable = false,
     searchPlaceholder = "Search…",
+    emptyLabel = "Pick…",
     accent = null,
     alignEnd = false,
     onChange,
@@ -40,13 +47,25 @@
   let root: HTMLDivElement | undefined = $state();
   let searchInput: HTMLInputElement | undefined = $state();
 
-  const selectedLabel = $derived(options.find((option) => option.value === value)?.label ?? options[0]?.label ?? "");
+  const isEmpty = $derived(multiple ? values.length === 0 : !value);
+
+  const selectedLabel = $derived.by(() => {
+    if (multiple) {
+      if (values.length === 0) return emptyLabel;
+      if (values.length === 1) {
+        return options.find((option) => option.value === values[0])?.label ?? "1 selected";
+      }
+      return `${values.length} selected`;
+    }
+    return options.find((option) => option.value === value)?.label ?? options[0]?.label ?? emptyLabel;
+  });
 
   const filteredOptions = $derived.by(() => {
-    if (!searchable) return options;
+    const list = multiple ? options.filter((option) => option.value) : options;
+    if (!searchable) return list;
     const needle = query.trim().toLowerCase();
-    if (!needle) return options;
-    return options.filter((option) => {
+    if (!needle) return list;
+    return list.filter((option) => {
       if (!option.value) return true;
       return option.label.toLowerCase().includes(needle);
     });
@@ -58,7 +77,23 @@
     if (!open) query = "";
   }
 
+  function isSelected(optionValue: string) {
+    if (multiple) return values.includes(optionValue);
+    return optionValue === value;
+  }
+
   function choose(next: string) {
+    if (multiple) {
+      if (!next) {
+        values = [];
+      } else if (values.includes(next)) {
+        values = values.filter((id) => id !== next);
+      } else {
+        values = [...values, next];
+      }
+      onChange?.(next);
+      return;
+    }
     value = next;
     open = false;
     query = "";
@@ -103,13 +138,20 @@
   class:disabled
   class:compact
   class:searchable
+  class:multiple
   class:align-end={alignEnd}
-  class:empty={!value}
-  class:has-accent={Boolean(accent && value)}
-  style={accent && value ? `--sketch-accent: ${accent}` : undefined}
+  class:empty={isEmpty}
+  class:has-accent={Boolean(accent && !isEmpty)}
+  style={accent && !isEmpty ? `--sketch-accent: ${accent}` : undefined}
   bind:this={root}
 >
-  <input type="hidden" {name} {value} />
+  {#if multiple}
+    {#each values as selected (selected)}
+      <input type="hidden" name={`${name}[]`} value={selected} />
+    {/each}
+  {:else}
+    <input type="hidden" {name} {value} />
+  {/if}
   <button type="button" class="sketch-trigger" aria-expanded={open} aria-haspopup="listbox" aria-label={ariaLabel} {disabled} onclick={toggleOpen}>
     <span class="sketch-value">{selectedLabel}</span>
     <span class="sketch-caret" aria-hidden="true">▾</span>
@@ -131,9 +173,9 @@
           />
         </div>
       {/if}
-      <ul class="sketch-options" role="listbox" aria-label={ariaLabel}>
+      <ul class="sketch-options" role="listbox" aria-label={ariaLabel} aria-multiselectable={multiple || undefined}>
         {#each filteredOptions as option (option.value || option.label)}
-          {@const selected = option.value === value}
+          {@const selected = isSelected(option.value)}
           <li>
             <button
               type="button"
@@ -144,7 +186,7 @@
               aria-selected={selected}
               onclick={() => choose(option.value)}
             >
-              <span class="dot" aria-hidden="true">•</span>
+              <span class="dot" aria-hidden="true">{multiple ? (selected ? "✓" : "○") : "•"}</span>
               <span class="mark">{option.label}</span>
             </button>
           </li>
@@ -152,6 +194,11 @@
           <li class="sketch-empty">No matches</li>
         {/each}
       </ul>
+      {#if multiple}
+        <div class="sketch-multi-foot">
+          <button type="button" class="sketch-done" onclick={() => ((open = false), (query = ""))}>Done</button>
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
@@ -388,5 +435,26 @@
 
   .sketch-option.empty.selected .dot {
     color: var(--ink-muted);
+  }
+
+  .sketch-multi-foot {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.25rem 0.35rem 0.1rem;
+    border-top: 1px dashed color-mix(in srgb, var(--ink) 14%, transparent);
+    margin-top: 0.2rem;
+  }
+
+  .sketch-done {
+    appearance: none;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    background: color-mix(in srgb, var(--yellow) 45%, var(--mix-wash));
+    color: var(--ink);
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    padding: 0.15rem 0.65rem;
+    cursor: pointer;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
   }
 </style>

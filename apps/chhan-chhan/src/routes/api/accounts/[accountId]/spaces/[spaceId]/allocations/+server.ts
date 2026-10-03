@@ -1,8 +1,8 @@
 import { error, json } from "@sveltejs/kit";
 import { canEdit, getMembershipOrThrow, requireUser } from "$lib/server/authz";
-import { createSpaceAllocation } from "$lib/server/finance";
+import { createSpaceAllocation, createSpaceAllocationsBatch } from "$lib/server/finance";
 import { readJsonBody } from "$lib/server/http";
-import { createSpaceAllocationSchema } from "$lib/validation/finance";
+import { createSpaceAllocationSchema, createSpaceAllocationsBatchSchema } from "$lib/validation/finance";
 
 export async function POST({ locals, params, request }) {
   const user = requireUser(locals);
@@ -11,8 +11,26 @@ export async function POST({ locals, params, request }) {
     throw error(403, "You only have read access");
   }
 
-  const payload = await readJsonBody(request, createSpaceAllocationSchema);
-  const allocation = await createSpaceAllocation(user.id, params.accountId, params.spaceId, payload);
+  const raw = await request.json();
+  const batchParsed = createSpaceAllocationsBatchSchema.safeParse(raw);
+  if (batchParsed.success) {
+    const result = await createSpaceAllocationsBatch(user.id, params.accountId, params.spaceId, batchParsed.data.allocations, {
+      incomingTransactionIds: batchParsed.data.incomingTransactionIds,
+      outgoingTransactionIds: batchParsed.data.outgoingTransactionIds,
+      notes: batchParsed.data.notes,
+    });
+    if (!result) {
+      throw error(400, "Settlement needs valid incoming↔outgoing pairs in this space within open remainders");
+    }
+    return json({ allocations: result.allocations, batch: result.batch }, { status: 201 });
+  }
+
+  const singleParsed = createSpaceAllocationSchema.safeParse(raw);
+  if (!singleParsed.success) {
+    throw error(400, "Invalid allocation payload");
+  }
+
+  const allocation = await createSpaceAllocation(user.id, params.accountId, params.spaceId, singleParsed.data);
   if (!allocation) {
     throw error(400, "Allocation needs two different transactions already in this space and a positive amount");
   }

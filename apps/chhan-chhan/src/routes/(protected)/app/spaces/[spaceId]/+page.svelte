@@ -4,12 +4,14 @@
   import SketchSelect from "$lib/components/sketch-select.svelte";
   import { formatMoney, parseIndianAmount } from "$lib/finance/money";
   import {
-    canAllocateTransactionTypes,
     equalSplitShares,
-    maxAllocationMinor,
+    groupSpaceTransactionsByEvents,
+    groupSpaceTransactionsBySettlements,
     maxItemPaymentMinor,
+    planMultiSettlement,
     sharesSumToAmount,
     spaceRemainders,
+    sumOpenMinor,
     weightedSplitShares,
   } from "$lib/finance/space-settlement";
   import ArrowLeftRight from "@lucide/svelte/icons/arrow-left-right";
@@ -21,6 +23,7 @@
 
   type Txn = PageData["transactions"][number];
   type Allocation = PageData["allocations"][number];
+  type SettlementBatch = PageData["settlementBatches"][number];
   type Person = PageData["people"][number];
   type Item = PageData["items"][number];
   type ItemPayment = PageData["itemPayments"][number];
@@ -28,14 +31,16 @@
 
   let transactions = $state<Txn[]>([]);
   let allocations = $state<Allocation[]>([]);
+  let settlementBatches = $state<SettlementBatch[]>([]);
   let people = $state<Person[]>([]);
   let items = $state<Item[]>([]);
   let itemPayments = $state<ItemPayment[]>([]);
   let personBalances = $state<PersonBalance[]>([]);
 
-  let incomingId = $state("");
-  let outgoingId = $state("");
+  let incomingIds = $state<string[]>([]);
+  let outgoingIds = $state<string[]>([]);
   let amountMajor = $state("");
+  let settlementNotes = $state("");
   let busy = $state(false);
   let errorMessage = $state<string | null>(null);
   let removingTxnId = $state<string | null>(null);
@@ -61,6 +66,7 @@
   let payItemId = $state("");
   let payPersonId = $state("");
   let payAmountMajor = $state("");
+  let payNotes = $state("");
   let deletingPersonId = $state<string | null>(null);
   let deletingItemId = $state<string | null>(null);
   let deletingPaymentId = $state<string | null>(null);
@@ -75,9 +81,18 @@
   ];
   let activeTab = $state<SpaceTabId>("transactions");
 
+  type TxnGroupMode = "flat" | "settlements" | "events";
+  const TXN_GROUP_MODES: Array<{ id: TxnGroupMode; label: string }> = [
+    { id: "flat", label: "All" },
+    { id: "settlements", label: "Settlements" },
+    { id: "events", label: "Events" },
+  ];
+  let txnGroupMode = $state<TxnGroupMode>("flat");
+
   $effect(() => {
     transactions = [...data.transactions];
     allocations = [...data.allocations];
+    settlementBatches = [...data.settlementBatches];
     people = [...data.people];
     items = [...data.items];
     itemPayments = [...data.itemPayments];
@@ -141,12 +156,33 @@
     return items.find((row) => row.id === id);
   }
 
-  const incomingTxn = $derived(incomingId ? (txnById(incomingId) ?? null) : null);
-  const outgoingTxn = $derived(outgoingId ? (txnById(outgoingId) ?? null) : null);
-  const incomingRemainder = $derived(incomingId ? (remainderById.get(incomingId)?.remainderMinor ?? 0) : 0);
-  const outgoingRemainder = $derived(outgoingId ? (remainderById.get(outgoingId)?.remainderMinor ?? 0) : 0);
-  const pairOk = $derived(incomingTxn != null && outgoingTxn != null && canAllocateTransactionTypes(incomingTxn.type, outgoingTxn.type));
-  const maxMinor = $derived(pairOk ? maxAllocationMinor(incomingRemainder, outgoingRemainder) : 0);
+  const selectedIncomingOpens = $derived(incomingIds.map((id) => ({ id, openMinor: remainderById.get(id)?.remainderMinor ?? 0 })));
+  const selectedOutgoingOpens = $derived(outgoingIds.map((id) => ({ id, openMinor: remainderById.get(id)?.remainderMinor ?? 0 })));
+  const incomingRemainder = $derived(sumOpenMinor(selectedIncomingOpens));
+  const outgoingRemainder = $derived(sumOpenMinor(selectedOutgoingOpens));
+  const pairOk = $derived(incomingIds.length > 0 && outgoingIds.length > 0);
+  const maxMinor = $derived(pairOk ? Math.min(incomingRemainder, outgoingRemainder) : 0);
+  const plannedEdges = $derived.by(() => {
+    if (!pairOk || maxMinor <= 0) return [];
+    let amountMinor = 0;
+    try {
+      amountMinor = amountMajor.trim() ? parseIndianAmount(amountMajor) : 0;
+    } catch {
+      return [];
+    }
+    if (amountMinor <= 0) return [];
+    return planMultiSettlement(selectedIncomingOpens, selectedOutgoingOpens, Math.min(amountMinor, maxMinor));
+  });
+
+  const txnIds = $derived(transactions.map((txn) => txn.id));
+  const settlementTxnGroups = $derived(groupSpaceTransactionsBySettlements(txnIds, settlementBatches));
+  const eventTxnGroups = $derived(groupSpaceTransactionsByEvents(txnIds, items, itemPayments));
+
+  function settlementGroupLabel(group: (typeof settlementTxnGroups.groups)[number]) {
+    const left = group.incomingTransactionIds.map((id) => txnById(id)?.merchant?.trim() || "Txn");
+    const right = group.outgoingTransactionIds.map((id) => txnById(id)?.merchant?.trim() || "Txn");
+    return `${left.join(", ")} ↔ ${right.join(", ")}`;
+  }
 
   const payTxnOpen = $derived(payTxnId ? (remainderById.get(payTxnId)?.remainderMinor ?? 0) : 0);
   const payShareOpen = $derived(payItemId && payPersonId ? (shareOpenByKey.get(`${payItemId}:${payPersonId}`) ?? 0) : 0);
@@ -199,14 +235,10 @@
   });
 
   $effect(() => {
-    if (incomingTxn && incomingTxn.type !== "income") {
-      incomingId = "";
-      amountMajor = "";
-    }
-    if (outgoingTxn && outgoingTxn.type !== "expense") {
-      outgoingId = "";
-      amountMajor = "";
-    }
+    const nextIncoming = incomingIds.filter((id) => txnById(id)?.type === "income");
+    const nextOutgoing = outgoingIds.filter((id) => txnById(id)?.type === "expense");
+    if (nextIncoming.length !== incomingIds.length) incomingIds = nextIncoming;
+    if (nextOutgoing.length !== outgoingIds.length) outgoingIds = nextOutgoing;
   });
 
   function txnOptionLabel(txn: Txn) {
@@ -214,10 +246,12 @@
   }
 
   function optionsForType(type: "income" | "expense") {
-    return [
-      { value: "", label: type === "income" ? "Pick incoming…" : "Pick outgoing…" },
-      ...transactions.filter((txn) => txn.type === type).map((txn) => ({ value: txn.id, label: txnOptionLabel(txn) })),
-    ];
+    return transactions
+      .filter((txn) => txn.type === type)
+      .map((txn) => ({
+        value: txn.id,
+        label: `${txnOptionLabel(txn)} · open ${formatMoney(remainderById.get(txn.id)?.remainderMinor ?? 0, data.account.currencyCode)}`,
+      }));
   }
 
   const incomingSelectOptions = $derived(optionsForType("income"));
@@ -282,12 +316,8 @@
     if (busy) return;
     errorMessage = null;
 
-    if (!incomingId || !outgoingId || incomingId === outgoingId) {
-      errorMessage = "Pick an incoming and an outgoing transaction.";
-      return;
-    }
-    if (!pairOk) {
-      errorMessage = "Link an incoming (income) with an outgoing (expense).";
+    if (incomingIds.length === 0 || outgoingIds.length === 0) {
+      errorMessage = "Pick at least one incoming and one outgoing transaction.";
       return;
     }
 
@@ -303,11 +333,17 @@
       return;
     }
     if (maxMinor <= 0) {
-      errorMessage = "Nothing left to allocate on one of these rows.";
+      errorMessage = "Nothing left to allocate on the selected rows.";
       return;
     }
     if (amountMinor > maxMinor) {
-      errorMessage = `Amount can’t exceed the smaller open remainder (${formatMoney(maxMinor, data.account.currencyCode)}).`;
+      errorMessage = `Amount can’t exceed the open capacity (${formatMoney(maxMinor, data.account.currencyCode)}).`;
+      return;
+    }
+
+    const edges = planMultiSettlement(selectedIncomingOpens, selectedOutgoingOpens, amountMinor);
+    if (edges.length === 0) {
+      errorMessage = "Could not plan a settlement from the selected transactions.";
       return;
     }
 
@@ -317,18 +353,22 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          leftTransactionId: incomingId,
-          rightTransactionId: outgoingId,
-          amountMinor,
+          allocations: edges,
+          incomingTransactionIds: incomingIds,
+          outgoingTransactionIds: outgoingIds,
+          notes: settlementNotes.trim() || undefined,
         }),
       });
       if (!response.ok) {
-        errorMessage = response.status === 400 ? "Pick an incoming and an outgoing transaction in this space." : "Could not create allocation.";
+        errorMessage =
+          response.status === 400 ? "Settlement needs valid incoming↔outgoing pairs within open remainders." : "Could not create settlement.";
         return;
       }
-      const payload = (await response.json()) as { allocation: Allocation };
-      allocations = [...allocations, payload.allocation];
+      const payload = (await response.json()) as { allocations: Allocation[]; batch: SettlementBatch };
+      allocations = [...allocations, ...payload.allocations];
+      settlementBatches = [...settlementBatches, payload.batch];
       amountMajor = "";
+      settlementNotes = "";
       await invalidateAll();
     } finally {
       busy = false;
@@ -344,10 +384,13 @@
         method: "DELETE",
       });
       if (!response.ok) {
-        errorMessage = "Could not delete allocation.";
+        errorMessage = "Could not delete settlement.";
         return;
       }
-      allocations = allocations.filter((row) => row.id !== allocationId);
+      const target = allocations.find((row) => row.id === allocationId);
+      const batchId = target?.batchId ?? allocationId;
+      allocations = allocations.filter((row) => (row.batchId ?? row.id) !== batchId);
+      settlementBatches = settlementBatches.filter((row) => row.id !== batchId);
       await invalidateAll();
     } finally {
       deletingAllocationId = null;
@@ -371,8 +414,8 @@
       transactions = transactions.filter((row) => row.id !== transactionId);
       allocations = allocations.filter((row) => row.leftTransactionId !== transactionId && row.rightTransactionId !== transactionId);
       itemPayments = itemPayments.filter((row) => row.transactionId !== transactionId);
-      if (incomingId === transactionId) incomingId = "";
-      if (outgoingId === transactionId) outgoingId = "";
+      if (incomingIds.includes(transactionId)) incomingIds = incomingIds.filter((id) => id !== transactionId);
+      if (outgoingIds.includes(transactionId)) outgoingIds = outgoingIds.filter((id) => id !== transactionId);
       if (payTxnId === transactionId) payTxnId = "";
       await invalidateAll();
     } finally {
@@ -584,6 +627,7 @@
           itemId: payItemId,
           coversPersonId: payPersonId,
           amountMinor,
+          notes: payNotes.trim() || undefined,
         }),
       });
       if (!response.ok) {
@@ -591,6 +635,7 @@
         return;
       }
       payAmountMajor = "";
+      payNotes = "";
       await invalidateAll();
     } finally {
       busy = false;
@@ -647,6 +692,31 @@
   {#if errorMessage}
     <p class="flash error">{errorMessage}</p>
   {/if}
+
+  {#snippet txnRow(txn: Txn)}
+    {@const rem = remainderById.get(txn.id)}
+    <tr>
+      <td class="mono dim">{txn.occurredOn}</td>
+      <td class="merchant">{txn.merchant ?? "—"}</td>
+      <td class="right mono amt {typeClass(txn.type)}">
+        {formatMoney(txn.amountMinor, data.account.currencyCode)}
+      </td>
+      <td class="right mono amt {typeClass(txn.type)}" class:rem-open={(rem?.remainderMinor ?? 0) > 0}>
+        {formatSignedMoney(signedOpenMinor(txn.type, rem?.remainderMinor ?? 0), data.account.currencyCode)}
+      </td>
+      <td class="right">
+        <button
+          type="button"
+          class="icon-btn danger"
+          aria-label="Remove from space"
+          disabled={removingTxnId === txn.id}
+          onclick={() => detachTransaction(txn.id)}
+        >
+          ×
+        </button>
+      </td>
+    </tr>
+  {/snippet}
 
   <div class="summary-row">
     <div class="flow" aria-label="Space summary">
@@ -738,7 +808,25 @@
     <div class="notebook-sheet" class:fill-table={activeTab === "transactions"} data-tone={activeTab}>
       {#if activeTab === "transactions"}
         <section class="sheet-panel" id="space-panel-transactions" role="tabpanel" aria-labelledby="space-tab-transactions">
-          <p class="panel-copy dim">Attach more from the ledger’s space icon, then settle here.</p>
+          <div class="txn-toolbar">
+            <p class="panel-copy dim">Attach more from the ledger’s space icon, then settle here.</p>
+            {#if transactions.length > 0}
+              <div class="split-modes txn-group-modes" role="radiogroup" aria-label="Group transactions">
+                {#each TXN_GROUP_MODES as mode (mode.id)}
+                  <button
+                    type="button"
+                    class="split-mode"
+                    class:active={txnGroupMode === mode.id}
+                    role="radio"
+                    aria-checked={txnGroupMode === mode.id}
+                    onclick={() => (txnGroupMode = mode.id)}
+                  >
+                    {mode.label}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
           {#if transactions.length === 0}
             <p class="dim empty">No transactions in this space yet.</p>
           {:else}
@@ -755,30 +843,92 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {#each transactions as txn (txn.id)}
-                      {@const rem = remainderById.get(txn.id)}
-                      <tr>
-                        <td class="mono dim">{txn.occurredOn}</td>
-                        <td class="merchant">{txn.merchant ?? "—"}</td>
-                        <td class="right mono amt {typeClass(txn.type)}">
-                          {formatMoney(txn.amountMinor, data.account.currencyCode)}
-                        </td>
-                        <td class="right mono amt {typeClass(txn.type)}" class:rem-open={(rem?.remainderMinor ?? 0) > 0}>
-                          {formatSignedMoney(signedOpenMinor(txn.type, rem?.remainderMinor ?? 0), data.account.currencyCode)}
-                        </td>
-                        <td class="right">
-                          <button
-                            type="button"
-                            class="icon-btn danger"
-                            aria-label="Remove from space"
-                            disabled={removingTxnId === txn.id}
-                            onclick={() => detachTransaction(txn.id)}
-                          >
-                            ×
-                          </button>
-                        </td>
-                      </tr>
-                    {/each}
+                    {#if txnGroupMode === "flat"}
+                      {#each transactions as txn (txn.id)}
+                        {@render txnRow(txn)}
+                      {/each}
+                    {:else if txnGroupMode === "settlements"}
+                      {#if settlementTxnGroups.groups.length === 0 && settlementTxnGroups.ungroupedIds.length === transactions.length}
+                        <tr class="group-empty">
+                          <td colspan="5" class="dim">No settlements yet — showing all transactions.</td>
+                        </tr>
+                      {/if}
+                      {#each settlementTxnGroups.groups as group (group.id)}
+                        <tr class="group-row">
+                          <td colspan="5">
+                            <span class="group-label">{settlementGroupLabel(group)}</span>
+                            <span class="mono dim group-meta">{formatMoney(group.amountMinor, data.account.currencyCode)}</span>
+                          </td>
+                        </tr>
+                        {#each group.transactionIds as txnId (txnId)}
+                          {@const txn = txnById(txnId)}
+                          {#if txn}
+                            {@render txnRow(txn)}
+                          {/if}
+                        {/each}
+                      {/each}
+                      {#if settlementTxnGroups.ungroupedIds.length > 0 && settlementTxnGroups.groups.length > 0}
+                        <tr class="group-row">
+                          <td colspan="5">
+                            <span class="group-label">Ungrouped</span>
+                            <span class="dim group-meta">not in a settlement</span>
+                          </td>
+                        </tr>
+                        {#each settlementTxnGroups.ungroupedIds as txnId (txnId)}
+                          {@const txn = txnById(txnId)}
+                          {#if txn}
+                            {@render txnRow(txn)}
+                          {/if}
+                        {/each}
+                      {:else if settlementTxnGroups.groups.length === 0}
+                        {#each transactions as txn (txn.id)}
+                          {@render txnRow(txn)}
+                        {/each}
+                      {/if}
+                    {:else}
+                      {#if eventTxnGroups.groups.length === 0 && eventTxnGroups.ungroupedIds.length === transactions.length}
+                        <tr class="group-empty">
+                          <td colspan="5" class="dim">No event payments yet — showing all transactions.</td>
+                        </tr>
+                      {/if}
+                      {#each eventTxnGroups.groups as group (group.id)}
+                        <tr class="group-row">
+                          <td colspan="5">
+                            <span class="group-label">{group.name}</span>
+                            <span class="mono dim group-meta">
+                              paid {formatMoney(group.paidMinor, data.account.currencyCode)} / {formatMoney(
+                                group.amountMinor,
+                                data.account.currencyCode
+                              )}
+                            </span>
+                          </td>
+                        </tr>
+                        {#each group.transactionIds as txnId (txnId)}
+                          {@const txn = txnById(txnId)}
+                          {#if txn}
+                            {@render txnRow(txn)}
+                          {/if}
+                        {/each}
+                      {/each}
+                      {#if eventTxnGroups.ungroupedIds.length > 0 && eventTxnGroups.groups.length > 0}
+                        <tr class="group-row">
+                          <td colspan="5">
+                            <span class="group-label">Ungrouped</span>
+                            <span class="dim group-meta">no event payment</span>
+                          </td>
+                        </tr>
+                        {#each eventTxnGroups.ungroupedIds as txnId (txnId)}
+                          {@const txn = txnById(txnId)}
+                          {#if txn}
+                            {@render txnRow(txn)}
+                          {/if}
+                        {/each}
+                      {:else if eventTxnGroups.groups.length === 0}
+                        {#each transactions as txn (txn.id)}
+                          {@render txnRow(txn)}
+                        {/each}
+                      {/if}
+                    {/if}
                   </tbody>
                 </table>
               </div>
@@ -787,7 +937,7 @@
         </section>
       {:else if activeTab === "settlements"}
         <section class="sheet-panel" id="space-panel-settlements" role="tabpanel" aria-labelledby="space-tab-settlements">
-          <p class="panel-copy dim">Link an incoming with an outgoing — refunds, splits, partial pays.</p>
+          <p class="panel-copy dim">Link incoming with outgoing — pick one or many on each side.</p>
           {#if transactions.length < 2}
             <p class="dim empty">Need at least two transactions to allocate.</p>
           {:else}
@@ -804,10 +954,12 @@
                   <SketchSelect
                     name="alloc-incoming"
                     options={incomingSelectOptions}
-                    bind:value={incomingId}
+                    bind:values={incomingIds}
+                    multiple
                     searchable
+                    emptyLabel="Pick incoming…"
                     searchPlaceholder="Search merchant or amount…"
-                    aria-label="Incoming transaction"
+                    aria-label="Incoming transactions"
                   />
                 </label>
                 <div class="alloc-mid" aria-hidden="true">
@@ -818,10 +970,12 @@
                   <SketchSelect
                     name="alloc-outgoing"
                     options={outgoingSelectOptions}
-                    bind:value={outgoingId}
+                    bind:values={outgoingIds}
+                    multiple
                     searchable
+                    emptyLabel="Pick outgoing…"
                     searchPlaceholder="Search merchant or amount…"
-                    aria-label="Outgoing transaction"
+                    aria-label="Outgoing transactions"
                   />
                 </label>
               </div>
@@ -850,42 +1004,65 @@
                   </button>
                 </div>
               </div>
-              {#if incomingId && outgoingId}
+              <label class="field settle-note-field">
+                <span class="field-k">Note</span>
+                <input
+                  class="underline-input"
+                  type="text"
+                  placeholder="Optional note…"
+                  maxlength="1000"
+                  bind:value={settlementNotes}
+                  aria-label="Settlement note"
+                />
+              </label>
+              {#if pairOk}
                 <span class="field-hint">
                   {#if maxMinor > 0}
-                    Suggested / max = smaller open remainder ({formatMoney(incomingRemainder, data.account.currencyCode)} vs
-                    {formatMoney(outgoingRemainder, data.account.currencyCode)}).
+                    Open capacity {formatMoney(maxMinor, data.account.currencyCode)}
+                    (incoming {formatMoney(incomingRemainder, data.account.currencyCode)} · outgoing
+                    {formatMoney(outgoingRemainder, data.account.currencyCode)})
+                    {#if plannedEdges.length > 1}
+                      · will create {plannedEdges.length} links
+                    {/if}.
                   {:else}
-                    Nothing left to allocate on one of these rows.
+                    Nothing left to allocate on the selected rows.
                   {/if}
                 </span>
               {/if}
             </form>
           {/if}
           <div class="alloc-scroll">
-            <h3>Allocations</h3>
-            {#if allocations.length === 0}
+            <h3>Settlements</h3>
+            {#if settlementBatches.length === 0}
               <p class="dim empty">None yet.</p>
             {:else}
               <ul class="alloc-list">
-                {#each allocations as allocation (allocation.id)}
-                  {@const left = txnById(allocation.leftTransactionId)}
-                  {@const right = txnById(allocation.rightTransactionId)}
+                {#each settlementBatches as batch (batch.id)}
+                  {@const leftNames = batch.incomingTransactionIds.map((id) => txnById(id)?.merchant?.trim() || "Txn")}
+                  {@const rightNames = batch.outgoingTransactionIds.map((id) => txnById(id)?.merchant?.trim() || "Txn")}
                   <li>
                     <div class="alloc-body">
                       <span class="pair">
-                        {left?.merchant ?? "Txn"}
+                        {leftNames.join(", ")}
                         <span class="dim">↔</span>
-                        {right?.merchant ?? "Txn"}
+                        {rightNames.join(", ")}
                       </span>
-                      <span class="mono amt">{formatMoney(allocation.amountMinor, data.account.currencyCode)}</span>
+                      <span class="mono amt">{formatMoney(batch.amountMinor, data.account.currencyCode)}</span>
+                      {#if batch.notes}
+                        <span class="alloc-note dim">{batch.notes}</span>
+                      {/if}
                     </div>
                     <button
                       type="button"
                       class="icon-btn danger"
-                      aria-label="Delete allocation"
-                      disabled={deletingAllocationId === allocation.id}
-                      onclick={() => deleteAllocation(allocation.id)}
+                      aria-label="Delete settlement"
+                      disabled={Boolean(
+                        deletingAllocationId && allocations.some((row) => row.batchId === batch.id && row.id === deletingAllocationId)
+                      )}
+                      onclick={() => {
+                        const edge = allocations.find((row) => row.batchId === batch.id);
+                        if (edge) void deleteAllocation(edge.id);
+                      }}
                     >
                       ×
                     </button>
@@ -956,6 +1133,17 @@
                   </button>
                 </div>
               </div>
+              <label class="field settle-note-field">
+                <span class="field-k">Note</span>
+                <input
+                  class="underline-input"
+                  type="text"
+                  placeholder="Optional note…"
+                  maxlength="1000"
+                  bind:value={payNotes}
+                  aria-label="Payment note"
+                />
+              </label>
             </form>
           {/if}
           <div class="alloc-scroll">
@@ -978,6 +1166,9 @@
                         {person?.name ?? "Person"}
                       </span>
                       <span class="mono amt">{formatMoney(payment.amountMinor, data.account.currencyCode)}</span>
+                      {#if payment.notes}
+                        <span class="alloc-note dim">{payment.notes}</span>
+                      {/if}
                     </div>
                     <button
                       type="button"
@@ -1678,6 +1869,46 @@
     flex: 0 0 auto;
   }
 
+  .txn-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.55rem 1rem;
+    flex: 0 0 auto;
+  }
+
+  .txn-toolbar .panel-copy {
+    margin: 0;
+    flex: 1 1 14rem;
+  }
+
+  .txn-group-modes {
+    flex: 0 0 auto;
+  }
+
+  .group-row td {
+    font-family: var(--hand);
+    padding-top: 0.75rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1.5px dashed color-mix(in srgb, var(--ink) 18%, transparent);
+    background: color-mix(in srgb, var(--yellow) 18%, transparent);
+  }
+
+  .group-row .group-label {
+    color: var(--ink);
+    margin-right: 0.55rem;
+  }
+
+  .group-row .group-meta {
+    font-size: 0.95rem;
+  }
+
+  .group-empty td {
+    font-family: var(--hand);
+    padding: 0.55rem 0.45rem;
+  }
+
   .dim.empty {
     margin: 0;
     font-family: var(--hand);
@@ -1808,6 +2039,17 @@
     white-space: nowrap;
   }
 
+  .settle-note-field {
+    margin-top: 0.15rem;
+    flex: 0 0 auto;
+  }
+
+  .settle-note-field .underline-input {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+  }
+
   .amount-row {
     display: flex;
     flex-wrap: wrap;
@@ -1913,12 +2155,21 @@
     flex: 1;
   }
 
+  .alloc-note {
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    line-height: 1.25;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
   .pair {
     font-family: var(--hand);
     font-size: 1.05rem;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    line-height: 1.3;
   }
 
   .icon-btn {

@@ -144,6 +144,13 @@ export const createSpaceAllocationSchema = z.object({
   amountMinor: z.number().int().positive(),
 });
 
+export const createSpaceAllocationsBatchSchema = z.object({
+  allocations: z.array(createSpaceAllocationSchema).min(1).max(100),
+  incomingTransactionIds: z.array(z.string().uuid()).min(1).max(100),
+  outgoingTransactionIds: z.array(z.string().uuid()).min(1).max(100),
+  notes: z.string().trim().max(1000).optional(),
+});
+
 export const updateSpaceAllocationSchema = z.object({
   amountMinor: z.number().int().positive(),
 });
@@ -182,6 +189,7 @@ export const createSpaceItemPaymentSchema = z.object({
   transactionId: z.string().uuid(),
   coversPersonId: z.string().uuid(),
   amountMinor: z.number().int().positive(),
+  notes: z.string().trim().max(1000).optional(),
 });
 
 export const transactionUpsertSchema = z.object({

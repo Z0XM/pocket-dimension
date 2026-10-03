@@ -5,12 +5,17 @@ import {
   equalSplitShares,
   maxAllocationMinor,
   maxItemPaymentMinor,
+  planMultiSettlement,
+  groupSettlementBatches,
+  groupSpaceTransactionsByEvents,
+  groupSpaceTransactionsBySettlements,
   remainderMinor,
   sharesSumToAmount,
   spacePersonBalances,
   spaceRemainders,
   spaceShareOpens,
   suggestedAllocationMinor,
+  sumOpenMinor,
   totalOpenRemainderMinor,
   weightedSplitShares,
 } from "./space-settlement";
@@ -126,5 +131,126 @@ describe("space-settlement", () => {
     const balances = spacePersonBalances(people, shares, payments);
     expect(balances.find((row) => row.personId === "rahul")?.openMinor).toBe(1000);
     expect(balances.find((row) => row.personId === "me")?.openMinor).toBe(1500);
+  });
+
+  test("planMultiSettlement pairs many income↔expense opens up to amount", () => {
+    const edges = planMultiSettlement(
+      [
+        { id: "in1", openMinor: 300 },
+        { id: "in2", openMinor: 200 },
+      ],
+      [
+        { id: "out1", openMinor: 250 },
+        { id: "out2", openMinor: 400 },
+      ],
+      450
+    );
+    expect(edges.reduce((sum, row) => sum + row.amountMinor, 0)).toBe(450);
+    expect(edges).toEqual([
+      { leftTransactionId: "in1", rightTransactionId: "out1", amountMinor: 250 },
+      { leftTransactionId: "in1", rightTransactionId: "out2", amountMinor: 50 },
+      { leftTransactionId: "in2", rightTransactionId: "out2", amountMinor: 150 },
+    ]);
+    expect(sumOpenMinor([{ openMinor: 300 }, { openMinor: 200 }])).toBe(500);
+  });
+
+  test("planMultiSettlement caps by the thinner side", () => {
+    const edges = planMultiSettlement([{ id: "in1", openMinor: 100 }], [{ id: "out1", openMinor: 50 }], 1000);
+    expect(edges).toEqual([{ leftTransactionId: "in1", rightTransactionId: "out1", amountMinor: 50 }]);
+  });
+
+  test("groupSettlementBatches collapses multi edges into one row", () => {
+    const groups = groupSettlementBatches([
+      {
+        id: "a1",
+        batchId: "b1",
+        leftTransactionId: "in1",
+        rightTransactionId: "out1",
+        amountMinor: 250,
+      },
+      {
+        id: "a2",
+        batchId: "b1",
+        leftTransactionId: "in1",
+        rightTransactionId: "out2",
+        amountMinor: 50,
+      },
+      {
+        id: "a3",
+        batchId: "b1",
+        leftTransactionId: "in2",
+        rightTransactionId: "out2",
+        amountMinor: 150,
+      },
+      {
+        id: "a4",
+        batchId: "b2",
+        leftTransactionId: "in3",
+        rightTransactionId: "out3",
+        amountMinor: 10,
+      },
+    ]);
+    expect(groups).toEqual([
+      {
+        batchId: "b1",
+        allocationIds: ["a1", "a2", "a3"],
+        leftTransactionIds: ["in1", "in2"],
+        rightTransactionIds: ["out1", "out2"],
+        amountMinor: 450,
+        createdAt: null,
+      },
+      {
+        batchId: "b2",
+        allocationIds: ["a4"],
+        leftTransactionIds: ["in3"],
+        rightTransactionIds: ["out3"],
+        amountMinor: 10,
+        createdAt: null,
+      },
+    ]);
+  });
+
+  test("groupSpaceTransactionsBySettlements keeps full selection and leftovers", () => {
+    const result = groupSpaceTransactionsBySettlements(
+      ["in1", "out1", "out2", "out3", "lonely"],
+      [
+        {
+          id: "b1",
+          amountMinor: 401,
+          incomingTransactionIds: ["in1"],
+          outgoingTransactionIds: ["out1", "out2", "out3"],
+        },
+      ]
+    );
+    expect(result.groups).toEqual([
+      {
+        id: "b1",
+        amountMinor: 401,
+        incomingTransactionIds: ["in1"],
+        outgoingTransactionIds: ["out1", "out2", "out3"],
+        transactionIds: ["in1", "out1", "out2", "out3"],
+      },
+    ]);
+    expect(result.ungroupedIds).toEqual(["lonely"]);
+  });
+
+  test("groupSpaceTransactionsByEvents groups payers under items", () => {
+    const result = groupSpaceTransactionsByEvents(
+      ["t1", "t2", "t3"],
+      [
+        { id: "i1", name: "Rent", amountMinor: 1000 },
+        { id: "i2", name: "Groceries", amountMinor: 500 },
+      ],
+      [
+        { itemId: "i1", transactionId: "t1", amountMinor: 400 },
+        { itemId: "i1", transactionId: "t2", amountMinor: 200 },
+        { itemId: "i2", transactionId: "t2", amountMinor: 100 },
+      ]
+    );
+    expect(result.groups).toEqual([
+      { id: "i1", name: "Rent", amountMinor: 1000, paidMinor: 600, transactionIds: ["t1", "t2"] },
+      { id: "i2", name: "Groceries", amountMinor: 500, paidMinor: 100, transactionIds: ["t2"] },
+    ]);
+    expect(result.ungroupedIds).toEqual(["t3"]);
   });
 });

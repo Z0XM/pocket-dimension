@@ -164,6 +164,24 @@ export const financeSpaceTransactions = chhanSchema.table(
   ]
 );
 
+/** One user settlement action — may cover many income/expense rows. */
+export const financeSpaceSettlementBatches = chhanSchema.table(
+  "finance_space_settlement_batches",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    spaceId: uuid("space_id")
+      .notNull()
+      .references(() => financeSpaces.id, { onDelete: "cascade" }),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
+    incomingTransactionIds: uuid("incoming_transaction_ids").array().notNull(),
+    outgoingTransactionIds: uuid("outgoing_transaction_ids").array().notNull(),
+    notes: text("notes"),
+  },
+  (table) => [index("finance_space_settlement_batches_space_id_idx").on(table.spaceId)]
+);
+
 /** M:N amount graph inside a space — income ↔ expense portions. */
 export const financeSpaceAllocations = chhanSchema.table(
   "finance_space_allocations",
@@ -174,6 +192,10 @@ export const financeSpaceAllocations = chhanSchema.table(
     spaceId: uuid("space_id")
       .notNull()
       .references(() => financeSpaces.id, { onDelete: "cascade" }),
+    /** Shared across edges created in one settlement action (1:1 or many:many). */
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => financeSpaceSettlementBatches.id, { onDelete: "cascade" }),
     leftTransactionId: uuid("left_transaction_id")
       .notNull()
       .references(() => financeTransactions.id, { onDelete: "cascade" }),
@@ -184,6 +206,7 @@ export const financeSpaceAllocations = chhanSchema.table(
   },
   (table) => [
     index("finance_space_allocations_space_id_idx").on(table.spaceId),
+    index("finance_space_allocations_batch_id_idx").on(table.batchId),
     index("finance_space_allocations_left_txn_idx").on(table.leftTransactionId),
     index("finance_space_allocations_right_txn_idx").on(table.rightTransactionId),
   ]
@@ -241,6 +264,7 @@ export const financeSpaceItemPayments = chhanSchema.table(
       .notNull()
       .references(() => financeSpacePeople.id, { onDelete: "cascade" }),
     amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
+    notes: text("notes"),
   },
   (table) => [
     index("finance_space_item_payments_space_id_idx").on(table.spaceId),
@@ -349,6 +373,7 @@ export const financeSpaceRelations = relations(financeSpaces, ({ one, many }) =>
     references: [financeAccounts.id],
   }),
   spaceTransactions: many(financeSpaceTransactions),
+  settlementBatches: many(financeSpaceSettlementBatches),
   allocations: many(financeSpaceAllocations),
   people: many(financeSpacePeople),
   items: many(financeSpaceItems),
@@ -375,10 +400,22 @@ export const financeSpaceTransactionRelations = relations(financeSpaceTransactio
   }),
 }));
 
+export const financeSpaceSettlementBatchRelations = relations(financeSpaceSettlementBatches, ({ one, many }) => ({
+  space: one(financeSpaces, {
+    fields: [financeSpaceSettlementBatches.spaceId],
+    references: [financeSpaces.id],
+  }),
+  allocations: many(financeSpaceAllocations),
+}));
+
 export const financeSpaceAllocationRelations = relations(financeSpaceAllocations, ({ one }) => ({
   space: one(financeSpaces, {
     fields: [financeSpaceAllocations.spaceId],
     references: [financeSpaces.id],
+  }),
+  batch: one(financeSpaceSettlementBatches, {
+    fields: [financeSpaceAllocations.batchId],
+    references: [financeSpaceSettlementBatches.id],
   }),
   leftTransaction: one(financeTransactions, {
     fields: [financeSpaceAllocations.leftTransactionId],

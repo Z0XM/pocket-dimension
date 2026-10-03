@@ -93,6 +93,208 @@ export function maxAllocationMinor(leftRemainderMinor: number, rightRemainderMin
   return Math.max(0, Math.min(leftRemainderMinor, rightRemainderMinor));
 }
 
+/** Sum of open remainders (used as multi-settlement ceiling). */
+export function sumOpenMinor(opens: Array<{ openMinor: number }>): number {
+  return opens.reduce((sum, row) => sum + Math.max(0, row.openMinor), 0);
+}
+
+export type SettlementSideOpen = {
+  id: string;
+  openMinor: number;
+};
+
+export type PlannedSettlementEdge = {
+  leftTransactionId: string;
+  rightTransactionId: string;
+  amountMinor: number;
+};
+
+/**
+ * Greedily pair selected incoming (income) opens with outgoing (expense) opens up to `amountMinor`.
+ * `left` is always income id, `right` always expense id. Returns [] if nothing can be settled.
+ */
+export function planMultiSettlement(incomings: SettlementSideOpen[], outgoings: SettlementSideOpen[], amountMinor: number): PlannedSettlementEdge[] {
+  if (!Number.isInteger(amountMinor) || amountMinor <= 0) return [];
+
+  const incomeLeft = incomings.filter((row) => row.openMinor > 0).map((row) => ({ id: row.id, openMinor: row.openMinor }));
+  const expenseLeft = outgoings.filter((row) => row.openMinor > 0).map((row) => ({ id: row.id, openMinor: row.openMinor }));
+
+  const maxPossible = Math.min(sumOpenMinor(incomeLeft), sumOpenMinor(expenseLeft));
+  let remaining = Math.min(amountMinor, maxPossible);
+  const edges: PlannedSettlementEdge[] = [];
+
+  let i = 0;
+  let j = 0;
+  while (remaining > 0 && i < incomeLeft.length && j < expenseLeft.length) {
+    const income = incomeLeft[i]!;
+    const expense = expenseLeft[j]!;
+    if (income.openMinor <= 0) {
+      i += 1;
+      continue;
+    }
+    if (expense.openMinor <= 0) {
+      j += 1;
+      continue;
+    }
+    const chunk = Math.min(income.openMinor, expense.openMinor, remaining);
+    if (chunk <= 0) break;
+    edges.push({
+      leftTransactionId: income.id,
+      rightTransactionId: expense.id,
+      amountMinor: chunk,
+    });
+    income.openMinor -= chunk;
+    expense.openMinor -= chunk;
+    remaining -= chunk;
+  }
+
+  return edges;
+}
+
+export type SettlementBatchAllocationLike = {
+  id: string;
+  batchId: string;
+  leftTransactionId: string;
+  rightTransactionId: string;
+  amountMinor: number;
+  createdAt?: Date | string | null;
+};
+
+export type SettlementBatchView = {
+  batchId: string;
+  allocationIds: string[];
+  leftTransactionIds: string[];
+  rightTransactionIds: string[];
+  amountMinor: number;
+  createdAt: Date | string | null;
+};
+
+/** Collapse pairwise allocation edges into one row per settlement batch. */
+export function groupSettlementBatches(allocations: SettlementBatchAllocationLike[]): SettlementBatchView[] {
+  const order: string[] = [];
+  const byBatch = new Map<string, SettlementBatchAllocationLike[]>();
+
+  for (const row of allocations) {
+    const key = row.batchId || row.id;
+    if (!byBatch.has(key)) {
+      byBatch.set(key, []);
+      order.push(key);
+    }
+    byBatch.get(key)!.push(row);
+  }
+
+  return order.map((batchId) => {
+    const rows = byBatch.get(batchId)!;
+    const leftTransactionIds: string[] = [];
+    const rightTransactionIds: string[] = [];
+    for (const row of rows) {
+      if (!leftTransactionIds.includes(row.leftTransactionId)) leftTransactionIds.push(row.leftTransactionId);
+      if (!rightTransactionIds.includes(row.rightTransactionId)) rightTransactionIds.push(row.rightTransactionId);
+    }
+    return {
+      batchId,
+      allocationIds: rows.map((row) => row.id),
+      leftTransactionIds,
+      rightTransactionIds,
+      amountMinor: rows.reduce((sum, row) => sum + row.amountMinor, 0),
+      createdAt: rows[0]?.createdAt ?? null,
+    };
+  });
+}
+
+export type SettlementBatchMembersLike = {
+  id: string;
+  amountMinor: number;
+  incomingTransactionIds: string[];
+  outgoingTransactionIds: string[];
+};
+
+export type SpaceTxnSettlementGroup = {
+  id: string;
+  amountMinor: number;
+  incomingTransactionIds: string[];
+  outgoingTransactionIds: string[];
+  transactionIds: string[];
+};
+
+/** Group space txns under settlement batches; leftovers are ungrouped. */
+export function groupSpaceTransactionsBySettlements(
+  transactionIds: string[],
+  batches: SettlementBatchMembersLike[]
+): { groups: SpaceTxnSettlementGroup[]; ungroupedIds: string[] } {
+  const txnSet = new Set(transactionIds);
+  const claimed = new Set<string>();
+  const groups: SpaceTxnSettlementGroup[] = [];
+
+  for (const batch of batches) {
+    const ordered: string[] = [];
+    for (const id of [...batch.incomingTransactionIds, ...batch.outgoingTransactionIds]) {
+      if (!txnSet.has(id) || ordered.includes(id)) continue;
+      ordered.push(id);
+      claimed.add(id);
+    }
+    if (ordered.length === 0) continue;
+    groups.push({
+      id: batch.id,
+      amountMinor: batch.amountMinor,
+      incomingTransactionIds: batch.incomingTransactionIds.filter((id) => txnSet.has(id)),
+      outgoingTransactionIds: batch.outgoingTransactionIds.filter((id) => txnSet.has(id)),
+      transactionIds: ordered,
+    });
+  }
+
+  return {
+    groups,
+    ungroupedIds: transactionIds.filter((id) => !claimed.has(id)),
+  };
+}
+
+export type SpaceTxnEventGroup = {
+  id: string;
+  name: string;
+  amountMinor: number;
+  paidMinor: number;
+  transactionIds: string[];
+};
+
+/** Group space txns under events via item payments; leftovers are ungrouped. */
+export function groupSpaceTransactionsByEvents(
+  transactionIds: string[],
+  items: Array<{ id: string; name: string; amountMinor: number }>,
+  payments: Array<{ itemId: string; transactionId: string; amountMinor: number }>
+): { groups: SpaceTxnEventGroup[]; ungroupedIds: string[] } {
+  const txnSet = new Set(transactionIds);
+  const claimed = new Set<string>();
+  const groups: SpaceTxnEventGroup[] = [];
+
+  for (const item of items) {
+    const ordered: string[] = [];
+    let paidMinor = 0;
+    for (const payment of payments) {
+      if (payment.itemId !== item.id) continue;
+      if (!txnSet.has(payment.transactionId)) continue;
+      paidMinor += payment.amountMinor;
+      if (!ordered.includes(payment.transactionId)) {
+        ordered.push(payment.transactionId);
+        claimed.add(payment.transactionId);
+      }
+    }
+    if (ordered.length === 0) continue;
+    groups.push({
+      id: item.id,
+      name: item.name,
+      amountMinor: item.amountMinor,
+      paidMinor,
+      transactionIds: ordered,
+    });
+  }
+
+  return {
+    groups,
+    ungroupedIds: transactionIds.filter((id) => !claimed.has(id)),
+  };
+}
+
 export type AllocatableTxnType = "expense" | "income" | "transfer";
 
 /**
