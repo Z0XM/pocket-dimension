@@ -191,6 +191,7 @@ export const financeTransactionGroups = chhanSchema.table(
     groupId: uuid("group_id")
       .notNull()
       .references(() => financeGroups.id, { onDelete: "cascade" }),
+    /** @deprecated Unused by product; kept for existing rows / future cleanup. */
     isHidden: boolean("is_hidden").notNull().default(false),
   },
   (table) => [primaryKey({ columns: [table.transactionId, table.groupId] }), index("finance_transaction_groups_group_id_idx").on(table.groupId)]

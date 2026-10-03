@@ -152,6 +152,7 @@ export const attachRefundLinkSchema = z.object({
 
 const groupNameSchema = z.string().trim().min(1).max(80);
 
+/** @deprecated Group hide UI was removed; column retained for backward compatibility. */
 export const setGroupHiddenSchema = z.object({
   hidden: z.boolean(),
 });

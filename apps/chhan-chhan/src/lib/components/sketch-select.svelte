@@ -10,6 +10,8 @@
     value?: string;
     disabled?: boolean;
     compact?: boolean;
+    /** Optional highlight color for compact trigger (e.g. category color). */
+    accent?: string | null;
     /** Anchor the menu to the trigger's end edge (opens leftward). Useful near the right side of a clipped container. */
     alignEnd?: boolean;
     onChange?: (value: string) => void;
@@ -22,6 +24,7 @@
     value = $bindable(""),
     disabled = false,
     compact = false,
+    accent = null,
     alignEnd = false,
     onChange,
     "aria-label": ariaLabel,
@@ -70,7 +73,17 @@
   });
 </script>
 
-<div class="sketch-select" class:open class:disabled class:compact class:align-end={alignEnd} class:empty={!value} bind:this={root}>
+<div
+  class="sketch-select"
+  class:open
+  class:disabled
+  class:compact
+  class:align-end={alignEnd}
+  class:empty={!value}
+  class:has-accent={Boolean(accent && value)}
+  style={accent && value ? `--sketch-accent: ${accent}` : undefined}
+  bind:this={root}
+>
   <input type="hidden" {name} {value} />
   <button type="button" class="sketch-trigger" aria-expanded={open} aria-haspopup="listbox" aria-label={ariaLabel} {disabled} onclick={toggleOpen}>
     <span class="sketch-value">{selectedLabel}</span>
@@ -142,6 +155,10 @@
     transform: rotate(-0.5deg);
   }
 
+  .sketch-select.compact.has-accent .sketch-trigger {
+    background: color-mix(in srgb, var(--sketch-accent) 48%, var(--surface-raised));
+  }
+
   .sketch-select.compact.empty .sketch-trigger {
     background: color-mix(in srgb, var(--ink) 5%, transparent);
     color: var(--ink-muted);
@@ -162,6 +179,11 @@
   .sketch-select.compact.open .sketch-trigger {
     background: color-mix(in srgb, var(--yellow) 78%, transparent);
     border-bottom-color: transparent;
+  }
+
+  .sketch-select.compact.has-accent .sketch-trigger:hover:not(:disabled),
+  .sketch-select.compact.has-accent.open .sketch-trigger {
+    background: color-mix(in srgb, var(--sketch-accent) 62%, var(--surface-raised));
   }
 
   .sketch-select.compact.empty .sketch-trigger:hover:not(:disabled),

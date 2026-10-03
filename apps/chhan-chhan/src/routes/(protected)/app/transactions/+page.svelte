@@ -5,8 +5,6 @@
   import StickyNote from "@lucide/svelte/icons/sticky-note";
   import Link from "@lucide/svelte/icons/link";
   import Layers from "@lucide/svelte/icons/layers";
-  import Eye from "@lucide/svelte/icons/eye";
-  import EyeOff from "@lucide/svelte/icons/eye-off";
   import ArrowLeftRight from "@lucide/svelte/icons/arrow-left-right";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import Check from "@lucide/svelte/icons/check";
@@ -41,7 +39,6 @@
   let savingTagTxId = $state<string | null>(null);
   let openTagMenuTxId = $state<string | null>(null);
   let savingGroupTxId = $state<string | null>(null);
-  let savingGroupHiddenId = $state<string | null>(null);
   let openGroupTxId = $state<string | null>(null);
   let openNoteTxId = $state<string | null>(null);
   let noteDraft = $state("");
@@ -1106,25 +1103,6 @@
       savingGroupTxId = null;
     }
   }
-
-  async function toggleGroupHidden(transactionId: string, hidden: boolean) {
-    if (!data.selectedGroupId) return;
-
-    savingGroupHiddenId = transactionId;
-    try {
-      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/groups/${data.selectedGroupId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hidden }),
-      });
-      if (!response.ok) return;
-
-      rows = rows.map((row) => (row.id === transactionId ? { ...row, groupHidden: hidden } : row));
-      await invalidateAll();
-    } finally {
-      savingGroupHiddenId = null;
-    }
-  }
 </script>
 
 <svelte:head><title>Chhan Chhan</title></svelte:head>
@@ -1433,7 +1411,6 @@
           {:else}
             {#each rows as t (t.id)}
               <tr
-                class:group-hidden={Boolean(data.selectedGroupId && t.groupHidden)}
                 class:calc-mode-active={calculateModeActive}
                 class:calc-mode-selected={isCalculateSelected(t.id)}
                 class:link-mode-anchor={refundLinkModeAnchorId === t.id}
@@ -1498,22 +1475,6 @@
                           </span>
                         {/if}
                       </div>
-                    {/if}
-                    {#if data.selectedGroupId}
-                      <button
-                        type="button"
-                        class="group-hidden-btn"
-                        class:is-hidden={t.groupHidden}
-                        aria-label="{t.groupHidden ? 'Show in group' : 'Hide in group'} for {t.merchant ?? 'transaction'}"
-                        disabled={savingGroupHiddenId === t.id}
-                        onclick={() => toggleGroupHidden(t.id, !t.groupHidden)}
-                      >
-                        {#if t.groupHidden}
-                          <EyeOff size={12} strokeWidth={1.5} aria-hidden="true" />
-                        {:else}
-                          <Eye size={12} strokeWidth={1.5} aria-hidden="true" />
-                        {/if}
-                      </button>
                     {/if}
                     <div class="note-wrap">
                       <button
@@ -1592,12 +1553,10 @@
                 </td>
                 <td class="category-cell">
                   <div class="cat-picker">
-                    {#if t.categoryColor}
-                      <span class="cat-dot" style="background:{t.categoryColor}" aria-hidden="true"></span>
-                    {/if}
                     <SketchSelect
                       name="category-{t.id}"
                       compact
+                      accent={t.categoryColor}
                       aria-label="Category for {t.merchant ?? 'transaction'}"
                       value={t.categoryId ?? ""}
                       disabled={savingCategoryId === t.id}
@@ -2244,17 +2203,24 @@
 
   .merchant-cell {
     min-width: 8rem;
+    max-width: 22rem;
   }
 
   .merchant-row {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.35rem;
     max-width: 100%;
+    min-width: 0;
+    width: 100%;
   }
 
   .merchant-row .merchant {
     min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .note-wrap {
@@ -2443,38 +2409,6 @@
     cursor: wait;
   }
 
-  tr.group-hidden {
-    opacity: 0.45;
-  }
-
-  tr.group-hidden .merchant,
-  tr.group-hidden .amt,
-  tr.group-hidden .balance-cell {
-    color: var(--muted);
-  }
-
-  .group-hidden-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-
-  .group-hidden-btn:hover,
-  .group-hidden-btn.is-hidden {
-    color: var(--hi-cyan);
-  }
-
-  .group-hidden-btn:disabled {
-    opacity: 0.55;
-    cursor: wait;
-  }
-
   .link-mode-banner {
     display: flex;
     align-items: center;
@@ -2576,22 +2510,42 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
     padding: 0;
-    border: none;
+    border: 1.5px dashed color-mix(in srgb, var(--ink) 28%, transparent);
     background: transparent;
-    color: var(--muted);
+    color: var(--ink-muted);
     cursor: pointer;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
   }
 
   .refund-cluster-btn:hover,
   .refund-cluster-btn.active {
-    color: var(--hi-green);
+    color: var(--brand);
+    border-color: var(--brand);
   }
 
   .refund-link-btn.has-links,
-  .refund-link-btn:hover,
   .refund-link-btn.active {
-    color: var(--brand-accent-light);
+    border-style: solid;
+    border-color: transparent;
+    background: color-mix(in srgb, var(--yellow) 62%, transparent);
+    color: var(--ink);
+    transform: rotate(0.8deg);
+  }
+
+  .refund-link-btn:hover:not(:disabled),
+  .refund-link-btn[aria-pressed="true"] {
+    color: var(--brand);
+    border-color: var(--brand);
+  }
+
+  .refund-link-btn.has-links:hover:not(:disabled),
+  .refund-link-btn.has-links.active {
+    background: color-mix(in srgb, var(--yellow) 82%, transparent);
+    border-color: transparent;
+    color: var(--ink);
   }
 
   .refund-link-btn:disabled {
@@ -2602,6 +2556,9 @@
   .warning-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
     color: var(--brand-accent);
   }
 
@@ -2786,16 +2743,7 @@
   .cat-picker {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
     max-width: 12rem;
-  }
-
-  .cat-dot {
-    width: 0.55rem;
-    height: 0.55rem;
-    flex: none;
-    border-radius: 2px 6px 3px 5px / 5px 2px 6px 2px;
-    box-shadow: 0.5px 0.5px 0 color-mix(in srgb, var(--ink) 18%, transparent);
   }
 
   .tx-tag {

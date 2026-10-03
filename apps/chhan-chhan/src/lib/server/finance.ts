@@ -109,25 +109,6 @@ async function loadGroupsForTransactions(transactionIds: string[]) {
   return groupsByTransaction;
 }
 
-async function loadGroupHiddenForTransactions(transactionIds: string[], groupId: string) {
-  if (!transactionIds.length) return new Map<string, boolean>();
-
-  const hiddenRows = await db
-    .select({
-      transactionId: schema.financeTransactionGroups.transactionId,
-      isHidden: schema.financeTransactionGroups.isHidden,
-    })
-    .from(schema.financeTransactionGroups)
-    .where(and(eq(schema.financeTransactionGroups.groupId, groupId), inArray(schema.financeTransactionGroups.transactionId, transactionIds)));
-
-  const hiddenByTransaction = new Map<string, boolean>();
-  for (const row of hiddenRows) {
-    hiddenByTransaction.set(row.transactionId, row.isHidden);
-  }
-
-  return hiddenByTransaction;
-}
-
 async function loadRefundLinksForTransactions(transactionIds: string[]) {
   if (!transactionIds.length) return new Map<string, RefundLinkPeer[]>();
 
@@ -474,14 +455,8 @@ async function seedDefaultTaxonomy(tx: Parameters<Parameters<typeof db.transacti
 /** True when the account is missing any starter category/tag (typical for accounts created before defaults existed). */
 export async function accountNeedsDefaultTaxonomy(accountId: string): Promise<boolean> {
   const [categories, tags] = await Promise.all([
-    db
-      .select({ name: schema.financeCategories.name })
-      .from(schema.financeCategories)
-      .where(eq(schema.financeCategories.accountId, accountId)),
-    db
-      .select({ name: schema.financeTags.name })
-      .from(schema.financeTags)
-      .where(eq(schema.financeTags.accountId, accountId)),
+    db.select({ name: schema.financeCategories.name }).from(schema.financeCategories).where(eq(schema.financeCategories.accountId, accountId)),
+    db.select({ name: schema.financeTags.name }).from(schema.financeTags).where(eq(schema.financeTags.accountId, accountId)),
   ]);
 
   const categoryNames = new Set(categories.map((row) => row.name));
@@ -834,30 +809,6 @@ export async function detachTransactionTag(accountId: string, transactionId: str
   return Boolean(removed);
 }
 
-export async function setTransactionGroupHidden(accountId: string, transactionId: string, groupId: string, hidden: boolean) {
-  const [transaction] = await db
-    .select({ id: schema.financeTransactions.id })
-    .from(schema.financeTransactions)
-    .where(and(eq(schema.financeTransactions.id, transactionId), eq(schema.financeTransactions.accountId, accountId)))
-    .limit(1);
-  if (!transaction) return null;
-
-  const [group] = await db
-    .select({ id: schema.financeGroups.id })
-    .from(schema.financeGroups)
-    .where(and(eq(schema.financeGroups.id, groupId), eq(schema.financeGroups.accountId, accountId)))
-    .limit(1);
-  if (!group) return null;
-
-  const [updated] = await db
-    .update(schema.financeTransactionGroups)
-    .set({ isHidden: hidden })
-    .where(and(eq(schema.financeTransactionGroups.transactionId, transactionId), eq(schema.financeTransactionGroups.groupId, groupId)))
-    .returning({ isHidden: schema.financeTransactionGroups.isHidden });
-
-  return updated ?? null;
-}
-
 export async function listTransactions(accountId: string, query: TransactionsQuery) {
   const conditions = [eq(schema.financeTransactions.accountId, accountId)];
   let linkClusterIds: string[] | null = null;
@@ -967,12 +918,6 @@ export async function listTransactions(accountId: string, query: TransactionsQue
   const groupsByTransaction = await loadGroupsForTransactions(rows.map((row) => row.id));
   const refundLinksByTransaction = await loadRefundLinksForTransactions(rows.map((row) => row.id));
   const warningsByTransaction = await buildRefundWarningsForTransactions(rows.map((row) => row.id));
-  const hiddenByTransaction = query.groupId
-    ? await loadGroupHiddenForTransactions(
-        rows.map((row) => row.id),
-        query.groupId
-      )
-    : null;
 
   return {
     rows: rows.map((row) => ({
@@ -981,7 +926,6 @@ export async function listTransactions(accountId: string, query: TransactionsQue
       groups: groupsByTransaction.get(row.id) ?? [],
       refundLinks: refundLinksByTransaction.get(row.id) ?? [],
       warnings: warningsByTransaction.get(row.id) ?? [],
-      ...(query.groupId ? { groupHidden: hiddenByTransaction?.get(row.id) ?? false } : {}),
     })),
     total,
     hasMore: loaded < total,
@@ -1708,7 +1652,6 @@ export async function getGroupSpend(accountId: string, selection: SummarySelecti
     from chhanchhan.finance_transactions t
     inner join chhanchhan.finance_transaction_groups ftg
       on ftg.transaction_id = t.id
-      and ftg.is_hidden = false
     inner join chhanchhan.finance_groups g on g.id = ftg.group_id
     where t.account_id = ${accountId}
       and t.type = 'expense'
@@ -1920,7 +1863,6 @@ function summaryGroupVisibleFilter(groupId?: string) {
     select 1 from chhanchhan.finance_transaction_groups ftg
     where ftg.transaction_id = t.id
       and ftg.group_id = ${groupId}
-      and ftg.is_hidden = false
   )`;
 }
 
