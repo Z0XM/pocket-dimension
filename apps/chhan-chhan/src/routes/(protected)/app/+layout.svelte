@@ -3,7 +3,7 @@
 
   const { children } = $props();
 
-  const lockPageScroll = $derived(page.url.pathname.includes("/app/transactions") || page.url.pathname.includes("/app/spaces/"));
+  const lockPageScroll = $derived(page.url.pathname.includes("/app/transactions"));
 </script>
 
 <div class="forge forge-shell">

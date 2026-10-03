@@ -70,13 +70,19 @@ Unique `(account_id, user_id)`; index on `user_id`. **Touched by:** `getMembersh
 
 Composite indexes: `(account_id, occurred_on)`, `(account_id, sort_order)`. **No `category_id`** — labeling is tags-only. **Touched by:** almost every function in `finance.ts`, `import.ts`, `$lib/finance/transaction-search.ts`.
 
-### `finance_spaces` / `finance_space_transactions` / `finance_space_allocations`
+### `finance_spaces` / membership / allocations / people ledger
 
 - `finance_spaces`: `account_id`, `name` (unique per account), `color_hex`, `notes`.
-- `finance_space_transactions`: membership junction (`space_id`, `transaction_id`), cascade both sides.
-- `finance_space_allocations`: M:N amount graph inside a space — `left_transaction_id` / `right_transaction_id` / `amount_minor` (must pair income ↔ expense; capped by each side’s open remainder).
+- `finance_space_transactions`: membership junction (`space_id`, `transaction_id`).
+- `finance_space_allocations`: M:N income↔expense graph — `left_transaction_id` / `right_transaction_id` / `amount_minor` (capped by unified txn open).
+- `finance_space_people`: free-form people in a space (`name`, `is_self`; ≤1 self per space).
+- `finance_space_items`: planned events (`name`, `amount_minor`, optional `notes`).
+- `finance_space_item_shares`: `(item_id, person_id)` expected slices — app enforces `sum(shares) === event.amount`.
+- `finance_space_item_payments`: bank money applied to a person’s open share on an event (`transaction_id`, `covers_person_id`, `amount_minor`).
 
-**Touched by:** `finance.ts` (space CRUD, attach/detach, allocations, space-spend analytics), ledger space-link UI, Control spaces CRUD.
+Txn open = amount − txn↔txn allocated − event payments. Person open = sum of uncovered shares.
+
+**Touched by:** `finance.ts` (space CRUD, people/events/payments, attach/detach, allocations, space-spend analytics), Space detail UI, ledger space-link UI, Control spaces CRUD.
 
 ### `finance_budgets`
 
@@ -102,7 +108,7 @@ Index on `account_id`. **Touched by:** `finance.ts` (`listGoals`, create/update 
 - Deleting a `finance_account` cascades **everything** scoped to it (members, transactions, budgets, goals, tags, spaces).
 - Deleting a `finance_transaction` cascades its tag links, space membership, and space allocations that reference it.
 - Deleting a `finance_tag` cascades transaction-tag links and any budgets scoped to that tag.
-- Deleting a `finance_space` cascades membership and allocations.
+- Deleting a `finance_space` cascades membership, allocations, people, events, shares, and event payments.
 - Deleting the `auth.user` who last touched a row cascades and **deletes that row** (both `createdById` and `updatedById` use `onDelete: cascade`).
 - `resetAccountTransactions` deletes all transactions for an account (cascading tag/space links) and nulls the account's balance snapshot — tag/space *definitions* themselves are untouched.
 

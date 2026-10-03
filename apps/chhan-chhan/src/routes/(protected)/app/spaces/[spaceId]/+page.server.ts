@@ -14,5 +14,11 @@ export const load: PageServerLoad = async ({ locals, parent, params }) => {
     space: detail.space,
     transactions: detail.transactions,
     allocations: detail.allocations,
+    people: detail.people,
+    items: detail.items,
+    itemPayments: detail.itemPayments,
+    personBalances: detail.personBalances,
+    shareOpens: detail.shareOpens,
+    itemOpens: detail.itemOpens,
   };
 };

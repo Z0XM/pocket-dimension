@@ -108,7 +108,7 @@ export const financeTransactionTags = chhanSchema.table(
 
 /**
  * Space: relationship container for shared money / linked transactions.
- * Quick mode = just membership + M:N allocations. Full mode adds members/items later.
+ * Quick mode = membership + M:N txn allocations. Full mode = people + items/shares + item payments.
  */
 export const financeSpaces = chhanSchema.table(
   "finance_spaces",
@@ -129,6 +129,25 @@ export const financeSpaces = chhanSchema.table(
   ]
 );
 
+/** Free-form named people inside a space (not auth users). At most one is_self per space. */
+export const financeSpacePeople = chhanSchema.table(
+  "finance_space_people",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    spaceId: uuid("space_id")
+      .notNull()
+      .references(() => financeSpaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    isSelf: boolean("is_self").notNull().default(false),
+  },
+  (table) => [
+    unique("finance_space_people_space_id_name_unique").on(table.spaceId, table.name),
+    index("finance_space_people_space_id_idx").on(table.spaceId),
+  ]
+);
+
 export const financeSpaceTransactions = chhanSchema.table(
   "finance_space_transactions",
   {
@@ -145,7 +164,7 @@ export const financeSpaceTransactions = chhanSchema.table(
   ]
 );
 
-/** M:N amount graph inside a space — any txn portion can allocate against any other. */
+/** M:N amount graph inside a space — income ↔ expense portions. */
 export const financeSpaceAllocations = chhanSchema.table(
   "finance_space_allocations",
   {
@@ -167,6 +186,67 @@ export const financeSpaceAllocations = chhanSchema.table(
     index("finance_space_allocations_space_id_idx").on(table.spaceId),
     index("finance_space_allocations_left_txn_idx").on(table.leftTransactionId),
     index("finance_space_allocations_right_txn_idx").on(table.rightTransactionId),
+  ]
+);
+
+/** Planned pot inside a space (rent, TV, groceries…). */
+export const financeSpaceItems = chhanSchema.table(
+  "finance_space_items",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    spaceId: uuid("space_id")
+      .notNull()
+      .references(() => financeSpaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
+    notes: text("notes"),
+  },
+  (table) => [index("finance_space_items_space_id_idx").on(table.spaceId)]
+);
+
+/** Expected slice of an item for a person. App enforces sum(shares) === item.amount. */
+export const financeSpaceItemShares = chhanSchema.table(
+  "finance_space_item_shares",
+  {
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => financeSpaceItems.id, { onDelete: "cascade" }),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => financeSpacePeople.id, { onDelete: "cascade" }),
+    shareMinor: bigint("share_minor", { mode: "number" }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.itemId, table.personId] }), index("finance_space_item_shares_person_id_idx").on(table.personId)]
+);
+
+/** Bank money applied to a person's open share on an item. */
+export const financeSpaceItemPayments = chhanSchema.table(
+  "finance_space_item_payments",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    spaceId: uuid("space_id")
+      .notNull()
+      .references(() => financeSpaces.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => financeSpaceItems.id, { onDelete: "cascade" }),
+    transactionId: uuid("transaction_id")
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: "cascade" }),
+    coversPersonId: uuid("covers_person_id")
+      .notNull()
+      .references(() => financeSpacePeople.id, { onDelete: "cascade" }),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
+  },
+  (table) => [
+    index("finance_space_item_payments_space_id_idx").on(table.spaceId),
+    index("finance_space_item_payments_item_id_idx").on(table.itemId),
+    index("finance_space_item_payments_transaction_id_idx").on(table.transactionId),
+    index("finance_space_item_payments_covers_person_id_idx").on(table.coversPersonId),
   ]
 );
 
@@ -270,6 +350,18 @@ export const financeSpaceRelations = relations(financeSpaces, ({ one, many }) =>
   }),
   spaceTransactions: many(financeSpaceTransactions),
   allocations: many(financeSpaceAllocations),
+  people: many(financeSpacePeople),
+  items: many(financeSpaceItems),
+  itemPayments: many(financeSpaceItemPayments),
+}));
+
+export const financeSpacePersonRelations = relations(financeSpacePeople, ({ one, many }) => ({
+  space: one(financeSpaces, {
+    fields: [financeSpacePeople.spaceId],
+    references: [financeSpaces.id],
+  }),
+  shares: many(financeSpaceItemShares),
+  paymentsCovered: many(financeSpaceItemPayments),
 }));
 
 export const financeSpaceTransactionRelations = relations(financeSpaceTransactions, ({ one }) => ({
@@ -297,6 +389,45 @@ export const financeSpaceAllocationRelations = relations(financeSpaceAllocations
     fields: [financeSpaceAllocations.rightTransactionId],
     references: [financeTransactions.id],
     relationName: "rightAllocations",
+  }),
+}));
+
+export const financeSpaceItemRelations = relations(financeSpaceItems, ({ one, many }) => ({
+  space: one(financeSpaces, {
+    fields: [financeSpaceItems.spaceId],
+    references: [financeSpaces.id],
+  }),
+  shares: many(financeSpaceItemShares),
+  payments: many(financeSpaceItemPayments),
+}));
+
+export const financeSpaceItemShareRelations = relations(financeSpaceItemShares, ({ one }) => ({
+  item: one(financeSpaceItems, {
+    fields: [financeSpaceItemShares.itemId],
+    references: [financeSpaceItems.id],
+  }),
+  person: one(financeSpacePeople, {
+    fields: [financeSpaceItemShares.personId],
+    references: [financeSpacePeople.id],
+  }),
+}));
+
+export const financeSpaceItemPaymentRelations = relations(financeSpaceItemPayments, ({ one }) => ({
+  space: one(financeSpaces, {
+    fields: [financeSpaceItemPayments.spaceId],
+    references: [financeSpaces.id],
+  }),
+  item: one(financeSpaceItems, {
+    fields: [financeSpaceItemPayments.itemId],
+    references: [financeSpaceItems.id],
+  }),
+  transaction: one(financeTransactions, {
+    fields: [financeSpaceItemPayments.transactionId],
+    references: [financeTransactions.id],
+  }),
+  coversPerson: one(financeSpacePeople, {
+    fields: [financeSpaceItemPayments.coversPersonId],
+    references: [financeSpacePeople.id],
   }),
 }));
 

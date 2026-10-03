@@ -148,6 +148,42 @@ export const updateSpaceAllocationSchema = z.object({
   amountMinor: z.number().int().positive(),
 });
 
+export const createSpacePersonSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  isSelf: z.boolean().optional(),
+});
+
+export const updateSpacePersonSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  isSelf: z.boolean().optional(),
+});
+
+export const spaceItemShareSchema = z.object({
+  personId: z.string().uuid(),
+  shareMinor: z.number().int().min(0),
+});
+
+export const createSpaceItemSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  amountMinor: z.number().int().positive(),
+  notes: z.string().trim().max(1000).optional(),
+  shares: z.array(spaceItemShareSchema).min(1),
+});
+
+export const updateSpaceItemSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  amountMinor: z.number().int().positive().optional(),
+  notes: z.string().trim().max(1000).nullable().optional(),
+  shares: z.array(spaceItemShareSchema).min(1).optional(),
+});
+
+export const createSpaceItemPaymentSchema = z.object({
+  itemId: z.string().uuid(),
+  transactionId: z.string().uuid(),
+  coversPersonId: z.string().uuid(),
+  amountMinor: z.number().int().positive(),
+});
+
 export const transactionUpsertSchema = z.object({
   occurredOn: z.string().date(),
   amountMinor: z.number().int(),

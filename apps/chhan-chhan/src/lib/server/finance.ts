@@ -2,7 +2,20 @@ import { normalizeMerchant, rankFuzzyMerchants } from "$lib/finance/merchant-mat
 import { billTagSqlFilter } from "$lib/finance/bill-categories";
 import { DEFAULT_TAGS } from "$lib/finance/default-taxonomy";
 import { parseSqlMinor } from "$lib/finance/money";
-import { maxAllocationMinor, spaceRemainders, canAllocateTransactionTypes } from "$lib/finance/space-settlement";
+import {
+  maxAllocationMinor,
+  spaceRemainders,
+  canAllocateTransactionTypes,
+  maxItemPaymentMinor,
+  sharesSumToAmount,
+  spacePersonBalances,
+  spaceShareOpens,
+  spaceItemOpens,
+  coveredByShare,
+  coveredByItem,
+  shareOpenMinor,
+  itemOpenMinor,
+} from "$lib/finance/space-settlement";
 import { buildSummarySearchFilterSql, buildTransactionSearchCondition } from "$lib/finance/transaction-search";
 import { currentMonthKey, readRowYear, type SummarySelection } from "$lib/finance/summary";
 import { isBalanceSnapshotNewer } from "$lib/server/balance";
@@ -460,7 +473,7 @@ export async function attachTransactionSpace(accountId: string, transactionId: s
   return space;
 }
 
-/** Removes the transaction from the space along with any allocations that reference it inside that space. */
+/** Removes the transaction from the space along with any allocations/payments that reference it inside that space. */
 export async function detachTransactionSpace(accountId: string, transactionId: string, spaceId: string) {
   const [transaction] = await db
     .select({ id: schema.financeTransactions.id })
@@ -481,6 +494,10 @@ export async function detachTransactionSpace(accountId: string, transactionId: s
           sql`(${schema.financeSpaceAllocations.leftTransactionId} = ${transactionId} OR ${schema.financeSpaceAllocations.rightTransactionId} = ${transactionId})`
         )
       );
+
+    await tx
+      .delete(schema.financeSpaceItemPayments)
+      .where(and(eq(schema.financeSpaceItemPayments.spaceId, spaceId), eq(schema.financeSpaceItemPayments.transactionId, transactionId)));
 
     const [removed] = await tx
       .delete(schema.financeSpaceTransactions)
@@ -535,16 +552,395 @@ export async function listSpaceAllocations(accountId: string, spaceId: string) {
     .orderBy(asc(schema.financeSpaceAllocations.createdAt));
 }
 
+export async function listSpacePeople(accountId: string, spaceId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  return db
+    .select({
+      id: schema.financeSpacePeople.id,
+      spaceId: schema.financeSpacePeople.spaceId,
+      name: schema.financeSpacePeople.name,
+      isSelf: schema.financeSpacePeople.isSelf,
+      createdAt: schema.financeSpacePeople.createdAt,
+    })
+    .from(schema.financeSpacePeople)
+    .where(eq(schema.financeSpacePeople.spaceId, spaceId))
+    .orderBy(desc(schema.financeSpacePeople.isSelf), asc(schema.financeSpacePeople.name));
+}
+
+export async function getSpacePerson(accountId: string, spaceId: string, personId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+  const [person] = await db
+    .select()
+    .from(schema.financeSpacePeople)
+    .where(and(eq(schema.financeSpacePeople.id, personId), eq(schema.financeSpacePeople.spaceId, spaceId)))
+    .limit(1);
+  return person ?? null;
+}
+
+async function ensureSpaceSelfPerson(userId: string, spaceId: string) {
+  const [existing] = await db
+    .select({ id: schema.financeSpacePeople.id })
+    .from(schema.financeSpacePeople)
+    .where(and(eq(schema.financeSpacePeople.spaceId, spaceId), eq(schema.financeSpacePeople.isSelf, true)))
+    .limit(1);
+  if (existing) return existing;
+
+  const [created] = await db
+    .insert(schema.financeSpacePeople)
+    .values({
+      spaceId,
+      name: "Me",
+      isSelf: true,
+      createdById: userId,
+      updatedById: userId,
+    })
+    .onConflictDoNothing()
+    .returning({ id: schema.financeSpacePeople.id });
+  return created ?? null;
+}
+
+export async function createSpacePerson(userId: string, accountId: string, spaceId: string, payload: { name: string; isSelf?: boolean }) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  await ensureSpaceSelfPerson(userId, spaceId);
+
+  const wantsSelf = Boolean(payload.isSelf);
+  if (wantsSelf) {
+    await db
+      .update(schema.financeSpacePeople)
+      .set({ isSelf: false, updatedById: userId })
+      .where(and(eq(schema.financeSpacePeople.spaceId, spaceId), eq(schema.financeSpacePeople.isSelf, true)));
+  }
+
+  const [created] = await db
+    .insert(schema.financeSpacePeople)
+    .values({
+      spaceId,
+      name: payload.name,
+      isSelf: wantsSelf,
+      createdById: userId,
+      updatedById: userId,
+    })
+    .onConflictDoNothing()
+    .returning();
+  return created ?? null;
+}
+
+export async function updateSpacePerson(
+  userId: string,
+  accountId: string,
+  spaceId: string,
+  personId: string,
+  payload: { name?: string; isSelf?: boolean }
+) {
+  const person = await getSpacePerson(accountId, spaceId, personId);
+  if (!person) return null;
+
+  if (payload.isSelf === true) {
+    await db
+      .update(schema.financeSpacePeople)
+      .set({ isSelf: false, updatedById: userId })
+      .where(and(eq(schema.financeSpacePeople.spaceId, spaceId), eq(schema.financeSpacePeople.isSelf, true)));
+  }
+
+  const [updated] = await db
+    .update(schema.financeSpacePeople)
+    .set({
+      ...(payload.name != null ? { name: payload.name } : {}),
+      ...(payload.isSelf != null ? { isSelf: payload.isSelf } : {}),
+      updatedById: userId,
+    })
+    .where(and(eq(schema.financeSpacePeople.id, personId), eq(schema.financeSpacePeople.spaceId, spaceId)))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteSpacePerson(accountId: string, spaceId: string, personId: string) {
+  const person = await getSpacePerson(accountId, spaceId, personId);
+  if (!person) return false;
+  if (person.isSelf) return false;
+
+  const [removed] = await db
+    .delete(schema.financeSpacePeople)
+    .where(and(eq(schema.financeSpacePeople.id, personId), eq(schema.financeSpacePeople.spaceId, spaceId)))
+    .returning({ id: schema.financeSpacePeople.id });
+  return Boolean(removed);
+}
+
+export async function listSpaceItems(accountId: string, spaceId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  const items = await db
+    .select({
+      id: schema.financeSpaceItems.id,
+      spaceId: schema.financeSpaceItems.spaceId,
+      name: schema.financeSpaceItems.name,
+      amountMinor: schema.financeSpaceItems.amountMinor,
+      notes: schema.financeSpaceItems.notes,
+      createdAt: schema.financeSpaceItems.createdAt,
+    })
+    .from(schema.financeSpaceItems)
+    .where(eq(schema.financeSpaceItems.spaceId, spaceId))
+    .orderBy(asc(schema.financeSpaceItems.createdAt));
+
+  if (items.length === 0) return [];
+
+  const shares = await db
+    .select({
+      itemId: schema.financeSpaceItemShares.itemId,
+      personId: schema.financeSpaceItemShares.personId,
+      shareMinor: schema.financeSpaceItemShares.shareMinor,
+    })
+    .from(schema.financeSpaceItemShares)
+    .where(
+      inArray(
+        schema.financeSpaceItemShares.itemId,
+        items.map((item) => item.id)
+      )
+    );
+
+  return items.map((item) => ({
+    ...item,
+    shares: shares.filter((share) => share.itemId === item.id),
+  }));
+}
+
+export async function createSpaceItem(
+  userId: string,
+  accountId: string,
+  spaceId: string,
+  payload: { name: string; amountMinor: number; notes?: string; shares: Array<{ personId: string; shareMinor: number }> }
+) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+  if (!sharesSumToAmount(payload.shares, payload.amountMinor)) return null;
+
+  const people = await listSpacePeople(accountId, spaceId);
+  if (!people) return null;
+  const personIds = new Set(people.map((row) => row.id));
+  if (payload.shares.some((share) => !personIds.has(share.personId))) return null;
+
+  return db.transaction(async (tx) => {
+    const [item] = await tx
+      .insert(schema.financeSpaceItems)
+      .values({
+        spaceId,
+        name: payload.name,
+        amountMinor: payload.amountMinor,
+        notes: payload.notes,
+        createdById: userId,
+        updatedById: userId,
+      })
+      .returning();
+    if (!item) return null;
+
+    await tx.insert(schema.financeSpaceItemShares).values(
+      payload.shares.map((share) => ({
+        itemId: item.id,
+        personId: share.personId,
+        shareMinor: share.shareMinor,
+      }))
+    );
+
+    return {
+      ...item,
+      shares: payload.shares.map((share) => ({ itemId: item.id, ...share })),
+    };
+  });
+}
+
+export async function updateSpaceItem(
+  userId: string,
+  accountId: string,
+  spaceId: string,
+  itemId: string,
+  payload: {
+    name?: string;
+    amountMinor?: number;
+    notes?: string | null;
+    shares?: Array<{ personId: string; shareMinor: number }>;
+  }
+) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  const [existing] = await db
+    .select()
+    .from(schema.financeSpaceItems)
+    .where(and(eq(schema.financeSpaceItems.id, itemId), eq(schema.financeSpaceItems.spaceId, spaceId)))
+    .limit(1);
+  if (!existing) return null;
+
+  const nextAmount = payload.amountMinor ?? existing.amountMinor;
+  if (payload.shares && !sharesSumToAmount(payload.shares, nextAmount)) return null;
+
+  if (payload.shares) {
+    const people = await listSpacePeople(accountId, spaceId);
+    if (!people) return null;
+    const personIds = new Set(people.map((row) => row.id));
+    if (payload.shares.some((share) => !personIds.has(share.personId))) return null;
+  }
+
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(schema.financeSpaceItems)
+      .set({
+        ...(payload.name != null ? { name: payload.name } : {}),
+        ...(payload.amountMinor != null ? { amountMinor: payload.amountMinor } : {}),
+        ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
+        updatedById: userId,
+      })
+      .where(and(eq(schema.financeSpaceItems.id, itemId), eq(schema.financeSpaceItems.spaceId, spaceId)))
+      .returning();
+    if (!updated) return null;
+
+    if (payload.shares) {
+      await tx.delete(schema.financeSpaceItemShares).where(eq(schema.financeSpaceItemShares.itemId, itemId));
+      await tx.insert(schema.financeSpaceItemShares).values(
+        payload.shares.map((share) => ({
+          itemId,
+          personId: share.personId,
+          shareMinor: share.shareMinor,
+        }))
+      );
+    }
+
+    const shares =
+      payload.shares?.map((share) => ({ itemId, ...share })) ??
+      (await tx
+        .select({
+          itemId: schema.financeSpaceItemShares.itemId,
+          personId: schema.financeSpaceItemShares.personId,
+          shareMinor: schema.financeSpaceItemShares.shareMinor,
+        })
+        .from(schema.financeSpaceItemShares)
+        .where(eq(schema.financeSpaceItemShares.itemId, itemId)));
+
+    return { ...updated, shares };
+  });
+}
+
+export async function deleteSpaceItem(accountId: string, spaceId: string, itemId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return false;
+
+  const [removed] = await db
+    .delete(schema.financeSpaceItems)
+    .where(and(eq(schema.financeSpaceItems.id, itemId), eq(schema.financeSpaceItems.spaceId, spaceId)))
+    .returning({ id: schema.financeSpaceItems.id });
+  return Boolean(removed);
+}
+
+export async function listSpaceItemPayments(accountId: string, spaceId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  return db
+    .select({
+      id: schema.financeSpaceItemPayments.id,
+      spaceId: schema.financeSpaceItemPayments.spaceId,
+      itemId: schema.financeSpaceItemPayments.itemId,
+      transactionId: schema.financeSpaceItemPayments.transactionId,
+      coversPersonId: schema.financeSpaceItemPayments.coversPersonId,
+      amountMinor: schema.financeSpaceItemPayments.amountMinor,
+      createdAt: schema.financeSpaceItemPayments.createdAt,
+    })
+    .from(schema.financeSpaceItemPayments)
+    .where(eq(schema.financeSpaceItemPayments.spaceId, spaceId))
+    .orderBy(asc(schema.financeSpaceItemPayments.createdAt));
+}
+
+export async function createSpaceItemPayment(
+  userId: string,
+  accountId: string,
+  spaceId: string,
+  payload: { itemId: string; transactionId: string; coversPersonId: string; amountMinor: number }
+) {
+  if (!Number.isInteger(payload.amountMinor) || payload.amountMinor <= 0) return null;
+
+  const detail = await getSpaceDetail(accountId, spaceId);
+  if (!detail) return null;
+
+  const txn = detail.transactions.find((row) => row.id === payload.transactionId);
+  const item = detail.items.find((row) => row.id === payload.itemId);
+  const person = detail.people.find((row) => row.id === payload.coversPersonId);
+  if (!txn || !item || !person) return null;
+
+  const share = item.shares.find((row) => row.personId === payload.coversPersonId);
+  if (!share) return null;
+
+  const remainders = spaceRemainders(detail.transactions, detail.allocations, detail.itemPayments);
+  const txnOpen = remainders.find((row) => row.transactionId === txn.id)?.remainderMinor ?? 0;
+  const shareOpen = shareOpenMinor(share.shareMinor, coveredByShare(detail.itemPayments, item.id, person.id));
+  const itemOpen = itemOpenMinor(item.amountMinor, coveredByItem(detail.itemPayments, item.id));
+  if (payload.amountMinor > maxItemPaymentMinor(txnOpen, shareOpen, itemOpen)) return null;
+
+  const [created] = await db
+    .insert(schema.financeSpaceItemPayments)
+    .values({
+      spaceId,
+      itemId: payload.itemId,
+      transactionId: payload.transactionId,
+      coversPersonId: payload.coversPersonId,
+      amountMinor: payload.amountMinor,
+      createdById: userId,
+      updatedById: userId,
+    })
+    .returning();
+  return created ?? null;
+}
+
+export async function deleteSpaceItemPayment(accountId: string, spaceId: string, paymentId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return false;
+
+  const [removed] = await db
+    .delete(schema.financeSpaceItemPayments)
+    .where(and(eq(schema.financeSpaceItemPayments.id, paymentId), eq(schema.financeSpaceItemPayments.spaceId, spaceId)))
+    .returning({ id: schema.financeSpaceItemPayments.id });
+  return Boolean(removed);
+}
+
 export async function getSpaceDetail(accountId: string, spaceId: string) {
   const space = await getSpace(accountId, spaceId);
   if (!space) return null;
 
-  const [transactions, allocations] = await Promise.all([listSpaceTransactions(accountId, spaceId), listSpaceAllocations(accountId, spaceId)]);
+  const [transactions, allocations, people, items, itemPayments] = await Promise.all([
+    listSpaceTransactions(accountId, spaceId),
+    listSpaceAllocations(accountId, spaceId),
+    listSpacePeople(accountId, spaceId),
+    listSpaceItems(accountId, spaceId),
+    listSpaceItemPayments(accountId, spaceId),
+  ]);
+
+  const txns = transactions ?? [];
+  const allocs = allocations ?? [];
+  const peopleRows = people ?? [];
+  const itemRows = items ?? [];
+  const paymentRows = itemPayments ?? [];
+
+  const allShares = itemRows.flatMap((item) => item.shares);
+  const remainders = spaceRemainders(txns, allocs, paymentRows);
+  const shareOpens = spaceShareOpens(allShares, paymentRows);
+  const itemOpens = spaceItemOpens(itemRows, paymentRows);
+  const personBalances = spacePersonBalances(peopleRows, allShares, paymentRows);
 
   return {
     space,
-    transactions: transactions ?? [],
-    allocations: allocations ?? [],
+    transactions: txns,
+    allocations: allocs,
+    people: peopleRows,
+    items: itemRows,
+    itemPayments: paymentRows,
+    remainders,
+    shareOpens,
+    itemOpens,
+    personBalances,
   };
 }
 
@@ -575,7 +971,7 @@ export async function createSpaceAllocation(userId: string, accountId: string, s
   if (!left || !right) return null;
   if (!canAllocateTransactionTypes(left.type, right.type)) return null;
 
-  const remainders = spaceRemainders(detail.transactions, detail.allocations);
+  const remainders = spaceRemainders(detail.transactions, detail.allocations, detail.itemPayments);
   const leftOpen = remainders.find((row) => row.transactionId === left.id)?.remainderMinor ?? 0;
   const rightOpen = remainders.find((row) => row.transactionId === right.id)?.remainderMinor ?? 0;
   if (payload.amountMinor > maxAllocationMinor(leftOpen, rightOpen)) return null;

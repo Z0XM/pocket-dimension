@@ -46,7 +46,7 @@
       tone: "blush",
       rotate: 2.4,
       pin: "tl",
-      body: ["Create in Control", "Attach via row space icon", "Open → to settle allocations"],
+      body: ["Create in Control", "Attach via row space icon", "People + items + settle on Space page"],
     },
     {
       id: "refund",
@@ -95,7 +95,7 @@
       rotate: -1.1,
       pin: "tr",
       wide: true,
-      body: ["charts / filters → Tag", "link + settle bank rows → Space", "people ledger → Space (later)"],
+      body: ["charts / filters → Tag", "link + settle bank rows → Space", "people + items → Space full mode"],
     },
   ];
 </script>

@@ -9,7 +9,7 @@ Brownfield capability inventory for `apps/chhan-chhan`. Classifier model: **Tags
 | F-3 | Statement import | `/app/control` | Product | Epic 1 | Live |
 | F-4 | Dashboard widgets | `/app/dashboards` | Product | Epic 1 | Live |
 | F-5 | Budgets and goals | `/app/dashboards`, API | Product | Epic 1 | Live |
-| F-6 | Spaces | `/app`, `/app/spaces/[id]`, Control | Product | Epic 1 | Live (settlement) |
+| F-6 | Spaces | `/app`, `/app/spaces/[id]`, Control | Product | Epic 1 | Live (full) |
 | F-7 | Control center | `/app/control` | Product | Epic 1 | Live |
 | F-8 | Money minor-units model | n/a | Product | Epic 1 | Live |
 | F-9 | Account membership authz | n/a | Product | Epic 1 | Live |
@@ -88,11 +88,12 @@ Brownfield capability inventory for `apps/chhan-chhan`. Classifier model: **Tags
 - **Area:** Ledger / Control / Space detail
 - **Includes:**
   - Space CRUD in Control; attach/detach transactions on the ledger
-  - M:N amount allocations (API + settlement UI at `/app/spaces/[spaceId]`); pairs must be income ↔ expense
-  - Open remainder meters per transaction; suggested allocation amount
+  - Quick mode: M:N income↔expense allocations (API + UI at `/app/spaces/[spaceId]`)
+  - Full mode: free-form people, planned events/shares (equal / amounts / weights), txn→event payments, who-owes-whom balances
+  - Open remainder meters (txn + share/event); suggested / max caps
   - Space spend dashboard widget
 - **Deferred:**
-  - Full mode: named people members, planned items/shares (“who owes whom” people ledger)
+  - Auth invites for people; pairwise settle matrix beyond per-person open-toward-shares
 - **See also:**
   - [data-models.md](./data-models.md), [api-contracts.md](./api-contracts.md)
 

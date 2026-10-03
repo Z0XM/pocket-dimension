@@ -37,12 +37,18 @@ Tag **update**/**delete** are primarily Control form actions (`updateTag`/`delet
 | GET | `/api/accounts/[accountId]/spaces` | member | — | `listSpaces`. |
 | POST | `/api/accounts/[accountId]/spaces` | canEdit | `createSpaceSchema` (`name`, `colorHex?`, `notes?`) | 409 on duplicate name. |
 | PATCH | `/api/accounts/[accountId]/spaces/[spaceId]` | canEdit | `updateSpaceSchema` | Space metadata. |
-| DELETE | `/api/accounts/[accountId]/spaces/[spaceId]` | canEdit | — | Cascades membership + allocations. |
-| POST | `/api/accounts/[accountId]/spaces/[spaceId]/allocations` | canEdit | `createSpaceAllocationSchema` | M:N amount edge inside the space. |
+| DELETE | `/api/accounts/[accountId]/spaces/[spaceId]` | canEdit | — | Cascades membership + allocations + people/events/payments. |
+| POST | `/api/accounts/[accountId]/spaces/[spaceId]/allocations` | canEdit | `createSpaceAllocationSchema` | M:N income↔expense edge (capped by unified txn open). |
 | PATCH | `/api/accounts/[accountId]/spaces/[spaceId]/allocations/[allocationId]` | canEdit | `updateSpaceAllocationSchema` | |
 | DELETE | `/api/accounts/[accountId]/spaces/[spaceId]/allocations/[allocationId]` | canEdit | — | |
+| GET/POST | `.../spaces/[spaceId]/people` | member / canEdit | `createSpacePersonSchema` | Free-form people; first create also ensures Me. |
+| PATCH/DELETE | `.../spaces/[spaceId]/people/[personId]` | canEdit | `updateSpacePersonSchema` | Me cannot be deleted. |
+| GET/POST | `.../spaces/[spaceId]/items` | member / canEdit | `createSpaceItemSchema` | Event + shares (must sum to amount). |
+| PATCH/DELETE | `.../spaces/[spaceId]/items/[itemId]` | canEdit | `updateSpaceItemSchema` | |
+| GET/POST | `.../spaces/[spaceId]/item-payments` | member / canEdit | `createSpaceItemPaymentSchema` | Txn→event share payment. |
+| DELETE | `.../spaces/[spaceId]/item-payments/[paymentId]` | canEdit | — | |
 
-Settlement UI: `/app/spaces/[spaceId]` (transactions, remainders, create/delete allocations).
+Settlement UI: `/app/spaces/[spaceId]` (people, events, balances, event payments, txn↔txn settlements).
 
 ## Budgets
 

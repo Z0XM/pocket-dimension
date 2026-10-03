@@ -89,15 +89,7 @@ export const DASHBOARD_WIDGET_CATALOG: DashboardWidgetDefinition[] = [
   },
 ];
 
-export const DEFAULT_DASHBOARD_WIDGETS: DashboardWidgetId[] = [
-  "summary-month",
-  "summary-all",
-  "tag-spend",
-  "monthly-trend",
-  "tag-trend",
-  "budgets",
-  "goals",
-];
+export const DEFAULT_DASHBOARD_WIDGETS: DashboardWidgetId[] = DASHBOARD_WIDGET_CATALOG.map((widget) => widget.id);
 
 const VALID_WIDGET_IDS = new Set<DashboardWidgetId>(DASHBOARD_WIDGET_CATALOG.map((widget) => widget.id));
 

@@ -281,6 +281,20 @@
       "when": 1791010000000,
       "tag": "0039_tags_and_spaces",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791100000000,
+      "tag": "0040_space_people_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791200000000,
+      "tag": "0041_drop_space_txn_actor",
+      "breakpoints": true
     }
   ]
 }
