@@ -15,6 +15,9 @@ import {
   coveredByItem,
   shareOpenMinor,
   itemOpenMinor,
+  leftoverOpensAfterSettlement,
+  planSettlementPockets,
+  sumPocketMinorByKind,
 } from "$lib/finance/space-settlement";
 import { buildSummarySearchFilterSql, buildTransactionSearchCondition } from "$lib/finance/transaction-search";
 import { currentMonthKey, readRowYear, type SummarySelection } from "$lib/finance/summary";
@@ -557,19 +560,51 @@ export async function listSpaceSettlementBatches(accountId: string, spaceId: str
   const space = await getSpace(accountId, spaceId);
   if (!space) return null;
 
+  const [batches, pockets] = await Promise.all([
+    db
+      .select({
+        id: schema.financeSpaceSettlementBatches.id,
+        spaceId: schema.financeSpaceSettlementBatches.spaceId,
+        amountMinor: schema.financeSpaceSettlementBatches.amountMinor,
+        incomingTransactionIds: schema.financeSpaceSettlementBatches.incomingTransactionIds,
+        outgoingTransactionIds: schema.financeSpaceSettlementBatches.outgoingTransactionIds,
+        notes: schema.financeSpaceSettlementBatches.notes,
+        createdAt: schema.financeSpaceSettlementBatches.createdAt,
+      })
+      .from(schema.financeSpaceSettlementBatches)
+      .where(eq(schema.financeSpaceSettlementBatches.spaceId, spaceId))
+      .orderBy(asc(schema.financeSpaceSettlementBatches.createdAt)),
+    listSpaceSettlementPockets(accountId, spaceId),
+  ]);
+  if (!pockets) return null;
+
+  return batches.map((batch) => {
+    const batchPockets = pockets.filter((row) => row.batchId === batch.id);
+    return {
+      ...batch,
+      inPocketMinor: sumPocketMinorByKind(batchPockets, "in_pocket"),
+      outOfPocketMinor: sumPocketMinorByKind(batchPockets, "out_pocket"),
+    };
+  });
+}
+
+export async function listSpaceSettlementPockets(accountId: string, spaceId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
   return db
     .select({
-      id: schema.financeSpaceSettlementBatches.id,
-      spaceId: schema.financeSpaceSettlementBatches.spaceId,
-      amountMinor: schema.financeSpaceSettlementBatches.amountMinor,
-      incomingTransactionIds: schema.financeSpaceSettlementBatches.incomingTransactionIds,
-      outgoingTransactionIds: schema.financeSpaceSettlementBatches.outgoingTransactionIds,
-      notes: schema.financeSpaceSettlementBatches.notes,
-      createdAt: schema.financeSpaceSettlementBatches.createdAt,
+      id: schema.financeSpaceSettlementPockets.id,
+      spaceId: schema.financeSpaceSettlementPockets.spaceId,
+      batchId: schema.financeSpaceSettlementPockets.batchId,
+      transactionId: schema.financeSpaceSettlementPockets.transactionId,
+      kind: schema.financeSpaceSettlementPockets.kind,
+      amountMinor: schema.financeSpaceSettlementPockets.amountMinor,
+      createdAt: schema.financeSpaceSettlementPockets.createdAt,
     })
-    .from(schema.financeSpaceSettlementBatches)
-    .where(eq(schema.financeSpaceSettlementBatches.spaceId, spaceId))
-    .orderBy(asc(schema.financeSpaceSettlementBatches.createdAt));
+    .from(schema.financeSpaceSettlementPockets)
+    .where(eq(schema.financeSpaceSettlementPockets.spaceId, spaceId))
+    .orderBy(asc(schema.financeSpaceSettlementPockets.createdAt));
 }
 
 export async function listSpacePeople(accountId: string, spaceId: string) {
@@ -895,7 +930,7 @@ export async function createSpaceItemPayment(
   const share = item.shares.find((row) => row.personId === payload.coversPersonId);
   if (!share) return null;
 
-  const remainders = spaceRemainders(detail.transactions, detail.allocations, detail.itemPayments);
+  const remainders = spaceRemainders(detail.transactions, detail.allocations, detail.itemPayments, detail.settlementPockets);
   const txnOpen = remainders.find((row) => row.transactionId === txn.id)?.remainderMinor ?? 0;
   const shareOpen = shareOpenMinor(share.shareMinor, coveredByShare(detail.itemPayments, item.id, person.id));
   const itemOpen = itemOpenMinor(item.amountMinor, coveredByItem(detail.itemPayments, item.id));
@@ -934,10 +969,11 @@ export async function getSpaceDetail(accountId: string, spaceId: string) {
   const space = await getSpace(accountId, spaceId);
   if (!space) return null;
 
-  const [transactions, allocations, settlementBatches, people, items, itemPayments] = await Promise.all([
+  const [transactions, allocations, settlementBatches, settlementPockets, people, items, itemPayments] = await Promise.all([
     listSpaceTransactions(accountId, spaceId),
     listSpaceAllocations(accountId, spaceId),
     listSpaceSettlementBatches(accountId, spaceId),
+    listSpaceSettlementPockets(accountId, spaceId),
     listSpacePeople(accountId, spaceId),
     listSpaceItems(accountId, spaceId),
     listSpaceItemPayments(accountId, spaceId),
@@ -946,12 +982,13 @@ export async function getSpaceDetail(accountId: string, spaceId: string) {
   const txns = transactions ?? [];
   const allocs = allocations ?? [];
   const batches = settlementBatches ?? [];
+  const pockets = settlementPockets ?? [];
   const peopleRows = people ?? [];
   const itemRows = items ?? [];
   const paymentRows = itemPayments ?? [];
 
   const allShares = itemRows.flatMap((item) => item.shares);
-  const remainders = spaceRemainders(txns, allocs, paymentRows);
+  const remainders = spaceRemainders(txns, allocs, paymentRows, pockets);
   const shareOpens = spaceShareOpens(allShares, paymentRows);
   const itemOpens = spaceItemOpens(itemRows, paymentRows);
   const personBalances = spacePersonBalances(peopleRows, allShares, paymentRows);
@@ -961,6 +998,7 @@ export async function getSpaceDetail(accountId: string, spaceId: string) {
     transactions: txns,
     allocations: allocs,
     settlementBatches: batches,
+    settlementPockets: pockets,
     people: peopleRows,
     items: itemRows,
     itemPayments: paymentRows,
@@ -998,7 +1036,7 @@ export async function createSpaceAllocation(userId: string, accountId: string, s
   if (!left || !right) return null;
   if (!canAllocateTransactionTypes(left.type, right.type)) return null;
 
-  const remainders = spaceRemainders(detail.transactions, detail.allocations, detail.itemPayments);
+  const remainders = spaceRemainders(detail.transactions, detail.allocations, detail.itemPayments, detail.settlementPockets);
   const leftOpen = remainders.find((row) => row.transactionId === left.id)?.remainderMinor ?? 0;
   const rightOpen = remainders.find((row) => row.transactionId === right.id)?.remainderMinor ?? 0;
   if (payload.amountMinor > maxAllocationMinor(leftOpen, rightOpen)) return null;
@@ -1046,7 +1084,13 @@ export async function createSpaceAllocationsBatch(
   accountId: string,
   spaceId: string,
   payloads: SpaceAllocationPayload[],
-  selection: { incomingTransactionIds: string[]; outgoingTransactionIds: string[]; notes?: string }
+  selection: {
+    incomingTransactionIds: string[];
+    outgoingTransactionIds: string[];
+    notes?: string;
+    markInPocket?: boolean;
+    markOutPocket?: boolean;
+  }
 ) {
   if (payloads.length === 0) return null;
   if (selection.incomingTransactionIds.length === 0 || selection.outgoingTransactionIds.length === 0) return null;
@@ -1058,9 +1102,8 @@ export async function createSpaceAllocationsBatch(
   if (!detail) return null;
 
   const txnById = new Map(detail.transactions.map((row) => [row.id, row]));
-  const openById = new Map(
-    spaceRemainders(detail.transactions, detail.allocations, detail.itemPayments).map((row) => [row.transactionId, row.remainderMinor])
-  );
+  const currentRemainders = spaceRemainders(detail.transactions, detail.allocations, detail.itemPayments, detail.settlementPockets);
+  const openById = new Map(currentRemainders.map((row) => [row.transactionId, row.remainderMinor]));
 
   for (const id of selection.incomingTransactionIds) {
     const txn = txnById.get(id);
@@ -1102,6 +1145,20 @@ export async function createSpaceAllocationsBatch(
   const amountMinor = prepared.reduce((sum, row) => sum + row.amountMinor, 0);
   const notes = selection.notes?.trim() ? selection.notes.trim() : null;
 
+  const incomingOpens = selection.incomingTransactionIds.map((id) => ({
+    id,
+    openMinor: currentRemainders.find((row) => row.transactionId === id)?.remainderMinor ?? 0,
+  }));
+  const outgoingOpens = selection.outgoingTransactionIds.map((id) => ({
+    id,
+    openMinor: currentRemainders.find((row) => row.transactionId === id)?.remainderMinor ?? 0,
+  }));
+  const leftover = leftoverOpensAfterSettlement(incomingOpens, outgoingOpens, prepared);
+  const plannedPockets = planSettlementPockets(leftover, {
+    markInPocket: Boolean(selection.markInPocket),
+    markOutPocket: Boolean(selection.markOutPocket),
+  });
+
   return db.transaction(async (tx) => {
     const batchId = crypto.randomUUID();
     const [batch] = await tx
@@ -1136,7 +1193,34 @@ export async function createSpaceAllocationsBatch(
       if (!row) return null;
       created.push(row);
     }
-    return { batch, allocations: created };
+
+    const createdPockets = [];
+    for (const pocket of plannedPockets) {
+      const [row] = await tx
+        .insert(schema.financeSpaceSettlementPockets)
+        .values({
+          spaceId,
+          batchId,
+          transactionId: pocket.transactionId,
+          kind: pocket.kind,
+          amountMinor: pocket.amountMinor,
+          createdById: userId,
+          updatedById: userId,
+        })
+        .returning();
+      if (!row) return null;
+      createdPockets.push(row);
+    }
+
+    return {
+      batch: {
+        ...batch,
+        inPocketMinor: sumPocketMinorByKind(plannedPockets, "in_pocket"),
+        outOfPocketMinor: sumPocketMinorByKind(plannedPockets, "out_pocket"),
+      },
+      allocations: created,
+      pockets: createdPockets,
+    };
   });
 }
 

@@ -316,6 +316,13 @@
       "when": 1791500000000,
       "tag": "0044_space_settlement_payment_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1791600000000,
+      "tag": "0045_space_settlement_pockets",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,12 @@ export type SpaceItemPaymentLike = {
   amountMinor: number;
 };
 
+export type SpaceSettlementPocketLike = {
+  transactionId: string;
+  amountMinor: number;
+  kind?: "in_pocket" | "out_pocket";
+};
+
 export type SpaceItemShareLike = {
   itemId: string;
   personId: string;
@@ -54,19 +60,34 @@ export function itemPaidByTransaction(payments: SpaceItemPaymentLike[]): Map<str
   return map;
 }
 
+/** Sum of settlement pocket amounts per transaction (closes leftover open). */
+export function pocketByTransaction(pockets: SpaceSettlementPocketLike[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const pocket of pockets) {
+    map.set(pocket.transactionId, (map.get(pocket.transactionId) ?? 0) + pocket.amountMinor);
+  }
+  return map;
+}
+
 /** Unmatched remainder for a txn: max(0, amount − allocated). */
 export function remainderMinor(amountMinor: number, allocatedMinor: number): number {
   return Math.max(0, amountMinor - allocatedMinor);
 }
 
 /**
- * Unified txn open: amount − txn↔txn allocated − item-payment allocated.
+ * Unified txn open: amount − txn↔txn allocated − item-payment allocated − pocketed.
  */
-export function spaceRemainders(transactions: SpaceTxnLike[], allocations: SpaceAllocationLike[], itemPayments: SpaceItemPaymentLike[] = []) {
+export function spaceRemainders(
+  transactions: SpaceTxnLike[],
+  allocations: SpaceAllocationLike[],
+  itemPayments: SpaceItemPaymentLike[] = [],
+  pockets: SpaceSettlementPocketLike[] = []
+) {
   const allocated = allocatedByTransaction(allocations);
   const itemPaid = itemPaidByTransaction(itemPayments);
+  const pocketed = pocketByTransaction(pockets);
   return transactions.map((txn) => {
-    const allocatedMinor = (allocated.get(txn.id) ?? 0) + (itemPaid.get(txn.id) ?? 0);
+    const allocatedMinor = (allocated.get(txn.id) ?? 0) + (itemPaid.get(txn.id) ?? 0) + (pocketed.get(txn.id) ?? 0);
     return {
       transactionId: txn.id,
       amountMinor: txn.amountMinor,
@@ -79,9 +100,10 @@ export function spaceRemainders(transactions: SpaceTxnLike[], allocations: Space
 export function totalOpenRemainderMinor(
   transactions: SpaceTxnLike[],
   allocations: SpaceAllocationLike[],
-  itemPayments: SpaceItemPaymentLike[] = []
+  itemPayments: SpaceItemPaymentLike[] = [],
+  pockets: SpaceSettlementPocketLike[] = []
 ): number {
-  return spaceRemainders(transactions, allocations, itemPayments).reduce((sum, row) => sum + row.remainderMinor, 0);
+  return spaceRemainders(transactions, allocations, itemPayments, pockets).reduce((sum, row) => sum + row.remainderMinor, 0);
 }
 
 export function suggestedAllocationMinor(leftRemainderMinor: number, rightRemainderMinor: number): number {
@@ -149,6 +171,69 @@ export function planMultiSettlement(incomings: SettlementSideOpen[], outgoings: 
   }
 
   return edges;
+}
+
+export type SettlementPocketKind = "in_pocket" | "out_pocket";
+
+export type PlannedSettlementPocket = {
+  transactionId: string;
+  kind: SettlementPocketKind;
+  amountMinor: number;
+};
+
+export type SettlementLeftoverOpens = {
+  incomingLeftover: SettlementSideOpen[];
+  outgoingLeftover: SettlementSideOpen[];
+  incomingLeftoverMinor: number;
+  outgoingLeftoverMinor: number;
+};
+
+/** Remaining open on selected sides after applying planned settlement edges. */
+export function leftoverOpensAfterSettlement(
+  incomings: SettlementSideOpen[],
+  outgoings: SettlementSideOpen[],
+  edges: PlannedSettlementEdge[]
+): SettlementLeftoverOpens {
+  const incomeLeft = new Map(incomings.map((row) => [row.id, Math.max(0, row.openMinor)]));
+  const expenseLeft = new Map(outgoings.map((row) => [row.id, Math.max(0, row.openMinor)]));
+
+  for (const edge of edges) {
+    incomeLeft.set(edge.leftTransactionId, Math.max(0, (incomeLeft.get(edge.leftTransactionId) ?? 0) - edge.amountMinor));
+    expenseLeft.set(edge.rightTransactionId, Math.max(0, (expenseLeft.get(edge.rightTransactionId) ?? 0) - edge.amountMinor));
+  }
+
+  const incomingLeftover = [...incomeLeft.entries()].filter(([, openMinor]) => openMinor > 0).map(([id, openMinor]) => ({ id, openMinor }));
+  const outgoingLeftover = [...expenseLeft.entries()].filter(([, openMinor]) => openMinor > 0).map(([id, openMinor]) => ({ id, openMinor }));
+
+  return {
+    incomingLeftover,
+    outgoingLeftover,
+    incomingLeftoverMinor: sumOpenMinor(incomingLeftover),
+    outgoingLeftoverMinor: sumOpenMinor(outgoingLeftover),
+  };
+}
+
+/** Turn leftover opens into in/out-of-pocket rows when the user opts in. */
+export function planSettlementPockets(
+  leftover: SettlementLeftoverOpens,
+  opts: { markInPocket?: boolean; markOutPocket?: boolean }
+): PlannedSettlementPocket[] {
+  const pockets: PlannedSettlementPocket[] = [];
+  if (opts.markInPocket) {
+    for (const row of leftover.incomingLeftover) {
+      if (row.openMinor > 0) pockets.push({ transactionId: row.id, kind: "in_pocket", amountMinor: row.openMinor });
+    }
+  }
+  if (opts.markOutPocket) {
+    for (const row of leftover.outgoingLeftover) {
+      if (row.openMinor > 0) pockets.push({ transactionId: row.id, kind: "out_pocket", amountMinor: row.openMinor });
+    }
+  }
+  return pockets;
+}
+
+export function sumPocketMinorByKind(pockets: Array<{ kind: SettlementPocketKind; amountMinor: number }>, kind: SettlementPocketKind): number {
+  return pockets.filter((row) => row.kind === kind).reduce((sum, row) => sum + row.amountMinor, 0);
 }
 
 export type SettlementBatchAllocationLike = {

@@ -15,6 +15,7 @@ export const load: PageServerLoad = async ({ locals, parent, params }) => {
     transactions: detail.transactions,
     allocations: detail.allocations,
     settlementBatches: detail.settlementBatches,
+    settlementPockets: detail.settlementPockets,
     people: detail.people,
     items: detail.items,
     itemPayments: detail.itemPayments,

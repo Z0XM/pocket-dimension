@@ -18,11 +18,13 @@ export async function POST({ locals, params, request }) {
       incomingTransactionIds: batchParsed.data.incomingTransactionIds,
       outgoingTransactionIds: batchParsed.data.outgoingTransactionIds,
       notes: batchParsed.data.notes,
+      markInPocket: batchParsed.data.markInPocket,
+      markOutPocket: batchParsed.data.markOutPocket,
     });
     if (!result) {
       throw error(400, "Settlement needs valid incoming↔outgoing pairs in this space within open remainders");
     }
-    return json({ allocations: result.allocations, batch: result.batch }, { status: 201 });
+    return json({ allocations: result.allocations, batch: result.batch, pockets: result.pockets }, { status: 201 });
   }
 
   const singleParsed = createSpaceAllocationSchema.safeParse(raw);

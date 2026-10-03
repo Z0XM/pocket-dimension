@@ -149,6 +149,8 @@ export const createSpaceAllocationsBatchSchema = z.object({
   incomingTransactionIds: z.array(z.string().uuid()).min(1).max(100),
   outgoingTransactionIds: z.array(z.string().uuid()).min(1).max(100),
   notes: z.string().trim().max(1000).optional(),
+  markInPocket: z.boolean().optional(),
+  markOutPocket: z.boolean().optional(),
 });
 
 export const updateSpaceAllocationSchema = z.object({

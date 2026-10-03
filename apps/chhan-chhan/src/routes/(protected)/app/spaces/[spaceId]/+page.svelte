@@ -7,6 +7,7 @@
     equalSplitShares,
     groupSpaceTransactionsByEvents,
     groupSpaceTransactionsBySettlements,
+    leftoverOpensAfterSettlement,
     maxItemPaymentMinor,
     planMultiSettlement,
     sharesSumToAmount,
@@ -24,6 +25,7 @@
   type Txn = PageData["transactions"][number];
   type Allocation = PageData["allocations"][number];
   type SettlementBatch = PageData["settlementBatches"][number];
+  type SettlementPocket = PageData["settlementPockets"][number];
   type Person = PageData["people"][number];
   type Item = PageData["items"][number];
   type ItemPayment = PageData["itemPayments"][number];
@@ -32,6 +34,7 @@
   let transactions = $state<Txn[]>([]);
   let allocations = $state<Allocation[]>([]);
   let settlementBatches = $state<SettlementBatch[]>([]);
+  let settlementPockets = $state<SettlementPocket[]>([]);
   let people = $state<Person[]>([]);
   let items = $state<Item[]>([]);
   let itemPayments = $state<ItemPayment[]>([]);
@@ -41,6 +44,8 @@
   let outgoingIds = $state<string[]>([]);
   let amountMajor = $state("");
   let settlementNotes = $state("");
+  let markInPocket = $state(false);
+  let markOutPocket = $state(false);
   let busy = $state(false);
   let errorMessage = $state<string | null>(null);
   let removingTxnId = $state<string | null>(null);
@@ -93,6 +98,7 @@
     transactions = [...data.transactions];
     allocations = [...data.allocations];
     settlementBatches = [...data.settlementBatches];
+    settlementPockets = [...data.settlementPockets];
     people = [...data.people];
     items = [...data.items];
     itemPayments = [...data.itemPayments];
@@ -131,7 +137,7 @@
     }
   });
 
-  const remainders = $derived(spaceRemainders(transactions, allocations, itemPayments));
+  const remainders = $derived(spaceRemainders(transactions, allocations, itemPayments, settlementPockets));
   const remainderById = $derived(new Map(remainders.map((row) => [row.transactionId, row])));
   const shareOpenByKey = $derived(new Map(data.shareOpens.map((row) => [`${row.itemId}:${row.personId}`, row.openMinor] as const)));
   const itemOpenById = $derived(new Map(data.itemOpens.map((row) => [row.itemId, row.openMinor] as const)));
@@ -143,7 +149,9 @@
     transactions.filter((txn) => txn.type === "expense").reduce((sum, txn) => sum + (remainderById.get(txn.id)?.remainderMinor ?? 0), 0)
   );
   const allocatedTotalMinor = $derived(
-    allocations.reduce((sum, row) => sum + row.amountMinor, 0) + itemPayments.reduce((sum, row) => sum + row.amountMinor, 0)
+    allocations.reduce((sum, row) => sum + row.amountMinor, 0) +
+      itemPayments.reduce((sum, row) => sum + row.amountMinor, 0) +
+      settlementPockets.reduce((sum, row) => sum + row.amountMinor, 0)
   );
 
   function txnById(id: string) {
@@ -172,6 +180,14 @@
     }
     if (amountMinor <= 0) return [];
     return planMultiSettlement(selectedIncomingOpens, selectedOutgoingOpens, Math.min(amountMinor, maxMinor));
+  });
+  const plannedLeftover = $derived(
+    pairOk && plannedEdges.length > 0 ? leftoverOpensAfterSettlement(selectedIncomingOpens, selectedOutgoingOpens, plannedEdges) : null
+  );
+
+  $effect(() => {
+    if (!plannedLeftover || plannedLeftover.incomingLeftoverMinor <= 0) markInPocket = false;
+    if (!plannedLeftover || plannedLeftover.outgoingLeftoverMinor <= 0) markOutPocket = false;
   });
 
   const txnIds = $derived(transactions.map((txn) => txn.id));
@@ -357,6 +373,8 @@
           incomingTransactionIds: incomingIds,
           outgoingTransactionIds: outgoingIds,
           notes: settlementNotes.trim() || undefined,
+          markInPocket: markInPocket || undefined,
+          markOutPocket: markOutPocket || undefined,
         }),
       });
       if (!response.ok) {
@@ -364,11 +382,18 @@
           response.status === 400 ? "Settlement needs valid incoming↔outgoing pairs within open remainders." : "Could not create settlement.";
         return;
       }
-      const payload = (await response.json()) as { allocations: Allocation[]; batch: SettlementBatch };
+      const payload = (await response.json()) as {
+        allocations: Allocation[];
+        batch: SettlementBatch;
+        pockets: SettlementPocket[];
+      };
       allocations = [...allocations, ...payload.allocations];
       settlementBatches = [...settlementBatches, payload.batch];
+      settlementPockets = [...settlementPockets, ...(payload.pockets ?? [])];
       amountMajor = "";
       settlementNotes = "";
+      markInPocket = false;
+      markOutPocket = false;
       await invalidateAll();
     } finally {
       busy = false;
@@ -391,6 +416,7 @@
       const batchId = target?.batchId ?? allocationId;
       allocations = allocations.filter((row) => (row.batchId ?? row.id) !== batchId);
       settlementBatches = settlementBatches.filter((row) => row.id !== batchId);
+      settlementPockets = settlementPockets.filter((row) => row.batchId !== batchId);
       await invalidateAll();
     } finally {
       deletingAllocationId = null;
@@ -414,6 +440,7 @@
       transactions = transactions.filter((row) => row.id !== transactionId);
       allocations = allocations.filter((row) => row.leftTransactionId !== transactionId && row.rightTransactionId !== transactionId);
       itemPayments = itemPayments.filter((row) => row.transactionId !== transactionId);
+      settlementPockets = settlementPockets.filter((row) => row.transactionId !== transactionId);
       if (incomingIds.includes(transactionId)) incomingIds = incomingIds.filter((id) => id !== transactionId);
       if (outgoingIds.includes(transactionId)) outgoingIds = outgoingIds.filter((id) => id !== transactionId);
       if (payTxnId === transactionId) payTxnId = "";
@@ -1015,6 +1042,40 @@
                   aria-label="Settlement note"
                 />
               </label>
+              {#if plannedLeftover && (plannedLeftover.incomingLeftoverMinor > 0 || plannedLeftover.outgoingLeftoverMinor > 0)}
+                <div class="pocket-options" role="group" aria-label="Pocket leftovers">
+                  {#if plannedLeftover.outgoingLeftoverMinor > 0}
+                    <button
+                      type="button"
+                      class="pocket-toggle"
+                      class:active={markOutPocket}
+                      aria-pressed={markOutPocket}
+                      onclick={() => (markOutPocket = !markOutPocket)}
+                    >
+                      <span class="pocket-mark" aria-hidden="true">{markOutPocket ? "✓" : "○"}</span>
+                      <span>
+                        Mark {formatMoney(plannedLeftover.outgoingLeftoverMinor, data.account.currencyCode)} outgoing leftover as
+                        <em>out of pocket</em>
+                      </span>
+                    </button>
+                  {/if}
+                  {#if plannedLeftover.incomingLeftoverMinor > 0}
+                    <button
+                      type="button"
+                      class="pocket-toggle"
+                      class:active={markInPocket}
+                      aria-pressed={markInPocket}
+                      onclick={() => (markInPocket = !markInPocket)}
+                    >
+                      <span class="pocket-mark" aria-hidden="true">{markInPocket ? "✓" : "○"}</span>
+                      <span>
+                        Mark {formatMoney(plannedLeftover.incomingLeftoverMinor, data.account.currencyCode)} incoming leftover as
+                        <em>in pocket</em>
+                      </span>
+                    </button>
+                  {/if}
+                </div>
+              {/if}
               {#if pairOk}
                 <span class="field-hint">
                   {#if maxMinor > 0}
@@ -1047,7 +1108,17 @@
                         <span class="dim">↔</span>
                         {rightNames.join(", ")}
                       </span>
-                      <span class="mono amt">{formatMoney(batch.amountMinor, data.account.currencyCode)}</span>
+                      <span class="mono amt settle-amounts">
+                        {formatMoney(batch.amountMinor, data.account.currencyCode)} settled
+                        {#if (batch.outOfPocketMinor ?? 0) > 0}
+                          <span class="dim">·</span>
+                          {formatMoney(batch.outOfPocketMinor, data.account.currencyCode)} out of pocket
+                        {/if}
+                        {#if (batch.inPocketMinor ?? 0) > 0}
+                          <span class="dim">·</span>
+                          {formatMoney(batch.inPocketMinor, data.account.currencyCode)} in pocket
+                        {/if}
+                      </span>
                       {#if batch.notes}
                         <span class="alloc-note dim">{batch.notes}</span>
                       {/if}
@@ -2048,6 +2119,71 @@
     flex: 0 0 auto;
     width: 100%;
     min-width: 0;
+  }
+
+  .pocket-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 0 0 auto;
+    align-items: flex-start;
+  }
+
+  .pocket-toggle {
+    appearance: none;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    max-width: 100%;
+    font-family: var(--hand);
+    font-size: 0.98rem;
+    line-height: 1.35;
+    text-align: left;
+    padding: 0.22rem 0.7rem 0.28rem 0.55rem;
+    border: 1.5px dashed color-mix(in srgb, var(--ink) 28%, transparent);
+    background: color-mix(in srgb, var(--yellow) 28%, transparent);
+    color: var(--ink-muted);
+    cursor: pointer;
+    border-radius: 3px 10px 4px 8px / 8px 3px 10px 4px;
+    transform: rotate(-0.3deg);
+  }
+
+  .pocket-toggle:hover {
+    border-style: solid;
+    color: var(--ink);
+  }
+
+  .pocket-toggle.active {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--ink) 35%, transparent);
+    background: color-mix(in srgb, var(--yellow) 62%, var(--mix-wash));
+    color: var(--ink);
+    transform: rotate(0.4deg);
+  }
+
+  .pocket-toggle .pocket-mark {
+    flex: none;
+    font-size: 0.95rem;
+    color: color-mix(in srgb, var(--ink-muted) 88%, transparent);
+  }
+
+  .pocket-toggle.active .pocket-mark {
+    color: var(--ink);
+  }
+
+  .pocket-toggle em {
+    font-style: normal;
+    background: color-mix(in srgb, var(--yellow) 55%, transparent);
+    padding: 0 0.12rem;
+  }
+
+  .pocket-toggle.active em {
+    background: color-mix(in srgb, var(--yellow) 78%, transparent);
+  }
+
+  .settle-amounts {
+    font-size: 0.98rem;
+    line-height: 1.35;
   }
 
   .amount-row {

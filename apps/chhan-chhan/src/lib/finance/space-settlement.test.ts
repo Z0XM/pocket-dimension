@@ -9,6 +9,8 @@ import {
   groupSettlementBatches,
   groupSpaceTransactionsByEvents,
   groupSpaceTransactionsBySettlements,
+  leftoverOpensAfterSettlement,
+  planSettlementPockets,
   remainderMinor,
   sharesSumToAmount,
   spacePersonBalances,
@@ -252,5 +254,26 @@ describe("space-settlement", () => {
       { id: "i2", name: "Groceries", amountMinor: 500, paidMinor: 100, transactionIds: ["t2"] },
     ]);
     expect(result.ungroupedIds).toEqual(["t3"]);
+  });
+
+  test("leftoverOpensAfterSettlement and planSettlementPockets close expense remainder as out of pocket", () => {
+    const leftover = leftoverOpensAfterSettlement(
+      [{ id: "in1", openMinor: 1_000_000 }],
+      [{ id: "out1", openMinor: 1_500_000 }],
+      [{ leftTransactionId: "in1", rightTransactionId: "out1", amountMinor: 1_000_000 }]
+    );
+    expect(leftover.incomingLeftoverMinor).toBe(0);
+    expect(leftover.outgoingLeftoverMinor).toBe(500_000);
+    expect(planSettlementPockets(leftover, { markOutPocket: true })).toEqual([{ transactionId: "out1", kind: "out_pocket", amountMinor: 500_000 }]);
+  });
+
+  test("spaceRemainders subtracts pocketed leftovers", () => {
+    const rows = spaceRemainders(
+      [{ id: "out1", amountMinor: 1_500_000 }],
+      [{ id: "a1", leftTransactionId: "in1", rightTransactionId: "out1", amountMinor: 1_000_000 }],
+      [],
+      [{ transactionId: "out1", amountMinor: 500_000, kind: "out_pocket" }]
+    );
+    expect(rows[0]?.remainderMinor).toBe(0);
   });
 });

@@ -164,6 +164,8 @@ export const financeSpaceTransactions = chhanSchema.table(
   ]
 );
 
+export const settlementPocketKind = chhanSchema.enum("settlement_pocket_kind", ["in_pocket", "out_pocket"]);
+
 /** One user settlement action — may cover many income/expense rows. */
 export const financeSpaceSettlementBatches = chhanSchema.table(
   "finance_space_settlement_batches",
@@ -180,6 +182,32 @@ export const financeSpaceSettlementBatches = chhanSchema.table(
     notes: text("notes"),
   },
   (table) => [index("finance_space_settlement_batches_space_id_idx").on(table.spaceId)]
+);
+
+/** Leftover open closed as in-pocket (income) or out-of-pocket (expense) on a settlement. */
+export const financeSpaceSettlementPockets = chhanSchema.table(
+  "finance_space_settlement_pockets",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    spaceId: uuid("space_id")
+      .notNull()
+      .references(() => financeSpaces.id, { onDelete: "cascade" }),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => financeSpaceSettlementBatches.id, { onDelete: "cascade" }),
+    transactionId: uuid("transaction_id")
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: "cascade" }),
+    kind: settlementPocketKind("kind").notNull(),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
+  },
+  (table) => [
+    index("finance_space_settlement_pockets_space_id_idx").on(table.spaceId),
+    index("finance_space_settlement_pockets_batch_id_idx").on(table.batchId),
+    index("finance_space_settlement_pockets_transaction_id_idx").on(table.transactionId),
+  ]
 );
 
 /** M:N amount graph inside a space — income ↔ expense portions. */
@@ -374,6 +402,7 @@ export const financeSpaceRelations = relations(financeSpaces, ({ one, many }) =>
   }),
   spaceTransactions: many(financeSpaceTransactions),
   settlementBatches: many(financeSpaceSettlementBatches),
+  settlementPockets: many(financeSpaceSettlementPockets),
   allocations: many(financeSpaceAllocations),
   people: many(financeSpacePeople),
   items: many(financeSpaceItems),
@@ -406,6 +435,22 @@ export const financeSpaceSettlementBatchRelations = relations(financeSpaceSettle
     references: [financeSpaces.id],
   }),
   allocations: many(financeSpaceAllocations),
+  pockets: many(financeSpaceSettlementPockets),
+}));
+
+export const financeSpaceSettlementPocketRelations = relations(financeSpaceSettlementPockets, ({ one }) => ({
+  space: one(financeSpaces, {
+    fields: [financeSpaceSettlementPockets.spaceId],
+    references: [financeSpaces.id],
+  }),
+  batch: one(financeSpaceSettlementBatches, {
+    fields: [financeSpaceSettlementPockets.batchId],
+    references: [financeSpaceSettlementBatches.id],
+  }),
+  transaction: one(financeTransactions, {
+    fields: [financeSpaceSettlementPockets.transactionId],
+    references: [financeTransactions.id],
+  }),
 }));
 
 export const financeSpaceAllocationRelations = relations(financeSpaceAllocations, ({ one }) => ({
