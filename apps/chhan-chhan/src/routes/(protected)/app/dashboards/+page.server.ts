@@ -51,7 +51,6 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const needsGroupSpend = isDashboardWidgetEnabled(enabledWidgets, "group-spend");
   const needsMonthlyTrend = isDashboardWidgetEnabled(enabledWidgets, "monthly-trend");
   const needsCategoryTrend = isDashboardWidgetEnabled(enabledWidgets, "category-trend");
-  const needsIncomeExpense = isDashboardWidgetEnabled(enabledWidgets, "income-expense");
   const needsBudgets = isDashboardWidgetEnabled(enabledWidgets, "budgets");
   const needsGoals = isDashboardWidgetEnabled(enabledWidgets, "goals");
   const needsMonthlyBills = isDashboardWidgetEnabled(enabledWidgets, "monthly-bills");
@@ -172,7 +171,6 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     goals,
     monthly: needsSummaryMonth && analytics ? analytics.monthly : null,
     allTime: needsSummaryAll && analytics ? analytics.allTime : null,
-    showIncomeExpense: needsIncomeExpense,
     monthlyBills,
     yearlyBills,
     billingYear,

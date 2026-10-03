@@ -13,6 +13,15 @@
     ariaLabel?: string;
   };
 
+  type Tip = {
+    left: string;
+    top: string;
+    name: string;
+    pct: string;
+    amount: string;
+    color: string;
+  };
+
   const { rows, currencyCode, ariaLabel = "Spend breakdown" }: Props = $props();
 
   const SIZE = 220;
@@ -24,7 +33,12 @@
   type ArcSlice = Slice & {
     share: number;
     path: string;
+    tipX: number;
+    tipY: number;
   };
+
+  let tip = $state<Tip | null>(null);
+  let activeName = $state<string | null>(null);
 
   function polar(cx: number, cy: number, r: number, angle: number) {
     const rad = ((angle - 90) * Math.PI) / 180;
@@ -61,13 +75,31 @@
         const share = row.amountMinor / total;
         const sweep = share * 360;
         const path = donutPath(angle, angle + sweep);
+        const mid = polar(CX, CY, (R_OUTER + R_INNER) / 2, angle + sweep / 2);
         angle += sweep;
-        return { ...row, share, path };
+        return { ...row, share, path, tipX: mid.x, tipY: mid.y };
       })
       .filter((row) => row.path);
   });
 
   const totalMinor = $derived(rows.reduce((sum, row) => sum + Math.max(0, row.amountMinor), 0));
+
+  function showTip(slice: ArcSlice) {
+    activeName = slice.name;
+    tip = {
+      left: `${(slice.tipX / SIZE) * 100}%`,
+      top: `${(slice.tipY / SIZE) * 100}%`,
+      name: slice.name,
+      pct: `${Math.round(slice.share * 100)}%`,
+      amount: formatMoney(slice.amountMinor, currencyCode),
+      color: slice.color,
+    };
+  }
+
+  function hideTip() {
+    tip = null;
+    activeName = null;
+  }
 </script>
 
 {#if slices.length === 0}
@@ -77,9 +109,15 @@
     <div class="pie-stage">
       <svg viewBox="0 0 {SIZE} {SIZE}" class="pie-svg" aria-hidden="true">
         {#each slices as slice (slice.name)}
-          <path class="slice" d={slice.path} fill={slice.color}>
-            <title>{slice.name}: {formatMoney(slice.amountMinor, currencyCode)}</title>
-          </path>
+          <path
+            class="slice"
+            class:active={activeName === slice.name}
+            class:dimmed={activeName !== null && activeName !== slice.name}
+            d={slice.path}
+            fill={slice.color}
+            onpointerenter={() => showTip(slice)}
+            onpointerleave={hideTip}
+          ></path>
         {/each}
         <circle class="hub-ring" cx={CX} cy={CY} r={R_INNER - 1.5} fill="none" />
       </svg>
@@ -87,18 +125,16 @@
         <span class="hub-k">total</span>
         <span class="hub-v">{formatMoney(totalMinor, currencyCode)}</span>
       </div>
-    </div>
 
-    <ul class="pie-legend">
-      {#each slices as slice (slice.name)}
-        <li>
-          <span class="swatch" style="background:{slice.color}" aria-hidden="true"></span>
-          <span class="name" title={slice.name}>{slice.name}</span>
-          <span class="pct">{Math.round(slice.share * 100)}%</span>
-          <span class="amt">{formatMoney(slice.amountMinor, currencyCode)}</span>
-        </li>
-      {/each}
-    </ul>
+      {#if tip}
+        <div class="sketch-tip" style="left:{tip.left}; top:{tip.top}" role="tooltip">
+          <span class="tip-swatch" style="background:{tip.color}" aria-hidden="true"></span>
+          <span class="tip-name">{tip.name}</span>
+          <span class="tip-pct">{tip.pct}</span>
+          <span class="tip-amt">{tip.amount}</span>
+        </div>
+      {/if}
+    </div>
   </div>
 {/if}
 
@@ -108,14 +144,12 @@
   }
 
   .pie-chart {
-    display: grid;
-    grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
-    gap: 1rem 1.25rem;
-    align-items: center;
+    display: flex;
+    justify-content: center;
   }
 
   .math-notebook {
-    padding: 0.65rem 0.7rem;
+    padding: 0.55rem 0.6rem;
     background-image:
       linear-gradient(rgba(90, 130, 180, 0.16) 1px, transparent 1px), linear-gradient(90deg, rgba(90, 130, 180, 0.12) 1px, transparent 1px);
     background-size: 16px 16px;
@@ -125,7 +159,7 @@
   .pie-stage {
     position: relative;
     width: 100%;
-    max-width: 14rem;
+    max-width: 16.5rem;
     margin: 0 auto;
     aspect-ratio: 1;
   }
@@ -142,10 +176,15 @@
     stroke-width: 1.25;
     paint-order: stroke fill;
     transition: opacity 120ms ease;
+    cursor: crosshair;
   }
 
-  .slice:hover {
-    opacity: 0.88;
+  .slice.dimmed {
+    opacity: 0.45;
+  }
+
+  .slice.active {
+    opacity: 1;
   }
 
   .hub-ring {
@@ -184,58 +223,62 @@
     white-space: nowrap;
   }
 
-  .pie-legend {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    min-width: 0;
-  }
-
-  .pie-legend li {
-    display: grid;
-    grid-template-columns: 0.7rem minmax(0, 1fr) auto auto;
-    gap: 0.4rem 0.45rem;
-    align-items: baseline;
+  .sketch-tip {
+    position: absolute;
+    z-index: 8;
+    transform: translate(-50%, calc(-100% - 0.45rem)) rotate(-0.5deg);
+    width: max-content;
+    max-width: 12rem;
+    padding: 0.35rem 0.5rem 0.35rem 0.4rem;
+    pointer-events: none;
+    background:
+      linear-gradient(transparent 0, transparent calc(100% - 1px), color-mix(in srgb, var(--ink) 10%, transparent) calc(100% - 1px)) 0 0 / 100% 1.1rem,
+      color-mix(in srgb, var(--yellow) 28%, var(--surface-raised));
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 2px 10px 3px 8px / 8px 2px 10px 3px;
+    box-shadow:
+      2px 2px 0 0 var(--shadow-paper),
+      2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
     font-family: var(--hand);
-    font-size: 0.92rem;
     color: var(--ink);
+    line-height: 1.2;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "swatch name"
+      "swatch pct"
+      "swatch amt";
+    column-gap: 0.35rem;
+    row-gap: 0.02rem;
+    align-items: start;
   }
 
-  .swatch {
-    width: 0.65rem;
-    height: 0.65rem;
-    border-radius: 2px 6px 3px 5px / 5px 2px 6px 2px;
+  .tip-swatch {
+    grid-area: swatch;
+    width: 0.55rem;
+    height: 0.55rem;
+    margin-top: 0.2rem;
+    border-radius: 2px 5px 3px 4px / 4px 2px 5px 2px;
     box-shadow: 0.5px 0.5px 0 color-mix(in srgb, var(--ink) 18%, transparent);
-    align-self: center;
   }
 
-  .name {
-    min-width: 0;
+  .tip-name {
+    grid-area: name;
+    font-size: 0.9rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 10rem;
   }
 
-  .pct {
+  .tip-pct {
+    grid-area: pct;
+    font-size: 0.8rem;
     color: var(--ink-muted);
-    font-variant-numeric: tabular-nums;
   }
 
-  .amt {
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  @media (max-width: 640px) {
-    .pie-chart {
-      grid-template-columns: 1fr;
-    }
-
-    .pie-stage {
-      max-width: 12.5rem;
-    }
+  .tip-amt {
+    grid-area: amt;
+    font-size: 0.95rem;
   }
 </style>

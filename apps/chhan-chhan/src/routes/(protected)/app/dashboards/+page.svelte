@@ -127,9 +127,7 @@
   );
 
   const showTrendsRow = $derived(
-    isDashboardWidgetEnabled(data.enabledWidgets, "monthly-trend") ||
-      isDashboardWidgetEnabled(data.enabledWidgets, "category-trend") ||
-      isDashboardWidgetEnabled(data.enabledWidgets, "income-expense")
+    isDashboardWidgetEnabled(data.enabledWidgets, "monthly-trend") || isDashboardWidgetEnabled(data.enabledWidgets, "category-trend")
   );
 
   const showGoalsRow = $derived(isDashboardWidgetEnabled(data.enabledWidgets, "budgets") || isDashboardWidgetEnabled(data.enabledWidgets, "goals"));
@@ -319,70 +317,51 @@
     {#if isDashboardWidgetEnabled(data.enabledWidgets, "summary-month") && data.monthly}
       <article class="dash-panel">
         <h2>This month</h2>
-        <dl class="dash-kv">
-          <div>
-            <dt>In</dt>
-            <dd class="pos">{formatMoney(data.monthly.incomeMinor, data.account.currencyCode)}</dd>
-          </div>
-          <div>
-            <dt>Out</dt>
-            <dd class="neg">{formatMoney(-data.monthly.expenseMinor, data.account.currencyCode)}</dd>
-          </div>
-          <div>
-            <dt>Net</dt>
-            <dd>{formatMoney(data.monthly.netMinor, data.account.currencyCode)}</dd>
-          </div>
-        </dl>
+        <IncomeExpenseBars
+          compact
+          incomeMinor={data.monthly.incomeMinor}
+          expenseMinor={data.monthly.expenseMinor}
+          netMinor={data.monthly.netMinor}
+          currencyCode={data.account.currencyCode}
+          ariaLabel="This month income, expense, and net"
+        />
       </article>
     {/if}
 
     {#if isDashboardWidgetEnabled(data.enabledWidgets, "summary-all") && data.allTime}
       <article class="dash-panel">
         <h2>All time</h2>
-        <dl class="dash-kv">
-          <div>
-            <dt>In</dt>
-            <dd class="pos">{formatMoney(data.allTime.incomeMinor, data.account.currencyCode)}</dd>
-          </div>
-          <div>
-            <dt>Out</dt>
-            <dd class="neg">{formatMoney(-data.allTime.expenseMinor, data.account.currencyCode)}</dd>
-          </div>
-          <div>
-            <dt>Net</dt>
-            <dd>{formatMoney(data.allTime.netMinor, data.account.currencyCode)}</dd>
-          </div>
-        </dl>
+        <IncomeExpenseBars
+          compact
+          incomeMinor={data.allTime.incomeMinor}
+          expenseMinor={data.allTime.expenseMinor}
+          netMinor={data.allTime.netMinor}
+          currencyCode={data.account.currencyCode}
+          ariaLabel="All time income, expense, and net"
+        />
       </article>
     {/if}
   </section>
 {/if}
 
 {#if showTrendsRow}
-  <section class="dash-grid">
+  <section class="dash-grid dash-grid-trends">
     {#if isDashboardWidgetEnabled(data.enabledWidgets, "monthly-trend") && data.monthlyTrend.length}
-      <article class="dash-panel dash-panel-wide">
+      <article class="dash-panel">
         <h2>Monthly trend · last 12 months</h2>
         <MonthlyTrendChart rows={data.monthlyTrend} currencyCode={data.account.currencyCode} />
       </article>
     {/if}
 
     {#if isDashboardWidgetEnabled(data.enabledWidgets, "category-trend") && data.categoryTrend?.categories.length}
-      <article class="dash-panel dash-panel-wide">
+      <article class="dash-panel">
         <h2>Category trend · last 12 months</h2>
         <CategoryTrendChart chart={data.categoryTrend} currencyCode={data.account.currencyCode} />
       </article>
     {:else if isDashboardWidgetEnabled(data.enabledWidgets, "category-trend")}
-      <article class="dash-panel dash-panel-wide">
+      <article class="dash-panel">
         <h2>Category trend · last 12 months</h2>
         <p class="dim dash-empty">No categorized expenses in this period.</p>
-      </article>
-    {/if}
-
-    {#if isDashboardWidgetEnabled(data.enabledWidgets, "income-expense") && data.showIncomeExpense}
-      <article class="dash-panel">
-        <h2>Income vs expense · {data.summaryLabel.toLowerCase()}</h2>
-        <IncomeExpenseBars incomeMinor={data.summary.incomeMinor} expenseMinor={data.summary.expenseMinor} currencyCode={data.account.currencyCode} />
       </article>
     {/if}
   </section>
@@ -396,11 +375,7 @@
         {#if data.categorySpend.length === 0}
           <p class="dim dash-empty">No expenses in this period.</p>
         {:else}
-          <div class="dash-meters">
-            {#each data.categorySpend as row (row.name)}
-              <MeterBar name={row.name} valueLabel={formatMoney(row.amountMinor, data.account.currencyCode)} pct={row.pct} color={row.color} />
-            {/each}
-          </div>
+          <SpendPieChart rows={data.categorySpend} currencyCode={data.account.currencyCode} ariaLabel="Category spend breakdown" />
         {/if}
       </article>
     {/if}
@@ -411,11 +386,7 @@
         {#if data.tagSpend.length === 0}
           <p class="dim dash-empty">No tagged expenses in this period.</p>
         {:else}
-          <div class="dash-meters">
-            {#each data.tagSpend as row (row.name)}
-              <MeterBar name={row.name} valueLabel={formatMoney(row.amountMinor, data.account.currencyCode)} pct={row.pct} color={row.color} />
-            {/each}
-          </div>
+          <SpendPieChart rows={data.tagSpend} currencyCode={data.account.currencyCode} ariaLabel="Tag spend breakdown" />
         {/if}
       </article>
     {/if}
@@ -437,11 +408,7 @@
         {#if data.groupSpend.length === 0}
           <p class="dim dash-empty">No grouped expenses in this period.</p>
         {:else}
-          <div class="dash-meters">
-            {#each data.groupSpend as row (row.name)}
-              <MeterBar name={row.name} valueLabel={formatMoney(row.amountMinor, data.account.currencyCode)} pct={row.pct} color={row.color} />
-            {/each}
-          </div>
+          <SpendPieChart rows={data.groupSpend} currencyCode={data.account.currencyCode} ariaLabel="Group spend breakdown" />
         {/if}
       </article>
     {/if}
@@ -898,6 +865,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .dash-grid-trends {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
   .dash-grid-billing {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -989,6 +961,8 @@
   @media (max-width: 900px) {
     .dash-grid,
     .dash-grid-spending,
+    .dash-grid-trends,
+    .dash-grid-billing,
     .dash-kv {
       grid-template-columns: 1fr;
     }

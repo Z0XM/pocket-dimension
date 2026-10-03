@@ -7,7 +7,6 @@ export type DashboardWidgetId =
   | "group-spend"
   | "monthly-trend"
   | "category-trend"
-  | "income-expense"
   | "budgets"
   | "goals"
   | "monthly-bills"
@@ -62,19 +61,13 @@ export const DASHBOARD_WIDGET_CATALOG: DashboardWidgetDefinition[] = [
   {
     id: "monthly-trend",
     label: "Monthly trend",
-    description: "Income and expense bars over the last 12 months",
+    description: "Income and expense lines over the last 12 months",
     category: "trends",
   },
   {
     id: "category-trend",
     label: "Category trend",
-    description: "Top category spend stacked by month over the last 12 months",
-    category: "trends",
-  },
-  {
-    id: "income-expense",
-    label: "Income vs expense",
-    description: "Side-by-side comparison for the selected period",
+    description: "Top category spend lines by month over the last 12 months",
     category: "trends",
   },
   {
@@ -109,7 +102,6 @@ export const DEFAULT_DASHBOARD_WIDGETS: DashboardWidgetId[] = [
   "category-spend",
   "monthly-trend",
   "category-trend",
-  "income-expense",
   "budgets",
   "goals",
 ];

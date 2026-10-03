@@ -1236,18 +1236,16 @@
 
       {#if data.groups.length > 0}
         <div class="flow-tools">
-          <div class="period-tabs group-filter-wrap">
-            <select
-              class="group-filter"
+          <div class="group-filter-wrap">
+            <SketchSelect
+              name="group-filter"
+              compact
+              alignEnd
               aria-label="Filter by group"
               value={data.selectedGroupId ?? ""}
-              onchange={(e) => setGroupFilter(e.currentTarget.value || null)}
-            >
-              <option value="">All groups</option>
-              {#each data.groups as group (group.id)}
-                <option value={group.id}>{group.name}</option>
-              {/each}
-            </select>
+              options={[{ value: "", label: "All groups" }, ...data.groups.map((group) => ({ value: group.id, label: group.name }))]}
+              onChange={(next) => setGroupFilter(next || null)}
+            />
           </div>
         </div>
       {/if}
@@ -1557,23 +1555,33 @@
                           disabled={savingGroupTxId === t.id}
                           onclick={() => (openGroupTxId = openGroupTxId === t.id ? null : t.id)}
                         >
-                          <Layers size={12} strokeWidth={1.5} aria-hidden="true" />
+                          <Layers size={12} strokeWidth={1.6} aria-hidden="true" />
                         </button>
                         {#if openGroupTxId === t.id}
-                          <div class="group-popup" role="dialog" aria-label="Transaction group">
-                            <select
-                              id="group-{t.id}"
-                              class="group-select"
-                              aria-label="Link transaction to group"
-                              value={primaryGroupId(t)}
+                          <div class="group-popup" role="menu" aria-label="Transaction group">
+                            <span class="group-popup-label" aria-hidden="true">group</span>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              class="group-option empty"
+                              class:selected={!primaryGroupId(t)}
                               disabled={savingGroupTxId === t.id}
-                              onchange={(e) => setTransactionGroup(t.id, e.currentTarget.value ? e.currentTarget.value : null)}
+                              onclick={() => setTransactionGroup(t.id, null)}
                             >
-                              <option value="">None</option>
-                              {#each data.groups as group (group.id)}
-                                <option value={group.id}>{group.name}</option>
-                              {/each}
-                            </select>
+                              None
+                            </button>
+                            {#each data.groups as group (group.id)}
+                              <button
+                                type="button"
+                                role="menuitem"
+                                class="group-option"
+                                class:selected={primaryGroupId(t) === group.id}
+                                disabled={savingGroupTxId === t.id}
+                                onclick={() => setTransactionGroup(t.id, group.id)}
+                              >
+                                {group.name}
+                              </button>
+                            {/each}
                           </div>
                         {:else if t.groups.length > 0}
                           <span class="group-preview" role="tooltip">{groupLabelFor(t)}</span>
@@ -2105,49 +2113,13 @@
 
   .group-filter-wrap {
     padding: 0;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .filter-multi-wrap {
     padding: 0;
     overflow: visible;
     min-width: 7.5rem;
-  }
-
-  .group-filter {
-    --period-tab-height: 1.625rem;
-    box-sizing: border-box;
-    height: var(--period-tab-height);
-    font-family: inherit;
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-  }
-
-  .group-filter {
-    display: block;
-    min-width: 7rem;
-    width: 100%;
-    margin: 0;
-    padding: 0 1.65rem 0 0.65rem;
-    border: none;
-    background: var(--surface2)
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23e8e4f0' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E")
-      no-repeat right 0.55rem center;
-    color: var(--main-text);
-    line-height: var(--period-tab-height);
-    text-transform: uppercase;
-    cursor: pointer;
-    appearance: none;
-  }
-
-  .group-filter:focus {
-    outline: none;
-    box-shadow: inset 0 0 0 2px var(--hi-focus);
-  }
-
-  .group-filter option {
-    text-transform: none;
-    letter-spacing: 0.04em;
   }
 
   .stats-label {
@@ -2435,17 +2407,35 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
     padding: 0;
-    border: none;
+    border: 1.5px dashed color-mix(in srgb, var(--ink) 28%, transparent);
     background: transparent;
-    color: var(--muted);
+    color: var(--ink-muted);
     cursor: pointer;
+    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
   }
 
-  .group-link-btn.has-group,
-  .group-link-btn:hover,
+  .group-link-btn.has-group {
+    border-style: solid;
+    border-color: transparent;
+    background: color-mix(in srgb, var(--yellow) 62%, transparent);
+    color: var(--ink);
+    transform: rotate(1deg);
+  }
+
+  .group-link-btn:hover:not(:disabled),
   .group-link-btn[aria-expanded="true"] {
-    color: var(--hi-purple);
+    color: var(--brand);
+    border-color: var(--brand);
+  }
+
+  .group-link-btn.has-group:hover:not(:disabled),
+  .group-link-btn.has-group[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--yellow) 82%, transparent);
+    border-color: transparent;
+    color: var(--ink);
   }
 
   .group-link-btn:disabled {
@@ -2646,18 +2636,22 @@
 
   .group-preview {
     position: absolute;
-    left: calc(100% + 0.35rem);
+    left: calc(100% + 0.4rem);
     top: 50%;
-    transform: translateY(-50%);
+    transform: translateY(-50%) rotate(0.5deg);
     z-index: 15;
     width: max-content;
     max-width: 14rem;
-    padding: 0.45rem 0.55rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
-    color: var(--main-text);
-    font-size: 0.72rem;
+    padding: 0.4rem 0.55rem;
+    background: color-mix(in srgb, var(--yellow) 28%, var(--surface-raised));
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 2px 10px 3px 8px / 8px 2px 10px 3px;
+    box-shadow:
+      2px 2px 0 0 var(--shadow-paper),
+      2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
+    color: var(--ink);
+    font-family: var(--hand);
+    font-size: 0.88rem;
     line-height: 1.35;
     white-space: normal;
     pointer-events: none;
@@ -2672,31 +2666,63 @@
 
   .group-popup {
     position: absolute;
-    left: calc(100% + 0.35rem);
-    top: 50%;
-    transform: translateY(-50%);
+    left: calc(100% + 0.4rem);
+    top: -0.35rem;
     z-index: 25;
-    width: 12rem;
-    padding: 0.45rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
+    min-width: 8.5rem;
+    max-width: 12rem;
+    padding: 0.35rem 0.3rem 0.3rem;
+    background: var(--surface-raised);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 2px 10px 3px 8px / 8px 2px 10px 3px;
+    box-shadow:
+      2px 2px 0 0 var(--shadow-paper),
+      2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
   }
 
-  .group-select {
+  .group-popup-label {
+    display: block;
+    margin: 0 0.2rem 0.15rem;
+    font-family: var(--hand);
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+    letter-spacing: 0.02em;
+  }
+
+  .group-option {
+    appearance: none;
+    display: block;
     width: 100%;
-    background: var(--surface2);
     border: none;
-    color: var(--main-text);
-    padding: 0.4rem 0.45rem;
-    font-family: inherit;
-    font-size: 0.72rem;
+    background: transparent;
+    text-align: left;
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    color: var(--ink);
+    padding: 0.28rem 0.45rem;
     cursor: pointer;
+    border-radius: 2px 6px 3px 5px / 5px 2px 6px 2px;
   }
 
-  .group-select:focus {
-    outline: none;
-    box-shadow: inset 0 0 0 1px var(--hi-focus);
+  .group-option.empty {
+    color: var(--ink-muted);
+  }
+
+  .group-option:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--yellow) 45%, transparent);
+    color: var(--ink);
+  }
+
+  .group-option.selected {
+    background: color-mix(in srgb, var(--yellow) 62%, transparent);
+  }
+
+  .group-option:disabled {
+    opacity: 0.55;
+    cursor: wait;
   }
 
   .note-textarea:disabled {
