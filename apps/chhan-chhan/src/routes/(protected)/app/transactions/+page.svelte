@@ -32,6 +32,7 @@
   let savingNotesId = $state<string | null>(null);
   let savingTagTxId = $state<string | null>(null);
   let openTagMenuTxId = $state<string | null>(null);
+  let tagMenuQuery = $state("");
   let savingSpaceTxId = $state<string | null>(null);
   let openSpaceTxId = $state<string | null>(null);
   let openNoteTxId = $state<string | null>(null);
@@ -91,7 +92,14 @@
   }
 
   $effect(() => {
-    if (!openTagMenuTxId) return;
+    if (!openTagMenuTxId) {
+      tagMenuQuery = "";
+      return;
+    }
+
+    queueMicrotask(() => {
+      document.querySelector<HTMLInputElement>(".tag-add-search")?.focus();
+    });
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as HTMLElement | null;
@@ -437,7 +445,17 @@
 
   function availableTagsFor(transaction: PageData["transactions"][number]) {
     const attached = new Set(transaction.tags.map((tag) => tag.id));
-    return data.tags.filter((tag) => !attached.has(tag.id));
+    const query = tagMenuQuery.trim().toLowerCase();
+    return data.tags.filter((tag) => {
+      if (attached.has(tag.id)) return false;
+      if (!query) return true;
+      return tag.name.toLowerCase().includes(query);
+    });
+  }
+
+  function hasUnattachedTags(transaction: PageData["transactions"][number]) {
+    const attached = new Set(transaction.tags.map((tag) => tag.id));
+    return data.tags.some((tag) => !attached.has(tag.id));
   }
 
   async function addTransactionTag(transactionId: string, tagId: string) {
@@ -854,6 +872,9 @@
               options={[{ value: "", label: "All spaces" }, ...data.spaces.map((space) => ({ value: space.id, label: space.name }))]}
               onChange={(next) => setSpaceFilter(next || null)}
             />
+            {#if data.selectedSpaceId}
+              <a class="space-settle-link" href="/app/spaces/{data.selectedSpaceId}">Settle</a>
+            {/if}
           </div>
         </div>
       {/if}
@@ -1055,20 +1076,31 @@
                             <span class="space-popup-label" aria-hidden="true">spaces</span>
                             {#each data.spaces as space (space.id)}
                               {@const attached = isInSpace(t, space.id)}
-                              <button
-                                type="button"
-                                role="menuitemcheckbox"
-                                aria-checked={attached}
-                                class="space-option"
-                                class:selected={attached}
-                                disabled={savingSpaceTxId === t.id}
-                                onclick={() => toggleTransactionSpace(t.id, space.id)}
-                              >
-                                <span class="space-option-check" aria-hidden="true">
-                                  {#if attached}<Check size={11} strokeWidth={2.2} />{/if}
-                                </span>
-                                {space.name}
-                              </button>
+                              <div class="space-option-row">
+                                <button
+                                  type="button"
+                                  role="menuitemcheckbox"
+                                  aria-checked={attached}
+                                  class="space-option"
+                                  class:selected={attached}
+                                  disabled={savingSpaceTxId === t.id}
+                                  onclick={() => toggleTransactionSpace(t.id, space.id)}
+                                >
+                                  <span class="space-option-check" aria-hidden="true">
+                                    {#if attached}<Check size={11} strokeWidth={2.2} />{/if}
+                                  </span>
+                                  {space.name}
+                                </button>
+                                <a
+                                  class="space-open"
+                                  href="/app/spaces/{space.id}"
+                                  title="Open settlement"
+                                  aria-label="Open {space.name} settlement"
+                                  onclick={(e) => e.stopPropagation()}
+                                >
+                                  →
+                                </a>
+                              </div>
                             {/each}
                           </div>
                         {:else if t.spaces.length > 0}
@@ -1095,7 +1127,7 @@
                         </button>
                       </span>
                     {/each}
-                    {#if data.tags.length > 0 && availableTagsFor(t).length > 0}
+                    {#if data.tags.length > 0 && hasUnattachedTags(t)}
                       <div class="tag-add-wrap">
                         <button
                           type="button"
@@ -1103,25 +1135,45 @@
                           aria-label="Add tag to {t.merchant ?? 'transaction'}"
                           aria-expanded={openTagMenuTxId === t.id}
                           disabled={savingTagTxId === t.id}
-                          onclick={() => (openTagMenuTxId = openTagMenuTxId === t.id ? null : t.id)}
+                          onclick={() => {
+                            openTagMenuTxId = openTagMenuTxId === t.id ? null : t.id;
+                            tagMenuQuery = "";
+                          }}
                         >
                           <Plus size={12} strokeWidth={2} aria-hidden="true" />
                         </button>
                         {#if openTagMenuTxId === t.id}
+                          {@const matchedTags = availableTagsFor(t)}
                           <div class="tag-add-menu" role="menu">
-                            {#each availableTagsFor(t) as tag (tag.id)}
-                              <button
-                                type="button"
-                                role="menuitem"
-                                disabled={savingTagTxId === t.id}
-                                onclick={() => {
-                                  handleAddTag(t, tag.id);
-                                  openTagMenuTxId = null;
-                                }}
-                              >
-                                {tag.name}
-                              </button>
-                            {/each}
+                            <input
+                              class="tag-add-search"
+                              type="search"
+                              placeholder="Find tag…"
+                              aria-label="Filter tags"
+                              value={tagMenuQuery}
+                              oninput={(e) => (tagMenuQuery = e.currentTarget.value)}
+                              onclick={(e) => e.stopPropagation()}
+                              onkeydown={(e) => {
+                                if (e.key !== "Escape") e.stopPropagation();
+                              }}
+                            />
+                            <div class="tag-add-list">
+                              {#each matchedTags as tag (tag.id)}
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  disabled={savingTagTxId === t.id}
+                                  onclick={() => {
+                                    handleAddTag(t, tag.id);
+                                    openTagMenuTxId = null;
+                                  }}
+                                >
+                                  {tag.name}
+                                </button>
+                              {:else}
+                                <p class="tag-add-empty">No match</p>
+                              {/each}
+                            </div>
                           </div>
                         {/if}
                       </div>
@@ -1568,6 +1620,21 @@
   .space-filter-wrap {
     padding: 0;
     overflow: visible;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .space-settle-link {
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    color: var(--brand);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .space-settle-link:hover {
+    text-decoration: underline;
   }
 
   .filter-multi-wrap {
@@ -1962,12 +2029,19 @@
     letter-spacing: 0.02em;
   }
 
+  .space-option-row {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+  }
+
   .space-option {
     appearance: none;
     display: flex;
     align-items: center;
     gap: 0.35rem;
     width: 100%;
+    min-width: 0;
     border: none;
     background: transparent;
     text-align: left;
@@ -1977,6 +2051,21 @@
     padding: 0.28rem 0.45rem;
     cursor: pointer;
     border-radius: 2px 6px 3px 5px / 5px 2px 6px 2px;
+  }
+
+  .space-open {
+    flex: none;
+    padding: 0.2rem 0.35rem;
+    font-family: var(--hand);
+    font-size: 0.9rem;
+    color: var(--ink-muted);
+    text-decoration: none;
+    border-radius: 2px 5px 3px 4px;
+  }
+
+  .space-open:hover {
+    color: var(--brand);
+    background: color-mix(in srgb, var(--blue) 35%, transparent);
   }
 
   .space-option-check {
@@ -2122,10 +2211,10 @@
     right: 0;
     left: auto;
     z-index: 20;
-    min-width: 7rem;
-    max-height: 10rem;
-    overflow: auto;
-    padding: 0.25rem;
+    min-width: 9.5rem;
+    max-height: 12.5rem;
+    overflow: hidden;
+    padding: 0.3rem;
     background: var(--surface-raised);
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
     border-radius: 2px 8px 3px 6px / 6px 2px 8px 3px;
@@ -2134,6 +2223,46 @@
       2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
     display: flex;
     flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .tag-add-search {
+    appearance: none;
+    width: 100%;
+    margin: 0;
+    padding: 0.28rem 0.4rem;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    border-radius: 0;
+    background: transparent;
+    font-family: var(--hand);
+    font-size: 0.88rem;
+    color: var(--ink);
+    outline: none;
+  }
+
+  .tag-add-search::placeholder {
+    color: var(--ink-muted);
+    opacity: 0.85;
+  }
+
+  .tag-add-search:focus {
+    border-bottom-color: var(--brand);
+  }
+
+  .tag-add-list {
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .tag-add-empty {
+    margin: 0;
+    padding: 0.35rem 0.4rem;
+    font-family: var(--hand);
+    font-size: 0.88rem;
+    color: var(--ink-muted);
   }
 
   .tag-add-menu button {

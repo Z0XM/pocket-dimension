@@ -32,6 +32,7 @@
   import Plus from "@lucide/svelte/icons/plus";
   import Check from "@lucide/svelte/icons/check";
   import X from "@lucide/svelte/icons/x";
+  import ArrowUpRight from "@lucide/svelte/icons/arrow-up-right";
   import { onMount } from "svelte";
   import type { PageData, ActionData } from "./$types";
 
@@ -985,6 +986,9 @@
                       </span>
                       <span class="dim space-count">{space.transactionCount} txn{space.transactionCount === 1 ? "" : "s"}</span>
                       <div class="row-actions">
+                        <a class="icon-btn" href="/app/spaces/{space.id}" aria-label="Open {space.name} settlement" title="Settle">
+                          <ArrowUpRight size={16} strokeWidth={1.25} aria-hidden="true" />
+                        </a>
                         <button type="button" class="icon-btn" aria-label="Edit {space.name}" onclick={() => beginEditSpace(space)}>
                           <SquarePen size={16} strokeWidth={1.25} aria-hidden="true" />
                         </button>
@@ -1794,6 +1798,13 @@
     color: var(--ink-muted);
     cursor: pointer;
     border-radius: 4px 9px 5px 8px / 8px 4px 9px 5px;
+    text-decoration: none;
+  }
+
+  a.icon-btn:hover {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--yellow) 45%, var(--mix-wash));
+    border-color: color-mix(in srgb, var(--ink) 35%, transparent);
   }
 
   .icon-btn:hover:not(:disabled) {

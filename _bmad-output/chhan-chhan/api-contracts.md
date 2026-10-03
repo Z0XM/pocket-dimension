@@ -39,7 +39,10 @@ Tag **update**/**delete** are primarily Control form actions (`updateTag`/`delet
 | PATCH | `/api/accounts/[accountId]/spaces/[spaceId]` | canEdit | `updateSpaceSchema` | Space metadata. |
 | DELETE | `/api/accounts/[accountId]/spaces/[spaceId]` | canEdit | — | Cascades membership + allocations. |
 | POST | `/api/accounts/[accountId]/spaces/[spaceId]/allocations` | canEdit | `createSpaceAllocationSchema` | M:N amount edge inside the space. |
+| PATCH | `/api/accounts/[accountId]/spaces/[spaceId]/allocations/[allocationId]` | canEdit | `updateSpaceAllocationSchema` | |
 | DELETE | `/api/accounts/[accountId]/spaces/[spaceId]/allocations/[allocationId]` | canEdit | — | |
+
+Settlement UI: `/app/spaces/[spaceId]` (transactions, remainders, create/delete allocations).
 
 ## Budgets
 

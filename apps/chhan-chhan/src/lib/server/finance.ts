@@ -2,6 +2,7 @@ import { normalizeMerchant, rankFuzzyMerchants } from "$lib/finance/merchant-mat
 import { billTagSqlFilter } from "$lib/finance/bill-categories";
 import { DEFAULT_TAGS } from "$lib/finance/default-taxonomy";
 import { parseSqlMinor } from "$lib/finance/money";
+import { maxAllocationMinor, spaceRemainders, canAllocateTransactionTypes } from "$lib/finance/space-settlement";
 import { buildSummarySearchFilterSql, buildTransactionSearchCondition } from "$lib/finance/transaction-search";
 import { currentMonthKey, readRowYear, type SummarySelection } from "$lib/finance/summary";
 import { isBalanceSnapshotNewer } from "$lib/server/balance";
@@ -565,6 +566,19 @@ export async function createSpaceAllocation(userId: string, accountId: string, s
 
   const memberCount = await countSpaceMembers(spaceId, [payload.leftTransactionId, payload.rightTransactionId]);
   if (memberCount !== 2) return null;
+
+  const detail = await getSpaceDetail(accountId, spaceId);
+  if (!detail) return null;
+
+  const left = detail.transactions.find((row) => row.id === payload.leftTransactionId);
+  const right = detail.transactions.find((row) => row.id === payload.rightTransactionId);
+  if (!left || !right) return null;
+  if (!canAllocateTransactionTypes(left.type, right.type)) return null;
+
+  const remainders = spaceRemainders(detail.transactions, detail.allocations);
+  const leftOpen = remainders.find((row) => row.transactionId === left.id)?.remainderMinor ?? 0;
+  const rightOpen = remainders.find((row) => row.transactionId === right.id)?.remainderMinor ?? 0;
+  if (payload.amountMinor > maxAllocationMinor(leftOpen, rightOpen)) return null;
 
   const [created] = await db
     .insert(schema.financeSpaceAllocations)

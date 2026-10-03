@@ -9,7 +9,7 @@ Brownfield capability inventory for `apps/chhan-chhan`. Classifier model: **Tags
 | F-3 | Statement import | `/app/control` | Product | Epic 1 | Live |
 | F-4 | Dashboard widgets | `/app/dashboards` | Product | Epic 1 | Live |
 | F-5 | Budgets and goals | `/app/dashboards`, API | Product | Epic 1 | Live |
-| F-6 | Spaces | `/app`, `/app/control`, API | Product | Epic 1 | Live (quick mode) |
+| F-6 | Spaces | `/app`, `/app/spaces/[id]`, Control | Product | Epic 1 | Live (settlement) |
 | F-7 | Control center | `/app/control` | Product | Epic 1 | Live |
 | F-8 | Money minor-units model | n/a | Product | Epic 1 | Live |
 | F-9 | Account membership authz | n/a | Product | Epic 1 | Live |
@@ -85,13 +85,14 @@ Brownfield capability inventory for `apps/chhan-chhan`. Classifier model: **Tags
 ### F-6 — Spaces
 
 - **Goal:** Relationship containers for shared money / linked transactions (replaces refund-links and group-based matching).
-- **Area:** Ledger / Control
+- **Area:** Ledger / Control / Space detail
 - **Includes:**
   - Space CRUD in Control; attach/detach transactions on the ledger
-  - M:N amount allocations inside a space (API + server)
+  - M:N amount allocations (API + settlement UI at `/app/spaces/[spaceId]`); pairs must be income ↔ expense
+  - Open remainder meters per transaction; suggested allocation amount
   - Space spend dashboard widget
 - **Deferred:**
-  - Full mode: named members, items, settlement UI
+  - Full mode: named people members, planned items/shares (“who owes whom” people ledger)
 - **See also:**
   - [data-models.md](./data-models.md), [api-contracts.md](./api-contracts.md)
 

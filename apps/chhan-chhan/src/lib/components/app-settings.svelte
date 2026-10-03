@@ -2,11 +2,13 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { authClient } from "$lib/auth-client";
+  import CircleHelp from "@lucide/svelte/icons/circle-help";
   import LogOut from "@lucide/svelte/icons/log-out";
   import Settings from "@lucide/svelte/icons/settings";
   import ThemeToggle from "$lib/components/theme-toggle.svelte";
 
   const onControl = $derived(page.url.pathname.startsWith("/app/control"));
+  const onGuide = $derived(page.url.pathname.startsWith("/app/guide"));
 
   let confirmOpen = $state(false);
   let signingOut = $state(false);
@@ -46,6 +48,16 @@
 
 <div class="settings">
   <ThemeToggle />
+  {#if onGuide}
+    <span class="settings-icon is-current" aria-current="page" title="User guide">
+      <CircleHelp size={17} strokeWidth={2.1} aria-hidden="true" />
+      <span class="sr-only">User guide</span>
+    </span>
+  {:else}
+    <a class="settings-icon" href="/app/guide" title="User guide" aria-label="User guide">
+      <CircleHelp size={17} strokeWidth={2.1} aria-hidden="true" />
+    </a>
+  {/if}
   {#if onControl}
     <span class="settings-icon is-current" aria-current="page" title="Control Center">
       <Settings size={17} strokeWidth={2.1} aria-hidden="true" />

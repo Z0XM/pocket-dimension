@@ -74,7 +74,7 @@ Composite indexes: `(account_id, occurred_on)`, `(account_id, sort_order)`. **No
 
 - `finance_spaces`: `account_id`, `name` (unique per account), `color_hex`, `notes`.
 - `finance_space_transactions`: membership junction (`space_id`, `transaction_id`), cascade both sides.
-- `finance_space_allocations`: M:N amount graph inside a space — `left_transaction_id` / `right_transaction_id` / `amount_minor` (any txn portion can allocate against any other).
+- `finance_space_allocations`: M:N amount graph inside a space — `left_transaction_id` / `right_transaction_id` / `amount_minor` (must pair income ↔ expense; capped by each side’s open remainder).
 
 **Touched by:** `finance.ts` (space CRUD, attach/detach, allocations, space-spend analytics), ledger space-link UI, Control spaces CRUD.
 
