@@ -626,512 +626,554 @@
 
 <svelte:head><title>{data.space.name} · Space · Chhan Chhan</title></svelte:head>
 
-<header class="topbar">
-  <div class="title-row">
-    <a class="back-link" href="/app/transactions?space={data.space.id}">← Back</a>
-    <h1>
-      <span class="swatch" style="background: {data.space.colorHex ?? '#BDE0FE'}" aria-hidden="true"></span>
-      {data.space.name}
-    </h1>
-  </div>
-  <div class="actions">
-    <AppSettings />
-  </div>
-</header>
-
-{#if data.space.notes}
-  <p class="space-notes dim">{data.space.notes}</p>
-{/if}
-
-{#if errorMessage}
-  <p class="flash error">{errorMessage}</p>
-{/if}
-
-<div class="summary-row">
-  <div class="flow" aria-label="Space summary">
-    <div class="node">
-      <span class="node-k">in space</span>
-      <span class="node-v">{transactions.length}</span>
+<div class="space-page">
+  <header class="topbar">
+    <div class="title-row">
+      <a class="back-link" href="/app/transactions?space={data.space.id}">← Back</a>
+      <h1>
+        <span class="swatch" style="background: {data.space.colorHex ?? '#BDE0FE'}" aria-hidden="true"></span>
+        {data.space.name}
+      </h1>
     </div>
-    <span class="flow-arrow" aria-hidden="true">→</span>
-    <div class="node">
-      <span class="node-k">allocations</span>
-      <span class="node-v">{allocations.length}</span>
+    <div class="actions">
+      <AppSettings />
     </div>
-    <span class="flow-arrow" aria-hidden="true">→</span>
-    <div class="node">
-      <span class="node-k">linked</span>
-      <span class="node-v">
-        <span class="rough-mark is-linked">
-          <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
-            <rect x="1" y="3" width="118" height="20" rx="2" fill="color-mix(in srgb, var(--blue) 55%, transparent)" />
-          </svg>
-          <span class="txt">{formatMoney(allocatedTotalMinor, data.account.currencyCode)}</span>
+  </header>
+
+  {#if data.space.notes}
+    <p class="space-notes dim">{data.space.notes}</p>
+  {/if}
+
+  {#if errorMessage}
+    <p class="flash error">{errorMessage}</p>
+  {/if}
+
+  <div class="summary-row">
+    <div class="flow" aria-label="Space summary">
+      <div class="node">
+        <span class="node-k">in space</span>
+        <span class="node-v">{transactions.length}</span>
+      </div>
+      <span class="flow-arrow" aria-hidden="true">→</span>
+      <div class="node">
+        <span class="node-k">allocations</span>
+        <span class="node-v">{allocations.length}</span>
+      </div>
+      <span class="flow-arrow" aria-hidden="true">→</span>
+      <div class="node">
+        <span class="node-k">linked</span>
+        <span class="node-v">
+          <span class="rough-mark is-linked">
+            <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+              <rect x="1" y="3" width="118" height="20" rx="2" fill="color-mix(in srgb, var(--blue) 55%, transparent)" />
+            </svg>
+            <span class="txt">{formatMoney(allocatedTotalMinor, data.account.currencyCode)}</span>
+          </span>
         </span>
-      </span>
-    </div>
-    <span class="flow-arrow" aria-hidden="true">=</span>
-    <div class="node" class:open-rem={incomingOpenMinor > 0} class:settled={incomingOpenMinor === 0 && transactions.length > 0}>
-      <span class="node-k">open in</span>
-      <span class="node-v">
-        <span class="rough-mark is-open">
-          <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
-            <rect
-              x="1"
-              y="3"
-              width="118"
-              height="20"
-              rx="2"
-              fill={incomingOpenMinor > 0 ? "color-mix(in srgb, var(--green) 55%, transparent)" : "color-mix(in srgb, var(--green) 35%, transparent)"}
-            />
-          </svg>
-          <span class="txt amt pos">{formatSignedMoney(incomingOpenMinor, data.account.currencyCode)}</span>
+      </div>
+      <span class="flow-arrow" aria-hidden="true">=</span>
+      <div class="node" class:open-rem={incomingOpenMinor > 0} class:settled={incomingOpenMinor === 0 && transactions.length > 0}>
+        <span class="node-k">open in</span>
+        <span class="node-v">
+          <span class="rough-mark is-open">
+            <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+              <rect
+                x="1"
+                y="3"
+                width="118"
+                height="20"
+                rx="2"
+                fill={incomingOpenMinor > 0
+                  ? "color-mix(in srgb, var(--green) 55%, transparent)"
+                  : "color-mix(in srgb, var(--green) 35%, transparent)"}
+              />
+            </svg>
+            <span class="txt amt pos">{formatSignedMoney(incomingOpenMinor, data.account.currencyCode)}</span>
+          </span>
         </span>
-      </span>
-    </div>
-    <div class="node" class:open-rem={outgoingOpenMinor > 0} class:settled={outgoingOpenMinor === 0 && transactions.length > 0}>
-      <span class="node-k">open out</span>
-      <span class="node-v">
-        <span class="rough-mark is-open">
-          <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
-            <rect
-              x="1"
-              y="3"
-              width="118"
-              height="20"
-              rx="2"
-              fill={outgoingOpenMinor > 0 ? "color-mix(in srgb, var(--pink) 55%, transparent)" : "color-mix(in srgb, var(--green) 35%, transparent)"}
-            />
-          </svg>
-          <span class="txt amt neg">{formatSignedMoney(-outgoingOpenMinor, data.account.currencyCode)}</span>
+      </div>
+      <div class="node" class:open-rem={outgoingOpenMinor > 0} class:settled={outgoingOpenMinor === 0 && transactions.length > 0}>
+        <span class="node-k">open out</span>
+        <span class="node-v">
+          <span class="rough-mark is-open">
+            <svg class="stroke" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
+              <rect
+                x="1"
+                y="3"
+                width="118"
+                height="20"
+                rx="2"
+                fill={outgoingOpenMinor > 0
+                  ? "color-mix(in srgb, var(--pink) 55%, transparent)"
+                  : "color-mix(in srgb, var(--green) 35%, transparent)"}
+              />
+            </svg>
+            <span class="txt amt neg">{formatSignedMoney(-outgoingOpenMinor, data.account.currencyCode)}</span>
+          </span>
         </span>
-      </span>
+      </div>
     </div>
+    <a class="manage-link" href="/app/control">Manage</a>
   </div>
-  <a class="manage-link" href="/app/control">Manage</a>
-</div>
 
-<div class="space-notebook">
-  <div class="paper-tabs" role="tablist" aria-label="Space sections">
-    {#each SPACE_TABS as tab, i (tab.id)}
-      <button
-        type="button"
-        role="tab"
-        class="paper-tab tone-{tab.tone}"
-        class:active={activeTab === tab.id}
-        id="space-tab-{tab.id}"
-        aria-selected={activeTab === tab.id}
-        aria-controls="space-panel-{tab.id}"
-        tabindex={activeTab === tab.id ? 0 : -1}
-        style="--depth: {i}"
-        onclick={() => (activeTab = tab.id)}
-      >
-        {tab.label}
-      </button>
-    {/each}
-  </div>
-  <div class="notebook-sheet" data-tone={activeTab}>
-    {#if activeTab === "transactions"}
-      <section class="sheet-panel" id="space-panel-transactions" role="tabpanel" aria-labelledby="space-tab-transactions">
-        <p class="panel-copy dim">Attach more from the ledger’s space icon, then settle here.</p>
-        {#if transactions.length === 0}
-          <p class="dim empty">No transactions in this space yet.</p>
-        {:else}
-          <div class="table-block table-sheet space-table">
-            <div class="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Merchant</th>
-                    <th class="right">Amount</th>
-                    <th class="right">Open</th>
-                    <th class="right"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each transactions as txn (txn.id)}
-                    {@const rem = remainderById.get(txn.id)}
-                    <tr>
-                      <td class="mono dim">{txn.occurredOn}</td>
-                      <td class="merchant">{txn.merchant ?? "—"}</td>
-                      <td class="right mono amt {typeClass(txn.type)}">
-                        {formatMoney(txn.amountMinor, data.account.currencyCode)}
-                      </td>
-                      <td class="right mono amt {typeClass(txn.type)}" class:rem-open={(rem?.remainderMinor ?? 0) > 0}>
-                        {formatSignedMoney(signedOpenMinor(txn.type, rem?.remainderMinor ?? 0), data.account.currencyCode)}
-                      </td>
-                      <td class="right">
-                        <button
-                          type="button"
-                          class="icon-btn danger"
-                          aria-label="Remove from space"
-                          disabled={removingTxnId === txn.id}
-                          onclick={() => detachTransaction(txn.id)}
-                        >
-                          ×
-                        </button>
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        {/if}
-      </section>
-    {:else if activeTab === "settlements"}
-      <section class="sheet-panel" id="space-panel-settlements" role="tabpanel" aria-labelledby="space-tab-settlements">
-        <p class="panel-copy dim">Link an incoming with an outgoing — refunds, splits, partial pays.</p>
-        {#if transactions.length < 2}
-          <p class="dim empty">Need at least two transactions to allocate.</p>
-        {:else}
-          <form
-            class="alloc-form settle-form"
-            onsubmit={(e) => {
-              e.preventDefault();
-              void createAllocation();
-            }}
-          >
-            <div class="settle-pair-row">
-              <label class="field">
-                <span class="field-k">Incoming</span>
-                <SketchSelect name="alloc-incoming" options={incomingSelectOptions} bind:value={incomingId} aria-label="Incoming transaction" />
-              </label>
-              <div class="alloc-mid" aria-hidden="true">
-                <ArrowLeftRight size={16} strokeWidth={1.6} />
-              </div>
-              <label class="field">
-                <span class="field-k">Outgoing</span>
-                <SketchSelect name="alloc-outgoing" options={outgoingSelectOptions} bind:value={outgoingId} aria-label="Outgoing transaction" />
-              </label>
-            </div>
-            <div class="settle-amount-row">
-              <span class="field-k">Amount</span>
-              <div class="amount-row">
-                <input
-                  class="underline-input"
-                  type="text"
-                  inputmode="decimal"
-                  placeholder="0.00"
-                  value={amountMajor}
-                  disabled={maxMinor <= 0}
-                  required
-                  aria-label="Amount"
-                  oninput={(e) => onAmountInput(e.currentTarget.value)}
-                />
-                {#if maxMinor > 0}
-                  <button type="button" class="suggest-btn" onclick={useMaxAmount}>
-                    Max {formatMoney(maxMinor, data.account.currencyCode)}
-                  </button>
-                {/if}
-                <button type="submit" class="sketch-action" disabled={busy}>
-                  <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
-                  {busy ? "Saving…" : "Add settlement"}
-                </button>
-              </div>
-            </div>
-            {#if incomingId && outgoingId}
-              <span class="field-hint">
-                {#if maxMinor > 0}
-                  Suggested / max = smaller open remainder ({formatMoney(incomingRemainder, data.account.currencyCode)} vs
-                  {formatMoney(outgoingRemainder, data.account.currencyCode)}).
-                {:else}
-                  Nothing left to allocate on one of these rows.
-                {/if}
-              </span>
-            {/if}
-          </form>
-        {/if}
-        <div class="alloc-scroll">
-          <h3>Allocations</h3>
-          {#if allocations.length === 0}
-            <p class="dim empty">None yet.</p>
-          {:else}
-            <ul class="alloc-list">
-              {#each allocations as allocation (allocation.id)}
-                {@const left = txnById(allocation.leftTransactionId)}
-                {@const right = txnById(allocation.rightTransactionId)}
-                <li>
-                  <div class="alloc-body">
-                    <span class="pair">
-                      {left?.merchant ?? "Txn"}
-                      <span class="dim">↔</span>
-                      {right?.merchant ?? "Txn"}
-                    </span>
-                    <span class="mono amt">{formatMoney(allocation.amountMinor, data.account.currencyCode)}</span>
-                  </div>
-                  <button
-                    type="button"
-                    class="icon-btn danger"
-                    aria-label="Delete allocation"
-                    disabled={deletingAllocationId === allocation.id}
-                    onclick={() => deleteAllocation(allocation.id)}
-                  >
-                    ×
-                  </button>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </div>
-      </section>
-    {:else if activeTab === "event-payments"}
-      <section class="sheet-panel" id="space-panel-event-payments" role="tabpanel" aria-labelledby="space-tab-event-payments">
-        <p class="panel-copy dim">Apply bank money to a person’s open share on an event.</p>
-        {#if people.length === 0 || items.length === 0 || transactions.length === 0}
-          <p class="dim empty">Need people, events, and transactions first.</p>
-        {:else}
-          <form
-            class="alloc-form settle-form"
-            onsubmit={(e) => {
-              e.preventDefault();
-              void createItemPayment();
-            }}
-          >
-            <div class="settle-pair-row pay-pair-row">
-              <label class="field">
-                <span class="field-k">Transaction</span>
-                <SketchSelect name="pay-txn" options={payTxnSelectOptions} bind:value={payTxnId} aria-label="Payment transaction" />
-              </label>
-              <div class="alloc-mid" aria-hidden="true">→</div>
-              <label class="field">
-                <span class="field-k">Event</span>
-                <SketchSelect name="pay-item" options={itemSelectOptions} bind:value={payItemId} aria-label="Event" />
-              </label>
-              <div class="alloc-mid" aria-hidden="true">→</div>
-              <label class="field">
-                <span class="field-k">Covers</span>
-                <SketchSelect name="pay-person" options={personSelectOptions} bind:value={payPersonId} aria-label="Person covered" />
-              </label>
-            </div>
-            <div class="settle-amount-row">
-              <span class="field-k">Amount</span>
-              <div class="amount-row">
-                <input
-                  class="underline-input"
-                  type="text"
-                  inputmode="decimal"
-                  placeholder="0.00"
-                  value={payAmountMajor}
-                  disabled={payMaxMinor <= 0}
-                  required
-                  aria-label="Amount"
-                  oninput={(e) => onPayAmountInput(e.currentTarget.value)}
-                />
-                {#if payMaxMinor > 0}
-                  <button type="button" class="suggest-btn" onclick={usePayMaxAmount}>
-                    Max {formatMoney(payMaxMinor, data.account.currencyCode)}
-                  </button>
-                {/if}
-                <button type="submit" class="sketch-action" disabled={busy}>
-                  <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
-                  {busy ? "Paying…" : "Add payment"}
-                </button>
-              </div>
-            </div>
-          </form>
-        {/if}
-        <div class="alloc-scroll">
-          <h3>Payments</h3>
-          {#if itemPayments.length === 0}
-            <p class="dim empty">None yet.</p>
-          {:else}
-            <ul class="alloc-list">
-              {#each itemPayments as payment (payment.id)}
-                {@const item = itemById(payment.itemId)}
-                {@const person = personById(payment.coversPersonId)}
-                {@const txn = txnById(payment.transactionId)}
-                <li>
-                  <div class="alloc-body">
-                    <span class="pair">
-                      {txn?.merchant ?? "Txn"}
-                      <span class="dim">→</span>
-                      {item?.name ?? "Event"}
-                      <span class="dim">covers</span>
-                      {person?.name ?? "Person"}
-                    </span>
-                    <span class="mono amt">{formatMoney(payment.amountMinor, data.account.currencyCode)}</span>
-                  </div>
-                  <button
-                    type="button"
-                    class="icon-btn danger"
-                    aria-label="Delete payment"
-                    disabled={deletingPaymentId === payment.id}
-                    onclick={() => removeItemPayment(payment.id)}
-                  >
-                    ×
-                  </button>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </div>
-      </section>
-    {:else if activeTab === "events"}
-      <section class="sheet-panel" id="space-panel-events" role="tabpanel" aria-labelledby="space-tab-events">
-        <p class="panel-copy dim">Planned events split across people — equal, by amounts, or by share weights.</p>
-        <form
-          class="event-form"
-          onsubmit={(e) => {
-            e.preventDefault();
-            void addItem();
-          }}
+  <div class="space-notebook">
+    <div class="paper-tabs" role="tablist" aria-label="Space sections">
+      {#each SPACE_TABS as tab, i (tab.id)}
+        <button
+          type="button"
+          role="tab"
+          class="paper-tab tone-{tab.tone}"
+          class:active={activeTab === tab.id}
+          id="space-tab-{tab.id}"
+          aria-selected={activeTab === tab.id}
+          aria-controls="space-panel-{tab.id}"
+          tabindex={activeTab === tab.id ? 0 : -1}
+          style="--depth: {i}"
+          onclick={() => (activeTab = tab.id)}
         >
-          <div class="event-basics">
-            <input class="underline-input" type="text" placeholder="Event name" bind:value={itemName} maxlength="120" />
-            <input class="underline-input" type="text" inputmode="decimal" placeholder="Total amount" bind:value={itemAmountMajor} />
-          </div>
-
-          <div class="split-modes" role="radiogroup" aria-label="Split mode">
-            {#each SPLIT_MODES as mode (mode.id)}
-              <button
-                type="button"
-                class="split-mode"
-                class:active={splitMode === mode.id}
-                role="radio"
-                aria-checked={splitMode === mode.id}
-                onclick={() => (splitMode = mode.id)}
-              >
-                {mode.label}
-              </button>
-            {/each}
-          </div>
-          <p class="field-hint split-hint">{splitModeHint}</p>
-
-          {#if splitMode === "amounts" && people.length > 0}
-            <ul class="split-grid">
-              {#each people as person (person.id)}
-                <li>
-                  <span class="split-name">{personLabel(person)}</span>
+          {tab.label}
+        </button>
+      {/each}
+    </div>
+    <div class="notebook-sheet" class:fill-table={activeTab === "transactions"} data-tone={activeTab}>
+      {#if activeTab === "transactions"}
+        <section class="sheet-panel" id="space-panel-transactions" role="tabpanel" aria-labelledby="space-tab-transactions">
+          <p class="panel-copy dim">Attach more from the ledger’s space icon, then settle here.</p>
+          {#if transactions.length === 0}
+            <p class="dim empty">No transactions in this space yet.</p>
+          {:else}
+            <div class="table-block table-sheet space-table">
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Merchant</th>
+                      <th class="right">Amount</th>
+                      <th class="right">Open</th>
+                      <th class="right"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each transactions as txn (txn.id)}
+                      {@const rem = remainderById.get(txn.id)}
+                      <tr>
+                        <td class="mono dim">{txn.occurredOn}</td>
+                        <td class="merchant">{txn.merchant ?? "—"}</td>
+                        <td class="right mono amt {typeClass(txn.type)}">
+                          {formatMoney(txn.amountMinor, data.account.currencyCode)}
+                        </td>
+                        <td class="right mono amt {typeClass(txn.type)}" class:rem-open={(rem?.remainderMinor ?? 0) > 0}>
+                          {formatSignedMoney(signedOpenMinor(txn.type, rem?.remainderMinor ?? 0), data.account.currencyCode)}
+                        </td>
+                        <td class="right">
+                          <button
+                            type="button"
+                            class="icon-btn danger"
+                            aria-label="Remove from space"
+                            disabled={removingTxnId === txn.id}
+                            onclick={() => detachTransaction(txn.id)}
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {/if}
+        </section>
+      {:else if activeTab === "settlements"}
+        <section class="sheet-panel" id="space-panel-settlements" role="tabpanel" aria-labelledby="space-tab-settlements">
+          <p class="panel-copy dim">Link an incoming with an outgoing — refunds, splits, partial pays.</p>
+          {#if transactions.length < 2}
+            <p class="dim empty">Need at least two transactions to allocate.</p>
+          {:else}
+            <form
+              class="alloc-form settle-form"
+              onsubmit={(e) => {
+                e.preventDefault();
+                void createAllocation();
+              }}
+            >
+              <div class="settle-pair-row">
+                <label class="field">
+                  <span class="field-k">Incoming</span>
+                  <SketchSelect
+                    name="alloc-incoming"
+                    options={incomingSelectOptions}
+                    bind:value={incomingId}
+                    searchable
+                    searchPlaceholder="Search merchant or amount…"
+                    aria-label="Incoming transaction"
+                  />
+                </label>
+                <div class="alloc-mid" aria-hidden="true">
+                  <ArrowLeftRight size={16} strokeWidth={1.6} />
+                </div>
+                <label class="field">
+                  <span class="field-k">Outgoing</span>
+                  <SketchSelect
+                    name="alloc-outgoing"
+                    options={outgoingSelectOptions}
+                    bind:value={outgoingId}
+                    searchable
+                    searchPlaceholder="Search merchant or amount…"
+                    aria-label="Outgoing transaction"
+                  />
+                </label>
+              </div>
+              <div class="settle-amount-row">
+                <span class="field-k">Amount</span>
+                <div class="amount-row">
                   <input
                     class="underline-input"
                     type="text"
                     inputmode="decimal"
                     placeholder="0.00"
-                    aria-label="Amount for {personLabel(person)}"
-                    value={splitAmountByPerson[person.id] ?? ""}
-                    oninput={(e) => {
-                      splitAmountByPerson = { ...splitAmountByPerson, [person.id]: e.currentTarget.value };
-                    }}
+                    value={amountMajor}
+                    disabled={maxMinor <= 0}
+                    required
+                    aria-label="Amount"
+                    oninput={(e) => onAmountInput(e.currentTarget.value)}
                   />
-                </li>
-              {/each}
-            </ul>
-          {:else if splitMode === "shares" && people.length > 0}
-            <ul class="split-grid has-preview">
-              {#each people as person (person.id)}
-                {@const preview = splitPreview.find((row) => row.personId === person.id)}
-                <li>
-                  <span class="split-name">{personLabel(person)}</span>
+                  {#if maxMinor > 0}
+                    <button type="button" class="suggest-btn" onclick={useMaxAmount}>
+                      Max {formatMoney(maxMinor, data.account.currencyCode)}
+                    </button>
+                  {/if}
+                  <button type="submit" class="sketch-action" disabled={busy}>
+                    <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
+                    {busy ? "Saving…" : "Add settlement"}
+                  </button>
+                </div>
+              </div>
+              {#if incomingId && outgoingId}
+                <span class="field-hint">
+                  {#if maxMinor > 0}
+                    Suggested / max = smaller open remainder ({formatMoney(incomingRemainder, data.account.currencyCode)} vs
+                    {formatMoney(outgoingRemainder, data.account.currencyCode)}).
+                  {:else}
+                    Nothing left to allocate on one of these rows.
+                  {/if}
+                </span>
+              {/if}
+            </form>
+          {/if}
+          <div class="alloc-scroll">
+            <h3>Allocations</h3>
+            {#if allocations.length === 0}
+              <p class="dim empty">None yet.</p>
+            {:else}
+              <ul class="alloc-list">
+                {#each allocations as allocation (allocation.id)}
+                  {@const left = txnById(allocation.leftTransactionId)}
+                  {@const right = txnById(allocation.rightTransactionId)}
+                  <li>
+                    <div class="alloc-body">
+                      <span class="pair">
+                        {left?.merchant ?? "Txn"}
+                        <span class="dim">↔</span>
+                        {right?.merchant ?? "Txn"}
+                      </span>
+                      <span class="mono amt">{formatMoney(allocation.amountMinor, data.account.currencyCode)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      class="icon-btn danger"
+                      aria-label="Delete allocation"
+                      disabled={deletingAllocationId === allocation.id}
+                      onclick={() => deleteAllocation(allocation.id)}
+                    >
+                      ×
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          </div>
+        </section>
+      {:else if activeTab === "event-payments"}
+        <section class="sheet-panel" id="space-panel-event-payments" role="tabpanel" aria-labelledby="space-tab-event-payments">
+          <p class="panel-copy dim">Apply bank money to a person’s open share on an event.</p>
+          {#if people.length === 0 || items.length === 0 || transactions.length === 0}
+            <p class="dim empty">Need people, events, and transactions first.</p>
+          {:else}
+            <form
+              class="alloc-form settle-form"
+              onsubmit={(e) => {
+                e.preventDefault();
+                void createItemPayment();
+              }}
+            >
+              <div class="settle-pair-row pay-pair-row">
+                <label class="field">
+                  <span class="field-k">Transaction</span>
+                  <SketchSelect
+                    name="pay-txn"
+                    options={payTxnSelectOptions}
+                    bind:value={payTxnId}
+                    searchable
+                    searchPlaceholder="Search merchant or amount…"
+                    aria-label="Payment transaction"
+                  />
+                </label>
+                <div class="alloc-mid" aria-hidden="true">→</div>
+                <label class="field">
+                  <span class="field-k">Event</span>
+                  <SketchSelect name="pay-item" options={itemSelectOptions} bind:value={payItemId} aria-label="Event" />
+                </label>
+                <div class="alloc-mid" aria-hidden="true">→</div>
+                <label class="field">
+                  <span class="field-k">Covers</span>
+                  <SketchSelect name="pay-person" options={personSelectOptions} bind:value={payPersonId} aria-label="Person covered" />
+                </label>
+              </div>
+              <div class="settle-amount-row">
+                <span class="field-k">Amount</span>
+                <div class="amount-row">
                   <input
-                    class="underline-input weight-input"
+                    class="underline-input"
                     type="text"
-                    inputmode="numeric"
-                    placeholder="1"
-                    aria-label="Share weight for {personLabel(person)}"
-                    value={splitWeightByPerson[person.id] ?? "1"}
-                    oninput={(e) => {
-                      splitWeightByPerson = { ...splitWeightByPerson, [person.id]: e.currentTarget.value };
-                    }}
+                    inputmode="decimal"
+                    placeholder="0.00"
+                    value={payAmountMajor}
+                    disabled={payMaxMinor <= 0}
+                    required
+                    aria-label="Amount"
+                    oninput={(e) => onPayAmountInput(e.currentTarget.value)}
                   />
-                  <span class="mono dim split-preview">
-                    {preview ? formatMoney(preview.shareMinor, data.account.currencyCode) : "—"}
-                  </span>
+                  {#if payMaxMinor > 0}
+                    <button type="button" class="suggest-btn" onclick={usePayMaxAmount}>
+                      Max {formatMoney(payMaxMinor, data.account.currencyCode)}
+                    </button>
+                  {/if}
+                  <button type="submit" class="sketch-action" disabled={busy}>
+                    <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
+                    {busy ? "Paying…" : "Add payment"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          {/if}
+          <div class="alloc-scroll">
+            <h3>Payments</h3>
+            {#if itemPayments.length === 0}
+              <p class="dim empty">None yet.</p>
+            {:else}
+              <ul class="alloc-list">
+                {#each itemPayments as payment (payment.id)}
+                  {@const item = itemById(payment.itemId)}
+                  {@const person = personById(payment.coversPersonId)}
+                  {@const txn = txnById(payment.transactionId)}
+                  <li>
+                    <div class="alloc-body">
+                      <span class="pair">
+                        {txn?.merchant ?? "Txn"}
+                        <span class="dim">→</span>
+                        {item?.name ?? "Event"}
+                        <span class="dim">covers</span>
+                        {person?.name ?? "Person"}
+                      </span>
+                      <span class="mono amt">{formatMoney(payment.amountMinor, data.account.currencyCode)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      class="icon-btn danger"
+                      aria-label="Delete payment"
+                      disabled={deletingPaymentId === payment.id}
+                      onclick={() => removeItemPayment(payment.id)}
+                    >
+                      ×
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          </div>
+        </section>
+      {:else if activeTab === "events"}
+        <section class="sheet-panel" id="space-panel-events" role="tabpanel" aria-labelledby="space-tab-events">
+          <p class="panel-copy dim">Planned events split across people — equal, by amounts, or by share weights.</p>
+          <form
+            class="event-form"
+            onsubmit={(e) => {
+              e.preventDefault();
+              void addItem();
+            }}
+          >
+            <div class="event-basics">
+              <input class="underline-input" type="text" placeholder="Event name" bind:value={itemName} maxlength="120" />
+              <input class="underline-input" type="text" inputmode="decimal" placeholder="Total amount" bind:value={itemAmountMajor} />
+            </div>
+
+            <div class="split-modes" role="radiogroup" aria-label="Split mode">
+              {#each SPLIT_MODES as mode (mode.id)}
+                <button
+                  type="button"
+                  class="split-mode"
+                  class:active={splitMode === mode.id}
+                  role="radio"
+                  aria-checked={splitMode === mode.id}
+                  onclick={() => (splitMode = mode.id)}
+                >
+                  {mode.label}
+                </button>
+              {/each}
+            </div>
+            <p class="field-hint split-hint">{splitModeHint}</p>
+
+            {#if splitMode === "amounts" && people.length > 0}
+              <ul class="split-grid">
+                {#each people as person (person.id)}
+                  <li>
+                    <span class="split-name">{personLabel(person)}</span>
+                    <input
+                      class="underline-input"
+                      type="text"
+                      inputmode="decimal"
+                      placeholder="0.00"
+                      aria-label="Amount for {personLabel(person)}"
+                      value={splitAmountByPerson[person.id] ?? ""}
+                      oninput={(e) => {
+                        splitAmountByPerson = { ...splitAmountByPerson, [person.id]: e.currentTarget.value };
+                      }}
+                    />
+                  </li>
+                {/each}
+              </ul>
+            {:else if splitMode === "shares" && people.length > 0}
+              <ul class="split-grid has-preview">
+                {#each people as person (person.id)}
+                  {@const preview = splitPreview.find((row) => row.personId === person.id)}
+                  <li>
+                    <span class="split-name">{personLabel(person)}</span>
+                    <input
+                      class="underline-input weight-input"
+                      type="text"
+                      inputmode="numeric"
+                      placeholder="1"
+                      aria-label="Share weight for {personLabel(person)}"
+                      value={splitWeightByPerson[person.id] ?? "1"}
+                      oninput={(e) => {
+                        splitWeightByPerson = { ...splitWeightByPerson, [person.id]: e.currentTarget.value };
+                      }}
+                    />
+                    <span class="mono dim split-preview">
+                      {preview ? formatMoney(preview.shareMinor, data.account.currencyCode) : "—"}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+
+            <button type="submit" class="sketch-action" disabled={busy || people.length === 0}>Add event</button>
+          </form>
+          {#if items.length === 0}
+            <p class="dim empty">No events yet.</p>
+          {:else}
+            <ul class="item-list">
+              {#each items as item (item.id)}
+                {@const open = itemOpenById.get(item.id) ?? 0}
+                <li>
+                  <div class="item-head">
+                    <strong>{item.name}</strong>
+                    <span class="mono">{formatMoney(item.amountMinor, data.account.currencyCode)}</span>
+                    <span class="dim mono">open {formatMoney(open, data.account.currencyCode)}</span>
+                    <button
+                      type="button"
+                      class="icon-btn danger"
+                      aria-label="Delete {item.name}"
+                      disabled={deletingItemId === item.id}
+                      onclick={() => removeItem(item.id)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <ul class="share-list">
+                    {#each item.shares as share (share.personId)}
+                      {@const person = personById(share.personId)}
+                      {@const shareOpen = shareOpenByKey.get(`${item.id}:${share.personId}`) ?? 0}
+                      <li>
+                        <span>{person ? personLabel(person) : "Person"}</span>
+                        <span class="mono dim">{formatMoney(share.shareMinor, data.account.currencyCode)}</span>
+                        <span class="mono" class:neg={shareOpen > 0}>open {formatMoney(shareOpen, data.account.currencyCode)}</span>
+                      </li>
+                    {/each}
+                  </ul>
                 </li>
               {/each}
             </ul>
           {/if}
-
-          <button type="submit" class="sketch-action" disabled={busy || people.length === 0}>Add event</button>
-        </form>
-        {#if items.length === 0}
-          <p class="dim empty">No events yet.</p>
-        {:else}
-          <ul class="item-list">
-            {#each items as item (item.id)}
-              {@const open = itemOpenById.get(item.id) ?? 0}
-              <li>
-                <div class="item-head">
-                  <strong>{item.name}</strong>
-                  <span class="mono">{formatMoney(item.amountMinor, data.account.currencyCode)}</span>
-                  <span class="dim mono">open {formatMoney(open, data.account.currencyCode)}</span>
-                  <button
-                    type="button"
-                    class="icon-btn danger"
-                    aria-label="Delete {item.name}"
-                    disabled={deletingItemId === item.id}
-                    onclick={() => removeItem(item.id)}
-                  >
-                    ×
-                  </button>
-                </div>
-                <ul class="share-list">
-                  {#each item.shares as share (share.personId)}
-                    {@const person = personById(share.personId)}
-                    {@const shareOpen = shareOpenByKey.get(`${item.id}:${share.personId}`) ?? 0}
-                    <li>
-                      <span>{person ? personLabel(person) : "Person"}</span>
-                      <span class="mono dim">{formatMoney(share.shareMinor, data.account.currencyCode)}</span>
-                      <span class="mono" class:neg={shareOpen > 0}>open {formatMoney(shareOpen, data.account.currencyCode)}</span>
-                    </li>
-                  {/each}
-                </ul>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
-    {:else}
-      <section class="sheet-panel" id="space-panel-people" role="tabpanel" aria-labelledby="space-tab-people">
-        <p class="panel-copy dim">Named folks in this space — Me is created when you add the first person.</p>
-        <form
-          class="inline-add"
-          onsubmit={(e) => {
-            e.preventDefault();
-            void addPerson();
-          }}
-        >
-          <input class="underline-input" type="text" placeholder="Name" bind:value={newPersonName} maxlength="80" />
-          <button type="submit" class="organize-plus" disabled={busy || !newPersonName.trim()} aria-label="Add person">
-            <Plus size={15} strokeWidth={1.75} />
-          </button>
-        </form>
-        {#if people.length === 0}
-          <p class="dim empty">No people yet — add flatmates to start the ledger.</p>
-        {:else}
-          <ul class="chip-list" aria-label="Who still owes toward shares">
-            {#each people as person (person.id)}
-              {@const balance = personBalances.find((row) => row.personId === person.id)}
-              {@const openMinor = balance?.openMinor ?? 0}
-              <li class:is-self={person.isSelf}>
-                <span class="person-mark" class:me={person.isSelf}>
-                  {person.isSelf ? `${person.name} (Me)` : person.name}
-                </span>
-                <span class="mono amt person-open" class:neg={openMinor > 0} class:pos={openMinor === 0}>
-                  {openMinor > 0 ? formatSignedMoney(openMinor, data.account.currencyCode) : formatMoney(0, data.account.currencyCode)}
-                </span>
-                {#if !person.isSelf}
-                  <button
-                    type="button"
-                    class="icon-btn danger"
-                    aria-label="Remove {person.name}"
-                    disabled={deletingPersonId === person.id}
-                    onclick={() => removePerson(person.id)}
-                  >
-                    ×
-                  </button>
-                {/if}
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
-    {/if}
+        </section>
+      {:else}
+        <section class="sheet-panel" id="space-panel-people" role="tabpanel" aria-labelledby="space-tab-people">
+          <p class="panel-copy dim">Named folks in this space — Me is created when you add the first person.</p>
+          <form
+            class="inline-add"
+            onsubmit={(e) => {
+              e.preventDefault();
+              void addPerson();
+            }}
+          >
+            <input class="underline-input" type="text" placeholder="Name" bind:value={newPersonName} maxlength="80" />
+            <button type="submit" class="organize-plus" disabled={busy || !newPersonName.trim()} aria-label="Add person">
+              <Plus size={15} strokeWidth={1.75} />
+            </button>
+          </form>
+          {#if people.length === 0}
+            <p class="dim empty">No people yet — add flatmates to start the ledger.</p>
+          {:else}
+            <ul class="chip-list" aria-label="Who still owes toward shares">
+              {#each people as person (person.id)}
+                {@const balance = personBalances.find((row) => row.personId === person.id)}
+                {@const openMinor = balance?.openMinor ?? 0}
+                <li class:is-self={person.isSelf}>
+                  <span class="person-mark" class:me={person.isSelf}>
+                    {person.isSelf ? `${person.name} (Me)` : person.name}
+                  </span>
+                  <span class="mono amt person-open" class:neg={openMinor > 0} class:pos={openMinor === 0}>
+                    {openMinor > 0 ? formatSignedMoney(openMinor, data.account.currencyCode) : formatMoney(0, data.account.currencyCode)}
+                  </span>
+                  {#if !person.isSelf}
+                    <button
+                      type="button"
+                      class="icon-btn danger"
+                      aria-label="Remove {person.name}"
+                      disabled={deletingPersonId === person.id}
+                      onclick={() => removePerson(person.id)}
+                    >
+                      ×
+                    </button>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
+      {/if}
+    </div>
   </div>
 </div>
 
 <style>
+  .space-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .space-page > .topbar,
+  .space-page > .space-notes,
+  .space-page > .flash,
+  .space-page > .summary-row {
+    flex: 0 0 auto;
+  }
+
   .title-row {
     display: flex;
     align-items: center;
@@ -1482,6 +1524,8 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .paper-tabs {
@@ -1493,6 +1537,7 @@
     position: relative;
     z-index: 1;
     margin-bottom: -1.5px;
+    flex: 0 0 auto;
   }
 
   .paper-tab {
@@ -1546,16 +1591,23 @@
     z-index: 6;
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 16rem;
+    overflow: auto;
     background: var(--page);
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
     border-radius: 1px 4px 3px 1px;
     padding: 1.2rem 1.35rem 1.55rem 1.55rem;
-    min-height: 16rem;
     box-shadow:
       3px 3px 0 0 var(--shadow-paper),
       3px 3px 0 1.5px color-mix(in srgb, var(--ink) 22%, transparent),
       6px 6px 0 0 #f1ece0,
       6px 6px 0 1.5px color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+
+  .notebook-sheet.fill-table {
+    overflow: hidden;
+    min-height: 0;
   }
 
   .notebook-sheet::before {
@@ -1631,13 +1683,21 @@
     font-family: var(--hand);
   }
 
+  .notebook-sheet.fill-table .sheet-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
   .space-table {
-    max-height: 28rem;
+    flex: 1 1 auto;
+    min-height: 12rem;
+    max-height: none;
   }
 
   :global(.forge .table-sheet.space-table) {
-    max-height: 28rem;
-    min-height: 0;
+    flex: 1 1 auto;
+    min-height: 12rem;
+    max-height: none;
   }
 
   .alloc-scroll {
@@ -1918,11 +1978,6 @@
 
     .settle-pair-row:not(.pay-pair-row) .alloc-mid {
       transform: rotate(90deg);
-    }
-
-    .space-table,
-    :global(.forge .table-sheet.space-table) {
-      max-height: 40vh;
     }
   }
 </style>

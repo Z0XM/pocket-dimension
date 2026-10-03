@@ -10,6 +10,9 @@
     value?: string;
     disabled?: boolean;
     compact?: boolean;
+    /** Show a filter field in the menu (matches option labels). */
+    searchable?: boolean;
+    searchPlaceholder?: string;
     /** Optional highlight color for compact trigger (e.g. category color). */
     accent?: string | null;
     /** Anchor the menu to the trigger's end edge (opens leftward). Useful near the right side of a clipped container. */
@@ -24,6 +27,8 @@
     value = $bindable(""),
     disabled = false,
     compact = false,
+    searchable = false,
+    searchPlaceholder = "Search…",
     accent = null,
     alignEnd = false,
     onChange,
@@ -31,18 +36,32 @@
   }: Props = $props();
 
   let open = $state(false);
+  let query = $state("");
   let root: HTMLDivElement | undefined = $state();
+  let searchInput: HTMLInputElement | undefined = $state();
 
   const selectedLabel = $derived(options.find((option) => option.value === value)?.label ?? options[0]?.label ?? "");
+
+  const filteredOptions = $derived.by(() => {
+    if (!searchable) return options;
+    const needle = query.trim().toLowerCase();
+    if (!needle) return options;
+    return options.filter((option) => {
+      if (!option.value) return true;
+      return option.label.toLowerCase().includes(needle);
+    });
+  });
 
   function toggleOpen() {
     if (disabled) return;
     open = !open;
+    if (!open) query = "";
   }
 
   function choose(next: string) {
     value = next;
     open = false;
+    query = "";
     onChange?.(next);
   }
 
@@ -53,16 +72,21 @@
       const target = event.target as Node | null;
       if (root && target && !root.contains(target)) {
         open = false;
+        query = "";
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") open = false;
+      if (event.key === "Escape") {
+        open = false;
+        query = "";
+      }
     }
 
     const timeout = window.setTimeout(() => {
       window.addEventListener("pointerdown", handlePointerDown);
       window.addEventListener("keydown", handleKeyDown);
+      if (searchable) searchInput?.focus();
     }, 0);
 
     return () => {
@@ -78,6 +102,7 @@
   class:open
   class:disabled
   class:compact
+  class:searchable
   class:align-end={alignEnd}
   class:empty={!value}
   class:has-accent={Boolean(accent && value)}
@@ -91,25 +116,43 @@
   </button>
 
   {#if open}
-    <ul class="sketch-menu" role="listbox" aria-label={ariaLabel}>
-      {#each options as option (option.value)}
-        {@const selected = option.value === value}
-        <li>
-          <button
-            type="button"
-            role="option"
-            class="sketch-option"
-            class:selected
-            class:empty={!option.value}
-            aria-selected={selected}
-            onclick={() => choose(option.value)}
-          >
-            <span class="dot" aria-hidden="true">•</span>
-            <span class="mark">{option.label}</span>
-          </button>
-        </li>
-      {/each}
-    </ul>
+    <div class="sketch-menu" role="presentation">
+      {#if searchable}
+        <div class="sketch-search">
+          <input
+            bind:this={searchInput}
+            class="sketch-search-input"
+            type="search"
+            placeholder={searchPlaceholder}
+            aria-label={ariaLabel ? `Search ${ariaLabel}` : "Search options"}
+            bind:value={query}
+            onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => e.stopPropagation()}
+          />
+        </div>
+      {/if}
+      <ul class="sketch-options" role="listbox" aria-label={ariaLabel}>
+        {#each filteredOptions as option (option.value || option.label)}
+          {@const selected = option.value === value}
+          <li>
+            <button
+              type="button"
+              role="option"
+              class="sketch-option"
+              class:selected
+              class:empty={!option.value}
+              aria-selected={selected}
+              onclick={() => choose(option.value)}
+            >
+              <span class="dot" aria-hidden="true">•</span>
+              <span class="mark">{option.label}</span>
+            </button>
+          </li>
+        {:else}
+          <li class="sketch-empty">No matches</li>
+        {/each}
+      </ul>
+    </div>
   {/if}
 </div>
 
@@ -212,7 +255,6 @@
   }
 
   .sketch-menu {
-    list-style: none;
     margin: 0.2rem 0 0;
     padding: 0.35rem 0.25rem;
     position: absolute;
@@ -225,8 +267,10 @@
     box-shadow:
       2px 2px 0 0 var(--shadow-paper),
       2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
-    max-height: 14rem;
-    overflow: auto;
+    max-height: 16rem;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
   }
 
   .sketch-select.compact .sketch-menu {
@@ -235,9 +279,57 @@
     z-index: 40;
   }
 
+  .sketch-select.searchable .sketch-menu {
+    min-width: max(100%, 16rem);
+  }
+
   .sketch-select.align-end .sketch-menu {
     left: auto;
     right: 0;
+  }
+
+  .sketch-search {
+    flex: 0 0 auto;
+    padding: 0.15rem 0.35rem 0.35rem;
+    border-bottom: 1px dashed color-mix(in srgb, var(--ink) 14%, transparent);
+    margin-bottom: 0.2rem;
+  }
+
+  .sketch-search-input {
+    appearance: none;
+    width: 100%;
+    border: none;
+    border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    background: transparent;
+    font-family: var(--hand);
+    font-size: 1rem;
+    color: var(--ink);
+    padding: 0.2rem 0.1rem;
+  }
+
+  .sketch-search-input:focus {
+    outline: none;
+    border-bottom-color: var(--brand);
+  }
+
+  .sketch-search-input::placeholder {
+    color: color-mix(in srgb, var(--ink-muted) 80%, transparent);
+  }
+
+  .sketch-options {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .sketch-empty {
+    font-family: var(--hand);
+    font-size: 0.95rem;
+    color: var(--ink-muted);
+    padding: 0.45rem 0.55rem;
   }
 
   .sketch-option {
