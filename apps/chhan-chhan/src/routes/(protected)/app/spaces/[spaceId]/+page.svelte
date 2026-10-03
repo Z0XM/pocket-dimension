@@ -251,10 +251,11 @@
   });
 
   $effect(() => {
-    const nextIncoming = incomingIds.filter((id) => txnById(id)?.type === "income");
-    const nextOutgoing = outgoingIds.filter((id) => txnById(id)?.type === "expense");
+    const nextIncoming = incomingIds.filter((id) => txnById(id)?.type === "income" && (remainderById.get(id)?.remainderMinor ?? 0) > 0);
+    const nextOutgoing = outgoingIds.filter((id) => txnById(id)?.type === "expense" && (remainderById.get(id)?.remainderMinor ?? 0) > 0);
     if (nextIncoming.length !== incomingIds.length) incomingIds = nextIncoming;
     if (nextOutgoing.length !== outgoingIds.length) outgoingIds = nextOutgoing;
+    if (payTxnId && (remainderById.get(payTxnId)?.remainderMinor ?? 0) <= 0) payTxnId = "";
   });
 
   function txnOptionLabel(txn: Txn) {
@@ -263,7 +264,7 @@
 
   function optionsForType(type: "income" | "expense") {
     return transactions
-      .filter((txn) => txn.type === type)
+      .filter((txn) => txn.type === type && (remainderById.get(txn.id)?.remainderMinor ?? 0) > 0)
       .map((txn) => ({
         value: txn.id,
         label: `${txnOptionLabel(txn)} · open ${formatMoney(remainderById.get(txn.id)?.remainderMinor ?? 0, data.account.currencyCode)}`,
@@ -305,10 +306,12 @@
   });
   const payTxnSelectOptions = $derived([
     { value: "", label: "Pick transaction…" },
-    ...transactions.map((txn) => ({
-      value: txn.id,
-      label: `${txnOptionLabel(txn)} · open ${formatMoney(remainderById.get(txn.id)?.remainderMinor ?? 0, data.account.currencyCode)}`,
-    })),
+    ...transactions
+      .filter((txn) => (remainderById.get(txn.id)?.remainderMinor ?? 0) > 0)
+      .map((txn) => ({
+        value: txn.id,
+        label: `${txnOptionLabel(txn)} · open ${formatMoney(remainderById.get(txn.id)?.remainderMinor ?? 0, data.account.currencyCode)}`,
+      })),
   ]);
 
   function typeClass(type: Txn["type"]) {
