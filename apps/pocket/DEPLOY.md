@@ -57,6 +57,8 @@ POCKET_APP_CHHAN_CHAN_URL=https://chhan.example.com
 POCKET_APP_ME_VIA_YOU_URL=https://me-via-you.example.com
 POCKET_APP_MARKITDOWN_URL=https://markitdown.example.com
 POCKET_APP_ZEO_URL=https://zeo.example.com
+POCKET_APP_DASHBOARD_URL=https://dashboard.example.com
+POCKET_APP_HEIMDALL_URL=https://heimdall.example.com
 ```
 
 Only apps with a URL set appear on the hub.
