@@ -3,27 +3,22 @@
   import Tag from "@lucide/svelte/icons/tag";
   import Plus from "@lucide/svelte/icons/plus";
   import StickyNote from "@lucide/svelte/icons/sticky-note";
-  import Link from "@lucide/svelte/icons/link";
   import Layers from "@lucide/svelte/icons/layers";
-  import ArrowLeftRight from "@lucide/svelte/icons/arrow-left-right";
-  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import Check from "@lucide/svelte/icons/check";
   import X from "@lucide/svelte/icons/x";
   import Calculator from "@lucide/svelte/icons/calculator";
   import { formatMoney } from "$lib/finance/money";
-  import { isRefundCategoryName } from "$lib/finance/refunds";
   import { buildSummarySelection, formatMonthKeyShort, summarySelectionToDateRange, type SummaryPeriod } from "$lib/finance/summary";
   import { serializeMultiFilterParam } from "$lib/finance/filter-params";
   import { infiniteScroll } from "$lib/actions/infinite-scroll";
   import FilterMultiselect from "$lib/components/filter-multiselect.svelte";
   import AppNav from "$lib/components/app-nav.svelte";
   import AppSettings from "$lib/components/app-settings.svelte";
-  import SmartCategorizePopup, { type SmartCategoryToggle } from "$lib/components/smart-categorize-popup.svelte";
   import SmartTagPopup, { type SmartTagToggle } from "$lib/components/smart-tag-popup.svelte";
   import CalculateWidget from "$lib/components/calculate-widget.svelte";
   import SketchSelect from "$lib/components/sketch-select.svelte";
   import BrandMark from "$lib/components/brand-mark.svelte";
-  import type { SmartCategorizationPreview, SmartTagApplyMode, SmartTaggingPreview } from "$lib/server/finance";
+  import type { SmartTagApplyMode, SmartTaggingPreview } from "$lib/server/finance";
   import type { PageData } from "./$types";
 
   const { data }: { data: PageData } = $props();
@@ -34,27 +29,13 @@
   let hasMore = $state(false);
   let searchInput = $state("");
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
-  let savingCategoryId = $state<string | null>(null);
   let savingNotesId = $state<string | null>(null);
   let savingTagTxId = $state<string | null>(null);
   let openTagMenuTxId = $state<string | null>(null);
-  let savingGroupTxId = $state<string | null>(null);
-  let openGroupTxId = $state<string | null>(null);
+  let savingSpaceTxId = $state<string | null>(null);
+  let openSpaceTxId = $state<string | null>(null);
   let openNoteTxId = $state<string | null>(null);
   let noteDraft = $state("");
-  let refundLinkModeAnchorId = $state<string | null>(null);
-  let savingRefundLinkId = $state<string | null>(null);
-  let smartCatOpen = $state(false);
-  let smartCatApplying = $state(false);
-  let smartCatPreview = $state<SmartCategorizationPreview | null>(null);
-  let smartCatToggles = $state<SmartCategoryToggle[]>([]);
-  let smartCatContext = $state<{
-    transactionId: string;
-    merchant: string;
-    type: PageData["transactions"][number]["type"];
-    newCategoryId: string | null;
-    previousCategoryId: string | null;
-  } | null>(null);
   let smartTagOpen = $state(false);
   let smartTagApplying = $state(false);
   let smartTagMode = $state<SmartTagApplyMode>("append");
@@ -101,15 +82,11 @@
     const dateRange = summarySelectionToDateRange(buildSummarySelection(data.summaryPeriod, data.selectedMonth, data.selectedYear));
     if (dateRange.dateFrom) params.set("dateFrom", dateRange.dateFrom);
     if (dateRange.dateTo) params.set("dateTo", dateRange.dateTo);
-    if (data.selectedGroupId) params.set("groupId", data.selectedGroupId);
-    if (data.selectedCategoryFilters.length) {
-      params.set("categoryIds", serializeMultiFilterParam(data.selectedCategoryFilters));
-    }
+    if (data.selectedSpaceId) params.set("spaceId", data.selectedSpaceId);
     if (data.selectedTagIds.length) {
       params.set("tagIds", serializeMultiFilterParam(data.selectedTagIds));
     }
     if (data.searchQuery?.trim()) params.set("search", data.searchQuery.trim());
-    if (data.selectedLinkTransactionId) params.set("linkTransactionId", data.selectedLinkTransactionId);
     return params;
   }
 
@@ -172,17 +149,6 @@
   });
 
   $effect(() => {
-    if (!smartCatOpen) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !smartCatApplying) closeSmartCat(true);
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  });
-
-  $effect(() => {
     if (!smartTagOpen) return;
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -194,16 +160,16 @@
   });
 
   $effect(() => {
-    if (!openGroupTxId) return;
+    if (!openSpaceTxId) return;
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as HTMLElement | null;
-      if (target?.closest(".group-link-wrap")) return;
-      openGroupTxId = null;
+      if (target?.closest(".space-link-wrap")) return;
+      openSpaceTxId = null;
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") openGroupTxId = null;
+      if (event.key === "Escape") openSpaceTxId = null;
     }
 
     window.addEventListener("pointerdown", handlePointerDown);
@@ -212,20 +178,6 @@
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  });
-
-  $effect(() => {
-    if (!refundLinkModeAnchorId) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.stopImmediatePropagation();
-        exitRefundLinkMode();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
   });
 
   $effect(() => {
@@ -255,11 +207,9 @@
       month?: string;
       year?: number;
       type?: "income" | "expense" | null;
-      group?: string | null;
-      category?: string[] | null;
+      space?: string | null;
       tag?: string[] | null;
       search?: string | null;
-      link?: string | null;
     } = {}
   ) {
     const params = new URLSearchParams();
@@ -268,11 +218,9 @@
     const month = updates.month ?? data.selectedMonth;
     const year = updates.year ?? data.selectedYear;
     const typeFilter = updates.type === undefined ? data.transactionTypeFilter : updates.type;
-    const groupFilter = updates.group === undefined ? data.selectedGroupId : updates.group;
-    const categoryFilter = updates.category === undefined ? data.selectedCategoryFilters : (updates.category ?? []);
+    const spaceFilter = updates.space === undefined ? data.selectedSpaceId : updates.space;
     const tagFilter = updates.tag === undefined ? data.selectedTagIds : (updates.tag ?? []);
     const searchFilter = updates.search === undefined ? (data.searchQuery ?? "") : (updates.search ?? "");
-    const linkFilter = updates.link === undefined ? data.selectedLinkTransactionId : updates.link;
 
     if (sort === "asc") params.set("sort", "asc");
 
@@ -287,11 +235,9 @@
     }
 
     if (typeFilter) params.set("type", typeFilter);
-    if (groupFilter) params.set("group", groupFilter);
-    if (categoryFilter.length) params.set("category", serializeMultiFilterParam(categoryFilter));
+    if (spaceFilter) params.set("space", spaceFilter);
     if (tagFilter.length) params.set("tag", serializeMultiFilterParam(tagFilter));
     if (searchFilter.trim()) params.set("search", searchFilter.trim());
-    if (linkFilter) params.set("link", linkFilter);
 
     const query = params.toString();
     return query ? `/app/transactions?${query}` : "/app/transactions";
@@ -330,37 +276,26 @@
     goto(appUrl({ type }), { keepFocus: true, noScroll: true, invalidateAll: true });
   }
 
-  function setGroupFilter(groupId: string | null) {
-    goto(appUrl({ group: groupId }), { keepFocus: true, noScroll: true, invalidateAll: true });
-  }
-
-  function setCategoryFilters(categoryFilters: string[]) {
-    goto(appUrl({ category: categoryFilters }), { keepFocus: true, noScroll: true, invalidateAll: true });
+  function setSpaceFilter(spaceId: string | null) {
+    goto(appUrl({ space: spaceId }), { keepFocus: true, noScroll: true, invalidateAll: true });
   }
 
   function setTagFilters(tagIds: string[]) {
     goto(appUrl({ tag: tagIds }), { keepFocus: true, noScroll: true, invalidateAll: true });
   }
 
-  function selectedCategoryLabels(): string {
-    return data.selectedCategoryFilters
+  function selectedTagLabels(): string {
+    return data.selectedTagIds
       .map((id) => {
-        if (id === "uncategorized") return "Uncategorized";
-        return data.categories.find((entry) => entry.id === id)?.name ?? "category";
+        if (id === "untagged") return "Untagged";
+        return data.tags.find((entry) => entry.id === id)?.name ?? "tag";
       })
       .join(", ");
   }
 
-  function selectedTagLabels(): string {
-    return data.selectedTagIds.map((id) => data.tags.find((entry) => entry.id === id)?.name ?? "tag").join(", ");
-  }
+  const tagFilterOptions = $derived([{ id: "untagged", label: "Untagged" }, ...data.tags.map((tag) => ({ id: tag.id, label: tag.name }))]);
 
-  const categoryFilterOptions = $derived([
-    { id: "uncategorized", label: "Uncategorized" },
-    ...data.categories.map((category) => ({ id: category.id, label: category.name })),
-  ]);
-
-  const tagFilterOptions = $derived(data.tags.map((tag) => ({ id: tag.id, label: tag.name })));
+  const selectedSpaceName = $derived(data.spaces.find((space) => space.id === data.selectedSpaceId)?.name ?? "this space");
 
   const calculateStats = $derived.by(() => {
     const selected = new Set(calculateSelectionIds);
@@ -389,11 +324,9 @@
   }
 
   function enterCalculateMode() {
-    exitRefundLinkMode();
     openNoteTxId = null;
-    openGroupTxId = null;
+    openSpaceTxId = null;
     openTagMenuTxId = null;
-    closeSmartCat(true);
     closeSmartTag(true);
     calculateModeActive = true;
   }
@@ -412,73 +345,6 @@
     calculateSelectionIds = [];
   }
 
-  function toggleLinkClusterFilter(transactionId: string) {
-    goto(appUrl({ link: data.selectedLinkTransactionId ? null : transactionId }), { keepFocus: true, noScroll: true, invalidateAll: true });
-  }
-
-  function clearLinkClusterFilter() {
-    goto(appUrl({ link: null }), { keepFocus: true, noScroll: true, invalidateAll: true });
-  }
-
-  function exitRefundLinkMode() {
-    refundLinkModeAnchorId = null;
-  }
-
-  function canUseRefundLinkMode(transaction: PageData["transactions"][number]) {
-    return isRefundCategoryName(transaction.categoryName) || transaction.refundLinks.length > 0;
-  }
-
-  function enterRefundLinkMode(transactionId: string) {
-    exitCalculateMode();
-    openNoteTxId = null;
-    openGroupTxId = null;
-    openTagMenuTxId = null;
-    refundLinkModeAnchorId = transactionId;
-  }
-
-  function toggleRefundLinkMode(transaction: PageData["transactions"][number]) {
-    if (refundLinkModeAnchorId === transaction.id) {
-      exitRefundLinkMode();
-      return;
-    }
-    enterRefundLinkMode(transaction.id);
-  }
-
-  function resolveRefundLinkPair(anchor: PageData["transactions"][number], clicked: PageData["transactions"][number]) {
-    const anchorIsCredit = isRefundCategoryName(anchor.categoryName);
-    const clickedIsCredit = isRefundCategoryName(clicked.categoryName);
-
-    if (anchorIsCredit && clicked.type === "expense") {
-      return { creditId: anchor.id, expenseId: clicked.id };
-    }
-    if (clickedIsCredit && anchor.type === "expense") {
-      return { creditId: clicked.id, expenseId: anchor.id };
-    }
-    return null;
-  }
-
-  function isLinkedToAnchor(transaction: PageData["transactions"][number]) {
-    if (!refundLinkModeAnchorId) return false;
-
-    const anchor = rows.find((row) => row.id === refundLinkModeAnchorId);
-    if (!anchor || transaction.id === anchor.id) return false;
-
-    const pair = resolveRefundLinkPair(anchor, transaction);
-    if (!pair) return false;
-
-    const creditRow = rows.find((row) => row.id === pair.creditId);
-    return creditRow?.refundLinks.some((link) => link.id === pair.expenseId) ?? false;
-  }
-
-  function isLinkModeTarget(transaction: PageData["transactions"][number]) {
-    if (!refundLinkModeAnchorId || transaction.id === refundLinkModeAnchorId) return false;
-
-    const anchor = rows.find((row) => row.id === refundLinkModeAnchorId);
-    if (!anchor) return false;
-
-    return resolveRefundLinkPair(anchor, transaction) !== null;
-  }
-
   function isRowInteractiveTarget(target: HTMLElement) {
     return Boolean(target.closest("button, select, textarea, input, a"));
   }
@@ -487,65 +353,6 @@
     if (!calculateModeActive) return;
     if (isRowInteractiveTarget(event.target as HTMLElement)) return;
     toggleCalculateSelection(transaction.id);
-  }
-
-  async function handleLinkModeRowClick(event: MouseEvent, transaction: PageData["transactions"][number]) {
-    if (calculateModeActive) return;
-    if (!refundLinkModeAnchorId || savingRefundLinkId) return;
-    if (isRowInteractiveTarget(event.target as HTMLElement)) return;
-    if (transaction.id === refundLinkModeAnchorId) return;
-
-    const anchor = rows.find((row) => row.id === refundLinkModeAnchorId);
-    if (!anchor) return;
-
-    const pair = resolveRefundLinkPair(anchor, transaction);
-    if (!pair) return;
-
-    const creditRow = rows.find((row) => row.id === pair.creditId);
-    const alreadyLinked = creditRow?.refundLinks.some((link) => link.id === pair.expenseId) ?? false;
-
-    if (alreadyLinked) {
-      await detachRefundLink(pair.creditId, pair.expenseId);
-    } else {
-      await attachRefundLink(pair.creditId, pair.expenseId);
-    }
-  }
-
-  async function attachRefundLink(creditTransactionId: string, expenseTransactionId: string) {
-    savingRefundLinkId = creditTransactionId;
-    try {
-      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${creditTransactionId}/refund-links`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expenseTransactionId }),
-      });
-      if (!response.ok) return;
-      await invalidateAll();
-    } finally {
-      savingRefundLinkId = null;
-    }
-  }
-
-  async function detachRefundLink(creditTransactionId: string, expenseTransactionId: string) {
-    savingRefundLinkId = creditTransactionId;
-    try {
-      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${creditTransactionId}/refund-links/${expenseTransactionId}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) return;
-      await invalidateAll();
-    } finally {
-      savingRefundLinkId = null;
-    }
-  }
-
-  function refundLinkLabel(link: PageData["transactions"][number]["refundLinks"][number]) {
-    const merchant = link.merchant ?? "Expense";
-    return `${link.occurredOn} · ${merchant}`;
-  }
-
-  function warningPreview(transaction: PageData["transactions"][number]) {
-    return transaction.warnings.map((warning) => warning.message).join(" · ");
   }
 
   async function loadMore() {
@@ -567,187 +374,6 @@
 
   function displayAmount(type: string, amountMinor: number) {
     return type === "expense" ? -amountMinor : amountMinor;
-  }
-
-  function categoriesForType(type: string, categoryId?: string | null) {
-    const matching = data.categories.filter((category) => category.kind === type);
-    if (!categoryId || matching.some((category) => category.id === categoryId)) {
-      return matching;
-    }
-
-    const current = data.categories.find((category) => category.id === categoryId);
-    return current ? [current, ...matching] : matching;
-  }
-
-  async function updateTransactionCategory(transactionId: string, categoryId: string | null) {
-    savingCategoryId = transactionId;
-    try {
-      const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoryId }),
-      });
-      if (!response.ok) return false;
-
-      applyCategoryToRows(transactionId, categoryId);
-      return true;
-    } finally {
-      savingCategoryId = null;
-    }
-  }
-
-  function applyCategoryToRows(transactionId: string, categoryId: string | null) {
-    const category = categoryId ? data.categories.find((entry) => entry.id === categoryId) : null;
-    rows = rows.map((row) =>
-      row.id === transactionId
-        ? {
-            ...row,
-            categoryId: categoryId ?? null,
-            categoryName: category?.name ?? null,
-            categoryColor: category?.colorHex ?? null,
-          }
-        : row
-    );
-  }
-
-  function buildSmartCatToggles(preview: SmartCategorizationPreview): SmartCategoryToggle[] {
-    const toggles: SmartCategoryToggle[] = [];
-    if (preview.exact) {
-      for (const category of preview.exact.categories) {
-        toggles.push({
-          merchant: preview.exact.merchant,
-          fromCategoryId: category.categoryId,
-          enabled: true,
-        });
-      }
-    }
-    for (const group of preview.fuzzy) {
-      for (const category of group.categories) {
-        toggles.push({
-          merchant: group.merchant,
-          fromCategoryId: category.categoryId,
-          enabled: true,
-        });
-      }
-    }
-    return toggles;
-  }
-
-  function closeSmartCat(revertTransaction = true) {
-    if (revertTransaction && smartCatContext) {
-      applyCategoryToRows(smartCatContext.transactionId, smartCatContext.previousCategoryId);
-    }
-    smartCatOpen = false;
-    smartCatPreview = null;
-    smartCatContext = null;
-    smartCatToggles = [];
-  }
-
-  function handleSmartCatToggle(key: string, enabled: boolean) {
-    smartCatToggles = smartCatToggles.map((toggle) =>
-      `${toggle.merchant}::${toggle.fromCategoryId ?? "null"}` === key ? { ...toggle, enabled } : toggle
-    );
-  }
-
-  async function applySmartCat(includeBulk: boolean) {
-    if (!smartCatContext) return;
-
-    smartCatApplying = true;
-    try {
-      if (!includeBulk) {
-        const ok = await updateTransactionCategory(smartCatContext.transactionId, smartCatContext.newCategoryId);
-        if (ok) closeSmartCat(false);
-        return;
-      }
-
-      const response = await fetch(`/api/accounts/${data.account.id}/transactions/smart-categorize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sourceTransactionId: smartCatContext.transactionId,
-          newCategoryId: smartCatContext.newCategoryId,
-          type: smartCatContext.type,
-          migrations: smartCatToggles,
-        }),
-      });
-      if (!response.ok) return;
-
-      const category = smartCatContext.newCategoryId ? data.categories.find((entry) => entry.id === smartCatContext!.newCategoryId) : null;
-
-      rows = rows.map((row) => {
-        const matched = smartCatToggles.some(
-          (migration) =>
-            migration.enabled &&
-            migration.merchant.trim().toLowerCase() === (row.merchant ?? "").trim().toLowerCase() &&
-            (migration.fromCategoryId ?? null) === (row.categoryId ?? null)
-        );
-
-        if (row.id === smartCatContext!.transactionId || matched) {
-          return {
-            ...row,
-            categoryId: smartCatContext!.newCategoryId,
-            categoryName: category?.name ?? null,
-            categoryColor: category?.colorHex ?? null,
-          };
-        }
-        return row;
-      });
-
-      closeSmartCat(false);
-      await invalidateAll();
-    } finally {
-      smartCatApplying = false;
-    }
-  }
-
-  async function handleCategoryChange(transaction: PageData["transactions"][number], categoryId: string | null) {
-    const previousCategoryId = transaction.categoryId ?? null;
-    if (previousCategoryId === categoryId) return;
-
-    const merchant = transaction.merchant?.trim();
-    if (!merchant) {
-      await updateTransactionCategory(transaction.id, categoryId);
-      return;
-    }
-
-    applyCategoryToRows(transaction.id, categoryId);
-    savingCategoryId = transaction.id;
-
-    try {
-      const params = new URLSearchParams({
-        merchant,
-        sourceTransactionId: transaction.id,
-        type: transaction.type,
-      });
-      if (categoryId) params.set("newCategoryId", categoryId);
-
-      const response = await fetch(`/api/accounts/${data.account.id}/transactions/smart-categorize?${params.toString()}`);
-      if (!response.ok) {
-        applyCategoryToRows(transaction.id, previousCategoryId);
-        return;
-      }
-
-      const body = (await response.json()) as { preview: SmartCategorizationPreview | null };
-      if (!body.preview) {
-        await updateTransactionCategory(transaction.id, categoryId);
-        return;
-      }
-
-      smartCatContext = {
-        transactionId: transaction.id,
-        merchant,
-        type: transaction.type,
-        newCategoryId: categoryId,
-        previousCategoryId,
-      };
-      smartCatPreview = body.preview;
-      smartCatToggles = buildSmartCatToggles(body.preview);
-      smartCatOpen = true;
-    } catch {
-      applyCategoryToRows(transaction.id, previousCategoryId);
-    } finally {
-      savingCategoryId = null;
-    }
   }
 
   async function updateTransactionNotes(transactionId: string, nextNotes: string, previousNotes: string) {
@@ -1057,50 +683,54 @@
     }
   }
 
-  function groupLabelFor(transaction: PageData["transactions"][number]) {
-    return transaction.groups.map((group) => group.name).join(", ");
+  function spaceLabelFor(transaction: PageData["transactions"][number]) {
+    return transaction.spaces.map((space) => space.name).join(", ");
   }
 
-  function primaryGroupId(transaction: PageData["transactions"][number]) {
-    return transaction.groups[0]?.id ?? "";
+  function isInSpace(transaction: PageData["transactions"][number], spaceId: string) {
+    return transaction.spaces.some((space) => space.id === spaceId);
   }
 
-  async function setTransactionGroup(transactionId: string, groupId: string | null) {
+  async function toggleTransactionSpace(transactionId: string, spaceId: string) {
     const transaction = rows.find((row) => row.id === transactionId);
     if (!transaction) return;
 
-    savingGroupTxId = transactionId;
+    const attached = isInSpace(transaction, spaceId);
+
+    savingSpaceTxId = transactionId;
     try {
-      for (const group of transaction.groups) {
-        const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/groups/${group.id}`, { method: "DELETE" });
-        if (!response.ok) return;
+      const response = attached
+        ? await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/spaces/${spaceId}`, { method: "DELETE" })
+        : await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/spaces`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ spaceId }),
+          });
+      if (!response.ok) return;
+
+      if (attached) {
+        if (data.selectedSpaceId === spaceId) {
+          rows = rows.filter((row) => row.id !== transactionId);
+          openSpaceTxId = null;
+        } else {
+          rows = rows.map((row) => (row.id === transactionId ? { ...row, spaces: row.spaces.filter((space) => space.id !== spaceId) } : row));
+        }
+        return;
       }
 
-      if (groupId) {
-        const response = await fetch(`/api/accounts/${data.account.id}/transactions/${transactionId}/groups`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ groupId }),
-        });
-        if (!response.ok) return;
-      }
+      const space = data.spaces.find((entry) => entry.id === spaceId);
+      if (!space) return;
 
-      const group = groupId ? data.groups.find((entry) => entry.id === groupId) : null;
-      if (data.selectedGroupId && groupId !== data.selectedGroupId) {
-        rows = rows.filter((row) => row.id !== transactionId);
-      } else {
-        rows = rows.map((row) =>
-          row.id === transactionId
-            ? {
-                ...row,
-                groups: group ? [{ id: group.id, name: group.name, colorHex: group.colorHex }] : [],
-              }
-            : row
-        );
-      }
-      openGroupTxId = null;
+      rows = rows.map((row) =>
+        row.id === transactionId
+          ? {
+              ...row,
+              spaces: [...row.spaces, { id: space.id, name: space.name, colorHex: space.colorHex }].sort((a, b) => a.name.localeCompare(b.name)),
+            }
+          : row
+      );
     } finally {
-      savingGroupTxId = null;
+      savingSpaceTxId = null;
     }
   }
 </script>
@@ -1212,17 +842,17 @@
         </button>
       </div>
 
-      {#if data.groups.length > 0}
+      {#if data.spaces.length > 0}
         <div class="flow-tools">
-          <div class="group-filter-wrap">
+          <div class="space-filter-wrap">
             <SketchSelect
-              name="group-filter"
+              name="space-filter"
               compact
               alignEnd
-              aria-label="Filter by group"
-              value={data.selectedGroupId ?? ""}
-              options={[{ value: "", label: "All groups" }, ...data.groups.map((group) => ({ value: group.id, label: group.name }))]}
-              onChange={(next) => setGroupFilter(next || null)}
+              aria-label="Filter by space"
+              value={data.selectedSpaceId ?? ""}
+              options={[{ value: "", label: "All spaces" }, ...data.spaces.map((space) => ({ value: space.id, label: space.name }))]}
+              onChange={(next) => setSpaceFilter(next || null)}
             />
           </div>
         </div>
@@ -1324,30 +954,6 @@
     </div>
   {/if}
 
-  {#if refundLinkModeAnchorId}
-    <div class="link-mode-banner">
-      <span>Link mode — click rows to link or unlink</span>
-      <div class="link-mode-banner-actions">
-        <button type="button" class="link-mode-cancel-btn" aria-label="Exit link mode" onclick={() => exitRefundLinkMode()}>
-          <X size={14} strokeWidth={2} aria-hidden="true" />
-        </button>
-        <button type="button" class="link-mode-exit-btn" aria-label="Done linking" onclick={() => exitRefundLinkMode()}>
-          <Check size={14} strokeWidth={2} aria-hidden="true" />
-        </button>
-      </div>
-    </div>
-  {/if}
-
-  {#if data.selectedLinkTransactionId}
-    <div class="link-filter-banner">
-      <span>
-        Showing {data.linkClusterSize} linked refund{data.linkClusterSize === 1 ? "" : "s"}
-        <span class="dim">· period filter ignored</span>
-      </span>
-      <button type="button" class="link-filter-clear" onclick={clearLinkClusterFilter}>Show all</button>
-    </div>
-  {/if}
-
   <section class="table-block table-sheet" class:calc-mode-on={calculateModeActive}>
     <div class="table-scroll">
       <table>
@@ -1366,20 +972,7 @@
             </th>
             <th>Merchant</th>
             <th class="th-filter">
-              <FilterMultiselect
-                variant="icon"
-                label="Category"
-                options={categoryFilterOptions}
-                selected={data.selectedCategoryFilters}
-                onchange={setCategoryFilters}
-              />
-            </th>
-            <th class="th-filter">
-              {#if data.tags.length > 0}
-                <FilterMultiselect variant="icon" label="Tags" options={tagFilterOptions} selected={data.selectedTagIds} onchange={setTagFilters} />
-              {:else}
-                Tags
-              {/if}
+              <FilterMultiselect variant="icon" label="Tags" options={tagFilterOptions} selected={data.selectedTagIds} onchange={setTagFilters} />
             </th>
             <th class="right">Amount</th>
             <th class="right">Balance</th>
@@ -1388,15 +981,11 @@
         <tbody>
           {#if rows.length === 0}
             <tr>
-              <td colspan="6" class="dim empty-row">
+              <td colspan="5" class="dim empty-row">
                 {#if data.searchQuery?.trim()}
                   No transactions match “{data.searchQuery}”.
-                {:else if data.selectedLinkTransactionId}
-                  No linked transactions found for this refund set.
-                {:else if data.selectedGroupId}
-                  No transactions in this group for the selected period.
-                {:else if data.selectedCategoryFilters.length}
-                  No transactions in {selectedCategoryLabels()} for the selected period.
+                {:else if data.selectedSpaceId}
+                  No transactions in {selectedSpaceName} for the selected period.
                 {:else if data.selectedTagIds.length}
                   No transactions tagged {selectedTagLabels()} for the selected period.
                 {:else if data.transactionTypeFilter === "income"}
@@ -1413,69 +1002,12 @@
               <tr
                 class:calc-mode-active={calculateModeActive}
                 class:calc-mode-selected={isCalculateSelected(t.id)}
-                class:link-mode-anchor={refundLinkModeAnchorId === t.id}
-                class:link-mode-target={isLinkModeTarget(t)}
-                class:link-mode-linked={isLinkedToAnchor(t)}
-                class:link-mode-busy={savingRefundLinkId !== null}
-                onclick={(event) => {
-                  handleCalculateRowClick(event, t);
-                  void handleLinkModeRowClick(event, t);
-                }}
+                onclick={(event) => handleCalculateRowClick(event, t)}
               >
                 <td class="mono dim">{t.occurredOn}</td>
                 <td class="merchant-cell">
                   <div class="merchant-row">
                     <span class="merchant">{t.merchant ?? "—"}</span>
-                    {#if t.refundLinks.length > 0}
-                      <div class="refund-cluster-wrap">
-                        <button
-                          type="button"
-                          class="refund-cluster-btn"
-                          class:active={Boolean(data.selectedLinkTransactionId)}
-                          aria-label={data.selectedLinkTransactionId ? "Show all transactions" : "Show linked transactions only"}
-                          aria-pressed={Boolean(data.selectedLinkTransactionId)}
-                          onclick={() => toggleLinkClusterFilter(t.id)}
-                        >
-                          <ArrowLeftRight size={12} strokeWidth={1.5} aria-hidden="true" />
-                        </button>
-                        <span class="refund-cluster-preview" role="tooltip">
-                          {t.refundLinks.length} linked · click to {data.selectedLinkTransactionId ? "show all" : "filter"}
-                        </span>
-                      </div>
-                    {/if}
-                    {#if t.warnings.length > 0}
-                      <div class="warning-wrap">
-                        <span class="warning-btn" aria-label="Transaction warning">
-                          <TriangleAlert size={12} strokeWidth={1.5} aria-hidden="true" />
-                        </span>
-                        <span class="warning-preview" role="tooltip">{warningPreview(t)}</span>
-                      </div>
-                    {/if}
-                    {#if canUseRefundLinkMode(t)}
-                      <div class="refund-link-wrap">
-                        <button
-                          type="button"
-                          class="refund-link-btn"
-                          class:has-links={t.refundLinks.length > 0}
-                          class:active={refundLinkModeAnchorId === t.id}
-                          aria-label="{refundLinkModeAnchorId === t.id
-                            ? 'Exit link mode'
-                            : t.refundLinks.length
-                              ? 'Edit refund links'
-                              : 'Link to expenses'} for {t.merchant ?? 'transaction'}"
-                          aria-pressed={refundLinkModeAnchorId === t.id}
-                          disabled={savingRefundLinkId === t.id}
-                          onclick={() => toggleRefundLinkMode(t)}
-                        >
-                          <Link size={12} strokeWidth={1.5} aria-hidden="true" />
-                        </button>
-                        {#if t.refundLinks.length > 0 && refundLinkModeAnchorId !== t.id}
-                          <span class="refund-link-preview" role="tooltip">
-                            {t.refundLinks.map((link) => refundLinkLabel(link)).join(", ")}
-                          </span>
-                        {/if}
-                      </div>
-                    {/if}
                     <div class="note-wrap">
                       <button
                         type="button"
@@ -1505,70 +1037,45 @@
                         <span class="note-preview" role="tooltip">{t.notes}</span>
                       {/if}
                     </div>
-                    {#if data.groups.length > 0}
-                      <div class="group-link-wrap">
+                    {#if data.spaces.length > 0}
+                      <div class="space-link-wrap">
                         <button
                           type="button"
-                          class="group-link-btn"
-                          class:has-group={t.groups.length > 0}
-                          aria-label="{t.groups.length ? `Linked to ${groupLabelFor(t)}` : 'Link to group'} for {t.merchant ?? 'transaction'}"
-                          aria-expanded={openGroupTxId === t.id}
-                          disabled={savingGroupTxId === t.id}
-                          onclick={() => (openGroupTxId = openGroupTxId === t.id ? null : t.id)}
+                          class="space-link-btn"
+                          class:has-space={t.spaces.length > 0}
+                          aria-label="{t.spaces.length ? `In ${spaceLabelFor(t)}` : 'Add to space'} for {t.merchant ?? 'transaction'}"
+                          aria-expanded={openSpaceTxId === t.id}
+                          disabled={savingSpaceTxId === t.id}
+                          onclick={() => (openSpaceTxId = openSpaceTxId === t.id ? null : t.id)}
                         >
                           <Layers size={12} strokeWidth={1.6} aria-hidden="true" />
                         </button>
-                        {#if openGroupTxId === t.id}
-                          <div class="group-popup" role="menu" aria-label="Transaction group">
-                            <span class="group-popup-label" aria-hidden="true">group</span>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              class="group-option empty"
-                              class:selected={!primaryGroupId(t)}
-                              disabled={savingGroupTxId === t.id}
-                              onclick={() => setTransactionGroup(t.id, null)}
-                            >
-                              None
-                            </button>
-                            {#each data.groups as group (group.id)}
+                        {#if openSpaceTxId === t.id}
+                          <div class="space-popup" role="menu" aria-label="Transaction spaces">
+                            <span class="space-popup-label" aria-hidden="true">spaces</span>
+                            {#each data.spaces as space (space.id)}
+                              {@const attached = isInSpace(t, space.id)}
                               <button
                                 type="button"
-                                role="menuitem"
-                                class="group-option"
-                                class:selected={primaryGroupId(t) === group.id}
-                                disabled={savingGroupTxId === t.id}
-                                onclick={() => setTransactionGroup(t.id, group.id)}
+                                role="menuitemcheckbox"
+                                aria-checked={attached}
+                                class="space-option"
+                                class:selected={attached}
+                                disabled={savingSpaceTxId === t.id}
+                                onclick={() => toggleTransactionSpace(t.id, space.id)}
                               >
-                                {group.name}
+                                <span class="space-option-check" aria-hidden="true">
+                                  {#if attached}<Check size={11} strokeWidth={2.2} />{/if}
+                                </span>
+                                {space.name}
                               </button>
                             {/each}
                           </div>
-                        {:else if t.groups.length > 0}
-                          <span class="group-preview" role="tooltip">{groupLabelFor(t)}</span>
+                        {:else if t.spaces.length > 0}
+                          <span class="space-preview" role="tooltip">{spaceLabelFor(t)}</span>
                         {/if}
                       </div>
                     {/if}
-                  </div>
-                </td>
-                <td class="category-cell">
-                  <div class="cat-picker">
-                    <SketchSelect
-                      name="category-{t.id}"
-                      compact
-                      accent={t.categoryColor}
-                      aria-label="Category for {t.merchant ?? 'transaction'}"
-                      value={t.categoryId ?? ""}
-                      disabled={savingCategoryId === t.id}
-                      options={[
-                        { value: "", label: "Uncategorized" },
-                        ...categoriesForType(t.type, t.categoryId).map((category) => ({
-                          value: category.id,
-                          label: category.name,
-                        })),
-                      ]}
-                      onChange={(next) => handleCategoryChange(t, next || null)}
-                    />
                   </div>
                 </td>
                 <td class="tags">
@@ -1649,17 +1156,6 @@
     </footer>
   </section>
 </div>
-
-<SmartCategorizePopup
-  open={smartCatOpen}
-  preview={smartCatPreview}
-  applying={smartCatApplying}
-  toggles={smartCatToggles}
-  onToggle={handleSmartCatToggle}
-  onApplySelected={() => applySmartCat(true)}
-  onThisOnly={() => applySmartCat(false)}
-  onCancel={() => closeSmartCat(true)}
-/>
 
 <SmartTagPopup
   open={smartTagOpen}
@@ -1906,8 +1402,7 @@
   .tx-page .topbar,
   .tx-page .balance-combo,
   .tx-page .stats-block,
-  .tx-page .calc-mode-banner,
-  .tx-page .link-filter-banner {
+  .tx-page .calc-mode-banner {
     flex: none;
   }
 
@@ -2070,7 +1565,7 @@
     transform: rotate(-2.6deg);
   }
 
-  .group-filter-wrap {
+  .space-filter-wrap {
     padding: 0;
     overflow: visible;
   }
@@ -2362,14 +1857,14 @@
     line-height: 1.2;
   }
 
-  .group-link-wrap {
+  .space-link-wrap {
     position: relative;
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
   }
 
-  .group-link-btn {
+  .space-link-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2383,7 +1878,7 @@
     border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
   }
 
-  .group-link-btn.has-group {
+  .space-link-btn.has-space {
     border-style: solid;
     border-color: transparent;
     background: color-mix(in srgb, var(--yellow) 62%, transparent);
@@ -2391,207 +1886,25 @@
     transform: rotate(1deg);
   }
 
-  .group-link-btn:hover:not(:disabled),
-  .group-link-btn[aria-expanded="true"] {
+  .space-link-btn:hover:not(:disabled),
+  .space-link-btn[aria-expanded="true"] {
     color: var(--brand);
     border-color: var(--brand);
   }
 
-  .group-link-btn.has-group:hover:not(:disabled),
-  .group-link-btn.has-group[aria-expanded="true"] {
+  .space-link-btn.has-space:hover:not(:disabled),
+  .space-link-btn.has-space[aria-expanded="true"] {
     background: color-mix(in srgb, var(--yellow) 82%, transparent);
     border-color: transparent;
     color: var(--ink);
   }
 
-  .group-link-btn:disabled {
+  .space-link-btn:disabled {
     opacity: 0.55;
     cursor: wait;
   }
 
-  .link-mode-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 0.65rem;
-    padding: 0.55rem 0.75rem;
-    background: color-mix(in srgb, var(--brand-accent-light) 14%, var(--surface));
-    border: 2px solid color-mix(in srgb, var(--brand-accent-light) 45%, var(--chrome-line));
-    font-size: 0.74rem;
-  }
-
-  .link-mode-banner-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-shrink: 0;
-  }
-
-  .link-mode-cancel-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.15rem;
-    border: none;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  .link-mode-cancel-btn:hover {
-    color: var(--brand-accent);
-  }
-
-  .link-mode-exit-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.15rem;
-    border: none;
-    background: transparent;
-    color: var(--hi-green);
-    cursor: pointer;
-  }
-
-  tr.link-mode-anchor {
-    outline: 2px solid var(--brand-accent-light);
-    outline-offset: -2px;
-  }
-
-  tr.link-mode-target {
-    cursor: pointer;
-  }
-
-  tr.link-mode-target:hover {
-    background: color-mix(in srgb, var(--brand-accent-light) 8%, transparent);
-  }
-
-  tr.link-mode-linked {
-    background: color-mix(in srgb, var(--hi-green) 10%, transparent);
-  }
-
-  tr.link-mode-busy {
-    cursor: wait;
-  }
-
-  .link-filter-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 0.65rem;
-    padding: 0.55rem 0.75rem;
-    background: color-mix(in srgb, var(--hi-green) 12%, var(--surface));
-    border: 2px solid color-mix(in srgb, var(--hi-green) 45%, var(--chrome-line));
-    font-size: 0.74rem;
-  }
-
-  .link-filter-clear {
-    border: none;
-    background: transparent;
-    color: var(--hi-green);
-    cursor: pointer;
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .refund-cluster-wrap,
-  .refund-link-wrap,
-  .warning-wrap {
-    position: relative;
-    display: inline-flex;
-    flex-shrink: 0;
-  }
-
-  .refund-cluster-btn,
-  .refund-link-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.35rem;
-    height: 1.35rem;
-    padding: 0;
-    border: 1.5px dashed color-mix(in srgb, var(--ink) 28%, transparent);
-    background: transparent;
-    color: var(--ink-muted);
-    cursor: pointer;
-    border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
-  }
-
-  .refund-cluster-btn:hover,
-  .refund-cluster-btn.active {
-    color: var(--brand);
-    border-color: var(--brand);
-  }
-
-  .refund-link-btn.has-links,
-  .refund-link-btn.active {
-    border-style: solid;
-    border-color: transparent;
-    background: color-mix(in srgb, var(--yellow) 62%, transparent);
-    color: var(--ink);
-    transform: rotate(0.8deg);
-  }
-
-  .refund-link-btn:hover:not(:disabled),
-  .refund-link-btn[aria-pressed="true"] {
-    color: var(--brand);
-    border-color: var(--brand);
-  }
-
-  .refund-link-btn.has-links:hover:not(:disabled),
-  .refund-link-btn.has-links.active {
-    background: color-mix(in srgb, var(--yellow) 82%, transparent);
-    border-color: transparent;
-    color: var(--ink);
-  }
-
-  .refund-link-btn:disabled {
-    opacity: 0.55;
-    cursor: wait;
-  }
-
-  .warning-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.35rem;
-    height: 1.35rem;
-    color: var(--brand-accent);
-  }
-
-  .refund-cluster-preview,
-  .refund-link-preview,
-  .warning-preview {
-    position: absolute;
-    left: calc(100% + 0.35rem);
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 15;
-    width: max-content;
-    max-width: 16rem;
-    padding: 0.45rem 0.55rem;
-    background: var(--surface);
-    border: 2px solid var(--chrome-line);
-    box-shadow: 2px 3px 0 rgba(27, 27, 31, 0.05);
-    color: var(--main-text);
-    font-size: 0.72rem;
-    line-height: 1.35;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-  }
-
-  .refund-cluster-wrap:hover .refund-cluster-preview,
-  .refund-link-wrap:has(.refund-link-btn.has-links):hover .refund-link-preview,
-  .warning-wrap:hover .warning-preview {
-    opacity: 1;
-    visibility: visible;
-  }
-
-  .group-preview {
+  .space-preview {
     position: absolute;
     left: calc(100% + 0.4rem);
     top: 50%;
@@ -2616,12 +1929,12 @@
     visibility: hidden;
   }
 
-  .group-link-wrap:has(.group-link-btn.has-group):hover .group-preview {
+  .space-link-wrap:has(.space-link-btn.has-space):hover .space-preview {
     opacity: 1;
     visibility: visible;
   }
 
-  .group-popup {
+  .space-popup {
     position: absolute;
     left: calc(100% + 0.4rem);
     top: -0.35rem;
@@ -2640,7 +1953,7 @@
     gap: 0.05rem;
   }
 
-  .group-popup-label {
+  .space-popup-label {
     display: block;
     margin: 0 0.2rem 0.15rem;
     font-family: var(--hand);
@@ -2649,9 +1962,11 @@
     letter-spacing: 0.02em;
   }
 
-  .group-option {
+  .space-option {
     appearance: none;
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
     width: 100%;
     border: none;
     background: transparent;
@@ -2664,20 +1979,24 @@
     border-radius: 2px 6px 3px 5px / 5px 2px 6px 2px;
   }
 
-  .group-option.empty {
-    color: var(--ink-muted);
+  .space-option-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.8rem;
+    flex: none;
   }
 
-  .group-option:hover:not(:disabled) {
+  .space-option:hover:not(:disabled) {
     background: color-mix(in srgb, var(--yellow) 45%, transparent);
     color: var(--ink);
   }
 
-  .group-option.selected {
+  .space-option.selected {
     background: color-mix(in srgb, var(--yellow) 62%, transparent);
   }
 
-  .group-option:disabled {
+  .space-option:disabled {
     opacity: 0.55;
     cursor: wait;
   }
@@ -2723,27 +2042,12 @@
     border: 0;
   }
 
-  .category-cell {
-    min-width: 9rem;
-    vertical-align: middle;
-  }
-
   .balance-cell {
     color: var(--ink-muted);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     font-family: var(--hand);
     font-size: 0.95rem;
-  }
-
-  .category-cell :global(.sketch-select.compact) {
-    max-width: 11rem;
-  }
-
-  .cat-picker {
-    display: inline-flex;
-    align-items: center;
-    max-width: 12rem;
   }
 
   .tx-tag {

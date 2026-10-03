@@ -1,34 +1,34 @@
 <script lang="ts">
   import { formatMoney } from "$lib/finance/money";
   import { formatMonthKeyShort } from "$lib/finance/summary";
-  import type { BillingCategoryGroup } from "$lib/finance/billing";
+  import type { BillingTagGroup } from "$lib/finance/billing";
 
   type Props = {
-    categories: BillingCategoryGroup[];
+    tags: BillingTagGroup[];
     currencyCode: string;
     mode: "monthly" | "yearly";
     periodLabel: string;
   };
 
-  const { categories, currencyCode, mode, periodLabel }: Props = $props();
+  const { tags, currencyCode, mode, periodLabel }: Props = $props();
 </script>
 
-{#if categories.length === 0}
-  <p class="dim billing-empty">No bill-category payments in {periodLabel.toLowerCase()}.</p>
+{#if tags.length === 0}
+  <p class="dim billing-empty">No bill-tag payments in {periodLabel.toLowerCase()}.</p>
 {:else}
   <div class="billing-groups">
-    {#each categories as category (category.categoryId ?? category.categoryName)}
-      <section class="billing-category">
-        <header class="billing-category-head">
-          <span class="cat-bar" style="background:{category.categoryColor}" aria-hidden="true"></span>
-          <div class="billing-category-copy">
-            <h3>{category.categoryName}</h3>
-            <span class="billing-category-total">{formatMoney(category.totalMinor, currencyCode)}</span>
+    {#each tags as tag (tag.tagId ?? tag.tagName)}
+      <section class="billing-tag">
+        <header class="billing-tag-head">
+          <span class="cat-bar" style="background:{tag.tagColor}" aria-hidden="true"></span>
+          <div class="billing-tag-copy">
+            <h3>{tag.tagName}</h3>
+            <span class="billing-tag-total">{formatMoney(tag.totalMinor, currencyCode)}</span>
           </div>
         </header>
 
         <ul class="billing-merchant-list">
-          {#each category.merchants as merchant (merchant.merchant)}
+          {#each tag.merchants as merchant (merchant.merchant)}
             <li class="billing-merchant">
               <div class="billing-merchant-top">
                 <span class="billing-merchant-name">{merchant.merchant}</span>
@@ -69,17 +69,17 @@
     gap: 1rem;
   }
 
-  .billing-category {
+  .billing-tag {
     border-top: 1px solid var(--chrome-line);
     padding-top: 0.85rem;
   }
 
-  .billing-category:first-child {
+  .billing-tag:first-child {
     border-top: none;
     padding-top: 0;
   }
 
-  .billing-category-head {
+  .billing-tag-head {
     display: flex;
     align-items: flex-start;
     gap: 0.55rem;
@@ -92,7 +92,7 @@
     flex-shrink: 0;
   }
 
-  .billing-category-copy {
+  .billing-tag-copy {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -101,7 +101,7 @@
     min-width: 0;
   }
 
-  .billing-category-copy h3 {
+  .billing-tag-copy h3 {
     margin: 0;
     font-size: 0.74rem;
     letter-spacing: 0.06em;
@@ -109,7 +109,7 @@
     color: var(--main-text);
   }
 
-  .billing-category-total {
+  .billing-tag-total {
     font-family: var(--hand);
     font-size: 0.95rem;
     font-variant-numeric: tabular-nums;

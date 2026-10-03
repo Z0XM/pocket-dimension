@@ -2,25 +2,21 @@ import { fail, redirect } from "@sveltejs/kit";
 import { canEdit, getMembershipOrThrow, requireUser } from "$lib/server/authz";
 import { resolveRequestAccount, setActiveAccountCookie } from "$lib/server/active-account";
 import {
-  createCategory,
-  createGroup,
+  createSpace,
   createTag,
-  deleteCategory as removeCategory,
-  deleteGroup as removeGroup,
+  deleteSpace as removeSpace,
   deleteTag as removeTag,
   countAccountTransactions,
   getAccountCurrency,
   getAccountOpeningBalance,
   getFirstTransactionDate,
-  listCategories,
-  listGroups,
+  listSpaces,
   listTags,
   createAccount,
   updateAccount,
   updateAccountCurrency,
   updateAccountOpeningBalance,
-  updateCategory as saveCategory,
-  updateGroup as saveGroup,
+  updateSpace as saveSpace,
   updateTag as saveTag,
   accountNeedsDefaultTaxonomy,
   configureAccountDefaults,
@@ -30,11 +26,9 @@ import { parseIndianAmount } from "$lib/finance/money";
 import { importTransactionRows, resetAccountTransactions } from "$lib/server/import";
 import { getImporter, listImporters } from "$lib/importers";
 import {
-  createCategorySchema,
-  createGroupSchema,
+  createSpaceSchema,
   createTagSchema,
-  deleteCategorySchema,
-  deleteGroupSchema,
+  deleteSpaceSchema,
   deleteTagSchema,
   createAccountSchema,
   updateAccountSchema,
@@ -42,8 +36,7 @@ import {
   updateAccountCurrencySchema,
   updateAccountOpeningBalanceSchema,
   clearAccountOpeningBalanceSchema,
-  updateCategorySchema,
-  updateGroupSchema,
+  updateSpaceSchema,
   updateTagSchema,
 } from "$lib/validation/finance";
 import type { Actions, PageServerLoad } from "./$types";
@@ -52,10 +45,9 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
   if (!locals.user?.id) redirect(307, "/login");
 
   const { account, accounts } = await parent();
-  const [categories, tags, groups, transactionCount, firstTransactionOn, openingBalance, needsDefaultTaxonomy] = await Promise.all([
-    listCategories(account.id),
+  const [tags, spaces, transactionCount, firstTransactionOn, openingBalance, needsDefaultTaxonomy] = await Promise.all([
     listTags(account.id),
-    listGroups(account.id),
+    listSpaces(account.id),
     countAccountTransactions(account.id),
     getFirstTransactionDate(account.id),
     getAccountOpeningBalance(account.id),
@@ -68,9 +60,8 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
     transactionCount,
     firstTransactionOn,
     openingBalance,
-    categories,
     tags,
-    groups,
+    spaces,
     needsDefaultTaxonomy,
     currencies: SUPPORTED_CURRENCIES,
     importers: listImporters().map(({ id, label }) => ({ id, label })),
@@ -78,81 +69,6 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 };
 
 export const actions: Actions = {
-  createCategory: async ({ request, locals, cookies }) => {
-    const user = requireUser(locals);
-    const { account } = await resolveRequestAccount(user.id, cookies);
-    const membership = await getMembershipOrThrow(user.id, account.id);
-    if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
-
-    const form = await request.formData();
-    const parsed = createCategorySchema.safeParse({
-      name: form.get("name"),
-      kind: form.get("kind") ?? "expense",
-      colorHex: form.get("colorHex") || undefined,
-    });
-
-    if (!parsed.success) {
-      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid category" });
-    }
-
-    const category = await createCategory(user.id, account.id, parsed.data);
-    if (!category) {
-      return fail(409, { message: "Category already exists" });
-    }
-
-    return { success: true, message: `Added category “${category.name}”` };
-  },
-
-  updateCategory: async ({ request, locals, cookies }) => {
-    const user = requireUser(locals);
-    const { account } = await resolveRequestAccount(user.id, cookies);
-    const membership = await getMembershipOrThrow(user.id, account.id);
-    if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
-
-    const form = await request.formData();
-    const parsed = updateCategorySchema.safeParse({
-      id: form.get("id"),
-      name: form.get("name"),
-      kind: form.get("kind") ?? "expense",
-      colorHex: form.get("colorHex") || undefined,
-    });
-
-    if (!parsed.success) {
-      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid category" });
-    }
-
-    try {
-      const category = await saveCategory(user.id, account.id, parsed.data);
-      if (!category) {
-        return fail(404, { message: "Category not found" });
-      }
-
-      return { success: true, message: `Updated category “${category.name}”` };
-    } catch {
-      return fail(409, { message: "A category with that name already exists" });
-    }
-  },
-
-  deleteCategory: async ({ request, locals, cookies }) => {
-    const user = requireUser(locals);
-    const { account } = await resolveRequestAccount(user.id, cookies);
-    const membership = await getMembershipOrThrow(user.id, account.id);
-    if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
-
-    const form = await request.formData();
-    const parsed = deleteCategorySchema.safeParse({ id: form.get("id") });
-    if (!parsed.success) {
-      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid category" });
-    }
-
-    const deleted = await removeCategory(account.id, parsed.data.id);
-    if (!deleted) {
-      return fail(404, { message: "Category not found" });
-    }
-
-    return { success: true, message: "Category deleted" };
-  },
-
   createTag: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
     const { account } = await resolveRequestAccount(user.id, cookies);
@@ -162,6 +78,7 @@ export const actions: Actions = {
     const form = await request.formData();
     const parsed = createTagSchema.safeParse({
       name: form.get("name"),
+      kind: form.get("kind") || null,
       colorHex: form.get("colorHex") || undefined,
     });
 
@@ -187,6 +104,7 @@ export const actions: Actions = {
     const parsed = updateTagSchema.safeParse({
       id: form.get("id"),
       name: form.get("name"),
+      kind: form.get("kind") || null,
       colorHex: form.get("colorHex") || undefined,
     });
 
@@ -226,75 +144,79 @@ export const actions: Actions = {
     return { success: true, message: "Tag deleted" };
   },
 
-  createGroup: async ({ request, locals, cookies }) => {
+  createSpace: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
     const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
     const form = await request.formData();
-    const parsed = createGroupSchema.safeParse({
+    const parsed = createSpaceSchema.safeParse({
       name: form.get("name"),
+      colorHex: form.get("colorHex") || undefined,
+      notes: form.get("notes") || undefined,
     });
 
     if (!parsed.success) {
-      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid group" });
+      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid space" });
     }
 
-    const group = await createGroup(user.id, account.id, parsed.data);
-    if (!group) {
-      return fail(409, { message: "Group already exists" });
+    const space = await createSpace(user.id, account.id, parsed.data);
+    if (!space) {
+      return fail(409, { message: "Space already exists" });
     }
 
-    return { success: true, message: `Added group “${group.name}”` };
+    return { success: true, message: `Added space “${space.name}”` };
   },
 
-  updateGroup: async ({ request, locals, cookies }) => {
+  updateSpace: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
     const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
     const form = await request.formData();
-    const parsed = updateGroupSchema.safeParse({
+    const parsed = updateSpaceSchema.safeParse({
       id: form.get("id"),
       name: form.get("name"),
+      colorHex: form.get("colorHex") || undefined,
+      notes: form.get("notes") ?? undefined,
     });
 
     if (!parsed.success) {
-      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid group" });
+      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid space" });
     }
 
     try {
-      const group = await saveGroup(user.id, account.id, parsed.data);
-      if (!group) {
-        return fail(404, { message: "Group not found" });
+      const space = await saveSpace(user.id, account.id, parsed.data);
+      if (!space) {
+        return fail(404, { message: "Space not found" });
       }
 
-      return { success: true, message: `Updated group “${group.name}”` };
+      return { success: true, message: `Updated space “${space.name}”` };
     } catch {
-      return fail(409, { message: "A group with that name already exists" });
+      return fail(409, { message: "A space with that name already exists" });
     }
   },
 
-  deleteGroup: async ({ request, locals, cookies }) => {
+  deleteSpace: async ({ request, locals, cookies }) => {
     const user = requireUser(locals);
     const { account } = await resolveRequestAccount(user.id, cookies);
     const membership = await getMembershipOrThrow(user.id, account.id);
     if (!canEdit(membership.role)) return fail(403, { message: "Read-only access" });
 
     const form = await request.formData();
-    const parsed = deleteGroupSchema.safeParse({ id: form.get("id") });
+    const parsed = deleteSpaceSchema.safeParse({ id: form.get("id") });
     if (!parsed.success) {
-      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid group" });
+      return fail(400, { message: parsed.error.issues[0]?.message ?? "Invalid space" });
     }
 
-    const deleted = await removeGroup(account.id, parsed.data.id);
+    const deleted = await removeSpace(account.id, parsed.data.id);
     if (!deleted) {
-      return fail(404, { message: "Group not found" });
+      return fail(404, { message: "Space not found" });
     }
 
-    return { success: true, message: "Group deleted" };
+    return { success: true, message: "Space deleted" };
   },
 
   updateCurrency: async ({ request, locals, cookies }) => {
@@ -496,7 +418,7 @@ export const actions: Actions = {
     }
 
     await configureAccountDefaults(user.id, account.id);
-    return { success: true, message: "Default categories and tags added" };
+    return { success: true, message: "Default tags added" };
   },
 
   updateAccount: async ({ request, locals, cookies }) => {

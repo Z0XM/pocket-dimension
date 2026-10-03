@@ -1,26 +1,26 @@
 import { describe, expect, test } from "bun:test";
-import { filterBillCategoryRows, isBillCategoryName } from "$lib/finance/bill-categories";
+import { filterBillTagRows, isBillTagName } from "$lib/finance/bill-categories";
 
-describe("isBillCategoryName", () => {
-  test("matches bill categories", () => {
-    expect(isBillCategoryName("Monthly Bill")).toBe(true);
-    expect(isBillCategoryName("Yearly Bill")).toBe(true);
-    expect(isBillCategoryName("Bill")).toBe(true);
+describe("isBillTagName", () => {
+  test("matches bill tags", () => {
+    expect(isBillTagName("Monthly Bill")).toBe(true);
+    expect(isBillTagName("Yearly Bill")).toBe(true);
+    expect(isBillTagName("Bill")).toBe(true);
   });
 
-  test("rejects non-bill categories", () => {
-    expect(isBillCategoryName("Food")).toBe(false);
-    expect(isBillCategoryName("Miscellaneous")).toBe(false);
-    expect(isBillCategoryName(null)).toBe(false);
+  test("rejects non-bill tags", () => {
+    expect(isBillTagName("Food")).toBe(false);
+    expect(isBillTagName("Miscellaneous")).toBe(false);
+    expect(isBillTagName(null)).toBe(false);
   });
 });
 
-describe("filterBillCategoryRows", () => {
-  test("keeps only bill category rows", () => {
+describe("filterBillTagRows", () => {
+  test("keeps only bill tag rows", () => {
     const rows = [
-      { category_name: "Monthly Bill", merchant_name: "Netflix" },
-      { category_name: "Food", merchant_name: "Swiggy" },
+      { tag_name: "Monthly Bill", merchant_name: "Netflix" },
+      { tag_name: "Food", merchant_name: "Swiggy" },
     ];
-    expect(filterBillCategoryRows(rows)).toHaveLength(1);
+    expect(filterBillTagRows(rows)).toHaveLength(1);
   });
 });

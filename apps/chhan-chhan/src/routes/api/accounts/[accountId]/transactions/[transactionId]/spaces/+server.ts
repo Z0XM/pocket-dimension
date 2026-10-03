@@ -1,8 +1,8 @@
 import { error, json } from "@sveltejs/kit";
 import { canEdit, getMembershipOrThrow, requireUser } from "$lib/server/authz";
-import { attachRefundLink } from "$lib/server/finance";
+import { attachTransactionSpace } from "$lib/server/finance";
 import { readJsonBody } from "$lib/server/http";
-import { attachRefundLinkSchema } from "$lib/validation/finance";
+import { attachTransactionSpaceSchema } from "$lib/validation/finance";
 
 export async function POST({ locals, params, request }) {
   const user = requireUser(locals);
@@ -11,9 +11,9 @@ export async function POST({ locals, params, request }) {
     throw error(403, "You only have read access");
   }
 
-  const payload = await readJsonBody(request, attachRefundLinkSchema);
-  const peer = await attachRefundLink(params.accountId, params.transactionId, payload.expenseTransactionId);
-  if (!peer) throw error(404, "Refund or expense transaction not found");
+  const payload = await readJsonBody(request, attachTransactionSpaceSchema);
+  const space = await attachTransactionSpace(params.accountId, params.transactionId, payload.spaceId);
+  if (!space) throw error(404, "Transaction or space not found");
 
-  return json({ peer });
+  return json({ space });
 }

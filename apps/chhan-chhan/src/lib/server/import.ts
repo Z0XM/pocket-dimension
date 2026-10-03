@@ -12,7 +12,7 @@ type ImportOptions = {
   skipDuplicates?: boolean;
   currencyCode?: string;
   onProgress?: (progress: ImportProgress) => void;
-  /** Per-row category/tag overrides keyed by 1-based statement row number. */
+  /** Per-row tag overrides keyed by 1-based statement row number. */
   assignments?: Record<string, ImportRowAssignment>;
 };
 
@@ -485,7 +485,6 @@ export async function importTransactionRows(
         externalRef: parsed.data.externalRef,
         balanceMinor: parsed.data.balanceMinor,
         sortOrder: parsed.data.sortOrder ?? 0,
-        ...(assignment?.setCategory ? { categoryId: assignment.categoryId } : {}),
         createdById: userId,
         updatedById: userId,
       })

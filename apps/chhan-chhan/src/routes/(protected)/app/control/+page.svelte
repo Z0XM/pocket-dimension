@@ -111,20 +111,16 @@
   let confirmingImport = $state(false);
   let confirmProgress = $state(0);
   let confirmStatus = $state("");
-  let importRowAssignments = $state<Record<number, { categoryId: string | null; tagIds: string[] }>>({});
+  let importRowAssignments = $state<Record<number, { tagIds: string[] }>>({});
   let importFormEl = $state<HTMLFormElement | null>(null);
-  let addingCategory = $state(false);
-  let editingId = $state<string | null>(null);
-  let savingCategoryId = $state<string | null>(null);
-  let deletingCategoryId = $state<string | null>(null);
   let addingTag = $state(false);
   let editingTagId = $state<string | null>(null);
   let savingTagId = $state<string | null>(null);
   let deletingTagId = $state<string | null>(null);
-  let addingGroup = $state(false);
-  let editingGroupId = $state<string | null>(null);
-  let savingGroupId = $state<string | null>(null);
-  let deletingGroupId = $state<string | null>(null);
+  let addingSpace = $state(false);
+  let editingSpaceId = $state<string | null>(null);
+  let savingSpaceId = $state<string | null>(null);
+  let deletingSpaceId = $state<string | null>(null);
   let savingAccount = $state(false);
   let creatingAccount = $state(false);
   let addingAccount = $state(false);
@@ -202,22 +198,24 @@
     { value: "transfer", label: "Transfer" },
   ];
 
-  let draftCategoryKind = $state("expense");
-  let draftCategoryColor = $state("#FFB997");
-  let draftTagColor = $state("#FFADAD");
-  let editCategoryKind = $state("expense");
-  let editCategoryColor = $state("#FFB997");
-  let editTagColor = $state("#FFADAD");
+  const TAG_KIND_OPTIONS: Array<{ value: string; label: string }> = [{ value: "", label: "Any kind" }, ...KIND_OPTIONS];
 
-  function beginEditCategory(category: (typeof data.categories)[number]) {
-    editingId = category.id;
-    editCategoryKind = category.kind;
-    editCategoryColor = category.colorHex ?? COLOR_PRESETS[0]!;
-  }
+  let draftTagKind = $state("");
+  let draftTagColor = $state("#FFADAD");
+  let editTagKind = $state("");
+  let editTagColor = $state("#FFADAD");
+  let draftSpaceColor = $state("#BDE0FE");
+  let editSpaceColor = $state("#BDE0FE");
 
   function beginEditTag(tag: (typeof data.tags)[number]) {
     editingTagId = tag.id;
+    editTagKind = tag.kind ?? "";
     editTagColor = tag.colorHex ?? COLOR_PRESETS[0]!;
+  }
+
+  function beginEditSpace(space: (typeof data.spaces)[number]) {
+    editingSpaceId = space.id;
+    editSpaceColor = space.colorHex ?? "#BDE0FE";
   }
 
   function downloadImportReport(csv: string) {
@@ -253,26 +251,21 @@
   }
 
   function buildAssignmentsFromPreview(preview: ImportPreview) {
-    const next: Record<number, { categoryId: string | null; tagIds: string[] }> = {};
+    const next: Record<number, { tagIds: string[] }> = {};
     for (const row of preview.rows) {
       if (row.status !== "will_import" && row.status !== "warning") continue;
       next[row.row] = {
-        categoryId: row.suggestion?.categoryId ?? null,
         tagIds: [...(row.suggestion?.tagIds ?? [])],
       };
     }
     return next;
   }
 
-  function updateImportRowAssignment(row: number, next: { categoryId: string | null; tagIds: string[] }) {
+  function updateImportRowAssignment(row: number, next: { tagIds: string[] }) {
     importRowAssignments = { ...importRowAssignments, [row]: next };
   }
 
-  function buildImportFormData(
-    file: File,
-    importer: string,
-    assignments?: Record<number, { categoryId: string | null; tagIds: string[] }>
-  ): FormData {
+  function buildImportFormData(file: File, importer: string, assignments?: Record<number, { tagIds: string[] }>): FormData {
     const formData = new FormData();
     formData.set("file", file);
     formData.set("importer", importer);
@@ -712,24 +705,20 @@
         <div class="danger-block">
           <h3>Danger zone</h3>
           <p class="panel-copy dim">
-            Permanently delete every transaction for this account ({data.transactionCount.toLocaleString()} now). Categories, tags, and groups are kept.
-            Account balance is cleared.
+            Permanently delete every transaction for this account ({data.transactionCount.toLocaleString()} now). Tags and spaces are kept. Account balance
+            is cleared.
           </p>
           <form
             method="POST"
             action="?/clearAllTransactions"
-            use:enhance={() => {
-              return async ({ cancel, update }) => {
-                const countLabel = data.transactionCount.toLocaleString();
-                if (
-                  !confirm(
-                    `Delete all ${countLabel} transactions? This cannot be undone. Tag, group, and refund links on those rows will be removed.`
-                  )
-                ) {
-                  cancel();
-                  return;
-                }
-                clearingTransactions = true;
+            use:enhance={({ cancel }) => {
+              const countLabel = data.transactionCount.toLocaleString();
+              if (!confirm(`Delete all ${countLabel} transactions? This cannot be undone. Tag and space links on those rows will be removed.`)) {
+                cancel();
+                return;
+              }
+              clearingTransactions = true;
+              return async ({ update }) => {
                 await update();
                 clearingTransactions = false;
                 await invalidateAll();
@@ -760,8 +749,7 @@
             }}
           >
             <p>
-              This account is missing starter categories and tags. Configure defaults to add Food, Monthly Bill, Personal, and the rest —
-              existing names stay put.
+              This account is missing starter tags. Configure defaults to add Food, Monthly Bill, Personal, and the rest — existing names stay put.
             </p>
             <button type="submit" class="defaults-btn" disabled={configuringDefaults}>
               {configuringDefaults ? "Configuring…" : "Configure defaults"}
@@ -770,140 +758,6 @@
         {/if}
 
         <div class="organize-grid">
-          <div class="organize-col">
-            <h3>Categories</h3>
-            <form
-              class="organize-add"
-              method="POST"
-              action="?/createCategory"
-              use:enhance={() => {
-                addingCategory = true;
-                return async ({ update, result }) => {
-                  addingCategory = false;
-                  await update();
-                  if (result.type === "success") {
-                    draftCategoryKind = "expense";
-                    draftCategoryColor = "#FFB997";
-                  }
-                };
-              }}
-            >
-              <input class="organize-name" name="name" placeholder="Category name" required />
-              <SketchSelect name="kind" bind:value={draftCategoryKind} options={KIND_OPTIONS} aria-label="Category kind" />
-              <input type="hidden" name="colorHex" value={draftCategoryColor} />
-              <div class="color-row compact">
-                {#each COLOR_PRESETS as color}
-                  <button
-                    type="button"
-                    class="color-option"
-                    class:selected={draftCategoryColor.toUpperCase() === color.toUpperCase()}
-                    aria-label="Use color {color}"
-                    disabled={addingCategory}
-                    onclick={() => (draftCategoryColor = color)}
-                  >
-                    <span class="swatch" style="background: {color}"></span>
-                  </button>
-                {/each}
-              </div>
-              <button class="organize-plus" type="submit" disabled={addingCategory} aria-label={addingCategory ? "Adding category" : "Add category"}>
-                <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
-              </button>
-            </form>
-            <ul class="list organize-list">
-              {#if data.categories.length === 0}
-                <li class="dim empty">No categories yet.</li>
-              {:else}
-                {#each data.categories as category (category.id)}
-                  <li class:editing={editingId === category.id}>
-                    {#if editingId === category.id}
-                      <form
-                        class="organize-edit"
-                        method="POST"
-                        action="?/updateCategory"
-                        use:enhance={() => {
-                          savingCategoryId = category.id;
-                          return async ({ update, result }) => {
-                            savingCategoryId = null;
-                            if (result.type === "success") editingId = null;
-                            await update();
-                          };
-                        }}
-                      >
-                        <input type="hidden" name="id" value={category.id} />
-                        <input class="organize-name" name="name" value={category.name} required />
-                        <SketchSelect name="kind" bind:value={editCategoryKind} options={KIND_OPTIONS} aria-label="Category kind" />
-                        <input type="hidden" name="colorHex" value={editCategoryColor} />
-                        <div class="color-row compact">
-                          {#each COLOR_PRESETS as color}
-                            <button
-                              type="button"
-                              class="color-option"
-                              class:selected={editCategoryColor.toUpperCase() === color.toUpperCase()}
-                              aria-label="Use color {color}"
-                              disabled={savingCategoryId === category.id}
-                              onclick={() => (editCategoryColor = color)}
-                            >
-                              <span class="swatch" style="background: {color}"></span>
-                            </button>
-                          {/each}
-                        </div>
-                        <div class="edit-actions">
-                          <button
-                            class="icon-btn ok"
-                            type="submit"
-                            aria-label={savingCategoryId === category.id ? "Saving" : "Save"}
-                            disabled={savingCategoryId === category.id}
-                          >
-                            <Check size={16} strokeWidth={1.6} aria-hidden="true" />
-                          </button>
-                          <button type="button" class="icon-btn danger" aria-label="Cancel" onclick={() => (editingId = null)}>
-                            <X size={16} strokeWidth={1.6} aria-hidden="true" />
-                          </button>
-                        </div>
-                      </form>
-                    {:else}
-                      <span class="cat">
-                        <span class="mark" style="--item-color: {category.colorHex ?? '#FFB997'}">{category.name}</span>
-                      </span>
-                      <span class="kind kind-{category.kind}">{category.kind}</span>
-                      <div class="row-actions">
-                        <button type="button" class="icon-btn" aria-label="Edit {category.name}" onclick={() => beginEditCategory(category)}>
-                          <SquarePen size={16} strokeWidth={1.25} aria-hidden="true" />
-                        </button>
-                        <form
-                          method="POST"
-                          action="?/deleteCategory"
-                          use:enhance={() => {
-                            return async ({ cancel, update }) => {
-                              if (!confirm(`Delete “${category.name}”? Linked transactions will become uncategorized.`)) {
-                                cancel();
-                                return;
-                              }
-                              deletingCategoryId = category.id;
-                              await update();
-                              deletingCategoryId = null;
-                              if (editingId === category.id) editingId = null;
-                            };
-                          }}
-                        >
-                          <input type="hidden" name="id" value={category.id} />
-                          <button
-                            type="submit"
-                            class="icon-btn danger"
-                            aria-label="Delete {category.name}"
-                            disabled={deletingCategoryId === category.id}
-                          >
-                            <Trash2 size={16} strokeWidth={1.25} aria-hidden="true" />
-                          </button>
-                        </form>
-                      </div>
-                    {/if}
-                  </li>
-                {/each}
-              {/if}
-            </ul>
-          </div>
-
           <div class="organize-col">
             <h3>Tags</h3>
             <form
@@ -915,11 +769,15 @@
                 return async ({ update, result }) => {
                   addingTag = false;
                   await update();
-                  if (result.type === "success") draftTagColor = "#FFADAD";
+                  if (result.type === "success") {
+                    draftTagColor = "#FFADAD";
+                    draftTagKind = "";
+                  }
                 };
               }}
             >
               <input class="organize-name" name="name" placeholder="Tag name" required />
+              <SketchSelect name="kind" bind:value={draftTagKind} options={TAG_KIND_OPTIONS} aria-label="Tag kind" />
               <input type="hidden" name="colorHex" value={draftTagColor} />
               <div class="color-row compact">
                 {#each COLOR_PRESETS as color}
@@ -961,6 +819,7 @@
                       >
                         <input type="hidden" name="id" value={tag.id} />
                         <input class="organize-name" name="name" value={tag.name} required />
+                        <SketchSelect name="kind" bind:value={editTagKind} options={TAG_KIND_OPTIONS} aria-label="Tag kind" />
                         <input type="hidden" name="colorHex" value={editTagColor} />
                         <div class="color-row compact">
                           {#each COLOR_PRESETS as color}
@@ -995,6 +854,9 @@
                         <Tag size={14} strokeWidth={1.25} class="tag-icon" style="color: {tag.colorHex ?? '#FFADAD'}" aria-hidden="true" />
                         <span class="mark" style="--item-color: {tag.colorHex ?? '#FFADAD'}">{tag.name}</span>
                       </span>
+                      {#if tag.kind}
+                        <span class="kind kind-{tag.kind}">{tag.kind}</span>
+                      {/if}
                       <div class="row-actions">
                         <button type="button" class="icon-btn" aria-label="Edit {tag.name}" onclick={() => beginEditTag(tag)}>
                           <SquarePen size={16} strokeWidth={1.25} aria-hidden="true" />
@@ -1002,13 +864,13 @@
                         <form
                           method="POST"
                           action="?/deleteTag"
-                          use:enhance={() => {
-                            return async ({ cancel, update }) => {
-                              if (!confirm(`Delete “${tag.name}”? It will be removed from linked transactions.`)) {
-                                cancel();
-                                return;
-                              }
-                              deletingTagId = tag.id;
+                          use:enhance={({ cancel }) => {
+                            if (!confirm(`Delete “${tag.name}”? It will be removed from linked transactions.`)) {
+                              cancel();
+                              return;
+                            }
+                            deletingTagId = tag.id;
+                            return async ({ update }) => {
                               await update();
                               deletingTagId = null;
                               if (editingTagId === tag.id) editingTagId = null;
@@ -1029,86 +891,121 @@
           </div>
 
           <div class="organize-col">
-            <h3>Groups</h3>
+            <h3>Spaces</h3>
             <form
               class="organize-add"
               method="POST"
-              action="?/createGroup"
+              action="?/createSpace"
               use:enhance={() => {
-                addingGroup = true;
-                return async ({ update }) => {
-                  addingGroup = false;
+                addingSpace = true;
+                return async ({ update, result }) => {
+                  addingSpace = false;
                   await update();
+                  if (result.type === "success") draftSpaceColor = "#BDE0FE";
                 };
               }}
             >
-              <input class="organize-name" name="name" placeholder="Group name" required />
-              <button class="organize-plus" type="submit" disabled={addingGroup} aria-label={addingGroup ? "Adding group" : "Add group"}>
+              <input class="organize-name" name="name" placeholder="Space name" required />
+              <input class="organize-name" name="notes" placeholder="Notes (optional)" />
+              <input type="hidden" name="colorHex" value={draftSpaceColor} />
+              <div class="color-row compact">
+                {#each COLOR_PRESETS as color}
+                  <button
+                    type="button"
+                    class="color-option"
+                    class:selected={draftSpaceColor.toUpperCase() === color.toUpperCase()}
+                    aria-label="Use color {color}"
+                    disabled={addingSpace}
+                    onclick={() => (draftSpaceColor = color)}
+                  >
+                    <span class="swatch" style="background: {color}"></span>
+                  </button>
+                {/each}
+              </div>
+              <button class="organize-plus" type="submit" disabled={addingSpace} aria-label={addingSpace ? "Adding space" : "Add space"}>
                 <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
               </button>
             </form>
             <ul class="list organize-list">
-              {#if data.groups.length === 0}
-                <li class="dim empty">No groups yet.</li>
+              {#if data.spaces.length === 0}
+                <li class="dim empty">No spaces yet.</li>
               {:else}
-                {#each data.groups as group (group.id)}
-                  <li class:editing={editingGroupId === group.id}>
-                    {#if editingGroupId === group.id}
+                {#each data.spaces as space (space.id)}
+                  <li class:editing={editingSpaceId === space.id}>
+                    {#if editingSpaceId === space.id}
                       <form
                         class="organize-edit"
                         method="POST"
-                        action="?/updateGroup"
+                        action="?/updateSpace"
                         use:enhance={() => {
-                          savingGroupId = group.id;
+                          savingSpaceId = space.id;
                           return async ({ update, result }) => {
-                            savingGroupId = null;
-                            if (result.type === "success") editingGroupId = null;
+                            savingSpaceId = null;
+                            if (result.type === "success") editingSpaceId = null;
                             await update();
                           };
                         }}
                       >
-                        <input type="hidden" name="id" value={group.id} />
-                        <input class="organize-name" name="name" value={group.name} required />
+                        <input type="hidden" name="id" value={space.id} />
+                        <input class="organize-name" name="name" value={space.name} required />
+                        <input class="organize-name" name="notes" value={space.notes ?? ""} placeholder="Notes (optional)" />
+                        <input type="hidden" name="colorHex" value={editSpaceColor} />
+                        <div class="color-row compact">
+                          {#each COLOR_PRESETS as color}
+                            <button
+                              type="button"
+                              class="color-option"
+                              class:selected={editSpaceColor.toUpperCase() === color.toUpperCase()}
+                              aria-label="Use color {color}"
+                              disabled={savingSpaceId === space.id}
+                              onclick={() => (editSpaceColor = color)}
+                            >
+                              <span class="swatch" style="background: {color}"></span>
+                            </button>
+                          {/each}
+                        </div>
                         <div class="edit-actions">
                           <button
                             class="icon-btn ok"
                             type="submit"
-                            aria-label={savingGroupId === group.id ? "Saving" : "Save"}
-                            disabled={savingGroupId === group.id}
+                            aria-label={savingSpaceId === space.id ? "Saving" : "Save"}
+                            disabled={savingSpaceId === space.id}
                           >
                             <Check size={16} strokeWidth={1.6} aria-hidden="true" />
                           </button>
-                          <button type="button" class="icon-btn danger" aria-label="Cancel" onclick={() => (editingGroupId = null)}>
+                          <button type="button" class="icon-btn danger" aria-label="Cancel" onclick={() => (editingSpaceId = null)}>
                             <X size={16} strokeWidth={1.6} aria-hidden="true" />
                           </button>
                         </div>
                       </form>
                     {:else}
-                      <span class="tag-chip group-chip">
-                        <Layers size={14} strokeWidth={1.25} class="tag-icon" aria-hidden="true" />
-                        {group.name}
+                      <span class="tag-chip space-chip" title={space.notes ?? undefined}>
+                        <Layers size={14} strokeWidth={1.25} class="tag-icon" style="color: {space.colorHex ?? '#BDE0FE'}" aria-hidden="true" />
+                        <span class="mark" style="--item-color: {space.colorHex ?? '#BDE0FE'}">{space.name}</span>
                       </span>
+                      <span class="dim space-count">{space.transactionCount} txn{space.transactionCount === 1 ? "" : "s"}</span>
                       <div class="row-actions">
-                        <button type="button" class="icon-btn" aria-label="Edit {group.name}" onclick={() => (editingGroupId = group.id)}>
+                        <button type="button" class="icon-btn" aria-label="Edit {space.name}" onclick={() => beginEditSpace(space)}>
                           <SquarePen size={16} strokeWidth={1.25} aria-hidden="true" />
                         </button>
                         <form
                           method="POST"
-                          action="?/deleteGroup"
-                          use:enhance={() => {
+                          action="?/deleteSpace"
+                          use:enhance={({ cancel }) => {
+                            if (!confirm(`Delete “${space.name}”? It will be removed from linked transactions.`)) {
+                              cancel();
+                              return;
+                            }
+                            deletingSpaceId = space.id;
                             return async ({ update }) => {
-                              if (!confirm(`Delete “${group.name}”? It will be removed from linked transactions.`)) {
-                                return;
-                              }
-                              deletingGroupId = group.id;
                               await update();
-                              deletingGroupId = null;
-                              if (editingGroupId === group.id) editingGroupId = null;
+                              deletingSpaceId = null;
+                              if (editingSpaceId === space.id) editingSpaceId = null;
                             };
                           }}
                         >
-                          <input type="hidden" name="id" value={group.id} />
-                          <button type="submit" class="icon-btn danger" aria-label="Delete {group.name}" disabled={deletingGroupId === group.id}>
+                          <input type="hidden" name="id" value={space.id} />
+                          <button type="submit" class="icon-btn danger" aria-label="Delete {space.name}" disabled={deletingSpaceId === space.id}>
                             <Trash2 size={16} strokeWidth={1.25} aria-hidden="true" />
                           </button>
                         </form>
@@ -1276,7 +1173,7 @@
 
   .organize-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem 1.35rem;
     align-items: start;
   }

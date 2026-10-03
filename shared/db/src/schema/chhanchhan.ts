@@ -51,8 +51,9 @@ export const financeAccountMembers = chhanSchema.table(
   ]
 );
 
-export const financeCategories = chhanSchema.table(
-  "finance_categories",
+/** Sole free-form classifier. Optional kind helps filter income vs expense tags. */
+export const financeTags = chhanSchema.table(
+  "finance_tags",
   {
     id,
     ...timestamps,
@@ -61,14 +62,10 @@ export const financeCategories = chhanSchema.table(
       .notNull()
       .references(() => financeAccounts.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    kind: transactionType("kind").notNull().default("expense"),
     colorHex: text("color_hex"),
-    parentCategoryId: uuid("parent_category_id"),
+    kind: transactionType("kind"),
   },
-  (table) => [
-    unique("finance_categories_account_id_name_unique").on(table.accountId, table.name),
-    index("finance_categories_account_id_idx").on(table.accountId),
-  ]
+  (table) => [unique("finance_tags_account_id_name_unique").on(table.accountId, table.name), index("finance_tags_account_id_idx").on(table.accountId)]
 );
 
 export const financeTransactions = chhanSchema.table(
@@ -80,7 +77,6 @@ export const financeTransactions = chhanSchema.table(
     accountId: uuid("account_id")
       .notNull()
       .references(() => financeAccounts.id, { onDelete: "cascade" }),
-    categoryId: uuid("category_id").references(() => financeCategories.id, { onDelete: "set null" }),
     occurredOn: date("occurred_on").notNull(),
     amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
     currencyCode: text("currency_code").notNull().default("USD"),
@@ -93,8 +89,84 @@ export const financeTransactions = chhanSchema.table(
   },
   (table) => [
     index("finance_transactions_account_id_occurred_on_idx").on(table.accountId, table.occurredOn),
-    index("finance_transactions_account_id_category_id_idx").on(table.accountId, table.categoryId),
     index("finance_transactions_account_id_sort_order_idx").on(table.accountId, table.sortOrder),
+  ]
+);
+
+export const financeTransactionTags = chhanSchema.table(
+  "finance_transaction_tags",
+  {
+    transactionId: uuid("transaction_id")
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => financeTags.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.transactionId, table.tagId] }), index("finance_transaction_tags_tag_id_idx").on(table.tagId)]
+);
+
+/**
+ * Space: relationship container for shared money / linked transactions.
+ * Quick mode = just membership + M:N allocations. Full mode adds members/items later.
+ */
+export const financeSpaces = chhanSchema.table(
+  "finance_spaces",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => financeAccounts.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    colorHex: text("color_hex"),
+    notes: text("notes"),
+  },
+  (table) => [
+    unique("finance_spaces_account_id_name_unique").on(table.accountId, table.name),
+    index("finance_spaces_account_id_idx").on(table.accountId),
+  ]
+);
+
+export const financeSpaceTransactions = chhanSchema.table(
+  "finance_space_transactions",
+  {
+    spaceId: uuid("space_id")
+      .notNull()
+      .references(() => financeSpaces.id, { onDelete: "cascade" }),
+    transactionId: uuid("transaction_id")
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.spaceId, table.transactionId] }),
+    index("finance_space_transactions_transaction_id_idx").on(table.transactionId),
+  ]
+);
+
+/** M:N amount graph inside a space — any txn portion can allocate against any other. */
+export const financeSpaceAllocations = chhanSchema.table(
+  "finance_space_allocations",
+  {
+    id,
+    ...timestamps,
+    ...actionsByUser,
+    spaceId: uuid("space_id")
+      .notNull()
+      .references(() => financeSpaces.id, { onDelete: "cascade" }),
+    leftTransactionId: uuid("left_transaction_id")
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: "cascade" }),
+    rightTransactionId: uuid("right_transaction_id")
+      .notNull()
+      .references(() => financeTransactions.id, { onDelete: "cascade" }),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
+  },
+  (table) => [
+    index("finance_space_allocations_space_id_idx").on(table.spaceId),
+    index("finance_space_allocations_left_txn_idx").on(table.leftTransactionId),
+    index("finance_space_allocations_right_txn_idx").on(table.rightTransactionId),
   ]
 );
 
@@ -107,7 +179,7 @@ export const financeBudgets = chhanSchema.table(
     accountId: uuid("account_id")
       .notNull()
       .references(() => financeAccounts.id, { onDelete: "cascade" }),
-    categoryId: uuid("category_id").references(() => financeCategories.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id").references(() => financeTags.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     period: budgetPeriod("period").notNull().default("monthly"),
     startDate: date("start_date").notNull(),
@@ -136,95 +208,17 @@ export const financeGoals = chhanSchema.table(
   (table) => [index("finance_goals_account_id_idx").on(table.accountId)]
 );
 
-export const financeTags = chhanSchema.table(
-  "finance_tags",
-  {
-    id,
-    ...timestamps,
-    ...actionsByUser,
-    accountId: uuid("account_id")
-      .notNull()
-      .references(() => financeAccounts.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    colorHex: text("color_hex"),
-  },
-  (table) => [unique("finance_tags_account_id_name_unique").on(table.accountId, table.name), index("finance_tags_account_id_idx").on(table.accountId)]
-);
-
-export const financeTransactionTags = chhanSchema.table(
-  "finance_transaction_tags",
-  {
-    transactionId: uuid("transaction_id")
-      .notNull()
-      .references(() => financeTransactions.id, { onDelete: "cascade" }),
-    tagId: uuid("tag_id")
-      .notNull()
-      .references(() => financeTags.id, { onDelete: "cascade" }),
-  },
-  (table) => [primaryKey({ columns: [table.transactionId, table.tagId] }), index("finance_transaction_tags_tag_id_idx").on(table.tagId)]
-);
-
-export const financeGroups = chhanSchema.table(
-  "finance_groups",
-  {
-    id,
-    ...timestamps,
-    ...actionsByUser,
-    accountId: uuid("account_id")
-      .notNull()
-      .references(() => financeAccounts.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    colorHex: text("color_hex"),
-  },
-  (table) => [
-    unique("finance_groups_account_id_name_unique").on(table.accountId, table.name),
-    index("finance_groups_account_id_idx").on(table.accountId),
-  ]
-);
-
-export const financeTransactionGroups = chhanSchema.table(
-  "finance_transaction_groups",
-  {
-    transactionId: uuid("transaction_id")
-      .notNull()
-      .references(() => financeTransactions.id, { onDelete: "cascade" }),
-    groupId: uuid("group_id")
-      .notNull()
-      .references(() => financeGroups.id, { onDelete: "cascade" }),
-    /** @deprecated Unused by product; kept for existing rows / future cleanup. */
-    isHidden: boolean("is_hidden").notNull().default(false),
-  },
-  (table) => [primaryKey({ columns: [table.transactionId, table.groupId] }), index("finance_transaction_groups_group_id_idx").on(table.groupId)]
-);
-
-export const financeTransactionRefundLinks = chhanSchema.table(
-  "finance_transaction_refund_links",
-  {
-    creditTransactionId: uuid("credit_transaction_id")
-      .notNull()
-      .references(() => financeTransactions.id, { onDelete: "cascade" }),
-    expenseTransactionId: uuid("expense_transaction_id")
-      .notNull()
-      .references(() => financeTransactions.id, { onDelete: "cascade" }),
-  },
-  (table) => [
-    primaryKey({ columns: [table.creditTransactionId, table.expenseTransactionId] }),
-    index("finance_transaction_refund_links_expense_id_idx").on(table.expenseTransactionId),
-  ]
-);
-
 export const financeAccountRelations = relations(financeAccounts, ({ one, many }) => ({
   owner: one(auth.user, {
     fields: [financeAccounts.ownerUserId],
     references: [auth.user.id],
   }),
   members: many(financeAccountMembers),
-  categories: many(financeCategories),
   transactions: many(financeTransactions),
   budgets: many(financeBudgets),
   goals: many(financeGoals),
   tags: many(financeTags),
-  groups: many(financeGroups),
+  spaces: many(financeSpaces),
 }));
 
 export const financeAccountMemberRelations = relations(financeAccountMembers, ({ one }) => ({
@@ -238,32 +232,15 @@ export const financeAccountMemberRelations = relations(financeAccountMembers, ({
   }),
 }));
 
-export const financeCategoryRelations = relations(financeCategories, ({ one, many }) => ({
-  account: one(financeAccounts, {
-    fields: [financeCategories.accountId],
-    references: [financeAccounts.id],
-  }),
-  parentCategory: one(financeCategories, {
-    fields: [financeCategories.parentCategoryId],
-    references: [financeCategories.id],
-  }),
-  transactions: many(financeTransactions),
-  budgets: many(financeBudgets),
-}));
-
 export const financeTransactionRelations = relations(financeTransactions, ({ one, many }) => ({
   account: one(financeAccounts, {
     fields: [financeTransactions.accountId],
     references: [financeAccounts.id],
   }),
-  category: one(financeCategories, {
-    fields: [financeTransactions.categoryId],
-    references: [financeCategories.id],
-  }),
   transactionTags: many(financeTransactionTags),
-  transactionGroups: many(financeTransactionGroups),
-  creditRefundLinks: many(financeTransactionRefundLinks, { relationName: "creditRefundLinks" }),
-  expenseRefundLinks: many(financeTransactionRefundLinks, { relationName: "expenseRefundLinks" }),
+  spaceTransactions: many(financeSpaceTransactions),
+  leftAllocations: many(financeSpaceAllocations, { relationName: "leftAllocations" }),
+  rightAllocations: many(financeSpaceAllocations, { relationName: "rightAllocations" }),
 }));
 
 export const financeTagRelations = relations(financeTags, ({ one, many }) => ({
@@ -272,6 +249,7 @@ export const financeTagRelations = relations(financeTags, ({ one, many }) => ({
     references: [financeAccounts.id],
   }),
   transactionTags: many(financeTransactionTags),
+  budgets: many(financeBudgets),
 }));
 
 export const financeTransactionTagRelations = relations(financeTransactionTags, ({ one }) => ({
@@ -285,35 +263,40 @@ export const financeTransactionTagRelations = relations(financeTransactionTags, 
   }),
 }));
 
-export const financeGroupRelations = relations(financeGroups, ({ one, many }) => ({
+export const financeSpaceRelations = relations(financeSpaces, ({ one, many }) => ({
   account: one(financeAccounts, {
-    fields: [financeGroups.accountId],
+    fields: [financeSpaces.accountId],
     references: [financeAccounts.id],
   }),
-  transactionGroups: many(financeTransactionGroups),
+  spaceTransactions: many(financeSpaceTransactions),
+  allocations: many(financeSpaceAllocations),
 }));
 
-export const financeTransactionGroupRelations = relations(financeTransactionGroups, ({ one }) => ({
+export const financeSpaceTransactionRelations = relations(financeSpaceTransactions, ({ one }) => ({
+  space: one(financeSpaces, {
+    fields: [financeSpaceTransactions.spaceId],
+    references: [financeSpaces.id],
+  }),
   transaction: one(financeTransactions, {
-    fields: [financeTransactionGroups.transactionId],
+    fields: [financeSpaceTransactions.transactionId],
     references: [financeTransactions.id],
-  }),
-  group: one(financeGroups, {
-    fields: [financeTransactionGroups.groupId],
-    references: [financeGroups.id],
   }),
 }));
 
-export const financeTransactionRefundLinkRelations = relations(financeTransactionRefundLinks, ({ one }) => ({
-  creditTransaction: one(financeTransactions, {
-    fields: [financeTransactionRefundLinks.creditTransactionId],
-    references: [financeTransactions.id],
-    relationName: "creditRefundLinks",
+export const financeSpaceAllocationRelations = relations(financeSpaceAllocations, ({ one }) => ({
+  space: one(financeSpaces, {
+    fields: [financeSpaceAllocations.spaceId],
+    references: [financeSpaces.id],
   }),
-  expenseTransaction: one(financeTransactions, {
-    fields: [financeTransactionRefundLinks.expenseTransactionId],
+  leftTransaction: one(financeTransactions, {
+    fields: [financeSpaceAllocations.leftTransactionId],
     references: [financeTransactions.id],
-    relationName: "expenseRefundLinks",
+    relationName: "leftAllocations",
+  }),
+  rightTransaction: one(financeTransactions, {
+    fields: [financeSpaceAllocations.rightTransactionId],
+    references: [financeTransactions.id],
+    relationName: "rightAllocations",
   }),
 }));
 
@@ -322,9 +305,9 @@ export const financeBudgetRelations = relations(financeBudgets, ({ one }) => ({
     fields: [financeBudgets.accountId],
     references: [financeAccounts.id],
   }),
-  category: one(financeCategories, {
-    fields: [financeBudgets.categoryId],
-    references: [financeCategories.id],
+  tag: one(financeTags, {
+    fields: [financeBudgets.tagId],
+    references: [financeTags.id],
   }),
 }));
 

@@ -1,10 +1,10 @@
 import { meterColor } from "$lib/finance/dashboard-widgets";
 import type { SummarySelection } from "$lib/finance/summary";
 
-export type CategoryMerchantBillRow = {
-  category_id: string | null;
-  category_name: string;
-  category_color: string | null;
+export type TagMerchantBillRow = {
+  tag_id: string | null;
+  tag_name: string;
+  tag_color: string | null;
   merchant_name: string;
   month_key: string;
   amount_minor: number;
@@ -24,10 +24,10 @@ export type BillingMerchantRow = {
   months: BillingMonthAmount[];
 };
 
-export type BillingCategoryGroup = {
-  categoryId: string | null;
-  categoryName: string;
-  categoryColor: string;
+export type BillingTagGroup = {
+  tagId: string | null;
+  tagName: string;
+  tagColor: string;
   totalMinor: number;
   merchants: BillingMerchantRow[];
 };
@@ -43,20 +43,20 @@ export function resolveBillingMonthKey(selection: SummarySelection): string | nu
   return null;
 }
 
-function categoryKey(categoryId: string | null, categoryName: string): string {
-  return categoryId ?? `name:${categoryName}`;
+function tagKey(tagId: string | null, tagName: string): string {
+  return tagId ?? `name:${tagName}`;
 }
 
-export function buildBillingByCategory(rows: CategoryMerchantBillRow[], options: { monthKey?: string | null } = {}): BillingCategoryGroup[] {
+export function buildBillingByTag(rows: TagMerchantBillRow[], options: { monthKey?: string | null } = {}): BillingTagGroup[] {
   const monthKey = options.monthKey ?? null;
   const filtered = monthKey ? rows.filter((row) => row.month_key === monthKey) : rows;
 
-  const categories = new Map<
+  const tags = new Map<
     string,
     {
-      categoryId: string | null;
-      categoryName: string;
-      categoryColor: string | null;
+      tagId: string | null;
+      tagName: string;
+      tagColor: string | null;
       merchants: Map<
         string,
         {
@@ -69,31 +69,31 @@ export function buildBillingByCategory(rows: CategoryMerchantBillRow[], options:
   >();
 
   for (const row of filtered) {
-    const key = categoryKey(row.category_id, row.category_name);
-    const category =
-      categories.get(key) ??
+    const key = tagKey(row.tag_id, row.tag_name);
+    const tag =
+      tags.get(key) ??
       (() => {
         const entry = {
-          categoryId: row.category_id,
-          categoryName: row.category_name,
-          categoryColor: row.category_color,
+          tagId: row.tag_id,
+          tagName: row.tag_name,
+          tagColor: row.tag_color,
           merchants: new Map(),
         };
-        categories.set(key, entry);
+        tags.set(key, entry);
         return entry;
       })();
 
     const amountMinor = Number(row.amount_minor);
     const txnCount = Number(row.txn_count);
     const merchant =
-      category.merchants.get(row.merchant_name) ??
+      tag.merchants.get(row.merchant_name) ??
       (() => {
         const entry = {
           totalMinor: 0,
           txnCount: 0,
           months: new Map<string, BillingMonthAmount>(),
         };
-        category.merchants.set(row.merchant_name, entry);
+        tag.merchants.set(row.merchant_name, entry);
         return entry;
       })();
 
@@ -110,9 +110,9 @@ export function buildBillingByCategory(rows: CategoryMerchantBillRow[], options:
     merchant.months.set(row.month_key, monthEntry);
   }
 
-  return [...categories.values()]
-    .map((category, categoryIndex) => {
-      const merchants = [...category.merchants.entries()]
+  return [...tags.values()]
+    .map((tag, tagIndex) => {
+      const merchants = [...tag.merchants.entries()]
         .map(([merchant, data]) => ({
           merchant,
           totalMinor: data.totalMinor,
@@ -124,13 +124,13 @@ export function buildBillingByCategory(rows: CategoryMerchantBillRow[], options:
       const totalMinor = merchants.reduce((sum, entry) => sum + entry.totalMinor, 0);
 
       return {
-        categoryId: category.categoryId,
-        categoryName: category.categoryName,
-        categoryColor: meterColor(categoryIndex, category.categoryColor),
+        tagId: tag.tagId,
+        tagName: tag.tagName,
+        tagColor: meterColor(tagIndex, tag.tagColor),
         totalMinor,
         merchants,
       };
     })
-    .filter((category) => category.totalMinor > 0)
-    .sort((a, b) => b.totalMinor - a.totalMinor || a.categoryName.localeCompare(b.categoryName));
+    .filter((tag) => tag.totalMinor > 0)
+    .sort((a, b) => b.totalMinor - a.totalMinor || a.tagName.localeCompare(b.tagName));
 }

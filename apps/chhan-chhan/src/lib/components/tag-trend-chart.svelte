@@ -1,11 +1,11 @@
 <script lang="ts">
   import { formatMoney } from "$lib/finance/money";
-  import type { CategoryTrendChartData } from "$lib/finance/dashboard-widgets";
+  import type { TagTrendChartData } from "$lib/finance/dashboard-widgets";
   import { sketchLinePath, type ChartPoint } from "$lib/finance/sketch-chart";
   import { formatMonthKeyShort } from "$lib/finance/summary";
 
   type Props = {
-    chart: CategoryTrendChartData;
+    chart: TagTrendChartData;
     currencyCode: string;
   };
 
@@ -28,11 +28,11 @@
   let tip = $state<Tip | null>(null);
 
   const series = $derived(
-    chart.categories.map((category, categoryIndex) => ({
-      name: category.name,
-      color: category.color,
-      seed: categoryIndex * 17 + 5,
-      values: chart.months.map((month) => month.segments.find((segment) => segment.name === category.name)?.amountMinor ?? 0),
+    chart.tags.map((tag, tagIndex) => ({
+      name: tag.name,
+      color: tag.color,
+      seed: tagIndex * 17 + 5,
+      values: chart.months.map((month) => month.segments.find((segment) => segment.name === tag.name)?.amountMinor ?? 0),
     }))
   );
 
@@ -68,13 +68,13 @@
   }
 </script>
 
-<div class="trend-chart math-notebook" role="img" aria-label="Category spend trend by month">
-  {#if chart.categories.length}
+<div class="trend-chart math-notebook" role="img" aria-label="Tag spend trend by month">
+  {#if chart.tags.length}
     <div class="trend-legend">
-      {#each chart.categories as category (category.name)}
+      {#each chart.tags as tag (tag.name)}
         <span>
-          <i class="swatch" style="background:{category.color}"></i>
-          {category.name}
+          <i class="swatch" style="background:{tag.color}"></i>
+          {tag.name}
         </span>
       {/each}
     </div>
@@ -83,13 +83,13 @@
   <div class="trend-plot">
     <svg viewBox="0 0 {VIEW_W} {VIEW_H}" aria-hidden="true">
       <defs>
-        <filter id="sketch-ink-category" x="-4%" y="-8%" width="108%" height="116%">
+        <filter id="sketch-ink-tag" x="-4%" y="-8%" width="108%" height="116%">
           <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="9" result="noise" />
           <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.7" xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </defs>
 
-      <g filter="url(#sketch-ink-category)">
+      <g filter="url(#sketch-ink-tag)">
         {#each series as line (line.name)}
           {@const points = toPoints(line.values)}
           <path class="line ghost" d={sketchLinePath(points, 3.1, line.seed + 3)} style="color:{line.color}"></path>

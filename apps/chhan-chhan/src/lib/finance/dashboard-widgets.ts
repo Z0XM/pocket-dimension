@@ -1,12 +1,11 @@
 export type DashboardWidgetId =
   | "summary-month"
   | "summary-all"
-  | "category-spend"
   | "tag-spend"
   | "merchant-spend"
-  | "group-spend"
+  | "space-spend"
   | "monthly-trend"
-  | "category-trend"
+  | "tag-trend"
   | "budgets"
   | "goals"
   | "monthly-bills"
@@ -35,12 +34,6 @@ export const DASHBOARD_WIDGET_CATALOG: DashboardWidgetDefinition[] = [
     category: "summary",
   },
   {
-    id: "category-spend",
-    label: "Category spend",
-    description: "Top expense categories for the selected period",
-    category: "spending",
-  },
-  {
     id: "tag-spend",
     label: "Tag spend",
     description: "Top tagged expenses for the selected period",
@@ -53,9 +46,9 @@ export const DASHBOARD_WIDGET_CATALOG: DashboardWidgetDefinition[] = [
     category: "spending",
   },
   {
-    id: "group-spend",
-    label: "Group spend",
-    description: "Expenses grouped by transaction group",
+    id: "space-spend",
+    label: "Space spend",
+    description: "Expenses grouped by space for the selected period",
     category: "spending",
   },
   {
@@ -65,9 +58,9 @@ export const DASHBOARD_WIDGET_CATALOG: DashboardWidgetDefinition[] = [
     category: "trends",
   },
   {
-    id: "category-trend",
-    label: "Category trend",
-    description: "Top category spend lines by month over the last 12 months",
+    id: "tag-trend",
+    label: "Tag trend",
+    description: "Top tag spend lines by month over the last 12 months",
     category: "trends",
   },
   {
@@ -85,13 +78,13 @@ export const DASHBOARD_WIDGET_CATALOG: DashboardWidgetDefinition[] = [
   {
     id: "monthly-bills",
     label: "Monthly bills",
-    description: "Bill-category merchants grouped by category for the selected month",
+    description: "Bill-tagged merchants grouped by tag for the selected month",
     category: "billing",
   },
   {
     id: "yearly-bills",
     label: "Yearly bills",
-    description: "Bill-category merchants with monthly breakdown for the year",
+    description: "Bill-tagged merchants with monthly breakdown for the year",
     category: "billing",
   },
 ];
@@ -99,9 +92,9 @@ export const DASHBOARD_WIDGET_CATALOG: DashboardWidgetDefinition[] = [
 export const DEFAULT_DASHBOARD_WIDGETS: DashboardWidgetId[] = [
   "summary-month",
   "summary-all",
-  "category-spend",
+  "tag-spend",
   "monthly-trend",
-  "category-trend",
+  "tag-trend",
   "budgets",
   "goals",
 ];
@@ -189,21 +182,21 @@ export function toGoalMeters(rows: Array<{ id: string; name: string; status: str
   }));
 }
 
-export type CategoryTrendSegment = {
+export type TagTrendSegment = {
   name: string;
   amountMinor: number;
   color: string;
 };
 
-export type CategoryTrendMonth = {
+export type TagTrendMonth = {
   monthKey: string;
   totalMinor: number;
-  segments: CategoryTrendSegment[];
+  segments: TagTrendSegment[];
 };
 
-export type CategoryTrendChartData = {
-  months: CategoryTrendMonth[];
-  categories: Array<{ name: string; color: string }>;
+export type TagTrendChartData = {
+  months: TagTrendMonth[];
+  tags: Array<{ name: string; color: string }>;
 };
 
 export function buildMonthKeys(monthCount: number, now = new Date()): string[] {
@@ -222,33 +215,33 @@ export function buildMonthKeys(monthCount: number, now = new Date()): string[] {
   return keys;
 }
 
-export function buildCategoryTrendChart(
-  rows: Array<{ month_key: string; category_name: string; amount_minor: number; color_hex?: string | null }>,
+export function buildTagTrendChart(
+  rows: Array<{ month_key: string; tag_name: string; amount_minor: number; color_hex?: string | null }>,
   monthCount = 12,
   topN = 6,
   now = new Date()
-): CategoryTrendChartData {
+): TagTrendChartData {
   const monthKeys = buildMonthKeys(monthCount, now);
-  const totalsByCategory = new Map<string, { totalMinor: number; colorHex?: string | null }>();
+  const totalsByTag = new Map<string, { totalMinor: number; colorHex?: string | null }>();
 
   for (const row of rows) {
-    const name = row.category_name;
+    const name = row.tag_name;
     const amountMinor = Number(row.amount_minor);
-    const existing = totalsByCategory.get(name) ?? { totalMinor: 0, colorHex: row.color_hex };
+    const existing = totalsByTag.get(name) ?? { totalMinor: 0, colorHex: row.color_hex };
     existing.totalMinor += amountMinor;
     if (!existing.colorHex && row.color_hex) existing.colorHex = row.color_hex;
-    totalsByCategory.set(name, existing);
+    totalsByTag.set(name, existing);
   }
 
-  const rankedCategories = [...totalsByCategory.entries()].sort((a, b) => b[1].totalMinor - a[1].totalMinor).slice(0, topN);
+  const rankedTags = [...totalsByTag.entries()].sort((a, b) => b[1].totalMinor - a[1].totalMinor).slice(0, topN);
 
-  const trackedNames = new Set(rankedCategories.map(([name]) => name));
-  const categories = rankedCategories.map(([name, meta], index) => ({
+  const trackedNames = new Set(rankedTags.map(([name]) => name));
+  const tags = rankedTags.map(([name, meta], index) => ({
     name,
     color: meterColor(index, meta.colorHex),
   }));
 
-  const colorByName = new Map(categories.map((category) => [category.name, category.color]));
+  const colorByName = new Map(tags.map((tag) => [tag.name, tag.color]));
   const amountsByMonth = new Map<string, Map<string, number>>();
   let hasOther = false;
 
@@ -256,26 +249,26 @@ export function buildCategoryTrendChart(
     const monthKey = row.month_key;
     if (!monthKeys.includes(monthKey)) continue;
 
-    const categoryName = trackedNames.has(row.category_name) ? row.category_name : "Other";
-    if (categoryName === "Other") hasOther = true;
+    const tagName = trackedNames.has(row.tag_name) ? row.tag_name : "Other";
+    if (tagName === "Other") hasOther = true;
 
     const monthMap = amountsByMonth.get(monthKey) ?? new Map<string, number>();
-    monthMap.set(categoryName, (monthMap.get(categoryName) ?? 0) + Number(row.amount_minor));
+    monthMap.set(tagName, (monthMap.get(tagName) ?? 0) + Number(row.amount_minor));
     amountsByMonth.set(monthKey, monthMap);
   }
 
   if (hasOther) {
-    categories.push({ name: "Other", color: "#666666" });
+    tags.push({ name: "Other", color: "#666666" });
     colorByName.set("Other", "#666666");
   }
 
   const months = monthKeys.map((monthKey) => {
     const monthMap = amountsByMonth.get(monthKey) ?? new Map<string, number>();
-    const segments: CategoryTrendSegment[] = categories
-      .map((category) => ({
-        name: category.name,
-        amountMinor: monthMap.get(category.name) ?? 0,
-        color: colorByName.get(category.name) ?? category.color,
+    const segments: TagTrendSegment[] = tags
+      .map((tag) => ({
+        name: tag.name,
+        amountMinor: monthMap.get(tag.name) ?? 0,
+        color: colorByName.get(tag.name) ?? tag.color,
       }))
       .filter((segment) => segment.amountMinor > 0);
 
@@ -285,6 +278,6 @@ export function buildCategoryTrendChart(
 
   return {
     months,
-    categories: categories.filter((category) => months.some((month) => month.segments.some((segment) => segment.name === category.name))),
+    tags: tags.filter((tag) => months.some((month) => month.segments.some((segment) => segment.name === tag.name))),
   };
 }

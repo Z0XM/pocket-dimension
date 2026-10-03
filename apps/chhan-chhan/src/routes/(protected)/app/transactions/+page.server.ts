@@ -1,13 +1,4 @@
-import {
-  getCurrentBalance,
-  getRefundLinkClusterIds,
-  getTransactionSummary,
-  listCategories,
-  listGroups,
-  listTags,
-  listTransactionPeriods,
-  listTransactions,
-} from "$lib/server/finance";
+import { getCurrentBalance, getTransactionSummary, listSpaces, listTags, listTransactionPeriods, listTransactions } from "$lib/server/finance";
 import {
   buildSummarySelection,
   getSummaryLabel,
@@ -33,26 +24,17 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const summaryYears = normalizeSummaryYears(periods.years);
   const selectedMonth = resolveMonthKey(url.searchParams.get("month"), periods.months);
   const selectedYear = resolveYearValue(url.searchParams.get("year"), periods.years);
-  const [groups, categories, tags] = await Promise.all([listGroups(account.id), listCategories(account.id), listTags(account.id)]);
-  const groupParam = url.searchParams.get("group");
-  const selectedGroupId = groupParam && groups.some((group) => group.id === groupParam) ? groupParam : null;
-  const categoryParam = url.searchParams.get("category");
-  const categoryParts = parseMultiFilterParam(categoryParam);
-  const selectedCategoryFilters = [
-    ...new Set(categoryParts.filter((part) => part === "uncategorized" || categories.some((category) => category.id === part))),
-  ];
+  const [spaces, tags] = await Promise.all([listSpaces(account.id), listTags(account.id)]);
+  const spaceParam = url.searchParams.get("space");
+  const selectedSpaceId = spaceParam && spaces.some((space) => space.id === spaceParam) ? spaceParam : null;
   const tagParam = url.searchParams.get("tag");
   const tagParts = parseMultiFilterParam(tagParam);
-  const selectedTagIds = [...new Set(tagParts.filter((part) => tags.some((tag) => tag.id === part)))];
+  const selectedTagIds = [...new Set(tagParts.filter((part) => part === "untagged" || tags.some((tag) => tag.id === part)))];
   const searchQuery = url.searchParams.get("search")?.trim() ?? "";
-  const linkParam = url.searchParams.get("link");
-  const linkClusterIds = linkParam ? await getRefundLinkClusterIds(account.id, linkParam) : null;
-  const selectedLinkTransactionId = linkParam && linkClusterIds?.includes(linkParam) ? linkParam : null;
   const summarySelection = {
     ...buildSummarySelection(summaryPeriod, selectedMonth, selectedYear),
-    ...(selectedGroupId ? { groupId: selectedGroupId } : {}),
+    ...(selectedSpaceId ? { spaceId: selectedSpaceId } : {}),
     ...(searchQuery ? { search: searchQuery } : {}),
-    ...(selectedCategoryFilters.length ? { categoryFilters: selectedCategoryFilters } : {}),
     ...(selectedTagIds.length ? { tagIds: selectedTagIds } : {}),
   };
   const dateRange = summarySelectionToDateRange(summarySelection);
@@ -66,11 +48,9 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       type: transactionTypeFilter,
       dateFrom: dateRange.dateFrom,
       dateTo: dateRange.dateTo,
-      groupId: selectedGroupId ?? undefined,
-      categoryIds: selectedCategoryFilters.length ? selectedCategoryFilters : undefined,
+      spaceId: selectedSpaceId ?? undefined,
       tagIds: selectedTagIds.length ? selectedTagIds : undefined,
       search: searchQuery || undefined,
-      linkTransactionId: selectedLinkTransactionId ?? undefined,
     }),
     getTransactionSummary(account.id, summarySelection),
     getCurrentBalance(account.id),
@@ -80,14 +60,10 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 
   return {
     account,
-    categories,
     tags,
-    groups,
-    selectedGroupId,
-    selectedCategoryFilters,
+    spaces,
+    selectedSpaceId,
     selectedTagIds,
-    selectedLinkTransactionId,
-    linkClusterSize: linkClusterIds?.length ?? 0,
     searchQuery,
     transactions: transactions.rows,
     hasMore: transactions.hasMore,

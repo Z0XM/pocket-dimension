@@ -47,11 +47,11 @@ export async function POST({ locals, params, request }) {
         streamLine(controller, { type: "phase", phase: "loading", total: parsed.rows.length });
 
         const currencyCode = await getAccountCurrency(params.accountId);
-        let assignments: Record<string, { categoryId?: string | null; tagIds?: string[] }> | undefined;
+        let assignments: Record<string, { tagIds?: string[] }> | undefined;
         const rawAssignments = body.get("assignments");
         if (typeof rawAssignments === "string" && rawAssignments.trim()) {
           try {
-            assignments = JSON.parse(rawAssignments) as Record<string, { categoryId?: string | null; tagIds?: string[] }>;
+            assignments = JSON.parse(rawAssignments) as Record<string, { tagIds?: string[] }>;
           } catch {
             streamLine(controller, { type: "error", message: "Invalid assignments payload" });
             controller.close();

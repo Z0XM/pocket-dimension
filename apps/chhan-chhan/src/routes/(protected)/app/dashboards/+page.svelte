@@ -12,7 +12,7 @@
   } from "$lib/finance/dashboard-widgets";
   import AppNav from "$lib/components/app-nav.svelte";
   import AppSettings from "$lib/components/app-settings.svelte";
-  import CategoryTrendChart from "$lib/components/category-trend-chart.svelte";
+  import TagTrendChart from "$lib/components/tag-trend-chart.svelte";
   import BillingPanel from "$lib/components/billing-panel.svelte";
   import DashboardWidgetPicker from "$lib/components/dashboard-widget-picker.svelte";
   import IncomeExpenseBars from "$lib/components/income-expense-bars.svelte";
@@ -120,14 +120,13 @@
   );
 
   const showSpendingRow = $derived(
-    isDashboardWidgetEnabled(data.enabledWidgets, "category-spend") ||
-      isDashboardWidgetEnabled(data.enabledWidgets, "tag-spend") ||
+    isDashboardWidgetEnabled(data.enabledWidgets, "tag-spend") ||
       isDashboardWidgetEnabled(data.enabledWidgets, "merchant-spend") ||
-      isDashboardWidgetEnabled(data.enabledWidgets, "group-spend")
+      isDashboardWidgetEnabled(data.enabledWidgets, "space-spend")
   );
 
   const showTrendsRow = $derived(
-    isDashboardWidgetEnabled(data.enabledWidgets, "monthly-trend") || isDashboardWidgetEnabled(data.enabledWidgets, "category-trend")
+    isDashboardWidgetEnabled(data.enabledWidgets, "monthly-trend") || isDashboardWidgetEnabled(data.enabledWidgets, "tag-trend")
   );
 
   const showGoalsRow = $derived(isDashboardWidgetEnabled(data.enabledWidgets, "budgets") || isDashboardWidgetEnabled(data.enabledWidgets, "goals"));
@@ -298,9 +297,9 @@
     <span class="saved-chip" title="Savings rate">{Math.round(data.summary.savingsRate * 100)}% saved</span>
   </div>
 
-  {#if data.categorySpend.length}
-    <div class="pills" aria-label="Top categories">
-      {#each data.categorySpend.slice(0, 6) as row, i (row.name)}
+  {#if data.tagSpend.length}
+    <div class="pills" aria-label="Top tags">
+      {#each data.tagSpend.slice(0, 6) as row, i (row.name)}
         <span class="pill pill-{PILL_TONES[i % PILL_TONES.length]}">
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M3 12.5 L8 3.5 L13 12.5 Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
@@ -353,15 +352,15 @@
       </article>
     {/if}
 
-    {#if isDashboardWidgetEnabled(data.enabledWidgets, "category-trend") && data.categoryTrend?.categories.length}
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "tag-trend") && data.tagTrend?.tags.length}
       <article class="dash-panel">
-        <h2>Category trend · last 12 months</h2>
-        <CategoryTrendChart chart={data.categoryTrend} currencyCode={data.account.currencyCode} />
+        <h2>Tag trend · last 12 months</h2>
+        <TagTrendChart chart={data.tagTrend} currencyCode={data.account.currencyCode} />
       </article>
-    {:else if isDashboardWidgetEnabled(data.enabledWidgets, "category-trend")}
+    {:else if isDashboardWidgetEnabled(data.enabledWidgets, "tag-trend")}
       <article class="dash-panel">
-        <h2>Category trend · last 12 months</h2>
-        <p class="dim dash-empty">No categorized expenses in this period.</p>
+        <h2>Tag trend · last 12 months</h2>
+        <p class="dim dash-empty">No tagged expenses in this period.</p>
       </article>
     {/if}
   </section>
@@ -369,17 +368,6 @@
 
 {#if showSpendingRow}
   <section class="dash-grid dash-grid-spending">
-    {#if isDashboardWidgetEnabled(data.enabledWidgets, "category-spend")}
-      <article class="dash-panel">
-        <h2>Category spend · {data.summaryLabel.toLowerCase()}</h2>
-        {#if data.categorySpend.length === 0}
-          <p class="dim dash-empty">No expenses in this period.</p>
-        {:else}
-          <SpendPieChart rows={data.categorySpend} currencyCode={data.account.currencyCode} ariaLabel="Category spend breakdown" />
-        {/if}
-      </article>
-    {/if}
-
     {#if isDashboardWidgetEnabled(data.enabledWidgets, "tag-spend")}
       <article class="dash-panel">
         <h2>Tag spend · {data.summaryLabel.toLowerCase()}</h2>
@@ -402,13 +390,13 @@
       </article>
     {/if}
 
-    {#if isDashboardWidgetEnabled(data.enabledWidgets, "group-spend")}
+    {#if isDashboardWidgetEnabled(data.enabledWidgets, "space-spend")}
       <article class="dash-panel">
-        <h2>Group spend · {data.summaryLabel.toLowerCase()}</h2>
-        {#if data.groupSpend.length === 0}
-          <p class="dim dash-empty">No grouped expenses in this period.</p>
+        <h2>Space spend · {data.summaryLabel.toLowerCase()}</h2>
+        {#if data.spaceSpend.length === 0}
+          <p class="dim dash-empty">No expenses in spaces for this period.</p>
         {:else}
-          <SpendPieChart rows={data.groupSpend} currencyCode={data.account.currencyCode} ariaLabel="Group spend breakdown" />
+          <SpendPieChart rows={data.spaceSpend} currencyCode={data.account.currencyCode} ariaLabel="Space spend breakdown" />
         {/if}
       </article>
     {/if}
@@ -469,14 +457,14 @@
     {#if isDashboardWidgetEnabled(data.enabledWidgets, "monthly-bills")}
       <article class="dash-panel">
         <h2>Monthly bills · {data.monthlyBillsLabel.toLowerCase()}</h2>
-        <BillingPanel categories={data.monthlyBills} currencyCode={data.account.currencyCode} mode="monthly" periodLabel={data.monthlyBillsLabel} />
+        <BillingPanel tags={data.monthlyBills} currencyCode={data.account.currencyCode} mode="monthly" periodLabel={data.monthlyBillsLabel} />
       </article>
     {/if}
 
     {#if isDashboardWidgetEnabled(data.enabledWidgets, "yearly-bills")}
       <article class="dash-panel dash-panel-wide">
         <h2>Yearly bills · {data.billingYear}</h2>
-        <BillingPanel categories={data.yearlyBills} currencyCode={data.account.currencyCode} mode="yearly" periodLabel={String(data.billingYear)} />
+        <BillingPanel tags={data.yearlyBills} currencyCode={data.account.currencyCode} mode="yearly" periodLabel={String(data.billingYear)} />
       </article>
     {/if}
   </section>

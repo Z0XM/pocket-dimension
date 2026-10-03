@@ -7,14 +7,12 @@
   import Tag from "@lucide/svelte/icons/tag";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import X from "@lucide/svelte/icons/x";
-  import SketchSelect from "$lib/components/sketch-select.svelte";
   import { formatMoney } from "$lib/finance/money";
   import type { ImportPreview, ImportPreviewRow, ImportResult } from "$lib/importers/types";
 
   type FilterKey = "all" | "will_import" | "duplicate" | "invalid" | "warning" | "accepted" | "skipped" | "rejected";
 
   type RowAssignment = {
-    categoryId: string | null;
     tagIds: string[];
   };
 
@@ -69,7 +67,6 @@
   }
 
   const previewRows = $derived(preview?.rows ?? []);
-  const categories = $derived(preview?.taxonomy.categories ?? []);
   const tags = $derived(preview?.taxonomy.tags ?? []);
 
   const resultRows = $derived(
@@ -100,7 +97,7 @@
     previewRows.filter((row) => {
       if (row.status !== "will_import" && row.status !== "warning") return false;
       const assignment = rowAssignments[row.row];
-      return Boolean(assignment?.categoryId || assignment?.tagIds.length);
+      return Boolean(assignment?.tagIds.length);
     }).length
   );
 
@@ -149,28 +146,7 @@
   }
 
   function assignmentFor(row: ImportPreviewRow): RowAssignment {
-    return rowAssignments[row.row] ?? { categoryId: null, tagIds: [] };
-  }
-
-  function categoriesForType(type: string | undefined, selectedId: string | null) {
-    const kind = type === "income" || type === "transfer" || type === "expense" ? type : "expense";
-    return categories.filter((category) => category.kind === kind || category.id === selectedId);
-  }
-
-  function categoryOptionsFor(row: ImportPreviewRow) {
-    const assignment = assignmentFor(row);
-    return [
-      { value: "", label: "Uncategorized" },
-      ...categoriesForType(row.type, assignment.categoryId).map((category) => ({
-        value: category.id,
-        label: category.name,
-      })),
-    ];
-  }
-
-  function setCategory(row: ImportPreviewRow, categoryId: string | null) {
-    const current = assignmentFor(row);
-    onRowAssignmentChange?.(row.row, { ...current, categoryId });
+    return rowAssignments[row.row] ?? { tagIds: [] };
   }
 
   function toggleTag(row: ImportPreviewRow, tagId: string) {
@@ -192,11 +168,10 @@
     const suggestion = row.suggestion;
     if (!suggestion) return false;
     const assignment = assignmentFor(row);
-    const sameCategory = (assignment.categoryId ?? null) === (suggestion.categoryId ?? null);
     const sameTags =
       assignment.tagIds.length === suggestion.tagIds.length &&
       [...assignment.tagIds].sort().every((id, index) => id === [...suggestion.tagIds].sort()[index]);
-    return sameCategory && sameTags && Boolean(suggestion.categoryId || suggestion.tagIds.length);
+    return sameTags && suggestion.tagIds.length > 0;
   }
 </script>
 
@@ -263,8 +238,7 @@
 
       {#if autoFilledCount > 0}
         <p class="auto-note dim">
-          Auto-filled category/tags on {autoFilledCount.toLocaleString()} row{autoFilledCount === 1 ? "" : "s"} from past merchants — change any before
-          confirming.
+          Auto-filled tags on {autoFilledCount.toLocaleString()} row{autoFilledCount === 1 ? "" : "s"} from past merchants — change any before confirming.
         </p>
       {/if}
 
@@ -278,7 +252,6 @@
               <th>Type</th>
               <th>Amount</th>
               <th>Merchant</th>
-              <th>Category</th>
               <th>Tags</th>
               <th>Notes / issues</th>
             </tr>
@@ -310,21 +283,6 @@
                       </span>
                     {/if}
                   </div>
-                </td>
-                <td class="classify-cell">
-                  {#if editable}
-                    <SketchSelect
-                      name="import-category-{row.row}"
-                      compact
-                      aria-label="Category for row {row.row}"
-                      value={assignment.categoryId ?? ""}
-                      options={categoryOptionsFor(row)}
-                      disabled={confirming}
-                      onChange={(next) => setCategory(row, next || null)}
-                    />
-                  {:else}
-                    <span class="dim">—</span>
-                  {/if}
                 </td>
                 <td class="classify-cell tags-cell">
                   {#if editable}
@@ -395,7 +353,7 @@
               </tr>
             {:else}
               <tr>
-                <td colspan="9" class="empty">No rows in this filter.</td>
+                <td colspan="8" class="empty">No rows in this filter.</td>
               </tr>
             {/each}
           </tbody>
@@ -827,10 +785,6 @@
   .classify-cell {
     min-width: 8.5rem;
     vertical-align: middle;
-  }
-
-  .classify-cell :global(.sketch-select.compact) {
-    max-width: 11rem;
   }
 
   .tags-cell {

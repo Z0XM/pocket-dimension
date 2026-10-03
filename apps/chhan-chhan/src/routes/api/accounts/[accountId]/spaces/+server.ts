@@ -1,14 +1,14 @@
 import { error, json } from "@sveltejs/kit";
 import { canEdit, getMembershipOrThrow, requireUser } from "$lib/server/authz";
-import { createCategory, listCategories } from "$lib/server/finance";
+import { createSpace, listSpaces } from "$lib/server/finance";
 import { readJsonBody } from "$lib/server/http";
-import { createCategorySchema } from "$lib/validation/finance";
+import { createSpaceSchema } from "$lib/validation/finance";
 
 export async function GET({ locals, params }) {
   const user = requireUser(locals);
   await getMembershipOrThrow(user.id, params.accountId);
-  const categories = await listCategories(params.accountId);
-  return json({ categories });
+  const spaces = await listSpaces(params.accountId);
+  return json({ spaces });
 }
 
 export async function POST({ locals, params, request }) {
@@ -18,10 +18,9 @@ export async function POST({ locals, params, request }) {
     throw error(403, "You only have read access");
   }
 
-  const payload = await readJsonBody(request, createCategorySchema);
-  const category = await createCategory(user.id, params.accountId, payload);
-  if (!category) {
-    throw error(409, "Category already exists");
-  }
-  return json({ category }, { status: 201 });
+  const payload = await readJsonBody(request, createSpaceSchema);
+  const space = await createSpace(user.id, params.accountId, payload);
+  if (!space) throw error(409, "A space with that name already exists");
+
+  return json({ space }, { status: 201 });
 }

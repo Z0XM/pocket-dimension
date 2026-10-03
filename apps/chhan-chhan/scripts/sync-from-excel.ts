@@ -6,8 +6,8 @@ const accountId = process.argv[2] ?? "019cb9bd-c1ea-7b7f-a9ae-8fa66448705c";
 const xlsxPath = process.argv[3] ?? "data/Finance.xlsx";
 const apply = process.argv.includes("--apply");
 
-/** Excel category names mapped to existing DB category names. Omit ambiguous names. */
-const EXCEL_CATEGORY_TO_DB: Record<string, string> = {
+/** Excel category / sub names mapped to DB tag names. Omit ambiguous names. */
+const EXCEL_LABEL_TO_TAG: Record<string, string> = {
   Food: "Food",
   Fuel: "Fuel",
   Fun: "Fun",
@@ -25,9 +25,10 @@ const EXCEL_CATEGORY_TO_DB: Record<string, string> = {
   Cashback: "Refund",
   "Lend Return": "Refund",
   "Tax Return": "Refund",
+  Personal: "Personal",
+  Family: "Family",
+  Others: "Others",
 };
-
-const TAG_NAMES = new Set(["Personal", "Family", "Others"]);
 
 type ExcelRow = {
   date: string;
@@ -46,7 +47,6 @@ type DbRow = {
   type: "expense" | "income" | "transfer";
   merchant: string | null;
   notes: string | null;
-  categoryId: string | null;
 };
 
 type PlannedUpdate = {
@@ -55,8 +55,7 @@ type PlannedUpdate = {
   date: string;
   amountMinor: number;
   merchant: string | null;
-  category: string | null;
-  tag: string | null;
+  tags: string[];
   notes: string | null;
   reason: string;
 };
@@ -168,6 +167,11 @@ function matchExcelToDb(excelRows: ExcelRow[], dbRows: DbRow[]) {
   return { matches, skipped };
 }
 
+function resolveTagName(label: string | null): string | null {
+  if (!label) return null;
+  return EXCEL_LABEL_TO_TAG[label] ?? null;
+}
+
 const account = await db.query.financeAccounts.findFirst({
   where: eq(schema.financeAccounts.id, accountId),
   columns: { id: true, name: true, ownerUserId: true },
@@ -178,7 +182,7 @@ if (!account) {
   process.exit(1);
 }
 
-const [excelRows, dbRows, categories, tags, existingTags] = await Promise.all([
+const [excelRows, dbRows, tags, existingTags] = await Promise.all([
   Promise.resolve(loadExcelRows(xlsxPath)),
   db
     .select({
@@ -188,11 +192,9 @@ const [excelRows, dbRows, categories, tags, existingTags] = await Promise.all([
       type: schema.financeTransactions.type,
       merchant: schema.financeTransactions.merchant,
       notes: schema.financeTransactions.notes,
-      categoryId: schema.financeTransactions.categoryId,
     })
     .from(schema.financeTransactions)
     .where(eq(schema.financeTransactions.accountId, accountId)),
-  db.select().from(schema.financeCategories).where(eq(schema.financeCategories.accountId, accountId)),
   db.select().from(schema.financeTags).where(eq(schema.financeTags.accountId, accountId)),
   db
     .select({
@@ -204,7 +206,6 @@ const [excelRows, dbRows, categories, tags, existingTags] = await Promise.all([
     .where(eq(schema.financeTransactions.accountId, accountId)),
 ]);
 
-const categoryByName = new Map(categories.map((category) => [category.name, category]));
 const tagByName = new Map(tags.map((tag) => [tag.name, tag]));
 const tagsByTransaction = new Map<string, Set<string>>();
 for (const row of existingTags) {
@@ -216,37 +217,35 @@ for (const row of existingTags) {
 const { matches, skipped } = matchExcelToDb(excelRows, dbRows);
 
 const planned: PlannedUpdate[] = [];
-let skippedCategory = 0;
-let skippedNotes = 0;
 let skippedTag = 0;
+let skippedNotes = 0;
 
 for (const excelRow of excelRows) {
   const dbRow = matches.get(excelRow.index);
   if (!dbRow) continue;
 
-  const mappedCategoryName = excelRow.category ? EXCEL_CATEGORY_TO_DB[excelRow.category] : null;
-  const category = mappedCategoryName ? categoryByName.get(mappedCategoryName) : null;
+  const attached = tagsByTransaction.get(dbRow.id) ?? new Set();
+  const tagUpdates: string[] = [];
 
-  let categoryUpdate: string | null = null;
-  if (excelRow.category && !mappedCategoryName) {
-    skippedCategory++;
-  } else if (category && !dbRow.categoryId) {
-    const categoryKind = category.kind === "transfer" ? dbRow.type : category.kind;
-    if (categoryKind === dbRow.type) {
-      categoryUpdate = category.name;
-    } else {
-      skippedCategory++;
+  for (const label of [excelRow.category, excelRow.sub]) {
+    if (!label) continue;
+    const mapped = resolveTagName(label);
+    if (!mapped) {
+      skippedTag++;
+      continue;
     }
-  }
-
-  let tagUpdate: string | null = null;
-  if (excelRow.sub && TAG_NAMES.has(excelRow.sub)) {
-    const tag = tagByName.get(excelRow.sub);
-    if (tag && !tagsByTransaction.get(dbRow.id)?.has(tag.id)) {
-      tagUpdate = excelRow.sub;
+    const tag = tagByName.get(mapped);
+    if (!tag) {
+      skippedTag++;
+      continue;
     }
-  } else if (excelRow.sub) {
-    skippedTag++;
+    if (attached.has(tag.id) || tagUpdates.includes(mapped)) continue;
+    const kindOk = !tag.kind || tag.kind === "transfer" || tag.kind === dbRow.type;
+    if (!kindOk) {
+      skippedTag++;
+      continue;
+    }
+    tagUpdates.push(mapped);
   }
 
   let notesUpdate: string | null = null;
@@ -256,7 +255,7 @@ for (const excelRow of excelRows) {
     skippedNotes++;
   }
 
-  if (!categoryUpdate && !tagUpdate && !notesUpdate) continue;
+  if (!tagUpdates.length && !notesUpdate) continue;
 
   planned.push({
     transactionId: dbRow.id,
@@ -264,8 +263,7 @@ for (const excelRow of excelRows) {
     date: excelRow.date,
     amountMinor: excelRow.amountMinor,
     merchant: dbRow.merchant,
-    category: categoryUpdate,
-    tag: tagUpdate,
+    tags: tagUpdates,
     notes: notesUpdate,
     reason: "matched date+amount+type",
   });
@@ -275,10 +273,8 @@ console.log(`Account: ${account.name}`);
 console.log(`Excel rows: ${excelRows.length}, DB rows: ${dbRows.length}`);
 console.log(`Matched: ${matches.size}, Skipped unmatched/ambiguous: ${skipped.length}`);
 console.log(`Planned updates: ${planned.length}`);
-console.log(
-  `  categories: ${planned.filter((row) => row.category).length}, tags: ${planned.filter((row) => row.tag).length}, notes: ${planned.filter((row) => row.notes).length}`
-);
-console.log(`Skipped category (unmapped/kind mismatch/already set): ${skippedCategory}, tag: ${skippedTag}, notes (already set): ${skippedNotes}`);
+console.log(`  tags: ${planned.reduce((n, row) => n + row.tags.length, 0)}, notes: ${planned.filter((row) => row.notes).length}`);
+console.log(`Skipped tag (unmapped/kind mismatch/already set): ${skippedTag}, notes (already set): ${skippedNotes}`);
 
 if (!apply) {
   console.log("\nDry run only. Re-run with --apply to write changes.");
@@ -301,24 +297,12 @@ if (!apply) {
   process.exit(0);
 }
 
-let categoriesUpdated = 0;
 let tagsUpdated = 0;
 let notesUpdated = 0;
 
 for (const update of planned) {
-  if (update.category) {
-    const category = categoryByName.get(update.category);
-    if (category) {
-      await db
-        .update(schema.financeTransactions)
-        .set({ categoryId: category.id, updatedById: account.ownerUserId })
-        .where(and(eq(schema.financeTransactions.id, update.transactionId), eq(schema.financeTransactions.accountId, accountId)));
-      categoriesUpdated++;
-    }
-  }
-
-  if (update.tag) {
-    const tag = tagByName.get(update.tag);
+  for (const tagName of update.tags) {
+    const tag = tagByName.get(tagName);
     if (tag) {
       await db.insert(schema.financeTransactionTags).values({ transactionId: update.transactionId, tagId: tag.id }).onConflictDoNothing();
       tagsUpdated++;
@@ -334,4 +318,4 @@ for (const update of planned) {
   }
 }
 
-console.log(`Applied: ${categoriesUpdated} categories, ${tagsUpdated} tags, ${notesUpdated} notes.`);
+console.log(`Applied: ${tagsUpdated} tags, ${notesUpdated} notes.`);

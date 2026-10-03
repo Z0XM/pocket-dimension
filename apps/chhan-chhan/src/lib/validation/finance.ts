@@ -7,7 +7,7 @@ export const paginationQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
 });
 
-const multiCategoryIdsSchema = z.preprocess(
+const multiTagIdsSchema = z.preprocess(
   (value) => {
     if (value == null || value === "") return undefined;
     if (Array.isArray(value)) return value;
@@ -16,27 +16,16 @@ const multiCategoryIdsSchema = z.preprocess(
       .map((part) => part.trim())
       .filter(Boolean);
   },
-  z.array(z.union([z.string().uuid(), z.literal("uncategorized")])).optional()
+  z.array(z.union([z.string().uuid(), z.literal("untagged")])).optional()
 );
-
-const multiTagIdsSchema = z.preprocess((value) => {
-  if (value == null || value === "") return undefined;
-  if (Array.isArray(value)) return value;
-  return String(value)
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-}, z.array(z.string().uuid()).optional());
 
 export const transactionsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().optional(),
-  categoryIds: multiCategoryIdsSchema,
   tagIds: multiTagIdsSchema,
   type: z.enum(["expense", "income", "transfer"]).optional(),
   dateFrom: z.string().date().optional(),
   dateTo: z.string().date().optional(),
-  groupId: z.string().uuid().optional(),
-  linkTransactionId: z.string().uuid().optional(),
+  spaceId: z.string().uuid().optional(),
   sortBy: z.enum(sortableColumns).default("occurredOn"),
   sortDirection: z.enum(["asc", "desc"]).default("desc"),
 });
@@ -96,24 +85,6 @@ export const clearAccountOpeningBalanceSchema = z.object({
   clear: z.literal("1"),
 });
 
-export const createCategorySchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  kind: z.enum(["expense", "income", "transfer"]).default("expense"),
-  colorHex: z
-    .string()
-    .trim()
-    .regex(/^#([0-9A-Fa-f]{6})$/)
-    .optional(),
-});
-
-export const updateCategorySchema = createCategorySchema.extend({
-  id: z.string().uuid(),
-});
-
-export const deleteCategorySchema = z.object({
-  id: z.string().uuid(),
-});
-
 const tagNameSchema = z
   .string()
   .trim()
@@ -123,6 +94,7 @@ const tagNameSchema = z
 
 export const createTagSchema = z.object({
   name: tagNameSchema,
+  kind: z.enum(["expense", "income", "transfer"]).nullish(),
   colorHex: z
     .string()
     .trim()
@@ -142,31 +114,38 @@ export const attachTransactionTagSchema = z.object({
   tagId: z.string().uuid(),
 });
 
-export const attachTransactionGroupSchema = z.object({
-  groupId: z.string().uuid(),
+const spaceNameSchema = z.string().trim().min(1).max(80);
+
+export const createSpaceSchema = z.object({
+  name: spaceNameSchema,
+  colorHex: z
+    .string()
+    .trim()
+    .regex(/^#([0-9A-Fa-f]{6})$/)
+    .optional(),
+  notes: z.string().trim().max(1000).optional(),
 });
 
-export const attachRefundLinkSchema = z.object({
-  expenseTransactionId: z.string().uuid(),
-});
-
-const groupNameSchema = z.string().trim().min(1).max(80);
-
-/** @deprecated Group hide UI was removed; column retained for backward compatibility. */
-export const setGroupHiddenSchema = z.object({
-  hidden: z.boolean(),
-});
-
-export const createGroupSchema = z.object({
-  name: groupNameSchema,
-});
-
-export const updateGroupSchema = createGroupSchema.extend({
+export const updateSpaceSchema = createSpaceSchema.extend({
   id: z.string().uuid(),
 });
 
-export const deleteGroupSchema = z.object({
+export const deleteSpaceSchema = z.object({
   id: z.string().uuid(),
+});
+
+export const attachTransactionSpaceSchema = z.object({
+  spaceId: z.string().uuid(),
+});
+
+export const createSpaceAllocationSchema = z.object({
+  leftTransactionId: z.string().uuid(),
+  rightTransactionId: z.string().uuid(),
+  amountMinor: z.number().int().positive(),
+});
+
+export const updateSpaceAllocationSchema = z.object({
+  amountMinor: z.number().int().positive(),
 });
 
 export const transactionUpsertSchema = z.object({
@@ -176,13 +155,12 @@ export const transactionUpsertSchema = z.object({
   merchant: z.string().trim().max(120).optional(),
   notes: z.string().trim().max(1000).optional(),
   externalRef: z.string().trim().max(120).optional(),
-  categoryId: z.string().uuid().nullish(),
   sortOrder: z.number().int().optional(),
 });
 
 export const budgetUpsertSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  categoryId: z.string().uuid().optional(),
+  tagId: z.string().uuid().optional(),
   period: z.enum(["monthly", "weekly", "custom"]).default("monthly"),
   startDate: z.string().date(),
   endDate: z.string().date().optional(),
@@ -204,30 +182,10 @@ export const csvImportRowSchema = z.object({
   type: z.enum(["expense", "income", "transfer"]),
   merchant: z.string().trim().optional(),
   notes: z.string().trim().optional(),
-  categoryName: z.string().trim().optional(),
+  tagNames: z.array(z.string().trim()).optional(),
   externalRef: z.string().trim().optional(),
   balanceMinor: z.number().int().optional(),
   sortOrder: z.number().int().optional(),
-});
-
-export const smartCategorizePreviewSchema = z.object({
-  merchant: z.string().trim().min(1).max(120),
-  newCategoryId: z.string().uuid().nullish(),
-  sourceTransactionId: z.string().uuid(),
-  type: z.enum(["expense", "income", "transfer"]),
-});
-
-export const smartCategorizeApplySchema = z.object({
-  sourceTransactionId: z.string().uuid(),
-  newCategoryId: z.string().uuid().nullish(),
-  type: z.enum(["expense", "income", "transfer"]),
-  migrations: z.array(
-    z.object({
-      merchant: z.string().trim().min(1).max(120),
-      fromCategoryId: z.string().uuid().nullish(),
-      enabled: z.boolean(),
-    })
-  ),
 });
 
 export const smartTagPreviewSchema = z.object({

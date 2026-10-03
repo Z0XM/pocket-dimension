@@ -34,7 +34,7 @@ No `relations()` block.
 
 Enums: member role, transaction type, budget period, goal status.
 
-Tables: `finance_accounts`, `finance_account_members`, `finance_categories` (`parentCategoryId` **no FK**), `finance_transactions`, `finance_budgets`, `finance_goals`, `finance_tags`, join tables for tags/groups/refund links. Full relations graph including refund link disambiguation.
+Tables: `finance_accounts`, `finance_account_members`, `finance_tags` (+ optional `kind`), `finance_transactions`, `finance_spaces` / `finance_space_transactions` / `finance_space_allocations`, `finance_budgets` (tag-scoped), `finance_goals`, `finance_transaction_tags`. Categories/groups/refund-links removed in migration `0039_tags_and_spaces`. Full relations graph including space allocation left/right disambiguation.
 
 ## `meviayou` — `schema/meviayou.ts`
 

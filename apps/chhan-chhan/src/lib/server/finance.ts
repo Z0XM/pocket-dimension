@@ -1,23 +1,16 @@
 import { normalizeMerchant, rankFuzzyMerchants } from "$lib/finance/merchant-match";
-import { billCategorySqlFilter } from "$lib/finance/bill-categories";
-import { DEFAULT_CATEGORIES, DEFAULT_TAGS } from "$lib/finance/default-taxonomy";
+import { billTagSqlFilter } from "$lib/finance/bill-categories";
+import { DEFAULT_TAGS } from "$lib/finance/default-taxonomy";
 import { parseSqlMinor } from "$lib/finance/money";
-import { isRefundCategoryName } from "$lib/finance/refunds";
 import { buildSummarySearchFilterSql, buildTransactionSearchCondition } from "$lib/finance/transaction-search";
-import {
-  computeRefundLinkWarnings,
-  type RefundLinkRow,
-  type RefundWarningTransaction,
-  type TransactionWarning,
-} from "$lib/finance/transaction-warnings";
 import { currentMonthKey, readRowYear, type SummarySelection } from "$lib/finance/summary";
 import { isBalanceSnapshotNewer } from "$lib/server/balance";
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, lte, sql, type SQL } from "drizzle-orm";
 import type { z } from "zod";
 import type {
   budgetUpsertSchema,
-  createCategorySchema,
+  createSpaceSchema,
   createTagSchema,
   goalUpsertSchema,
   transactionUpsertSchema,
@@ -28,12 +21,18 @@ type TransactionsQuery = z.infer<typeof transactionsQuerySchema>;
 type TxPayload = z.infer<typeof transactionUpsertSchema>;
 type BudgetPayload = z.infer<typeof budgetUpsertSchema>;
 type GoalPayload = z.infer<typeof goalUpsertSchema>;
-type CategoryPayload = z.infer<typeof createCategorySchema>;
-type UpdateCategoryPayload = z.infer<typeof import("$lib/validation/finance").updateCategorySchema>;
 type TagPayload = z.infer<typeof createTagSchema>;
 type UpdateTagPayload = z.infer<typeof import("$lib/validation/finance").updateTagSchema>;
-type GroupPayload = z.infer<typeof import("$lib/validation/finance").createGroupSchema>;
-type UpdateGroupPayload = z.infer<typeof import("$lib/validation/finance").updateGroupSchema>;
+type SpacePayload = z.infer<typeof createSpaceSchema>;
+type UpdateSpacePayload = z.infer<typeof import("$lib/validation/finance").updateSpaceSchema>;
+
+type MerchantTransactionType = "expense" | "income" | "transfer";
+
+type SpaceAllocationPayload = {
+  leftTransactionId: string;
+  rightTransactionId: string;
+  amountMinor: number;
+};
 
 type TransactionTag = {
   id: string;
@@ -41,23 +40,11 @@ type TransactionTag = {
   colorHex: string | null;
 };
 
-type TransactionGroup = {
+type TransactionSpace = {
   id: string;
   name: string;
   colorHex: string | null;
 };
-
-type RefundLinkPeer = {
-  id: string;
-  occurredOn: string;
-  merchant: string | null;
-  amountMinor: number;
-  type: string;
-  categoryName: string | null;
-  role: "credit" | "expense";
-};
-
-export type { TransactionWarning };
 
 async function loadTagsForTransactions(transactionIds: string[]) {
   if (!transactionIds.length) return new Map<string, TransactionTag[]>();
@@ -84,274 +71,29 @@ async function loadTagsForTransactions(transactionIds: string[]) {
   return tagsByTransaction;
 }
 
-async function loadGroupsForTransactions(transactionIds: string[]) {
-  if (!transactionIds.length) return new Map<string, TransactionGroup[]>();
+async function loadSpacesForTransactions(transactionIds: string[]) {
+  if (!transactionIds.length) return new Map<string, TransactionSpace[]>();
 
-  const groupRows = await db
+  const spaceRows = await db
     .select({
-      transactionId: schema.financeTransactionGroups.transactionId,
-      id: schema.financeGroups.id,
-      name: schema.financeGroups.name,
-      colorHex: schema.financeGroups.colorHex,
+      transactionId: schema.financeSpaceTransactions.transactionId,
+      id: schema.financeSpaces.id,
+      name: schema.financeSpaces.name,
+      colorHex: schema.financeSpaces.colorHex,
     })
-    .from(schema.financeTransactionGroups)
-    .innerJoin(schema.financeGroups, eq(schema.financeGroups.id, schema.financeTransactionGroups.groupId))
-    .where(inArray(schema.financeTransactionGroups.transactionId, transactionIds))
-    .orderBy(asc(schema.financeGroups.name));
+    .from(schema.financeSpaceTransactions)
+    .innerJoin(schema.financeSpaces, eq(schema.financeSpaces.id, schema.financeSpaceTransactions.spaceId))
+    .where(inArray(schema.financeSpaceTransactions.transactionId, transactionIds))
+    .orderBy(asc(schema.financeSpaces.name));
 
-  const groupsByTransaction = new Map<string, TransactionGroup[]>();
-  for (const row of groupRows) {
-    const groups = groupsByTransaction.get(row.transactionId) ?? [];
-    groups.push({ id: row.id, name: row.name, colorHex: row.colorHex });
-    groupsByTransaction.set(row.transactionId, groups);
+  const spacesByTransaction = new Map<string, TransactionSpace[]>();
+  for (const row of spaceRows) {
+    const spaces = spacesByTransaction.get(row.transactionId) ?? [];
+    spaces.push({ id: row.id, name: row.name, colorHex: row.colorHex });
+    spacesByTransaction.set(row.transactionId, spaces);
   }
 
-  return groupsByTransaction;
-}
-
-async function loadRefundLinksForTransactions(transactionIds: string[]) {
-  if (!transactionIds.length) return new Map<string, RefundLinkPeer[]>();
-
-  const rawLinks = await db
-    .select({
-      creditTransactionId: schema.financeTransactionRefundLinks.creditTransactionId,
-      expenseTransactionId: schema.financeTransactionRefundLinks.expenseTransactionId,
-    })
-    .from(schema.financeTransactionRefundLinks)
-    .where(
-      or(
-        inArray(schema.financeTransactionRefundLinks.creditTransactionId, transactionIds),
-        inArray(schema.financeTransactionRefundLinks.expenseTransactionId, transactionIds)
-      )
-    );
-
-  if (!rawLinks.length) return new Map<string, RefundLinkPeer[]>();
-
-  const peerIds = new Set<string>();
-  for (const link of rawLinks) {
-    if (transactionIds.includes(link.creditTransactionId)) peerIds.add(link.expenseTransactionId);
-    if (transactionIds.includes(link.expenseTransactionId)) peerIds.add(link.creditTransactionId);
-  }
-
-  const peerRows = await db
-    .select({
-      id: schema.financeTransactions.id,
-      occurredOn: schema.financeTransactions.occurredOn,
-      merchant: schema.financeTransactions.merchant,
-      amountMinor: schema.financeTransactions.amountMinor,
-      type: schema.financeTransactions.type,
-      categoryName: schema.financeCategories.name,
-    })
-    .from(schema.financeTransactions)
-    .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
-    .where(inArray(schema.financeTransactions.id, [...peerIds]));
-
-  const peersById = new Map(peerRows.map((row) => [row.id, row]));
-  const linksByTransaction = new Map<string, RefundLinkPeer[]>();
-
-  for (const link of rawLinks) {
-    if (transactionIds.includes(link.creditTransactionId)) {
-      const peer = peersById.get(link.expenseTransactionId);
-      if (!peer) continue;
-      const peers = linksByTransaction.get(link.creditTransactionId) ?? [];
-      peers.push({ ...peer, role: "expense" });
-      linksByTransaction.set(link.creditTransactionId, peers);
-    }
-    if (transactionIds.includes(link.expenseTransactionId)) {
-      const peer = peersById.get(link.creditTransactionId);
-      if (!peer) continue;
-      const peers = linksByTransaction.get(link.expenseTransactionId) ?? [];
-      peers.push({ ...peer, role: "credit" });
-      linksByTransaction.set(link.expenseTransactionId, peers);
-    }
-  }
-
-  return linksByTransaction;
-}
-
-async function loadRefundLinkRowsForTransactions(transactionIds: string[]) {
-  if (!transactionIds.length) return [] as RefundLinkRow[];
-
-  const knownIds = new Set(transactionIds);
-  const collected = new Map<string, RefundLinkRow>();
-  let frontier = [...knownIds];
-
-  while (frontier.length) {
-    const batch = await db
-      .select({
-        creditTransactionId: schema.financeTransactionRefundLinks.creditTransactionId,
-        expenseTransactionId: schema.financeTransactionRefundLinks.expenseTransactionId,
-      })
-      .from(schema.financeTransactionRefundLinks)
-      .where(
-        or(
-          inArray(schema.financeTransactionRefundLinks.creditTransactionId, frontier),
-          inArray(schema.financeTransactionRefundLinks.expenseTransactionId, frontier)
-        )
-      );
-
-    const nextFrontier: string[] = [];
-    for (const row of batch) {
-      const key = `${row.creditTransactionId}:${row.expenseTransactionId}`;
-      collected.set(key, row);
-      if (!knownIds.has(row.creditTransactionId)) {
-        knownIds.add(row.creditTransactionId);
-        nextFrontier.push(row.creditTransactionId);
-      }
-      if (!knownIds.has(row.expenseTransactionId)) {
-        knownIds.add(row.expenseTransactionId);
-        nextFrontier.push(row.expenseTransactionId);
-      }
-    }
-
-    frontier = nextFrontier;
-  }
-
-  return [...collected.values()];
-}
-
-async function loadRefundWarningTransactions(linkRows: RefundLinkRow[]) {
-  const transactionIds = [...new Set(linkRows.flatMap((row) => [row.creditTransactionId, row.expenseTransactionId]))];
-  if (!transactionIds.length) return new Map<string, RefundWarningTransaction>();
-
-  const rows = await db
-    .select({
-      id: schema.financeTransactions.id,
-      amountMinor: schema.financeTransactions.amountMinor,
-      categoryName: schema.financeCategories.name,
-    })
-    .from(schema.financeTransactions)
-    .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
-    .where(inArray(schema.financeTransactions.id, transactionIds));
-
-  return new Map(
-    rows.map((row) => [
-      row.id,
-      {
-        id: row.id,
-        amountMinor: row.amountMinor,
-        categoryName: row.categoryName,
-      },
-    ])
-  );
-}
-
-function formatDifferenceMinor(differenceMinor: number) {
-  const major = Math.abs(differenceMinor) / 100;
-  return major.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-async function buildRefundWarningsForTransactions(transactionIds: string[]) {
-  const linkRows = await loadRefundLinkRowsForTransactions(transactionIds);
-  if (!linkRows.length) return new Map<string, TransactionWarning[]>();
-
-  const transactions = await loadRefundWarningTransactions(linkRows);
-  return computeRefundLinkWarnings(linkRows, transactions, formatDifferenceMinor);
-}
-
-export async function getRefundLinkClusterIds(accountId: string, seedTransactionId: string) {
-  const [seed] = await db
-    .select({ id: schema.financeTransactions.id })
-    .from(schema.financeTransactions)
-    .where(and(eq(schema.financeTransactions.id, seedTransactionId), eq(schema.financeTransactions.accountId, accountId)))
-    .limit(1);
-  if (!seed) return null;
-
-  const linkRows = await loadRefundLinkRowsForTransactions([seedTransactionId]);
-  if (!linkRows.length) return null;
-
-  const ids = new Set<string>();
-  for (const row of linkRows) {
-    ids.add(row.creditTransactionId);
-    ids.add(row.expenseTransactionId);
-  }
-
-  const clusterIds = [...ids];
-  const accountRows = await db
-    .select({ id: schema.financeTransactions.id })
-    .from(schema.financeTransactions)
-    .where(and(inArray(schema.financeTransactions.id, clusterIds), eq(schema.financeTransactions.accountId, accountId)));
-
-  return accountRows.length === clusterIds.length ? clusterIds : null;
-}
-
-export async function attachRefundLink(accountId: string, creditTransactionId: string, expenseTransactionId: string) {
-  const [credit] = await db
-    .select({
-      id: schema.financeTransactions.id,
-      type: schema.financeTransactions.type,
-      categoryName: schema.financeCategories.name,
-    })
-    .from(schema.financeTransactions)
-    .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
-    .where(and(eq(schema.financeTransactions.id, creditTransactionId), eq(schema.financeTransactions.accountId, accountId)))
-    .limit(1);
-  if (!credit || !isRefundCategoryName(credit.categoryName)) return null;
-
-  const [expense] = await db
-    .select({
-      id: schema.financeTransactions.id,
-      type: schema.financeTransactions.type,
-    })
-    .from(schema.financeTransactions)
-    .where(
-      and(
-        eq(schema.financeTransactions.id, expenseTransactionId),
-        eq(schema.financeTransactions.accountId, accountId),
-        eq(schema.financeTransactions.type, "expense")
-      )
-    )
-    .limit(1);
-  if (!expense) return null;
-
-  await db.insert(schema.financeTransactionRefundLinks).values({ creditTransactionId, expenseTransactionId }).onConflictDoNothing();
-
-  const [peer] = await db
-    .select({
-      id: schema.financeTransactions.id,
-      occurredOn: schema.financeTransactions.occurredOn,
-      merchant: schema.financeTransactions.merchant,
-      amountMinor: schema.financeTransactions.amountMinor,
-      type: schema.financeTransactions.type,
-      categoryName: schema.financeCategories.name,
-    })
-    .from(schema.financeTransactions)
-    .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
-    .where(eq(schema.financeTransactions.id, expenseTransactionId))
-    .limit(1);
-
-  if (!peer) return null;
-
-  return {
-    id: peer.id,
-    occurredOn: peer.occurredOn,
-    merchant: peer.merchant,
-    amountMinor: peer.amountMinor,
-    type: peer.type,
-    categoryName: peer.categoryName,
-    role: "expense" as const,
-  };
-}
-
-export async function detachRefundLink(accountId: string, creditTransactionId: string, expenseTransactionId: string) {
-  const [credit] = await db
-    .select({ id: schema.financeTransactions.id })
-    .from(schema.financeTransactions)
-    .where(and(eq(schema.financeTransactions.id, creditTransactionId), eq(schema.financeTransactions.accountId, accountId)))
-    .limit(1);
-  if (!credit) return false;
-
-  const [removed] = await db
-    .delete(schema.financeTransactionRefundLinks)
-    .where(
-      and(
-        eq(schema.financeTransactionRefundLinks.creditTransactionId, creditTransactionId),
-        eq(schema.financeTransactionRefundLinks.expenseTransactionId, expenseTransactionId)
-      )
-    )
-    .returning({ creditTransactionId: schema.financeTransactionRefundLinks.creditTransactionId });
-
-  return Boolean(removed);
+  return spacesByTransaction;
 }
 
 const sortMap = {
@@ -425,25 +167,12 @@ export async function createAccount(userId: string, payload: z.infer<typeof impo
 
 async function seedDefaultTaxonomy(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], accountId: string, userId: string) {
   await tx
-    .insert(schema.financeCategories)
-    .values(
-      DEFAULT_CATEGORIES.map((category) => ({
-        accountId,
-        name: category.name,
-        kind: category.kind,
-        colorHex: category.colorHex,
-        createdById: userId,
-        updatedById: userId,
-      }))
-    )
-    .onConflictDoNothing({ target: [schema.financeCategories.accountId, schema.financeCategories.name] });
-
-  await tx
     .insert(schema.financeTags)
     .values(
       DEFAULT_TAGS.map((tag) => ({
         accountId,
         name: tag.name,
+        kind: tag.kind ?? null,
         colorHex: tag.colorHex,
         createdById: userId,
         updatedById: userId,
@@ -452,21 +181,15 @@ async function seedDefaultTaxonomy(tx: Parameters<Parameters<typeof db.transacti
     .onConflictDoNothing({ target: [schema.financeTags.accountId, schema.financeTags.name] });
 }
 
-/** True when the account is missing any starter category/tag (typical for accounts created before defaults existed). */
+/** True when the account is missing any starter tag (typical for accounts created before defaults existed). */
 export async function accountNeedsDefaultTaxonomy(accountId: string): Promise<boolean> {
-  const [categories, tags] = await Promise.all([
-    db.select({ name: schema.financeCategories.name }).from(schema.financeCategories).where(eq(schema.financeCategories.accountId, accountId)),
-    db.select({ name: schema.financeTags.name }).from(schema.financeTags).where(eq(schema.financeTags.accountId, accountId)),
-  ]);
+  const tags = await db.select({ name: schema.financeTags.name }).from(schema.financeTags).where(eq(schema.financeTags.accountId, accountId));
 
-  const categoryNames = new Set(categories.map((row) => row.name));
   const tagNames = new Set(tags.map((row) => row.name));
-  const missingCategory = DEFAULT_CATEGORIES.some((category) => !categoryNames.has(category.name));
-  const missingTag = DEFAULT_TAGS.some((tag) => !tagNames.has(tag.name));
-  return missingCategory || missingTag;
+  return DEFAULT_TAGS.some((tag) => !tagNames.has(tag.name));
 }
 
-/** Idempotent: inserts any missing starter categories/tags for an existing account. */
+/** Idempotent: inserts any missing starter tags for an existing account. */
 export async function configureAccountDefaults(userId: string, accountId: string) {
   await db.transaction(async (tx) => {
     await seedDefaultTaxonomy(tx, accountId, userId);
@@ -603,51 +326,6 @@ export async function updateAccountOpeningBalance(userId: string, accountId: str
   return updated ?? null;
 }
 
-export async function listCategories(accountId: string) {
-  return db.query.financeCategories.findMany({
-    where: eq(schema.financeCategories.accountId, accountId),
-    orderBy: [asc(schema.financeCategories.name)],
-  });
-}
-
-export async function createCategory(userId: string, accountId: string, payload: CategoryPayload) {
-  const [category] = await db
-    .insert(schema.financeCategories)
-    .values({
-      accountId,
-      name: payload.name,
-      kind: payload.kind,
-      colorHex: payload.colorHex,
-      createdById: userId,
-      updatedById: userId,
-    })
-    .onConflictDoNothing()
-    .returning();
-  return category ?? null;
-}
-
-export async function updateCategory(userId: string, accountId: string, payload: UpdateCategoryPayload) {
-  const [updated] = await db
-    .update(schema.financeCategories)
-    .set({
-      name: payload.name,
-      kind: payload.kind,
-      colorHex: payload.colorHex,
-      updatedById: userId,
-    })
-    .where(and(eq(schema.financeCategories.id, payload.id), eq(schema.financeCategories.accountId, accountId)))
-    .returning();
-  return updated ?? null;
-}
-
-export async function deleteCategory(accountId: string, categoryId: string) {
-  const [removed] = await db
-    .delete(schema.financeCategories)
-    .where(and(eq(schema.financeCategories.id, categoryId), eq(schema.financeCategories.accountId, accountId)))
-    .returning({ id: schema.financeCategories.id });
-  return Boolean(removed);
-}
-
 export async function listTags(accountId: string) {
   return db.query.financeTags.findMany({
     where: eq(schema.financeTags.accountId, accountId),
@@ -661,6 +339,7 @@ export async function createTag(userId: string, accountId: string, payload: TagP
     .values({
       accountId,
       name: payload.name,
+      kind: payload.kind,
       colorHex: payload.colorHex,
       createdById: userId,
       updatedById: userId,
@@ -675,6 +354,7 @@ export async function updateTag(userId: string, accountId: string, payload: Upda
     .update(schema.financeTags)
     .set({
       name: payload.name,
+      kind: payload.kind,
       colorHex: payload.colorHex,
       updatedById: userId,
     })
@@ -691,45 +371,71 @@ export async function deleteTag(accountId: string, tagId: string) {
   return Boolean(removed);
 }
 
-export async function listGroups(accountId: string) {
-  return db.select().from(schema.financeGroups).where(eq(schema.financeGroups.accountId, accountId)).orderBy(asc(schema.financeGroups.name));
+export async function listSpaces(accountId: string) {
+  return db
+    .select({
+      id: schema.financeSpaces.id,
+      name: schema.financeSpaces.name,
+      colorHex: schema.financeSpaces.colorHex,
+      notes: schema.financeSpaces.notes,
+      createdAt: schema.financeSpaces.createdAt,
+      transactionCount: count(schema.financeSpaceTransactions.transactionId),
+    })
+    .from(schema.financeSpaces)
+    .leftJoin(schema.financeSpaceTransactions, eq(schema.financeSpaceTransactions.spaceId, schema.financeSpaces.id))
+    .where(eq(schema.financeSpaces.accountId, accountId))
+    .groupBy(schema.financeSpaces.id)
+    .orderBy(asc(schema.financeSpaces.name));
 }
 
-export async function createGroup(userId: string, accountId: string, payload: GroupPayload) {
-  const [group] = await db
-    .insert(schema.financeGroups)
+export async function getSpace(accountId: string, spaceId: string) {
+  const [space] = await db
+    .select()
+    .from(schema.financeSpaces)
+    .where(and(eq(schema.financeSpaces.id, spaceId), eq(schema.financeSpaces.accountId, accountId)))
+    .limit(1);
+  return space ?? null;
+}
+
+export async function createSpace(userId: string, accountId: string, payload: SpacePayload) {
+  const [space] = await db
+    .insert(schema.financeSpaces)
     .values({
       accountId,
       name: payload.name,
+      colorHex: payload.colorHex,
+      notes: payload.notes,
       createdById: userId,
       updatedById: userId,
     })
     .onConflictDoNothing()
     .returning();
-  return group ?? null;
+  return space ?? null;
 }
 
-export async function updateGroup(userId: string, accountId: string, payload: UpdateGroupPayload) {
+export async function updateSpace(userId: string, accountId: string, payload: UpdateSpacePayload) {
   const [updated] = await db
-    .update(schema.financeGroups)
+    .update(schema.financeSpaces)
     .set({
       name: payload.name,
+      colorHex: payload.colorHex,
+      notes: payload.notes,
       updatedById: userId,
     })
-    .where(and(eq(schema.financeGroups.id, payload.id), eq(schema.financeGroups.accountId, accountId)))
+    .where(and(eq(schema.financeSpaces.id, payload.id), eq(schema.financeSpaces.accountId, accountId)))
     .returning();
   return updated ?? null;
 }
 
-export async function deleteGroup(accountId: string, groupId: string) {
+export async function deleteSpace(accountId: string, spaceId: string) {
   const [removed] = await db
-    .delete(schema.financeGroups)
-    .where(and(eq(schema.financeGroups.id, groupId), eq(schema.financeGroups.accountId, accountId)))
-    .returning({ id: schema.financeGroups.id });
+    .delete(schema.financeSpaces)
+    .where(and(eq(schema.financeSpaces.id, spaceId), eq(schema.financeSpaces.accountId, accountId)))
+    .returning({ id: schema.financeSpaces.id });
   return Boolean(removed);
 }
 
-export async function attachTransactionGroup(accountId: string, transactionId: string, groupId: string) {
+export async function attachTransactionSpace(accountId: string, transactionId: string, spaceId: string) {
   const [transaction] = await db
     .select({ id: schema.financeTransactions.id })
     .from(schema.financeTransactions)
@@ -737,23 +443,24 @@ export async function attachTransactionGroup(accountId: string, transactionId: s
     .limit(1);
   if (!transaction) return null;
 
-  const [group] = await db
+  const [space] = await db
     .select({
-      id: schema.financeGroups.id,
-      name: schema.financeGroups.name,
-      colorHex: schema.financeGroups.colorHex,
+      id: schema.financeSpaces.id,
+      name: schema.financeSpaces.name,
+      colorHex: schema.financeSpaces.colorHex,
     })
-    .from(schema.financeGroups)
-    .where(and(eq(schema.financeGroups.id, groupId), eq(schema.financeGroups.accountId, accountId)))
+    .from(schema.financeSpaces)
+    .where(and(eq(schema.financeSpaces.id, spaceId), eq(schema.financeSpaces.accountId, accountId)))
     .limit(1);
-  if (!group) return null;
+  if (!space) return null;
 
-  await db.insert(schema.financeTransactionGroups).values({ transactionId, groupId }).onConflictDoNothing();
+  await db.insert(schema.financeSpaceTransactions).values({ spaceId, transactionId }).onConflictDoNothing();
 
-  return group;
+  return space;
 }
 
-export async function detachTransactionGroup(accountId: string, transactionId: string, groupId: string) {
+/** Removes the transaction from the space along with any allocations that reference it inside that space. */
+export async function detachTransactionSpace(accountId: string, transactionId: string, spaceId: string) {
   const [transaction] = await db
     .select({ id: schema.financeTransactions.id })
     .from(schema.financeTransactions)
@@ -761,11 +468,140 @@ export async function detachTransactionGroup(accountId: string, transactionId: s
     .limit(1);
   if (!transaction) return false;
 
-  const [removed] = await db
-    .delete(schema.financeTransactionGroups)
-    .where(and(eq(schema.financeTransactionGroups.transactionId, transactionId), eq(schema.financeTransactionGroups.groupId, groupId)))
-    .returning({ groupId: schema.financeTransactionGroups.groupId });
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return false;
 
+  return db.transaction(async (tx) => {
+    await tx
+      .delete(schema.financeSpaceAllocations)
+      .where(
+        and(
+          eq(schema.financeSpaceAllocations.spaceId, spaceId),
+          sql`(${schema.financeSpaceAllocations.leftTransactionId} = ${transactionId} OR ${schema.financeSpaceAllocations.rightTransactionId} = ${transactionId})`
+        )
+      );
+
+    const [removed] = await tx
+      .delete(schema.financeSpaceTransactions)
+      .where(and(eq(schema.financeSpaceTransactions.spaceId, spaceId), eq(schema.financeSpaceTransactions.transactionId, transactionId)))
+      .returning({ transactionId: schema.financeSpaceTransactions.transactionId });
+
+    return Boolean(removed);
+  });
+}
+
+export async function listSpaceTransactions(accountId: string, spaceId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  const rows = await db
+    .select({
+      id: schema.financeTransactions.id,
+      occurredOn: schema.financeTransactions.occurredOn,
+      amountMinor: schema.financeTransactions.amountMinor,
+      type: schema.financeTransactions.type,
+      merchant: schema.financeTransactions.merchant,
+      notes: schema.financeTransactions.notes,
+    })
+    .from(schema.financeSpaceTransactions)
+    .innerJoin(schema.financeTransactions, eq(schema.financeTransactions.id, schema.financeSpaceTransactions.transactionId))
+    .where(and(eq(schema.financeSpaceTransactions.spaceId, spaceId), eq(schema.financeTransactions.accountId, accountId)))
+    .orderBy(desc(schema.financeTransactions.occurredOn), desc(schema.financeTransactions.sortOrder), desc(schema.financeTransactions.id));
+
+  const tagsByTransaction = await loadTagsForTransactions(rows.map((row) => row.id));
+
+  return rows.map((row) => ({
+    ...row,
+    tags: tagsByTransaction.get(row.id) ?? [],
+  }));
+}
+
+export async function listSpaceAllocations(accountId: string, spaceId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  return db
+    .select({
+      id: schema.financeSpaceAllocations.id,
+      spaceId: schema.financeSpaceAllocations.spaceId,
+      leftTransactionId: schema.financeSpaceAllocations.leftTransactionId,
+      rightTransactionId: schema.financeSpaceAllocations.rightTransactionId,
+      amountMinor: schema.financeSpaceAllocations.amountMinor,
+      createdAt: schema.financeSpaceAllocations.createdAt,
+    })
+    .from(schema.financeSpaceAllocations)
+    .where(eq(schema.financeSpaceAllocations.spaceId, spaceId))
+    .orderBy(asc(schema.financeSpaceAllocations.createdAt));
+}
+
+export async function getSpaceDetail(accountId: string, spaceId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  const [transactions, allocations] = await Promise.all([listSpaceTransactions(accountId, spaceId), listSpaceAllocations(accountId, spaceId)]);
+
+  return {
+    space,
+    transactions: transactions ?? [],
+    allocations: allocations ?? [],
+  };
+}
+
+async function countSpaceMembers(spaceId: string, transactionIds: string[]) {
+  const [row] = await db
+    .select({ total: count() })
+    .from(schema.financeSpaceTransactions)
+    .where(and(eq(schema.financeSpaceTransactions.spaceId, spaceId), inArray(schema.financeSpaceTransactions.transactionId, transactionIds)));
+  return Number(row?.total ?? 0);
+}
+
+/** Both transactions must already be members of the space; amount must be a positive integer (minor units). */
+export async function createSpaceAllocation(userId: string, accountId: string, spaceId: string, payload: SpaceAllocationPayload) {
+  if (payload.leftTransactionId === payload.rightTransactionId) return null;
+  if (!Number.isInteger(payload.amountMinor) || payload.amountMinor <= 0) return null;
+
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  const memberCount = await countSpaceMembers(spaceId, [payload.leftTransactionId, payload.rightTransactionId]);
+  if (memberCount !== 2) return null;
+
+  const [created] = await db
+    .insert(schema.financeSpaceAllocations)
+    .values({
+      spaceId,
+      leftTransactionId: payload.leftTransactionId,
+      rightTransactionId: payload.rightTransactionId,
+      amountMinor: payload.amountMinor,
+      createdById: userId,
+      updatedById: userId,
+    })
+    .returning();
+  return created;
+}
+
+export async function updateSpaceAllocation(userId: string, accountId: string, spaceId: string, allocationId: string, amountMinor: number) {
+  if (!Number.isInteger(amountMinor) || amountMinor <= 0) return null;
+
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return null;
+
+  const [updated] = await db
+    .update(schema.financeSpaceAllocations)
+    .set({ amountMinor, updatedById: userId })
+    .where(and(eq(schema.financeSpaceAllocations.id, allocationId), eq(schema.financeSpaceAllocations.spaceId, spaceId)))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteSpaceAllocation(accountId: string, spaceId: string, allocationId: string) {
+  const space = await getSpace(accountId, spaceId);
+  if (!space) return false;
+
+  const [removed] = await db
+    .delete(schema.financeSpaceAllocations)
+    .where(and(eq(schema.financeSpaceAllocations.id, allocationId), eq(schema.financeSpaceAllocations.spaceId, spaceId)))
+    .returning({ id: schema.financeSpaceAllocations.id });
   return Boolean(removed);
 }
 
@@ -811,14 +647,6 @@ export async function detachTransactionTag(accountId: string, transactionId: str
 
 export async function listTransactions(accountId: string, query: TransactionsQuery) {
   const conditions = [eq(schema.financeTransactions.accountId, accountId)];
-  let linkClusterIds: string[] | null = null;
-
-  if (query.linkTransactionId) {
-    linkClusterIds = await getRefundLinkClusterIds(accountId, query.linkTransactionId);
-    if (linkClusterIds?.length) {
-      conditions.push(inArray(schema.financeTransactions.id, linkClusterIds));
-    }
-  }
 
   if (query.search) {
     conditions.push(
@@ -829,47 +657,28 @@ export async function listTransactions(accountId: string, query: TransactionsQue
       })
     );
   }
-  if (query.categoryIds?.length) {
-    const hasUncategorized = query.categoryIds.includes("uncategorized");
-    const categoryIds = query.categoryIds.filter((id): id is string => id !== "uncategorized");
-
-    if (hasUncategorized && categoryIds.length) {
-      conditions.push(or(isNull(schema.financeTransactions.categoryId), inArray(schema.financeTransactions.categoryId, categoryIds))!);
-    } else if (hasUncategorized) {
-      conditions.push(isNull(schema.financeTransactions.categoryId));
-    } else if (categoryIds.length) {
-      conditions.push(inArray(schema.financeTransactions.categoryId, categoryIds));
-    }
-  }
   if (query.tagIds?.length) {
-    conditions.push(
-      sql`EXISTS (
-        SELECT 1 FROM ${schema.financeTransactionTags}
-        WHERE ${schema.financeTransactionTags.transactionId} = ${schema.financeTransactions.id}
-        AND ${schema.financeTransactionTags.tagId} IN (${sql.join(
-          query.tagIds.map((tagId) => sql`${tagId}`),
-          sql`, `
-        )})
-      )`
-    );
+    const tagCondition = tagFilterCondition(query.tagIds, sql`${schema.financeTransactions.id}`, sql`${schema.financeTransactionTags}`, {
+      transactionId: sql`${schema.financeTransactionTags.transactionId}`,
+      tagId: sql`${schema.financeTransactionTags.tagId}`,
+    });
+    conditions.push(tagCondition);
   }
   if (query.type) {
     conditions.push(eq(schema.financeTransactions.type, query.type));
   }
-  if (!linkClusterIds?.length) {
-    if (query.dateFrom) {
-      conditions.push(gte(schema.financeTransactions.occurredOn, query.dateFrom));
-    }
-    if (query.dateTo) {
-      conditions.push(lte(schema.financeTransactions.occurredOn, query.dateTo));
-    }
+  if (query.dateFrom) {
+    conditions.push(gte(schema.financeTransactions.occurredOn, query.dateFrom));
   }
-  if (query.groupId) {
+  if (query.dateTo) {
+    conditions.push(lte(schema.financeTransactions.occurredOn, query.dateTo));
+  }
+  if (query.spaceId) {
     conditions.push(
       sql`EXISTS (
-        SELECT 1 FROM ${schema.financeTransactionGroups}
-        WHERE ${schema.financeTransactionGroups.transactionId} = ${schema.financeTransactions.id}
-        AND ${schema.financeTransactionGroups.groupId} = ${query.groupId}
+        SELECT 1 FROM ${schema.financeSpaceTransactions}
+        WHERE ${schema.financeSpaceTransactions.transactionId} = ${schema.financeTransactions.id}
+        AND ${schema.financeSpaceTransactions.spaceId} = ${query.spaceId}
       )`
     );
   }
@@ -898,13 +707,9 @@ export async function listTransactions(accountId: string, query: TransactionsQue
         type: schema.financeTransactions.type,
         merchant: schema.financeTransactions.merchant,
         notes: schema.financeTransactions.notes,
-        categoryId: schema.financeTransactions.categoryId,
-        categoryName: schema.financeCategories.name,
-        categoryColor: schema.financeCategories.colorHex,
         createdAt: schema.financeTransactions.createdAt,
       })
       .from(schema.financeTransactions)
-      .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeTransactions.categoryId))
       .where(whereExpr)
       .orderBy(direction, ...tieBreakers)
       .limit(query.pageSize)
@@ -914,18 +719,15 @@ export async function listTransactions(accountId: string, query: TransactionsQue
 
   const total = Number(totalRows[0]?.total ?? 0);
   const loaded = offset + rows.length;
-  const tagsByTransaction = await loadTagsForTransactions(rows.map((row) => row.id));
-  const groupsByTransaction = await loadGroupsForTransactions(rows.map((row) => row.id));
-  const refundLinksByTransaction = await loadRefundLinksForTransactions(rows.map((row) => row.id));
-  const warningsByTransaction = await buildRefundWarningsForTransactions(rows.map((row) => row.id));
+  const transactionIds = rows.map((row) => row.id);
+  const tagsByTransaction = await loadTagsForTransactions(transactionIds);
+  const spacesByTransaction = await loadSpacesForTransactions(transactionIds);
 
   return {
     rows: rows.map((row) => ({
       ...row,
       tags: tagsByTransaction.get(row.id) ?? [],
-      groups: groupsByTransaction.get(row.id) ?? [],
-      refundLinks: refundLinksByTransaction.get(row.id) ?? [],
-      warnings: warningsByTransaction.get(row.id) ?? [],
+      spaces: spacesByTransaction.get(row.id) ?? [],
     })),
     total,
     hasMore: loaded < total,
@@ -937,7 +739,6 @@ export async function createTransaction(userId: string, accountId: string, paylo
     .insert(schema.financeTransactions)
     .values({
       accountId,
-      categoryId: payload.categoryId,
       occurredOn: payload.occurredOn,
       amountMinor: payload.amountMinor,
       currencyCode: "USD",
@@ -962,7 +763,6 @@ export async function updateTransaction(userId: string, accountId: string, trans
   if (payload.merchant !== undefined) patch.merchant = payload.merchant;
   if (payload.notes !== undefined) patch.notes = payload.notes;
   if (payload.externalRef !== undefined) patch.externalRef = payload.externalRef;
-  if ("categoryId" in payload) patch.categoryId = payload.categoryId ?? null;
   if (payload.sortOrder !== undefined) patch.sortOrder = payload.sortOrder;
 
   const [updated] = await db
@@ -981,39 +781,7 @@ export async function deleteTransaction(accountId: string, transactionId: string
   return Boolean(removed);
 }
 
-export type SmartCategoryBreakdown = {
-  categoryId: string | null;
-  categoryName: string;
-  count: number;
-};
-
-export type SmartCategoryMerchantGroup = {
-  merchant: string;
-  categories: SmartCategoryBreakdown[];
-};
-
-export type SmartCategorizationPreview = {
-  merchant: string;
-  newCategoryId: string | null;
-  newCategoryName: string;
-  exact: SmartCategoryMerchantGroup | null;
-  fuzzy: SmartCategoryMerchantGroup[];
-};
-
-type SmartCategoryQuery = {
-  merchant: string;
-  newCategoryId: string | null;
-  sourceTransactionId: string;
-  type: "expense" | "income" | "transfer";
-};
-
-type SmartCategoryMigration = {
-  merchant: string;
-  fromCategoryId: string | null;
-  enabled: boolean;
-};
-
-async function listDistinctMerchantsForType(accountId: string, type: SmartCategoryQuery["type"]) {
+async function listDistinctMerchantsForType(accountId: string, type: MerchantTransactionType) {
   const result = await db.execute(sql`
     select distinct trim(t.merchant) as merchant
     from chhanchhan.finance_transactions t
@@ -1024,146 +792,6 @@ async function listDistinctMerchantsForType(accountId: string, type: SmartCatego
   `);
 
   return result.rows.map((row) => String((row as { merchant: string }).merchant)).filter(Boolean);
-}
-
-async function getMerchantCategoryBreakdown(
-  accountId: string,
-  merchant: string,
-  type: SmartCategoryQuery["type"],
-  excludeTransactionId?: string
-): Promise<SmartCategoryBreakdown[]> {
-  const excludeFilter = excludeTransactionId ? sql`and t.id != ${excludeTransactionId}` : sql``;
-
-  const result = await db.execute(sql`
-    select
-      t.category_id,
-      coalesce(c.name, 'Uncategorized') as category_name,
-      count(*)::int as row_count
-    from chhanchhan.finance_transactions t
-    left join chhanchhan.finance_categories c on c.id = t.category_id
-    where t.account_id = ${accountId}
-      and t.type = ${type}
-      and lower(trim(t.merchant)) = lower(${merchant})
-      ${excludeFilter}
-    group by t.category_id, c.name
-    order by row_count desc, category_name asc
-  `);
-
-  return result.rows.map((row) => {
-    const typed = row as { category_id: string | null; category_name: string; row_count: number };
-    return {
-      categoryId: typed.category_id ?? null,
-      categoryName: String(typed.category_name),
-      count: Number(typed.row_count),
-    };
-  });
-}
-
-function categoriesNeedingMigration(categories: SmartCategoryBreakdown[], newCategoryId: string | null): SmartCategoryBreakdown[] {
-  return categories.filter((category) => {
-    if (newCategoryId == null) return category.categoryId != null;
-    return category.categoryId !== newCategoryId;
-  });
-}
-
-export async function previewSmartCategorization(accountId: string, query: SmartCategoryQuery): Promise<SmartCategorizationPreview | null> {
-  const merchant = query.merchant.trim();
-  if (!merchant) return null;
-
-  const [newCategoryNameRow] = query.newCategoryId
-    ? await db
-        .select({ name: schema.financeCategories.name })
-        .from(schema.financeCategories)
-        .where(and(eq(schema.financeCategories.id, query.newCategoryId), eq(schema.financeCategories.accountId, accountId)))
-        .limit(1)
-    : [{ name: "Uncategorized" }];
-
-  const exactCategories = await getMerchantCategoryBreakdown(accountId, merchant, query.type, query.sourceTransactionId);
-  const exactMigratable = categoriesNeedingMigration(exactCategories, query.newCategoryId);
-  const exact =
-    exactMigratable.length > 0
-      ? {
-          merchant,
-          categories: exactMigratable,
-        }
-      : null;
-
-  const distinctMerchants = await listDistinctMerchantsForType(accountId, query.type);
-  const fuzzyMerchants = rankFuzzyMerchants(merchant, distinctMerchants).filter(
-    (candidate) => normalizeMerchant(candidate) !== normalizeMerchant(merchant)
-  );
-
-  const fuzzy: SmartCategoryMerchantGroup[] = [];
-  for (const fuzzyMerchant of fuzzyMerchants) {
-    const categories = categoriesNeedingMigration(await getMerchantCategoryBreakdown(accountId, fuzzyMerchant, query.type), query.newCategoryId);
-    if (categories.length) {
-      fuzzy.push({ merchant: fuzzyMerchant, categories });
-    }
-  }
-
-  if (!exact && !fuzzy.length) return null;
-
-  return {
-    merchant,
-    newCategoryId: query.newCategoryId,
-    newCategoryName: newCategoryNameRow?.name ?? "Uncategorized",
-    exact,
-    fuzzy,
-  };
-}
-
-function categoryMatchFilter(fromCategoryId: string | null) {
-  return fromCategoryId ? eq(schema.financeTransactions.categoryId, fromCategoryId) : isNull(schema.financeTransactions.categoryId);
-}
-
-export async function applySmartCategorization(
-  userId: string,
-  accountId: string,
-  payload: {
-    sourceTransactionId: string;
-    newCategoryId: string | null;
-    type: SmartCategoryQuery["type"];
-    migrations: SmartCategoryMigration[];
-  }
-) {
-  await updateTransaction(userId, accountId, payload.sourceTransactionId, {
-    categoryId: payload.newCategoryId,
-  });
-
-  let updatedCount = 0;
-  const seen = new Set<string>();
-
-  for (const migration of payload.migrations) {
-    if (!migration.enabled) continue;
-
-    const merchant = migration.merchant.trim();
-    if (!merchant) continue;
-
-    const key = `${merchant}::${migration.fromCategoryId ?? "null"}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    const updated = await db
-      .update(schema.financeTransactions)
-      .set({
-        categoryId: payload.newCategoryId,
-        updatedById: userId,
-      })
-      .where(
-        and(
-          eq(schema.financeTransactions.accountId, accountId),
-          eq(schema.financeTransactions.type, payload.type),
-          sql`lower(trim(${schema.financeTransactions.merchant})) = lower(${merchant})`,
-          categoryMatchFilter(migration.fromCategoryId),
-          ne(schema.financeTransactions.id, payload.sourceTransactionId)
-        )
-      )
-      .returning({ id: schema.financeTransactions.id });
-
-    updatedCount += updated.length;
-  }
-
-  return { updatedCount };
 }
 
 export type SmartTagProfileBreakdown = {
@@ -1369,12 +997,12 @@ export async function listBudgets(accountId: string) {
       startDate: schema.financeBudgets.startDate,
       endDate: schema.financeBudgets.endDate,
       limitMinor: schema.financeBudgets.limitMinor,
-      categoryId: schema.financeBudgets.categoryId,
-      categoryName: schema.financeCategories.name,
+      tagId: schema.financeBudgets.tagId,
+      tagName: schema.financeTags.name,
       isActive: schema.financeBudgets.isActive,
     })
     .from(schema.financeBudgets)
-    .leftJoin(schema.financeCategories, eq(schema.financeCategories.id, schema.financeBudgets.categoryId))
+    .leftJoin(schema.financeTags, eq(schema.financeTags.id, schema.financeBudgets.tagId))
     .where(eq(schema.financeBudgets.accountId, accountId))
     .orderBy(desc(schema.financeBudgets.createdAt));
 
@@ -1388,7 +1016,7 @@ export async function upsertBudget(userId: string, accountId: string, payload: B
       .values({
         accountId,
         name: payload.name,
-        categoryId: payload.categoryId,
+        tagId: payload.tagId,
         period: payload.period,
         startDate: payload.startDate,
         endDate: payload.endDate,
@@ -1405,7 +1033,7 @@ export async function upsertBudget(userId: string, accountId: string, payload: B
     .update(schema.financeBudgets)
     .set({
       name: payload.name,
-      categoryId: payload.categoryId,
+      tagId: payload.tagId,
       period: payload.period,
       startDate: payload.startDate,
       endDate: payload.endDate,
@@ -1552,9 +1180,8 @@ export async function getTransactionSummary(accountId: string, selection: Summar
     from chhanchhan.finance_transactions t
     where t.account_id = ${accountId}
       and ${filters.dateFilter}
-      and ${filters.groupFilter}
+      and ${filters.spaceFilter}
       and ${filters.searchFilter}
-      and ${filters.categoryFilter}
       and ${filters.tagFilter}
   `);
   const row = result.rows[0] as Record<string, unknown> | undefined;
@@ -1566,30 +1193,6 @@ export async function getTransactionSummary(accountId: string, selection: Summar
     expenseMinor,
     netMinor: incomeMinor - expenseMinor,
   };
-}
-
-export async function getCategorySpend(accountId: string, selection: SummarySelection) {
-  const filters = summaryTransactionFilters(selection);
-
-  const categorySpend = await db.execute(sql`
-    select
-      coalesce(c.name, 'Uncategorized') as category_name,
-      coalesce(sum(t.amount_minor), 0)::bigint as amount_minor
-    from chhanchhan.finance_transactions t
-    left join chhanchhan.finance_categories c on c.id = t.category_id
-    where t.account_id = ${accountId}
-      and t.type = 'expense'
-      and ${filters.dateFilter}
-      and ${filters.groupFilter}
-      and ${filters.searchFilter}
-      and ${filters.categoryFilter}
-      and ${filters.tagFilter}
-    group by c.name
-    order by amount_minor desc
-    limit 8
-  `);
-
-  return categorySpend.rows as Array<{ category_name: string; amount_minor: number }>;
 }
 
 export async function getTagSpend(accountId: string, selection: SummarySelection) {
@@ -1606,9 +1209,8 @@ export async function getTagSpend(accountId: string, selection: SummarySelection
     where t.account_id = ${accountId}
       and t.type = 'expense'
       and ${filters.dateFilter}
-      and ${filters.groupFilter}
+      and ${filters.spaceFilter}
       and ${filters.searchFilter}
-      and ${filters.categoryFilter}
       and ${filters.tagFilter}
     group by tg.id, tg.name, tg.color_hex
     order by amount_minor desc
@@ -1629,9 +1231,8 @@ export async function getMerchantSpend(accountId: string, selection: SummarySele
     where t.account_id = ${accountId}
       and t.type = 'expense'
       and ${filters.dateFilter}
-      and ${filters.groupFilter}
+      and ${filters.spaceFilter}
       and ${filters.searchFilter}
-      and ${filters.categoryFilter}
       and ${filters.tagFilter}
     group by merchant_name
     order by amount_minor desc
@@ -1641,64 +1242,68 @@ export async function getMerchantSpend(accountId: string, selection: SummarySele
   return result.rows as Array<{ merchant_name: string; amount_minor: number }>;
 }
 
-export async function getGroupSpend(accountId: string, selection: SummarySelection) {
+export async function getSpaceSpend(accountId: string, selection: SummarySelection) {
   const filters = summaryTransactionFilters(selection);
 
   const result = await db.execute(sql`
     select
-      g.name as group_name,
-      g.color_hex,
+      s.name as space_name,
+      s.color_hex,
       coalesce(sum(t.amount_minor), 0)::bigint as amount_minor
     from chhanchhan.finance_transactions t
-    inner join chhanchhan.finance_transaction_groups ftg
-      on ftg.transaction_id = t.id
-    inner join chhanchhan.finance_groups g on g.id = ftg.group_id
+    inner join chhanchhan.finance_space_transactions fst
+      on fst.transaction_id = t.id
+    inner join chhanchhan.finance_spaces s on s.id = fst.space_id
     where t.account_id = ${accountId}
       and t.type = 'expense'
       and ${filters.dateFilter}
-      and ${filters.groupFilter}
+      and ${filters.spaceFilter}
       and ${filters.searchFilter}
-      and ${filters.categoryFilter}
       and ${filters.tagFilter}
-    group by g.id, g.name, g.color_hex
+    group by s.id, s.name, s.color_hex
     order by amount_minor desc
     limit 8
   `);
 
-  return result.rows as Array<{ group_name: string; color_hex: string | null; amount_minor: number }>;
+  return result.rows as Array<{ space_name: string; color_hex: string | null; amount_minor: number }>;
 }
 
-export async function getCategoryMerchantBills(accountId: string, selection: SummarySelection) {
+/** Bill tags are matched by name (see `billTagSqlFilter`); each bill tag on a transaction yields its own row. */
+function billTagNameSqlFilter() {
+  return sql`tg.name ~* '\\mbill\\M'`;
+}
+
+export async function getTagMerchantBills(accountId: string, selection: SummarySelection) {
   const filters = summaryTransactionFilters(selection);
 
   const result = await db.execute(sql`
     select
-      t.category_id,
-      c.name as category_name,
-      c.color_hex as category_color,
+      tg.id as tag_id,
+      tg.name as tag_name,
+      tg.color_hex as tag_color,
       coalesce(nullif(trim(t.merchant), ''), 'Unknown') as merchant_name,
       to_char(date_trunc('month', t.occurred_on), 'YYYY-MM') as month_key,
       coalesce(sum(t.amount_minor), 0)::bigint as amount_minor,
       count(*)::int as txn_count
     from chhanchhan.finance_transactions t
-    inner join chhanchhan.finance_categories c on c.id = t.category_id
-    left join chhanchhan.finance_categories parent on parent.id = c.parent_category_id
+    inner join chhanchhan.finance_transaction_tags ftt on ftt.transaction_id = t.id
+    inner join chhanchhan.finance_tags tg on tg.id = ftt.tag_id
     where t.account_id = ${accountId}
       and t.type = 'expense'
-      and ${billCategorySqlFilter()}
+      and ${billTagSqlFilter()}
+      and ${billTagNameSqlFilter()}
       and ${filters.dateFilter}
-      and ${filters.groupFilter}
+      and ${filters.spaceFilter}
       and ${filters.searchFilter}
-      and ${filters.categoryFilter}
       and ${filters.tagFilter}
-    group by t.category_id, c.name, c.color_hex, merchant_name, month_key
-    order by category_name asc, merchant_name asc, month_key asc
+    group by tg.id, tg.name, tg.color_hex, merchant_name, month_key
+    order by tag_name asc, merchant_name asc, month_key asc
   `);
 
   return result.rows as Array<{
-    category_id: string | null;
-    category_name: string;
-    category_color: string | null;
+    tag_id: string;
+    tag_name: string;
+    tag_color: string | null;
     merchant_name: string;
     month_key: string;
     amount_minor: number;
@@ -1706,31 +1311,32 @@ export async function getCategoryMerchantBills(accountId: string, selection: Sum
   }>;
 }
 
-export async function getCategoryMerchantBillsForYear(accountId: string, year: number) {
+export async function getTagMerchantBillsForYear(accountId: string, year: number) {
   const result = await db.execute(sql`
     select
-      t.category_id,
-      c.name as category_name,
-      c.color_hex as category_color,
+      tg.id as tag_id,
+      tg.name as tag_name,
+      tg.color_hex as tag_color,
       coalesce(nullif(trim(t.merchant), ''), 'Unknown') as merchant_name,
       to_char(date_trunc('month', t.occurred_on), 'YYYY-MM') as month_key,
       coalesce(sum(t.amount_minor), 0)::bigint as amount_minor,
       count(*)::int as txn_count
     from chhanchhan.finance_transactions t
-    inner join chhanchhan.finance_categories c on c.id = t.category_id
-    left join chhanchhan.finance_categories parent on parent.id = c.parent_category_id
+    inner join chhanchhan.finance_transaction_tags ftt on ftt.transaction_id = t.id
+    inner join chhanchhan.finance_tags tg on tg.id = ftt.tag_id
     where t.account_id = ${accountId}
       and t.type = 'expense'
-      and ${billCategorySqlFilter()}
+      and ${billTagSqlFilter()}
+      and ${billTagNameSqlFilter()}
       and extract(year from t.occurred_on) = ${year}
-    group by t.category_id, c.name, c.color_hex, merchant_name, month_key
-    order by category_name asc, merchant_name asc, month_key asc
+    group by tg.id, tg.name, tg.color_hex, merchant_name, month_key
+    order by tag_name asc, merchant_name asc, month_key asc
   `);
 
   return result.rows as Array<{
-    category_id: string | null;
-    category_name: string;
-    category_color: string | null;
+    tag_id: string;
+    tag_name: string;
+    tag_color: string | null;
     merchant_name: string;
     month_key: string;
     amount_minor: number;
@@ -1771,7 +1377,7 @@ export async function getMonthlyTrend(accountId: string, monthCount = 12) {
   });
 }
 
-export async function getCategoryTrend(accountId: string, monthCount = 12) {
+export async function getTagTrend(accountId: string, monthCount = 12) {
   const safeCount = Math.min(24, Math.max(3, monthCount));
   const start = new Date();
   start.setDate(1);
@@ -1782,21 +1388,22 @@ export async function getCategoryTrend(accountId: string, monthCount = 12) {
   const result = await db.execute(sql`
     select
       to_char(date_trunc('month', t.occurred_on), 'YYYY-MM') as month_key,
-      coalesce(c.name, 'Uncategorized') as category_name,
-      c.color_hex,
+      coalesce(tg.name, 'Untagged') as tag_name,
+      tg.color_hex,
       coalesce(sum(t.amount_minor), 0)::bigint as amount_minor
     from chhanchhan.finance_transactions t
-    left join chhanchhan.finance_categories c on c.id = t.category_id
+    left join chhanchhan.finance_transaction_tags ftt on ftt.transaction_id = t.id
+    left join chhanchhan.finance_tags tg on tg.id = ftt.tag_id
     where t.account_id = ${accountId}
       and t.type = 'expense'
       and t.occurred_on >= ${dateFrom}::date
-    group by month_key, category_name, c.color_hex
+    group by month_key, tag_name, tg.color_hex
     order by month_key asc, amount_minor desc
   `);
 
   return result.rows as Array<{
     month_key: string;
-    category_name: string;
+    tag_name: string;
     color_hex: string | null;
     amount_minor: number;
   }>;
@@ -1806,63 +1413,57 @@ function summarySearchFilter(search?: string) {
   return buildSummarySearchFilterSql(search);
 }
 
-function summaryCategoryFilter(categoryFilters?: string[]) {
-  if (!categoryFilters?.length) return sql`true`;
-
-  const hasUncategorized = categoryFilters.includes("uncategorized");
-  const categoryIds = categoryFilters.filter((value) => value !== "uncategorized");
-
-  if (hasUncategorized && categoryIds.length) {
-    return sql`(t.category_id is null or t.category_id in (${sql.join(
-      categoryIds.map((categoryId) => sql`${categoryId}`),
-      sql`, `
-    )}))`;
-  }
-  if (hasUncategorized) return sql`t.category_id is null`;
-  if (categoryIds.length === 1) return sql`t.category_id = ${categoryIds[0]}`;
-  return sql`t.category_id in (${sql.join(
-    categoryIds.map((categoryId) => sql`${categoryId}`),
-    sql`, `
-  )})`;
-}
-
 function summaryTagFilter(tagIds?: string[]) {
   if (!tagIds?.length) return sql`true`;
-  if (tagIds.length === 1) {
-    return sql`exists (
-      select 1 from chhanchhan.finance_transaction_tags ftt
-      where ftt.transaction_id = t.id
-        and ftt.tag_id = ${tagIds[0]}
-    )`;
+  return tagFilterCondition(tagIds, sql`t.id`, sql`chhanchhan.finance_transaction_tags ftt`, {
+    transactionId: sql`ftt.transaction_id`,
+    tagId: sql`ftt.tag_id`,
+  });
+}
+
+/** Matches transactions carrying any listed tag; the special id "untagged" matches transactions with no tags. */
+function tagFilterCondition(tagIds: string[], transactionIdExpr: SQL, linkTable: SQL, columns: { transactionId: SQL; tagId: SQL }): SQL {
+  const wantsUntagged = tagIds.includes("untagged");
+  const realIds = tagIds.filter((tagId) => tagId !== "untagged");
+  const parts: SQL[] = [];
+
+  if (realIds.length) {
+    parts.push(sql`exists (
+      select 1 from ${linkTable}
+      where ${columns.transactionId} = ${transactionIdExpr}
+        and ${columns.tagId} in (${sql.join(
+          realIds.map((tagId) => sql`${tagId}`),
+          sql`, `
+        )})
+    )`);
   }
 
-  return sql`exists (
-    select 1 from chhanchhan.finance_transaction_tags ftt
-    where ftt.transaction_id = t.id
-      and ftt.tag_id in (${sql.join(
-        tagIds.map((tagId) => sql`${tagId}`),
-        sql`, `
-      )})
-  )`;
+  if (wantsUntagged) {
+    parts.push(sql`not exists (
+      select 1 from ${linkTable}
+      where ${columns.transactionId} = ${transactionIdExpr}
+    )`);
+  }
+
+  return sql`(${sql.join(parts, sql` or `)})`;
 }
 
 function summaryTransactionFilters(selection: SummarySelection) {
   return {
     dateFilter: summaryDateFilter(selection),
-    groupFilter: summaryGroupVisibleFilter(selection.groupId),
+    spaceFilter: summarySpaceFilter(selection.spaceId),
     searchFilter: summarySearchFilter(selection.search),
-    categoryFilter: summaryCategoryFilter(selection.categoryFilters),
     tagFilter: summaryTagFilter(selection.tagIds),
   };
 }
 
-function summaryGroupVisibleFilter(groupId?: string) {
-  if (!groupId) return sql`true`;
+function summarySpaceFilter(spaceId?: string) {
+  if (!spaceId) return sql`true`;
 
   return sql`exists (
-    select 1 from chhanchhan.finance_transaction_groups ftg
-    where ftg.transaction_id = t.id
-      and ftg.group_id = ${groupId}
+    select 1 from chhanchhan.finance_space_transactions fst
+    where fst.transaction_id = t.id
+      and fst.space_id = ${spaceId}
   )`;
 }
 
@@ -1879,7 +1480,7 @@ function summaryDateFilter(selection: SummarySelection) {
 }
 
 export async function getAnalytics(accountId: string) {
-  const categorySpend = await getCategorySpend(accountId, { period: "month", month: currentMonthKey() });
+  const tagSpend = await getTagSpend(accountId, { period: "month", month: currentMonthKey() });
 
   const budgetUsage = await db.execute(sql`
     select
@@ -1890,7 +1491,14 @@ export async function getAnalytics(accountId: string) {
     from chhanchhan.finance_budgets b
     left join chhanchhan.finance_transactions t
       on t.account_id = b.account_id
-      and (b.category_id is null or t.category_id = b.category_id)
+      and (
+        b.tag_id is null
+        or exists (
+          select 1 from chhanchhan.finance_transaction_tags ftt
+          where ftt.transaction_id = t.id
+            and ftt.tag_id = b.tag_id
+        )
+      )
       and t.occurred_on between b.start_date and coalesce(b.end_date, now()::date)
     where b.account_id = ${accountId}
       and b.is_active = true
@@ -1913,7 +1521,7 @@ export async function getAnalytics(accountId: string) {
   return {
     monthly,
     allTime,
-    categorySpend,
+    tagSpend,
     budgetUsage: budgetUsage.rows as Array<{ id: string; name: string; limit_minor: number; spent_minor: number }>,
     goals: goals.rows as Array<{ id: string; name: string; target_minor: number; current_minor: number; status: string }>,
   };

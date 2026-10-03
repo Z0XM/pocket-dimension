@@ -1,25 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_CATEGORIES, DEFAULT_TAGS } from "./default-taxonomy";
-import { REFUND_CATEGORY_NAME, SPLIT_RETURN_CATEGORY_NAME } from "./refunds";
-import { isBillCategoryName } from "./bill-categories";
+import { DEFAULT_TAGS, REFUND_TAG_NAME, SPLIT_RETURN_TAG_NAME, isRefundTagName } from "./default-taxonomy";
 
-describe("default taxonomy", () => {
-  test("includes refund and bill categories used by special flows", () => {
-    const names = DEFAULT_CATEGORIES.map((category) => category.name);
-    expect(names).toContain(REFUND_CATEGORY_NAME);
-    expect(names).toContain(SPLIT_RETURN_CATEGORY_NAME);
-    expect(names.some((name) => isBillCategoryName(name))).toBe(true);
+describe("DEFAULT_TAGS", () => {
+  test("includes refund and bill tags used by special flows", () => {
+    const names = DEFAULT_TAGS.map((tag) => tag.name);
+    expect(names).toContain(REFUND_TAG_NAME);
+    expect(names).toContain(SPLIT_RETURN_TAG_NAME);
+    expect(names).toContain("Monthly Bill");
+    expect(names).toContain("Yearly Bill");
+    expect(names).toContain("Personal");
   });
 
-  test("category and tag names are unique", () => {
-    const categoryNames = DEFAULT_CATEGORIES.map((category) => category.name);
-    const tagNames = DEFAULT_TAGS.map((tag) => tag.name);
-    expect(new Set(categoryNames).size).toBe(categoryNames.length);
-    expect(new Set(tagNames).size).toBe(tagNames.length);
-  });
-
-  test("seeds both expense and income kinds", () => {
-    expect(DEFAULT_CATEGORIES.some((category) => category.kind === "expense")).toBe(true);
-    expect(DEFAULT_CATEGORIES.some((category) => category.kind === "income")).toBe(true);
+  test("isRefundTagName recognizes refund tags", () => {
+    expect(isRefundTagName(REFUND_TAG_NAME)).toBe(true);
+    expect(isRefundTagName(SPLIT_RETURN_TAG_NAME)).toBe(true);
+    expect(isRefundTagName("Food")).toBe(false);
   });
 });

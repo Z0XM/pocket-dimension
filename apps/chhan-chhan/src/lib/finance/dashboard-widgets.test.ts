@@ -4,7 +4,7 @@ import {
   parseDashboardWidgets,
   serializeDashboardWidgets,
   toSpendMeters,
-  buildCategoryTrendChart,
+  buildTagTrendChart,
 } from "$lib/finance/dashboard-widgets";
 
 describe("parseDashboardWidgets", () => {
@@ -13,7 +13,7 @@ describe("parseDashboardWidgets", () => {
   });
 
   test("parses comma-separated widget ids", () => {
-    expect(parseDashboardWidgets("category-spend,monthly-trend,budgets")).toEqual(["category-spend", "monthly-trend", "budgets"]);
+    expect(parseDashboardWidgets("tag-spend,monthly-trend,budgets")).toEqual(["tag-spend", "monthly-trend", "budgets"]);
   });
 
   test("ignores unknown ids and falls back to defaults when empty", () => {
@@ -23,7 +23,7 @@ describe("parseDashboardWidgets", () => {
 
 describe("serializeDashboardWidgets", () => {
   test("joins widget ids", () => {
-    expect(serializeDashboardWidgets(["category-spend", "goals"])).toBe("category-spend,goals");
+    expect(serializeDashboardWidgets(["tag-spend", "goals"])).toBe("tag-spend,goals");
   });
 });
 
@@ -42,22 +42,22 @@ describe("toSpendMeters", () => {
   });
 });
 
-describe("buildCategoryTrendChart", () => {
-  test("builds stacked monthly series for top categories", () => {
+describe("buildTagTrendChart", () => {
+  test("builds stacked monthly series for top tags", () => {
     const now = new Date(2026, 3, 15);
-    const chart = buildCategoryTrendChart(
+    const chart = buildTagTrendChart(
       [
-        { month_key: "2026-03", category_name: "Food", amount_minor: 1000 },
-        { month_key: "2026-03", category_name: "Travel", amount_minor: 2000 },
-        { month_key: "2026-04", category_name: "Food", amount_minor: 1500 },
-        { month_key: "2026-04", category_name: "Misc", amount_minor: 500 },
+        { month_key: "2026-03", tag_name: "Food", amount_minor: 1000 },
+        { month_key: "2026-03", tag_name: "Travel", amount_minor: 2000 },
+        { month_key: "2026-04", tag_name: "Food", amount_minor: 1500 },
+        { month_key: "2026-04", tag_name: "Misc", amount_minor: 500 },
       ],
       3,
       2,
       now
     );
 
-    expect(chart.categories.map((category) => category.name)).toEqual(["Food", "Travel", "Other"]);
+    expect(chart.tags.map((tag) => tag.name)).toEqual(["Food", "Travel", "Other"]);
     expect(chart.months).toHaveLength(3);
     expect(chart.months.find((month) => month.monthKey === "2026-03")?.totalMinor).toBe(3000);
     expect(chart.months.find((month) => month.monthKey === "2026-04")?.segments.find((segment) => segment.name === "Other")?.amountMinor).toBe(500);

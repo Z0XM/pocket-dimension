@@ -39,8 +39,6 @@ export type ImportResult = {
 export type ImportPreviewRowStatus = "will_import" | "duplicate" | "invalid" | "warning";
 
 export type ImportClassificationSuggestion = {
-  categoryId: string | null;
-  categoryName: string | null;
   tagIds: string[];
   tagNames: string[];
   source: "exact" | "fuzzy";
@@ -64,15 +62,10 @@ export type ImportPreviewRow = {
 };
 
 export type ImportPreviewTaxonomy = {
-  categories: Array<{
-    id: string;
-    name: string;
-    kind: "expense" | "income" | "transfer";
-    colorHex: string | null;
-  }>;
   tags: Array<{
     id: string;
     name: string;
+    kind: "expense" | "income" | "transfer" | null;
     colorHex: string | null;
   }>;
 };
@@ -100,7 +93,6 @@ export type ImportPreview = {
 };
 
 export type ImportRowAssignment = {
-  categoryId?: string | null;
   tagIds?: string[];
 };
 

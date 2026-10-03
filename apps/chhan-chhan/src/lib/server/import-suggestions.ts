@@ -7,20 +7,10 @@ type TxType = "expense" | "income" | "transfer";
 
 type MerchantIntel = {
   merchant: string;
-  categoryId: string | null;
-  categoryName: string | null;
-  categoryCount: number;
-  categoryTotal: number;
   tagIds: string[];
   tagNames: string[];
   tagCount: number;
   tagTotal: number;
-};
-
-type CategoryBucket = {
-  categoryId: string | null;
-  categoryName: string;
-  count: number;
 };
 
 type TagProfile = {
@@ -30,17 +20,8 @@ type TagProfile = {
 };
 
 export type ResolvedImportAssignment = {
-  setCategory: boolean;
-  categoryId: string | null;
   tagIds: string[];
 };
-
-function pickBestCategory(buckets: CategoryBucket[]): CategoryBucket | null {
-  if (!buckets.length) return null;
-  const categorized = buckets.filter((bucket) => bucket.categoryId != null);
-  const pool = categorized.length ? categorized : buckets;
-  return [...pool].sort((a, b) => b.count - a.count || a.categoryName.localeCompare(b.categoryName))[0] ?? null;
-}
 
 function pickBestTagProfile(profiles: TagProfile[]): TagProfile | null {
   const withTags = profiles.filter((profile) => profile.tagIds.length > 0);
@@ -53,43 +34,6 @@ function tagProfileKey(tagIds: string[]): string {
 }
 
 async function buildMerchantIntelMap(accountId: string, type: TxType): Promise<Map<string, MerchantIntel>> {
-  const categoryResult = await db.execute(sql`
-    select
-      lower(trim(t.merchant)) as merchant_key,
-      min(trim(t.merchant)) as merchant,
-      t.category_id,
-      coalesce(c.name, 'Uncategorized') as category_name,
-      count(*)::int as row_count
-    from chhanchhan.finance_transactions t
-    left join chhanchhan.finance_categories c on c.id = t.category_id
-    where t.account_id = ${accountId}
-      and t.type = ${type}
-      and t.merchant is not null
-      and trim(t.merchant) != ''
-    group by lower(trim(t.merchant)), t.category_id, c.name
-  `);
-
-  const bucketsByMerchant = new Map<string, { merchant: string; buckets: CategoryBucket[]; total: number }>();
-  for (const row of categoryResult.rows) {
-    const typed = row as {
-      merchant_key: string;
-      merchant: string;
-      category_id: string | null;
-      category_name: string;
-      row_count: number;
-    };
-    const key = String(typed.merchant_key);
-    const existing = bucketsByMerchant.get(key) ?? { merchant: String(typed.merchant), buckets: [], total: 0 };
-    existing.merchant = String(typed.merchant);
-    existing.buckets.push({
-      categoryId: typed.category_id ?? null,
-      categoryName: String(typed.category_name),
-      count: Number(typed.row_count),
-    });
-    existing.total += Number(typed.row_count);
-    bucketsByMerchant.set(key, existing);
-  }
-
   const txResult = await db.execute(sql`
     select
       t.id,
@@ -157,25 +101,16 @@ async function buildMerchantIntelMap(accountId: string, type: TxType): Promise<M
   }
 
   const intel = new Map<string, MerchantIntel>();
-  const keys = new Set([...bucketsByMerchant.keys(), ...profilesByMerchant.keys()]);
 
-  for (const key of keys) {
-    const categoryMeta = bucketsByMerchant.get(key);
-    const tagMeta = profilesByMerchant.get(key);
-    const bestCategory = categoryMeta ? pickBestCategory(categoryMeta.buckets) : null;
-    const bestTags = tagMeta ? pickBestTagProfile([...tagMeta.profiles.values()]) : null;
-    const merchant = categoryMeta?.merchant ?? tagMeta?.merchant ?? key;
+  for (const [key, tagMeta] of profilesByMerchant) {
+    const bestTags = pickBestTagProfile([...tagMeta.profiles.values()]);
 
     intel.set(key, {
-      merchant,
-      categoryId: bestCategory?.categoryId ?? null,
-      categoryName: bestCategory?.categoryId ? bestCategory.categoryName : null,
-      categoryCount: bestCategory?.count ?? 0,
-      categoryTotal: categoryMeta?.total ?? 0,
+      merchant: tagMeta.merchant,
       tagIds: bestTags?.tagIds ?? [],
       tagNames: bestTags?.tagNames ?? [],
       tagCount: bestTags?.count ?? 0,
-      tagTotal: tagMeta?.total ?? 0,
+      tagTotal: tagMeta.total,
     });
   }
 
@@ -183,18 +118,14 @@ async function buildMerchantIntelMap(accountId: string, type: TxType): Promise<M
 }
 
 function suggestionFromIntel(intel: MerchantIntel, source: "exact" | "fuzzy"): ImportClassificationSuggestion | null {
-  const hasCategory = Boolean(intel.categoryId);
-  const hasTags = intel.tagIds.length > 0;
-  if (!hasCategory && !hasTags) return null;
+  if (!intel.tagIds.length) return null;
 
   return {
-    categoryId: intel.categoryId,
-    categoryName: intel.categoryName,
     tagIds: [...intel.tagIds],
     tagNames: [...intel.tagNames],
     source,
     matchedMerchant: intel.merchant,
-    sampleCount: Math.max(intel.categoryCount, intel.tagCount, 1),
+    sampleCount: Math.max(intel.tagCount, 1),
   };
 }
 
@@ -253,56 +184,35 @@ export async function enrichPreviewRowsWithSuggestions(accountId: string, rows: 
 }
 
 export async function loadImportTaxonomy(accountId: string): Promise<ImportPreviewTaxonomy> {
-  const [categories, tags] = await Promise.all([
-    db
-      .select({
-        id: schema.financeCategories.id,
-        name: schema.financeCategories.name,
-        kind: schema.financeCategories.kind,
-        colorHex: schema.financeCategories.colorHex,
-      })
-      .from(schema.financeCategories)
-      .where(eq(schema.financeCategories.accountId, accountId))
-      .orderBy(asc(schema.financeCategories.name)),
-    db
-      .select({
-        id: schema.financeTags.id,
-        name: schema.financeTags.name,
-        colorHex: schema.financeTags.colorHex,
-      })
-      .from(schema.financeTags)
-      .where(eq(schema.financeTags.accountId, accountId))
-      .orderBy(asc(schema.financeTags.name)),
-  ]);
+  const tags = await db
+    .select({
+      id: schema.financeTags.id,
+      name: schema.financeTags.name,
+      kind: schema.financeTags.kind,
+      colorHex: schema.financeTags.colorHex,
+    })
+    .from(schema.financeTags)
+    .where(eq(schema.financeTags.accountId, accountId))
+    .orderBy(asc(schema.financeTags.name));
 
-  return { categories, tags };
+  return { tags };
 }
 
 export async function resolveImportAssignments(
   accountId: string,
-  assignments: Record<string, { categoryId?: string | null; tagIds?: string[] }> | undefined
+  assignments: Record<string, { tagIds?: string[] }> | undefined
 ): Promise<Map<number, ResolvedImportAssignment>> {
   const resolved = new Map<number, ResolvedImportAssignment>();
   if (!assignments) return resolved;
 
-  const [categoryRows, tagRows] = await Promise.all([
-    db.select({ id: schema.financeCategories.id }).from(schema.financeCategories).where(eq(schema.financeCategories.accountId, accountId)),
-    db.select({ id: schema.financeTags.id }).from(schema.financeTags).where(eq(schema.financeTags.accountId, accountId)),
-  ]);
-  const categoryIds = new Set(categoryRows.map((row) => row.id));
+  const tagRows = await db.select({ id: schema.financeTags.id }).from(schema.financeTags).where(eq(schema.financeTags.accountId, accountId));
   const tagIds = new Set(tagRows.map((row) => row.id));
 
   for (const [key, assignment] of Object.entries(assignments)) {
     const rowNumber = Number(key);
     if (!Number.isInteger(rowNumber) || rowNumber < 1) continue;
 
-    const setCategory = Object.prototype.hasOwnProperty.call(assignment, "categoryId");
-    const categoryId =
-      setCategory && typeof assignment.categoryId === "string" && categoryIds.has(assignment.categoryId) ? assignment.categoryId : null;
-
     resolved.set(rowNumber, {
-      setCategory,
-      categoryId,
       tagIds: (assignment.tagIds ?? []).filter((tagId) => tagIds.has(tagId)),
     });
   }

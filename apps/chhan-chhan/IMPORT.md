@@ -18,7 +18,7 @@ Statement file (CSV / PDF)
 |-------------|------|
 | UI (Control) | Upload → `POST /api/accounts/[id]/transactions/import` or `/import/stream` |
 | CLI backfill / reset | `bun --env-file=.env scripts/dedupe-transactions.ts <account-id> [file.pdf] [--reset]` |
-| Excel legacy sync | `scripts/sync-from-excel.ts` (separate; category mapping only) |
+| Excel legacy sync | `scripts/sync-from-excel.ts` (separate; maps Excel labels → tags) |
 | Control clear-all | `?/clearAllTransactions` → `resetAccountTransactions()` |
 
 ### Supported importers
@@ -205,7 +205,7 @@ Kotak **reuses refs** across related legs (deposit + fee, auth + reversal) — d
 bun --env-file=.env scripts/dedupe-transactions.ts <account-id> data/bank-all-2.pdf --reset
 ```
 
-Warning: `--reset` deletes **all** transactions for the account (tags, groups, refund links cascade). Re-apply manual metadata afterward.
+Warning: `--reset` deletes **all** transactions for the account (tags and space links cascade). Re-apply manual metadata afterward.
 
 **Backfill only** (keep existing rows, add missing):
 
@@ -371,7 +371,7 @@ Account balance in UI may differ from sum of visible filtered transactions — i
 | Script | Purpose |
 |--------|---------|
 | `scripts/dedupe-transactions.ts` | Dedupe, backfill, or `--reset` + full reimport from PDF |
-| `scripts/sync-from-excel.ts` | Legacy Excel → categories (not statement import) |
+| `scripts/sync-from-excel.ts` | Legacy Excel → tags (not statement import) |
 | `scripts/clear-transaction-notes.ts` | Bulk note cleanup |
 
 ---
@@ -385,7 +385,7 @@ Account balance in UI may differ from sum of visible filtered transactions — i
 5. [ ] Verify: `COUNT(*) = COUNT(DISTINCT sort_order) = parsed row count`.
 6. [ ] Spot-check balance card vs statement closing balance.
 7. [ ] Search for a known recent txn by `external_ref`.
-8. [ ] Re-apply tags, groups, refund links if this was a `--reset` reimport.
+8. [ ] Re-apply tags and spaces if this was a `--reset` reimport.
 
 ---
 

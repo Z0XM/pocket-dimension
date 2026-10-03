@@ -62,7 +62,7 @@ requireUser(locals)              // 401 if no locals.user.id
 | `http.ts` | 26 | `readJsonBody`/`parseSearch` — Zod-validated request/query parsing, called after authz in every route. |
 | `pdf-text.ts` | 7 | `extractPdfText(bytes)` via `unpdf` — merges pages, collapses all whitespace to single spaces. This whitespace-collapsing is load-bearing for every PDF importer's regexes. |
 | `import.ts` | 301 | The import engine — see [Importer pipeline](#importer-pipeline) below. |
-| `finance.ts` | 1,844 | The single largest file in the app — all CRUD + analytics for accounts, categories, tags, groups, transactions, budgets, goals, refund-links, smart-categorize/smart-tag, and every dashboard aggregate query. ~45 exported functions. |
+| `finance.ts` | largest | All CRUD + analytics for accounts, tags, spaces, transactions, budgets, goals, smart-tag, and every dashboard aggregate query. |
 
 ## Importer pipeline
 
@@ -93,7 +93,7 @@ StatementInput { fileName, mimeType, bytes }
 
 Dedup is bank-agnostic (`src/lib/importers/transaction-dedup.ts` + `import.ts`): prefer `externalRef|date|amount|type`, fall back to `date|amount|merchant|type` when no ref is present. Amount+type stay in the key even when a ref is present because Kotak reuses refs across related legs (deposit + fee, auth + reversal).
 
-**Reset:** `resetAccountTransactions(accountId)` deletes all transactions for an account and nulls the account's balance snapshot — cascades tags/groups/refund-links per FK `onDelete: cascade`, no soft-delete/undo. Wired to Control's "clear all transactions" danger-zone action and the `--reset` flag on `scripts/dedupe-transactions.ts`.
+**Reset:** `resetAccountTransactions(accountId)` deletes all transactions for an account and nulls the account's balance snapshot — cascades tag links and space membership/allocations per FK `onDelete: cascade`, no soft-delete/undo. Wired to Control's "clear all transactions" danger-zone action and the `--reset` flag on `scripts/dedupe-transactions.ts`.
 
 Full operational detail (per-bank strategy, known issues #1–#7, debugging playbook): `apps/chhan-chhan/IMPORT.md`. See [project-context.md](./project-context.md) for gaps found between `IMPORT.md`/code and the real importer behavior.
 

@@ -43,8 +43,8 @@ When adding a bank: `{bank}.ts` + `{bank}-pdf.ts` + `{bank}-shared.ts` + tests +
 ## Control center
 
 - Import (stream), currency, **first transaction date**, **opening balance** set/clear
-- Export CSV (always the whole account — ignores filters), categories/tags/groups CRUD
-- **Danger zone:** clear all transactions → `resetAccountTransactions` (nulls account balance; keeps category/tag/group definitions)
+- Export CSV (always the whole account — ignores filters), tags + spaces CRUD, seed default tags
+- **Danger zone:** clear all transactions → `resetAccountTransactions` (nulls account balance; keeps tag/space definitions)
 - **No budgets/goals UI at all** — those resources exist only via direct API calls (list/create/update); see the gotcha below.
 
 ## Balance
@@ -57,9 +57,9 @@ When adding a bank: `{bank}.ts` + `{bank}-pdf.ts` + `{bank}-shared.ts` + tests +
 
 | Route | Purpose |
 |-------|---------|
-| `/app` | Ledger + filters + smart cat/tag + refunds |
-| `/app/dashboards` | Widgetized analytics (budgets/goals display; Control CRUD still backlog) |
-| `/app/control` | Import/export/metadata/opening balance/clear-all |
+| `/app` | Ledger + filters + smart tag + spaces |
+| `/app/dashboards` | Widgetized analytics (tag/space spend, budgets/goals display; Control CRUD still backlog) |
+| `/app/control` | Import/export/metadata/opening balance/tags/spaces/clear-all |
 
 ## Multi-account (planned, not implemented)
 
@@ -84,10 +84,9 @@ These are real, currently-present issues in `apps/chhan-chhan` — check before 
 7. **`IMPORT.md`'s Kotak PDF section is incomplete relative to the code (not wrong, just missing coverage).** It documents only the legacy "Account Statement" chunking strategy. The code has a second, fully-implemented and tested "monthly" PDF format (`isKotakMonthlyPdf`/`parseKotakMonthlyPdf`/`stripKotakMonthlyPdfChunkFooter`, signed amounts, per-transaction timestamps, reverse-chronological row order requiring an explicit `.reverse()`) that `IMPORT.md` never mentions — including that the "MUKUL SINGH" hardcode limitation (gotcha #3 above) also applies to it.
 8. **Import loop is unbatched and untransacted.** `importTransactionRows`'s per-row `await db.insert(...)` runs inside a plain `for...of` loop with no wrapping `db.transaction()` — a large statement means many sequential DB round-trips, and a mid-import crash leaves a partial import with no rollback.
 9. **`import-report.ts` hardcodes `formatMoney(amountMinor, "INR")`** for the downloadable import-issue report — a non-INR account's report shows amounts with a ₹ symbol regardless of the account's actual currency.
-10. **Refund/split-return and "bill" categorization are both purely category-name string matches**, not a schema flag (`$lib/finance/refunds.ts`, `$lib/finance/bill-categories.ts`). Renaming a category silently breaks refund-link validation or bill-widget grouping — no error, just quietly stops matching.
-11. **`finance_categories.parent_category_id` has no DB-level foreign key** (unlike every other relationship in the schema) and no current app code path writes to it — schema-only, unused, unconstrained.
-12. **HDFC/ICICI PDF parsers silently drop rows with `amountMinor <= 0`** with zero reporting beyond the aggregate `rejected`/`skipped` counts — no per-row "PDF parse failed" issue type exists for these regex-non-match cases (only Zod-validation failures get an `ImportIssue`).
-13. **Local browser session stickiness.** Better Auth cookies use `secure: true`/`sameSite: "none"` (shared by every app via `@pocket-dimension/auth`). Over plain `http://localhost:3005` the browser may refuse to persist the session, so a logged-in session may not stick across reloads locally. Signup/API calls still succeed; flip `email_verified` directly in the `auth.user` table to test verified-only flows.
+10. **Refund/split-return and "bill" labels are purely tag-name string matches**, not a schema flag (`$lib/finance/default-taxonomy.ts` for Refund/Split Return; `$lib/finance/bill-categories.ts` for bills). Renaming those tags silently breaks special flows — no error, just quietly stops matching. Linked money relationships live in **Spaces** (membership + allocations), not a separate refund-links table.
+11. **HDFC/ICICI PDF parsers silently drop rows with `amountMinor <= 0`** with zero reporting beyond the aggregate `rejected`/`skipped` counts — no per-row "PDF parse failed" issue type exists for these regex-non-match cases (only Zod-validation failures get an `ImportIssue`).
+12. **Local browser session stickiness.** Better Auth cookies use `secure: true`/`sameSite: "none"` (shared by every app via `@pocket-dimension/auth`). Over plain `http://localhost:3005` the browser may refuse to persist the session, so a logged-in session may not stick across reloads locally. Signup/API calls still succeed; flip `email_verified` directly in the `auth.user` table to test verified-only flows.
 
 ## Anti-patterns / things not to repeat
 
@@ -96,7 +95,8 @@ These are real, currently-present issues in `apps/chhan-chhan` — check before 
 - Don't hardcode a currency code in a new write path — read it from `getAccountCurrency(accountId)` the way `importTransactionRows` does; don't repeat `createTransaction()`'s USD-hardcode mistake (gotcha #1).
 - Don't call `getOrCreateDefaultAccount` from a *new* code path if you're implementing multi-account UI — wait for (or build) `resolveActiveAccount` per `planning-artifacts/architecture-multi-account.md`; adding more `getOrCreateDefaultAccount` call sites increases the alphabetical-default blast radius (gotcha #2).
 - Don't duplicate `METER_COLORS` — it's exported from `$lib/finance/dashboard-widgets.ts`; the ledger's own server load currently hardcodes a copy and should be migrated to the shared constant if touched.
-- Don't add refund/bill classification logic anywhere except `$lib/finance/refunds.ts`/`$lib/finance/bill-categories.ts` — both are already fragile (name-string matching); a third independent copy would triple the fragility.
+- Don't add refund/bill classification logic anywhere except `$lib/finance/default-taxonomy.ts` / `$lib/finance/bill-categories.ts` — both are fragile name-string matches; a third independent copy would triple the fragility.
+- Don't reintroduce categories, groups, or refund-links tables — classifiers are **Tags + Spaces only** (see [data-models.md](./data-models.md)).
 
 ## Where NOT to write docs
 
