@@ -1,4 +1,13 @@
-export type AppId = "watchlist" | "rhymes" | "howwasyourday" | "chhan-chhan" | "me-via-you" | "markitdown" | "zeo";
+export type AppId =
+  | "watchlist"
+  | "rhymes"
+  | "howwasyourday"
+  | "chhan-chhan"
+  | "me-via-you"
+  | "markitdown"
+  | "zeo"
+  | "dashboard"
+  | "heimdall";
 
 export type AppEntry = {
   id: AppId;
@@ -49,6 +58,18 @@ export const appCatalog: AppEntry[] = [
     name: "Zeo",
     description: "Group video calls, games, and shared listening.",
     envKey: "POCKET_APP_ZEO_URL",
+  },
+  {
+    id: "dashboard",
+    name: "Dashboard",
+    description: "BMAD Showcase of epics, stories, and docs.",
+    envKey: "POCKET_APP_DASHBOARD_URL",
+  },
+  {
+    id: "heimdall",
+    name: "Heimdall",
+    description: "BMAD / docs War Room for the monorepo.",
+    envKey: "POCKET_APP_HEIMDALL_URL",
   },
 ];
 
