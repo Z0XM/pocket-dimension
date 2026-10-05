@@ -1002,6 +1002,131 @@
       padding: 0.85rem;
       max-height: 96vh;
       transform: none;
+      width: 100%;
+      border-radius: 4px 10px 6px 8px / 8px 4px 10px 6px;
+    }
+
+    .overlay {
+      padding: 0.5rem;
+      align-items: stretch;
+    }
+
+    .balance-card > div {
+      min-width: 0;
+      flex: 1 1 100%;
+    }
+
+    .foot-copy {
+      min-width: 0;
+    }
+
+    .sheet-foot {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.65rem;
+    }
+
+    .foot-actions {
+      width: 100%;
+    }
+
+    .foot-actions .primary,
+    .foot-actions .ghost {
+      flex: 1 1 auto;
+      min-height: 2.5rem;
+    }
+
+    .merchant-cell {
+      min-width: 0;
+    }
+
+    .table-wrap {
+      min-height: 10rem;
+    }
+
+    .table-wrap thead {
+      display: none;
+    }
+
+    .table-wrap table,
+    .table-wrap tbody {
+      display: block;
+      width: 100%;
+    }
+
+    .table-wrap tbody tr {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      grid-template-areas:
+        "num status amount"
+        "date type type"
+        "merchant merchant merchant"
+        "tags tags tags"
+        "notes notes notes";
+      gap: 0.25rem 0.55rem;
+      padding: 0.7rem 0.55rem;
+      border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+    }
+
+    .table-wrap tbody tr:has(td.empty),
+    .table-wrap tbody tr:has(td[colspan]) {
+      display: block;
+      padding: 0.85rem 0.55rem;
+    }
+
+    .table-wrap tbody td {
+      border: none;
+      padding: 0;
+      background: transparent !important;
+      min-width: 0 !important;
+    }
+
+    .table-wrap tbody td:nth-child(1) {
+      grid-area: num;
+      color: var(--ink-muted);
+      font-size: 0.85rem;
+    }
+
+    .table-wrap tbody td:nth-child(2) {
+      grid-area: status;
+    }
+
+    .table-wrap tbody td:nth-child(3) {
+      grid-area: date;
+      font-size: 0.88rem;
+    }
+
+    .table-wrap tbody td:nth-child(4) {
+      grid-area: type;
+      font-size: 0.88rem;
+      color: var(--ink-muted);
+    }
+
+    .table-wrap tbody td:nth-child(5),
+    .table-wrap tbody td.num {
+      grid-area: amount;
+      justify-self: end;
+      font-size: 1.02rem;
+    }
+
+    .table-wrap tbody td:nth-child(6) {
+      grid-area: merchant;
+    }
+
+    .table-wrap tbody td:nth-child(7) {
+      grid-area: tags;
+    }
+
+    .table-wrap tbody td:nth-child(8) {
+      grid-area: notes;
+      font-size: 0.88rem;
+      color: var(--ink-muted);
+    }
+
+    .tag-add-btn,
+    .tag-remove {
+      min-width: 2.25rem;
+      min-height: 2.25rem;
     }
   }
 </style>

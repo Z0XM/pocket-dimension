@@ -959,4 +959,21 @@
       grid-column: auto;
     }
   }
+
+  @media (max-width: 640px) {
+    .period-tabs button {
+      min-height: 2.5rem;
+      padding: 0.4rem 0.65rem;
+    }
+
+    .sticky-stack {
+      display: none;
+    }
+
+    .flow {
+      font-size: 1rem;
+      gap: 0.25rem 0.4rem;
+      margin-bottom: 0.75rem;
+    }
+  }
 </style>

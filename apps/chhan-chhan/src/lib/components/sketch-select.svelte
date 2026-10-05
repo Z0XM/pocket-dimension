@@ -457,4 +457,20 @@
     cursor: pointer;
     border-radius: 3px 8px 4px 7px / 7px 3px 8px 4px;
   }
+
+  @media (max-width: 640px) {
+    .sketch-select.searchable .sketch-menu {
+      min-width: min(100%, 16rem);
+      max-width: calc(100vw - 1.5rem);
+    }
+
+    .sketch-trigger {
+      min-height: 2.5rem;
+    }
+
+    .sketch-done {
+      min-height: 2.5rem;
+      padding: 0.35rem 0.85rem;
+    }
+  }
 </style>

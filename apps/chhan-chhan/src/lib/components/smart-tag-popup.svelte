@@ -406,4 +406,24 @@
     opacity: 0.55;
     cursor: wait;
   }
+
+  @media (max-width: 480px) {
+    .smart-tag-close {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+
+    .smart-tag-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .btn-ghost,
+    .btn-ink {
+      width: 100%;
+      min-height: 2.5rem;
+      justify-content: center;
+      text-align: center;
+    }
+  }
 </style>

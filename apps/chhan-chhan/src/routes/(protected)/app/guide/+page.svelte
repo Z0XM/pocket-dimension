@@ -268,6 +268,10 @@
   }
 
   @media (max-width: 720px) {
+    .notes {
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+    }
+
     .note.wide {
       grid-column: span 1;
     }

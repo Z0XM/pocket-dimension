@@ -1904,4 +1904,26 @@
     gap: 0.35rem;
     min-width: 0;
   }
+
+  @media (max-width: 640px) {
+    .organize-col .list li {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.35rem;
+    }
+
+    .organize-col .list li .row-actions {
+      justify-content: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .icon-btn {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+
+    .organize-plus {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+  }
 </style>

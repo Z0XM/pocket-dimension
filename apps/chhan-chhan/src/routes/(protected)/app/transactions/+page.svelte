@@ -2293,4 +2293,245 @@
     opacity: 0.55;
     cursor: wait;
   }
+
+  @media (max-width: 640px) {
+    .tx-page .topbar {
+      margin-bottom: 0.65rem;
+    }
+
+    .balance-combo {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.55rem;
+      margin: 0 0 0.55rem;
+    }
+
+    .balance-open {
+      flex: none;
+    }
+
+    .balance-open .v {
+      font-size: clamp(1.85rem, 9vw, 2.6rem);
+    }
+
+    .balance-open .meta {
+      font-size: 0.78rem;
+    }
+
+    .balance-combo .stats-controls {
+      align-items: stretch;
+      gap: 0.55rem;
+      width: 100%;
+    }
+
+    .balance-combo .stats-label,
+    .balance-combo .summary-tabs,
+    .balance-combo .flow-tools {
+      justify-content: flex-start;
+    }
+
+    .stats-controls {
+      gap: 0.55rem;
+    }
+
+    .summary-tabs {
+      width: 100%;
+      justify-content: stretch;
+    }
+
+    .summary-tabs button {
+      flex: 1 1 0;
+      min-height: 2.5rem;
+      padding: 0.4rem 0.55rem;
+    }
+
+    .stats-block {
+      margin-bottom: 0.55rem;
+    }
+
+    .table-toolbar {
+      gap: 0.55rem;
+    }
+
+    .table-toolbar .flow {
+      width: 100%;
+      font-size: 1rem;
+      gap: 0.25rem 0.4rem;
+    }
+
+    .flow .arrow {
+      font-size: 1rem;
+    }
+
+    .node-v {
+      font-size: 1.05rem;
+    }
+
+    .flow button.node.active .node-v {
+      font-size: 1.2rem;
+    }
+
+    .stats-tools {
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .stats-search {
+      flex: 1 1 auto;
+      min-width: 0;
+      width: auto;
+      max-width: none;
+    }
+
+    .calc-mode-btn {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+
+    .note-btn,
+    .space-link-btn,
+    .tag-add-btn {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+
+    .tag-remove {
+      min-width: 1.75rem;
+      min-height: 1.75rem;
+      padding: 0.25rem;
+      margin-left: 0.1rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tx-tag {
+      padding: 0.2rem 0.35rem;
+      font-size: 0.88rem;
+    }
+
+    .merchant-cell {
+      min-width: 0;
+      max-width: none;
+    }
+
+    .note-preview,
+    .space-preview {
+      display: none;
+    }
+
+    .note-popup,
+    .space-popup,
+    .tag-add-menu {
+      left: auto;
+      right: 0;
+      top: calc(100% + 0.35rem);
+      width: min(16rem, calc(100vw - 2rem));
+      max-width: calc(100vw - 2rem);
+    }
+
+    .tx-page .table-sheet thead {
+      display: none;
+    }
+
+    .tx-page .table-sheet table,
+    .tx-page .table-sheet tbody {
+      display: block;
+      width: 100%;
+    }
+
+    .tx-page .table-sheet tbody tr {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        "date amount"
+        "merchant merchant"
+        "tags balance";
+      gap: 0.3rem 0.75rem;
+      padding: 0.75rem 0.7rem;
+      border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+      align-items: start;
+    }
+
+    .tx-page .table-sheet tbody tr:nth-child(even) {
+      background: color-mix(in srgb, var(--blue) 8%, transparent);
+    }
+
+    .tx-page .table-sheet tbody tr:hover {
+      background: color-mix(in srgb, var(--blue) 18%, transparent);
+    }
+
+    .tx-page .table-sheet tbody td {
+      border: none;
+      padding: 0;
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+
+    .tx-page .table-sheet tbody td:nth-child(1) {
+      grid-area: date;
+      font-size: 0.88rem;
+    }
+
+    .tx-page .table-sheet tbody td.merchant-cell {
+      grid-area: merchant;
+    }
+
+    .tx-page .table-sheet tbody td.tags {
+      grid-area: tags;
+      min-width: 0;
+    }
+
+    .tx-page .table-sheet tbody td.amt {
+      grid-area: amount;
+      text-align: right;
+      font-size: 1.05rem;
+      justify-self: end;
+    }
+
+    .tx-page .table-sheet tbody td.balance-cell {
+      grid-area: balance;
+      text-align: right;
+      font-size: 0.82rem;
+      justify-self: end;
+      align-self: end;
+    }
+
+    .tx-page .table-sheet tbody td.balance-cell::before {
+      content: "bal ";
+      color: var(--ink-soft);
+      font-size: 0.75rem;
+    }
+
+    .tx-page .table-sheet tbody tr:has(td.empty-row),
+    .tx-page .table-sheet tbody tr:has(td[colspan]) {
+      display: block;
+      padding: 1rem 0.7rem;
+    }
+
+    .tx-page .table-sheet tbody td.empty-row,
+    .tx-page .table-sheet tbody td[colspan] {
+      display: block;
+      width: 100%;
+    }
+
+    tr.calc-mode-selected td:first-child {
+      box-shadow: none;
+    }
+
+    tr.calc-mode-selected {
+      box-shadow: inset 3px 0 0 color-mix(in srgb, var(--yellow) 85%, var(--ink));
+      background: color-mix(in srgb, var(--yellow) 42%, transparent);
+    }
+
+    .merchant-row .merchant {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .space-filter-wrap {
+      width: 100%;
+      flex-wrap: wrap;
+    }
+  }
 </style>
