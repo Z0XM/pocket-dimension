@@ -2,7 +2,7 @@
 title: 'chhan-chhan mobile-friendly screens'
 type: 'feature'
 created: '2026-10-05'
-status: 'ready-for-dev'
+status: 'in-review'
 context:
   - '{project-root}/_bmad-output/chhan-chhan/project-context.md'
 ---
