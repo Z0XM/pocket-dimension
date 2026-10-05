@@ -359,4 +359,23 @@
     min-width: 0;
     line-height: 1.25;
   }
+
+  @media (max-width: 640px) {
+    .filter-icon-btn {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+
+    .filter-multi-btn {
+      min-height: 2.5rem;
+      padding: 0.35rem 0.1rem 0.4rem;
+      align-items: center;
+    }
+
+    .filter-option {
+      min-height: 2.5rem;
+      align-items: center;
+      padding: 0.4rem 0.45rem;
+    }
+  }
 </style>

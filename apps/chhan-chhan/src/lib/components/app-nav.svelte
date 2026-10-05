@@ -47,4 +47,20 @@
     flex-wrap: wrap;
     gap: inherit;
   }
+
+  @media (max-width: 640px) {
+    .app-nav {
+      gap: 0.45rem 0.75rem;
+      width: 100%;
+    }
+
+    .tabs {
+      gap: 0.1rem;
+    }
+
+    .app-nav :global(.account-switcher) {
+      flex: 1 1 100%;
+      max-width: 100%;
+    }
+  }
 </style>

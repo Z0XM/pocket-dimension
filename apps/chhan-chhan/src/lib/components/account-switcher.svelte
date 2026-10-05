@@ -230,4 +230,31 @@
     font-size: 0.82rem;
     color: var(--neg);
   }
+
+  @media (max-width: 640px) {
+    .account-switcher {
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .account-trigger {
+      min-height: 2.5rem;
+      padding: 0.35rem 0.1rem 0.35rem;
+      align-items: center;
+    }
+
+    .account-menu {
+      min-width: 100%;
+      max-width: min(100vw - 1.5rem, 22rem);
+      right: 0;
+      left: auto;
+    }
+
+    .account-option {
+      min-height: 2.5rem;
+      align-items: center;
+      padding: 0.4rem 0.55rem;
+    }
+  }
 </style>

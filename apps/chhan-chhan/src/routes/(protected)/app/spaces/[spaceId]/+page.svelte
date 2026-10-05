@@ -2370,4 +2370,172 @@
       transform: rotate(90deg);
     }
   }
+
+  @media (max-width: 640px) {
+    .space-page > .topbar {
+      margin-bottom: 0.65rem;
+    }
+
+    .title-row {
+      flex-wrap: wrap;
+      gap: 0.35rem 0.65rem;
+      width: 100%;
+    }
+
+    .topbar h1 {
+      font-size: clamp(1.35rem, 6.5vw, 1.75rem);
+      width: 100%;
+    }
+
+    .summary-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.45rem;
+    }
+
+    .summary-row .flow {
+      width: 100%;
+      font-size: 0.98rem;
+      gap: 0.25rem 0.4rem;
+    }
+
+    .manage-link {
+      align-self: flex-start;
+    }
+
+    .paper-tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      padding: 0 0.35rem;
+      gap: 0;
+    }
+
+    .paper-tab {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      padding: 0.4rem 0.75rem 0.7rem;
+      font-size: 0.95rem;
+      min-height: 2.5rem;
+      margin-right: -0.15rem;
+      transform: none;
+    }
+
+    .paper-tab.active {
+      transform: none;
+      padding-bottom: 0.8rem;
+    }
+
+    .notebook-sheet {
+      padding: 0.9rem 0.85rem 1.1rem;
+      min-height: 12rem;
+    }
+
+    .txn-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.45rem;
+    }
+
+    .split-modes.txn-group-modes {
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .split-mode {
+      min-height: 2.35rem;
+      padding: 0.35rem 0.65rem;
+    }
+
+    .space-table thead {
+      display: none;
+    }
+
+    .space-table table,
+    .space-table tbody {
+      display: block;
+      width: 100%;
+    }
+
+    .space-table tbody tr {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      grid-template-areas:
+        "date amount remove"
+        "merchant open open";
+      gap: 0.25rem 0.55rem;
+      padding: 0.7rem 0.55rem;
+      border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+      align-items: center;
+    }
+
+    .space-table tbody tr.group-row,
+    .space-table tbody tr.group-empty {
+      display: block;
+      padding: 0.55rem 0.45rem;
+    }
+
+    .space-table tbody td {
+      border: none;
+      padding: 0;
+      background: transparent !important;
+    }
+
+    .space-table tbody td:nth-child(1) {
+      grid-area: date;
+      font-size: 0.85rem;
+    }
+
+    .space-table tbody td.merchant {
+      grid-area: merchant;
+      overflow-wrap: anywhere;
+    }
+
+    .space-table tbody td.amt:nth-child(3) {
+      grid-area: amount;
+      justify-self: end;
+      font-size: 1.02rem;
+    }
+
+    .space-table tbody td.amt:nth-child(4),
+    .space-table tbody td.rem-open {
+      grid-area: open;
+      justify-self: end;
+      font-size: 0.88rem;
+    }
+
+    .space-table tbody td.amt:nth-child(4)::before,
+    .space-table tbody td.rem-open::before {
+      content: "open ";
+      color: var(--ink-soft);
+      font-size: 0.72rem;
+    }
+
+    .space-table tbody td:nth-child(5) {
+      grid-area: remove;
+      justify-self: end;
+    }
+
+    .icon-btn {
+      min-width: 2.5rem;
+      height: 2.5rem;
+      font-size: 1.5rem;
+    }
+
+    .settle-amount-row .amount-row {
+      flex-wrap: wrap;
+    }
+
+    .settle-amount-row .sketch-action {
+      width: 100%;
+      flex: 1 1 100%;
+      min-height: 2.5rem;
+    }
+
+    .alloc-list li {
+      flex-wrap: wrap;
+    }
+  }
 </style>

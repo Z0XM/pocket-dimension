@@ -141,4 +141,35 @@
       align-self: stretch;
     }
   }
+
+  @media (max-width: 640px) {
+    .auth-shell {
+      padding: 0.75rem;
+    }
+
+    .auth-card {
+      margin: 0;
+      max-width: 100%;
+    }
+
+    .auth-page {
+      background-image:
+        linear-gradient(
+          to right,
+          transparent 0,
+          transparent 1.15rem,
+          color-mix(in srgb, var(--danger) 62%, transparent) 1.15rem,
+          color-mix(in srgb, var(--danger) 62%, transparent) calc(1.15rem + 1px),
+          transparent calc(1.15rem + 1px)
+        ),
+        repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent 27px,
+          color-mix(in srgb, var(--blue) 45%, transparent) 27px,
+          color-mix(in srgb, var(--blue) 45%, transparent) 28px
+        );
+      padding-left: 0.15rem;
+    }
+  }
 </style>
