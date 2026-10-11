@@ -27,6 +27,10 @@ The Zap **Dockerfile runner is fat**: `ffmpeg`, `yt-dlp`, and `Deno` (for yt-dlp
 
 Optional: `YTDLP_COOKIES_B64` or `YTDLP_COOKIES_FILE` (Netscape cookies) if YouTube blocks datacenter IPs. Public URL paste does **not** need Google OAuth (Phase 4). Tracks over **10 minutes** are skipped/rejected.
 
+### Phase 4 Connect YouTube
+
+Create a **Google Cloud OAuth client** for Zap. Authorized redirect URI: `https://<zap-host>/api/auth/youtube/callback`. Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (and optionally `YOUTUBE_TOKEN_SECRET` for AES-GCM token encryption; defaults to `BETTER_AUTH_SECRET`). Tokens live in `zap.youtube_account_links`.
+
 ### Cloudflare R2 (uploads + ingest)
 
 Create an **R2 API token** (Dashboard → R2 → Manage R2 API Tokens), not a global Cloudflare Account API token.
