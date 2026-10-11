@@ -96,7 +96,7 @@
     <button type="submit" class="auth-btn w-fit">Apply filters</button>
   </form>
 
-  <div class="rounded-lg border border-border/70 bg-card/40 p-4">
+  <div class="relative z-10 overflow-visible rounded-lg border border-border/70 bg-card/40 p-4">
     <h2 class="font-mono text-xs tracking-wider text-muted-foreground uppercase">Upload</h2>
     {#if !data.storageReady}
       <p class="mt-2 text-sm text-muted-foreground">
@@ -132,15 +132,9 @@
       <input class="auth-field" type="file" name="file" accept="audio/*" required />
       <div>
         <p class="mb-1 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Tags (many allowed)</p>
-        <TagMultiSelect
-          options={data.availableTags}
-          bind:selected={uploadTagIds}
-          name="tagIds"
-          placeholder="Select tags…"
-          disabled={!data.storageReady}
-        />
+        <TagMultiSelect options={data.availableTags} bind:selected={uploadTagIds} name="tagIds" placeholder="Select tags…" />
       </div>
-      <input class="auth-field" type="text" name="customTag" placeholder="New custom tag (optional)" disabled={!data.storageReady} />
+      <input class="auth-field" type="text" name="customTag" placeholder="New custom tag (optional)" />
       <button type="submit" class="auth-btn" disabled={!data.storageReady}>Upload to Zap</button>
     </form>
   </div>

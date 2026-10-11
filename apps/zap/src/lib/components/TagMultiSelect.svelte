@@ -32,10 +32,22 @@
     if (!rootEl.contains(e.target as Node)) open = false;
   }
 
+  function toggleOpen(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    open = !open;
+  }
+
   $effect(() => {
     if (!open) return;
-    document.addEventListener("pointerdown", onDocPointerDown);
-    return () => document.removeEventListener("pointerdown", onDocPointerDown);
+    // Defer so the opening click doesn't immediately count as an outside click
+    const id = window.setTimeout(() => {
+      document.addEventListener("pointerdown", onDocPointerDown);
+    }, 0);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("pointerdown", onDocPointerDown);
+    };
   });
 </script>
 
@@ -50,7 +62,7 @@
     {disabled}
     aria-haspopup="listbox"
     aria-expanded={open}
-    onclick={() => (open = !open)}
+    onclick={toggleOpen}
   >
     <span class="flex min-w-0 flex-1 flex-wrap gap-1">
       {#if selectedTags.length === 0}
