@@ -11,6 +11,8 @@ export const tagKind = zapSchema.enum("tag_kind", ["system", "custom"]);
 export const sessionStatus = zapSchema.enum("session_status", ["live", "ended"]);
 export const sessionPlaybackState = zapSchema.enum("session_playback_state", ["idle", "playing", "paused"]);
 export const sessionMemberRole = zapSchema.enum("session_member_role", ["host", "guest"]);
+export const fetchJobStatus = zapSchema.enum("fetch_job_status", ["pending", "running", "ready", "failed"]);
+export const syncRunStatus = zapSchema.enum("sync_run_status", ["pending", "running", "completed", "failed"]);
 
 /** Global Zap catalogue — never deleted by app logic. */
 export const mediaAssets = zapSchema.table(
@@ -168,4 +170,44 @@ export const queueItems = zapSchema.table(
     index("queue_items_media_asset_id_idx").on(table.mediaAssetId),
     index("queue_items_added_by_user_id_idx").on(table.addedByUserId),
   ]
+);
+
+/** Single-flight ingest by identity_key (youtube:VIDEO_ID, etc.). */
+export const fetchJobs = zapSchema.table(
+  "fetch_jobs",
+  {
+    id,
+    identityKey: text("identity_key").notNull(),
+    status: fetchJobStatus("status").default("pending").notNull(),
+    mediaAssetId: uuid("media_asset_id").references(() => mediaAssets.id, { onDelete: "set null" }),
+    sourceUrl: text("source_url"),
+    errorMessage: text("error_message"),
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamp("updated_at")
+      .$default(() => sql`now()`)
+      .$onUpdate(() => sql`now()`)
+      .notNull(),
+  },
+  (table) => [uniqueIndex("fetch_jobs_identity_key_unique").on(table.identityKey), index("fetch_jobs_status_idx").on(table.status)]
+);
+
+/** One Library “Add URL” / playlist sync attempt. */
+export const syncRuns = zapSchema.table(
+  "sync_runs",
+  {
+    id,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    sourceUrl: text("source_url").notNull(),
+    status: syncRunStatus("status").default("pending").notNull(),
+    importedCount: integer("imported_count").default(0).notNull(),
+    skippedCount: integer("skipped_count").default(0).notNull(),
+    failedCount: integer("failed_count").default(0).notNull(),
+    summaryJson: text("summary_json"),
+    errorMessage: text("error_message"),
+    createdAt: timestamps.createdAt,
+    finishedAt: timestamp("finished_at"),
+  },
+  (table) => [index("sync_runs_user_id_idx").on(table.userId), index("sync_runs_status_idx").on(table.status)]
 );

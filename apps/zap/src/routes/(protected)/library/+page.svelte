@@ -15,6 +15,8 @@
   let q = $state("");
   let selected = $state<string[]>([]);
   let uploadTagIds = $state<string[]>([]);
+  let ingestUrl = $state("");
+  let ingestBusy = $state(false);
 
   let assets = $state<TrackItem[]>([]);
   let hasMore = $state(false);
@@ -260,12 +262,14 @@
     </div>
   {:else}
     <div class="relative z-10 space-y-4 overflow-visible" role="tabpanel" id="panel-upload" aria-labelledby="tab-upload">
-      <p class="text-sm text-muted-foreground">Add a track to the shared Zap catalogue (max 10 minutes).</p>
+      <p class="text-sm text-muted-foreground">
+        Add to the shared Zap catalogue (max 10 minutes per track). Paste a public YouTube song/playlist URL, or upload a file.
+      </p>
 
       <div class="overflow-visible rounded-lg border border-border/70 bg-card/40 p-4">
         {#if !data.storageReady}
           <p class="text-sm text-muted-foreground">
-            Configure R2 env to enable uploads. Use account endpoint
+            Configure R2 env to enable uploads/URL ingest. Use account endpoint
             <span class="font-mono text-signal">https://&lt;ACCOUNT_ID&gt;.r2.cloudflarestorage.com</span>,
             <span class="font-mono">S3_ACCESS_KEY</span> / <span class="font-mono">S3_SECRET_KEY</span>,
             <span class="font-mono">S3_BUCKET</span>, <span class="font-mono">S3_REGION=auto</span>.
@@ -273,19 +277,65 @@
         {:else if data.storageInfo.configured}
           <p class="font-mono text-[11px] text-muted-foreground">
             R2 ready · {data.storageInfo.bucket} · {data.storageInfo.endpoint}
+            {#if data.ytDlpReady}
+              · yt-dlp ready
+            {:else}
+              · yt-dlp missing (URL ingest disabled)
+            {/if}
           </p>
         {/if}
+
+        <h2 class="mt-4 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Public URL</h2>
+        {#if form?.ingestError}
+          <p class="auth-error mt-2">{form.ingestError}</p>
+        {/if}
+        {#if form?.ingestOk && form.ingestSummary}
+          <p class="mt-2 text-sm text-signal">
+            Sync done — imported {form.ingestSummary.imported}, skipped {form.ingestSummary.skipped}, failed {form.ingestSummary.failed}.
+          </p>
+        {/if}
+        <form
+          method="POST"
+          action="?/ingestUrl"
+          class="mt-2 space-y-3"
+          use:enhance={() => {
+            ingestBusy = true;
+            return async ({ result, update }) => {
+              await update();
+              ingestBusy = false;
+              if (result.type === "success") {
+                ingestUrl = "";
+                tab = "browse";
+                void fetchPage({ reset: true });
+              }
+            };
+          }}
+        >
+          <input
+            class="auth-field"
+            type="url"
+            name="url"
+            placeholder="https://www.youtube.com/watch?v=… or playlist URL"
+            bind:value={ingestUrl}
+            required
+          />
+          <button type="submit" class="auth-btn" disabled={!data.ingestReady || ingestBusy}>
+            {ingestBusy ? "Importing…" : "Import URL"}
+          </button>
+        </form>
+
+        <h2 class="mt-6 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">File upload</h2>
         {#if form?.uploadError}
-          <p class="auth-error mt-3">{form.uploadError}</p>
+          <p class="auth-error mt-2">{form.uploadError}</p>
         {/if}
         {#if form?.uploadOk}
-          <p class="mt-3 text-sm text-signal">Added to catalogue.</p>
+          <p class="mt-2 text-sm text-signal">Added to catalogue.</p>
         {/if}
         <form
           method="POST"
           action="?/upload"
           enctype="multipart/form-data"
-          class="mt-3 space-y-3"
+          class="mt-2 space-y-3"
           use:enhance={() => {
             return async ({ result, update }) => {
               await update();
