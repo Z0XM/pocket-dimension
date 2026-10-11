@@ -48,13 +48,13 @@
     const trigger = root.querySelector(".widget-picker-btn");
     if (!(trigger instanceof HTMLElement)) return;
     const anchor = trigger.getBoundingClientRect();
-    const preferred = Math.min(22 * 16, window.innerWidth - 16);
+    const preferred = Math.min(22 * 16, window.innerWidth - 24);
     const placement = computeFloatingPanelPlacement({
       anchor,
       panelWidth: Math.max(panelEl.scrollWidth, preferred),
       panelHeight: panelEl.scrollHeight,
       alignEnd: true,
-      padding: 8,
+      padding: 12,
       gap: 6,
     });
     panelStyle = floatingPanelStyle(placement);
@@ -185,7 +185,7 @@
     padding: 0.75rem 0.7rem 0.85rem;
     font-family: var(--hand);
     color: var(--ink);
-    transform: rotate(0.35deg);
+    /* No rotate: fixed + transform expands getBoundingClientRect past the viewport pad. */
     box-sizing: border-box;
   }
 
