@@ -23,6 +23,7 @@ Works regardless of the Railpack “root directory” setting.
 | zeo | `apps/zeo/Dockerfile` | `/` (repo root) | 3008 |
 | zeo-music-worker | `apps/zeo-music-worker/Dockerfile` | `/` (repo root) | 3010 |
 | heimdall | `apps/heimdall/Dockerfile` | `/` (repo root) | 3012 |
+| zap | `apps/zap/Dockerfile` | `/` (repo root) | 3013 |
 
 Dokploy has three separate fields — **Build Path**, **Docker Context Path**, and **Dockerfile Path**:
 
@@ -69,6 +70,7 @@ If root directory is `apps/auth-service`, `railpack.json` is picked up automatic
 | zeo | 3008 | [apps/zeo/DEPLOY.md](./apps/zeo/DEPLOY.md) · [dokploy runbook](./apps/zeo/deploy/dokploy/README.md) |
 | markitdown | 3009 | [apps/markitdown/railpack.json](./apps/markitdown/railpack.json) |
 | heimdall | 3012 | [apps/heimdall/DEPLOY.md](./apps/heimdall/DEPLOY.md) |
+| zap | 3013 | [apps/zap/DEPLOY.md](./apps/zap/DEPLOY.md) |
 
 ## Database
 

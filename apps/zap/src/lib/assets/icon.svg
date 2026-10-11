@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" fill="none">
+  <rect width="400" height="600" fill="#0c1822"/>
+  <text x="40" y="120" fill="#3dffe8" font-family="monospace" font-size="72" font-weight="700">Zap</text>
+  <path d="M40 200 Q200 160 360 220 T40 320 T360 420" stroke="#5b8cff" stroke-width="3" fill="none" opacity="0.7"/>
+  <path d="M40 240 Q200 200 360 260 T40 360 T360 460" stroke="#3dffe8" stroke-width="2" fill="none" opacity="0.45"/>
+</svg>

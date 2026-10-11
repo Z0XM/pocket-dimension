@@ -33,6 +33,8 @@
     "dev:app:dashboard": "./scripts/turbo-no-prefix.sh run dev --filter=@pocket-dimension/dashboard",
     "dev:app:zeo": "./scripts/turbo-no-prefix.sh run dev --filter=@pocket-dimension/zeo",
     "dev:app:zeo-music-worker": "./scripts/turbo-no-prefix.sh run dev --filter=@pocket-dimension/zeo-music-worker",
+    "build:app:zap": "./scripts/turbo-no-prefix.sh run build --filter=@pocket-dimension/zap",
+    "dev:app:zap": "./scripts/turbo-no-prefix.sh run dev --filter=@pocket-dimension/zap",
     "db:generate": "./scripts/turbo-no-prefix.sh run db:generate --filter=@pocket-dimension/db --",
     "db:migrate": "./scripts/turbo-no-prefix.sh run db:migrate --filter=@pocket-dimension/db",
     "db:studio": "./scripts/turbo-no-prefix.sh run db:studio --filter=@pocket-dimension/db",

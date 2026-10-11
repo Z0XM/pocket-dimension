@@ -18,6 +18,7 @@ This is the **Pocket Dimension** Bun + Turbo monorepo. Standard commands live in
 | `pocket` (SvelteKit) | 3007 | no (hub app) | `bun run dev:app:pocket` |
 | `dashboard` (SvelteKit) | 3011 | no (standalone) | `bun run dev:app:dashboard` |
 | `heimdall` (Vite/React War Room) | 5174/5175 dev · **3012** prod | no (standalone) | `bun run dev:app:heimdall` / `bun run start` in `apps/heimdall` |
+| `zap` (SvelteKit) | 3013 | yes | `bun run dev:app:zap` |
 | `zeo` (SvelteKit) | 3008 | yes | `bun run dev:app:zeo` |
 | `zeo-music-worker` | 3010 | worker (internal) | `bun run dev:app:zeo-music-worker` |
 
