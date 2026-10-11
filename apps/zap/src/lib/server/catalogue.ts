@@ -127,4 +127,80 @@ export async function listAvailableTags(userId: string) {
     .orderBy(asc(schema.tags.kind), asc(schema.tags.name));
 }
 
+export function slugifyTag(name: string) {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
+/** Resolve selectable tags for a user (system + their custom). Invalid ids are ignored. */
+export async function resolveUserTagIds(userId: string, tagIds: string[]) {
+  const unique = [...new Set(tagIds.map((id) => id.trim()).filter(Boolean))];
+  if (unique.length === 0) return [];
+  const rows = await db
+    .select()
+    .from(schema.tags)
+    .where(and(inArray(schema.tags.id, unique), or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, userId))));
+  return rows;
+}
+
+export async function ensureCustomTag(userId: string, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  const slug = slugifyTag(trimmed);
+  if (!slug) return null;
+
+  const existing = await db.query.tags.findFirst({
+    where: and(eq(schema.tags.kind, "custom"), eq(schema.tags.ownerUserId, userId), eq(schema.tags.slug, slug)),
+  });
+  if (existing) return existing;
+
+  const [inserted] = await db
+    .insert(schema.tags)
+    .values({
+      name: trimmed.slice(0, 64),
+      slug,
+      kind: "custom",
+      ownerUserId: userId,
+    })
+    .returning();
+  return inserted;
+}
+
+/**
+ * Replace this user's tags on an asset with the given set (many tags per song).
+ * Removing tags never deletes the catalogue asset / R2 object.
+ */
+export async function setUserAssetTags(userId: string, mediaAssetId: string, tagIds: string[]) {
+  const tags = await resolveUserTagIds(userId, tagIds);
+  const nextIds = new Set(tags.map((t) => t.id));
+
+  const existing = await db
+    .select()
+    .from(schema.mediaAssetTags)
+    .where(and(eq(schema.mediaAssetTags.userId, userId), eq(schema.mediaAssetTags.mediaAssetId, mediaAssetId)));
+
+  const toRemove = existing.filter((row) => !nextIds.has(row.tagId));
+  for (const row of toRemove) {
+    await db
+      .delete(schema.mediaAssetTags)
+      .where(
+        and(
+          eq(schema.mediaAssetTags.userId, userId),
+          eq(schema.mediaAssetTags.mediaAssetId, mediaAssetId),
+          eq(schema.mediaAssetTags.tagId, row.tagId)
+        )
+      );
+  }
+
+  for (const tag of tags) {
+    await db.insert(schema.mediaAssetTags).values({ userId, mediaAssetId, tagId: tag.id }).onConflictDoNothing();
+  }
+
+  return tags;
+}
+
 export { SYSTEM_TAG_SEEDS };

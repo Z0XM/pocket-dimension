@@ -18,8 +18,22 @@ Build from the **monorepo root** so `@pocket-dimension/*` workspace deps resolve
 Copy from `.env.example`. Required in production:
 
 - `DATABASE_URL`, `BETTER_AUTH_SECRET`, `PUBLIC_BASE_AUTH_URL`
-- R2: `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_REGION`
+- R2 (S3 API — see below)
 - `ORIGIN=https://your-zap-host`
+
+### Cloudflare R2 (uploads)
+
+Create an **R2 API token** (Dashboard → R2 → Manage R2 API Tokens), not a global Cloudflare Account API token.
+
+| Var | Example |
+| --- | --- |
+| `S3_ENDPOINT` | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` (no bucket in the path) |
+| `S3_ACCESS_KEY` | R2 access key id (alias: `S3_ACCESS_KEY_ID`) |
+| `S3_SECRET_KEY` | R2 secret (alias: `S3_SECRET_ACCESS_KEY`) — no quotes/spaces |
+| `S3_BUCKET` | e.g. `zap-media` |
+| `S3_REGION` | `auto` |
+
+Signature mismatch usually means wrong endpoint shape (bucket embedded incorrectly), wrong credential type, or quoted/whitespace secrets. Zap normalizes trailing slashes, peels `/bucket` off the account endpoint, and auto-detects virtual-hosted `https://<bucket>.<account>.r2.cloudflarestorage.com`.
 
 Apply migrations: `bun run db:migrate` (PG 18+) after deploy or when `DATABASE_URL` is set at build.
 

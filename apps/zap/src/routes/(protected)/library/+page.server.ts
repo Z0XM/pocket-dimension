@@ -1,12 +1,19 @@
 import { fail } from "@sveltejs/kit";
 import { createHash } from "node:crypto";
 import { db, schema } from "@pocket-dimension/db";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Actions, PageServerLoad } from "./$types";
-import { ensureSystemTags, listAvailableTags, listCatalogue } from "$lib/server/catalogue";
-import { isStorageConfigured, putMediaObject } from "$lib/server/storage";
+import { ensureCustomTag, ensureSystemTags, listAvailableTags, listCatalogue, setUserAssetTags } from "$lib/server/catalogue";
+import { describeStorageConfig, isStorageConfigured, putMediaObject } from "$lib/server/storage";
 
 const MAX_DURATION_MS = 10 * 60 * 1000;
+
+function readTagIds(form: FormData): string[] {
+  return form
+    .getAll("tagIds")
+    .map((v) => String(v).trim())
+    .filter(Boolean);
+}
 
 export const load: PageServerLoad = async ({ locals, url }) => {
   const userId = locals.user!.id;
@@ -23,6 +30,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     q,
     selectedTagIds: tagIds,
     storageReady: isStorageConfigured(),
+    storageInfo: describeStorageConfig(),
     availableTags: availableTags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
     assets: assets.map((asset) => ({
       id: asset.id,
@@ -45,7 +53,8 @@ export const actions: Actions = {
     const form = await request.formData();
     const file = form.get("file");
     const title = String(form.get("title") ?? "").trim();
-    const tagId = String(form.get("tagId") ?? "").trim();
+    const tagIds = readTagIds(form);
+    const customTagName = String(form.get("customTag") ?? "").trim();
 
     if (!(file instanceof File) || file.size === 0) {
       return fail(400, { uploadError: "Choose an audio file." });
@@ -55,7 +64,6 @@ export const actions: Actions = {
     const hash = createHash("sha256").update(bytes).digest("hex");
     const identityKey = `upload:${hash}`;
 
-    // Duration probe deferred (ffprobe in fat image). Accept upload; client may omit duration.
     const durationRaw = String(form.get("durationMs") ?? "").trim();
     const durationMs = durationRaw ? Number(durationRaw) : null;
     if (durationMs != null && Number.isFinite(durationMs) && durationMs > MAX_DURATION_MS) {
@@ -99,15 +107,43 @@ export const actions: Actions = {
       asset = inserted;
     }
 
-    if (tagId) {
-      const tag = await db.query.tags.findFirst({
-        where: and(eq(schema.tags.id, tagId), eq(schema.tags.kind, "system")),
-      });
-      if (tag) {
-        await db.insert(schema.mediaAssetTags).values({ userId, mediaAssetId: asset.id, tagId: tag.id }).onConflictDoNothing();
-      }
+    const nextTagIds = [...tagIds];
+    if (customTagName) {
+      const custom = await ensureCustomTag(userId, customTagName);
+      if (custom) nextTagIds.push(custom.id);
+    }
+    if (nextTagIds.length > 0) {
+      await setUserAssetTags(userId, asset.id, nextTagIds);
     }
 
     return { uploadOk: true };
+  },
+
+  setTags: async ({ request, locals }) => {
+    const userId = locals.user!.id;
+    const form = await request.formData();
+    const mediaAssetId = String(form.get("mediaAssetId") ?? "").trim();
+    const tagIds = readTagIds(form);
+    const customTagName = String(form.get("customTag") ?? "").trim();
+
+    if (!mediaAssetId) {
+      return fail(400, { tagError: "Missing track." });
+    }
+
+    const asset = await db.query.mediaAssets.findFirst({
+      where: eq(schema.mediaAssets.id, mediaAssetId),
+    });
+    if (!asset || asset.status !== "ready") {
+      return fail(404, { tagError: "Track not found." });
+    }
+
+    const nextTagIds = [...tagIds];
+    if (customTagName) {
+      const custom = await ensureCustomTag(userId, customTagName);
+      if (custom) nextTagIds.push(custom.id);
+    }
+
+    await setUserAssetTags(userId, mediaAssetId, nextTagIds);
+    return { tagOk: true, mediaAssetId };
   },
 };
