@@ -253,6 +253,22 @@
           All
         </button>
       </div>
+
+      <div class="summary-period-select">
+        <SketchSelect
+          name="summary-period"
+          compact
+          alignEnd
+          aria-label="Summary period"
+          value={data.summaryPeriod}
+          options={[
+            { value: "month", label: "Month" },
+            { value: "year", label: "Year" },
+            { value: "all", label: "All" },
+          ]}
+          onChange={(next) => setSummaryPeriod(next as SummaryPeriod)}
+        />
+      </div>
     </div>
   </div>
 
@@ -729,6 +745,10 @@
     color: var(--ink);
   }
 
+  .summary-period-select {
+    display: none;
+  }
+
   .flow {
     display: flex;
     flex-wrap: wrap;
@@ -961,9 +981,13 @@
   }
 
   @media (max-width: 640px) {
-    .period-tabs button {
-      min-height: 2.5rem;
-      padding: 0.4rem 0.65rem;
+    .period-tabs {
+      display: none;
+    }
+
+    .summary-period-select {
+      display: inline-flex;
+      align-items: center;
     }
 
     .sticky-stack {

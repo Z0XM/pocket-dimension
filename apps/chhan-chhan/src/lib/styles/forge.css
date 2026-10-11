@@ -69,9 +69,14 @@
       transform 120ms ease;
   }
 
-  .forge .settings-icon + .settings-icon {
+  .forge .settings-row .settings-icon + .settings-icon {
     transform: rotate(2.5deg);
     background: color-mix(in srgb, var(--blue) 38%, transparent);
+  }
+
+  .forge .settings-kebab .kebab-trigger {
+    transform: rotate(1.5deg);
+    background: color-mix(in srgb, var(--yellow) 42%, transparent);
   }
 
   .forge a.settings-icon:hover,

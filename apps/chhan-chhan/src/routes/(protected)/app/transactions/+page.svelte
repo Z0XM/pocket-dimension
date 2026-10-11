@@ -860,6 +860,22 @@
         </button>
       </div>
 
+      <div class="summary-period-select">
+        <SketchSelect
+          name="summary-period"
+          compact
+          alignEnd
+          aria-label="Summary period"
+          value={data.summaryPeriod}
+          options={[
+            { value: "month", label: "Month" },
+            { value: "year", label: "Year" },
+            { value: "all", label: "All" },
+          ]}
+          onChange={(next) => setSummaryPeriod(next as SummaryPeriod)}
+        />
+      </div>
+
       {#if data.spaces.length > 0}
         <div class="flow-tools">
           <div class="space-filter-wrap">
@@ -1724,6 +1740,10 @@
     color: var(--ink);
   }
 
+  .summary-period-select {
+    display: none;
+  }
+
   .period-tabs {
     display: inline-flex;
     border: 1.5px solid var(--chrome-line);
@@ -2325,7 +2345,7 @@
     }
 
     .balance-combo .stats-label,
-    .balance-combo .summary-tabs,
+    .balance-combo .summary-period-select,
     .balance-combo .flow-tools {
       justify-content: flex-start;
     }
@@ -2335,14 +2355,12 @@
     }
 
     .summary-tabs {
-      width: 100%;
-      justify-content: stretch;
+      display: none;
     }
 
-    .summary-tabs button {
-      flex: 1 1 0;
-      min-height: 2.5rem;
-      padding: 0.4rem 0.55rem;
+    .summary-period-select {
+      display: inline-flex;
+      align-items: center;
     }
 
     .stats-block {
