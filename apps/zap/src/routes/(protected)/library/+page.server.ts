@@ -15,6 +15,7 @@ import {
 import { IngestError, ingestPublicUrl, resolveYtDlpBin } from "$lib/server/ingest";
 import { MAX_TRACK_DURATION_MS } from "$lib/server/ingest/limits";
 import { describeStorageConfig, isStorageConfigured, putMediaObject } from "$lib/server/storage";
+import { getYoutubeLinkStatus, isGoogleOAuthConfigured } from "$lib/server/youtube";
 
 const MAX_DURATION_MS = MAX_TRACK_DURATION_MS;
 
@@ -40,6 +41,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
   const ytDlpReady = Boolean(await resolveYtDlpBin());
   const storageReady = isStorageConfigured();
+  const youtubeOauthConfigured = isGoogleOAuthConfigured();
+  const youtubeLink = await getYoutubeLinkStatus(userId);
 
   return {
     scope,
@@ -52,6 +55,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     ingestReady: storageReady && ytDlpReady,
     ytDlpReady,
     storageInfo: describeStorageConfig(),
+    youtubeOauthConfigured,
+    youtubeLinked: youtubeLink.linked,
+    youtubeLinkedAt: youtubeLink.linked ? youtubeLink.linkedAt : null,
     availableTags: availableTags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
     assets: assets.map((asset) => serializeCatalogueAsset(asset, tagsByAsset.get(asset.id) ?? [])),
   };

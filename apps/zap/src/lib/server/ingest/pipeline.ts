@@ -76,7 +76,13 @@ async function waitForReadyAsset(identityKey: string, attempts = 30): Promise<ty
   return null;
 }
 
-async function ingestSingleVideo(opts: { userId: string; url: string; identityKey: string; titleHint?: string }): Promise<IngestItemResult> {
+/** Single catalogue video ingest (no sync_run row) — used by URL paste + connected playlist import. */
+export async function ingestCatalogueVideo(opts: {
+  userId: string;
+  url: string;
+  identityKey: string;
+  titleHint?: string;
+}): Promise<IngestItemResult> {
   const { userId, url, identityKey } = opts;
 
   const existingAsset = await findReadyAsset(identityKey);
@@ -223,7 +229,7 @@ export async function ingestPublicUrl(userId: string, rawUrl: string): Promise<S
           });
           continue;
         }
-        const result = await ingestSingleVideo({
+        const result = await ingestCatalogueVideo({
           userId,
           url: entry.url,
           identityKey: `youtube:${entry.id}`,
@@ -233,7 +239,7 @@ export async function ingestPublicUrl(userId: string, rawUrl: string): Promise<S
       }
     } else if (parsed.kind === "youtube_video") {
       items.push(
-        await ingestSingleVideo({
+        await ingestCatalogueVideo({
           userId,
           url: parsed.canonicalUrl,
           identityKey: parsed.identityKey,
@@ -241,7 +247,7 @@ export async function ingestPublicUrl(userId: string, rawUrl: string): Promise<S
       );
     } else {
       items.push(
-        await ingestSingleVideo({
+        await ingestCatalogueVideo({
           userId,
           url: parsed.canonicalUrl,
           identityKey: parsed.identityKey,

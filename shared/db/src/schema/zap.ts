@@ -211,3 +211,22 @@ export const syncRuns = zapSchema.table(
   },
   (table) => [index("sync_runs_user_id_idx").on(table.userId), index("sync_runs_status_idx").on(table.status)]
 );
+
+/**
+ * Connected Google/YouTube account for playlist import (Phase 4).
+ * Tokens AES-GCM encrypted at rest. Distinct export name from zeo.youtubeAccountLinks.
+ */
+export const zapYoutubeAccountLinks = zapSchema.table("youtube_account_links", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => auth.user.id, { onDelete: "cascade" }),
+  googleSub: text("google_sub").notNull(),
+  refreshTokenEnc: text("refresh_token_enc").notNull(),
+  accessTokenEnc: text("access_token_enc").notNull(),
+  accessExpiresAt: timestamp("access_expires_at").notNull(),
+  scopes: text("scopes").array().notNull(),
+  linkedAt: timestamp("linked_at")
+    .$default(() => sql`now()`)
+    .notNull(),
+  revokedAt: timestamp("revoked_at"),
+});
