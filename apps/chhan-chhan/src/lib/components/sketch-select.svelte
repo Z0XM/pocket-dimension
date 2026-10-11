@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { computeFloatingPanelPlacement, floatingPanelStyle } from "$lib/floating-panel";
+
   type Option = {
     value: string;
     label: string;
@@ -45,7 +47,9 @@
   let open = $state(false);
   let query = $state("");
   let root: HTMLDivElement | undefined = $state();
+  let menuEl: HTMLDivElement | undefined = $state();
   let searchInput: HTMLInputElement | undefined = $state();
+  let menuStyle = $state("");
 
   const isEmpty = $derived(multiple ? values.length === 0 : !value);
 
@@ -71,10 +75,37 @@
     });
   });
 
+  function preferredMenuWidth(anchorWidth: number): number {
+    if (searchable) return Math.max(anchorWidth, 16 * 16);
+    if (compact) return Math.max(anchorWidth, 7.5 * 16);
+    return Math.max(anchorWidth, 1);
+  }
+
+  function syncMenuPosition() {
+    if (!root || !menuEl) return;
+    const trigger = root.querySelector(".sketch-trigger");
+    if (!(trigger instanceof HTMLElement)) return;
+    const anchor = trigger.getBoundingClientRect();
+    const preferred = preferredMenuWidth(anchor.width);
+    const measured = Math.max(menuEl.scrollWidth, preferred);
+    const placement = computeFloatingPanelPlacement({
+      anchor,
+      panelWidth: measured,
+      panelHeight: menuEl.scrollHeight,
+      alignEnd: compact ? alignEnd : false,
+      padding: 8,
+      gap: 4,
+    });
+    menuStyle = floatingPanelStyle(placement);
+  }
+
   function toggleOpen() {
     if (disabled) return;
     open = !open;
-    if (!open) query = "";
+    if (!open) {
+      query = "";
+      menuStyle = "";
+    }
   }
 
   function isSelected(optionValue: string) {
@@ -97,6 +128,7 @@
     value = next;
     open = false;
     query = "";
+    menuStyle = "";
     onChange?.(next);
   }
 
@@ -108,6 +140,7 @@
       if (root && target && !root.contains(target)) {
         open = false;
         query = "";
+        menuStyle = "";
       }
     }
 
@@ -115,12 +148,20 @@
       if (event.key === "Escape") {
         open = false;
         query = "";
+        menuStyle = "";
       }
     }
 
+    function handleLayoutChange() {
+      syncMenuPosition();
+    }
+
     const timeout = window.setTimeout(() => {
+      syncMenuPosition();
       window.addEventListener("pointerdown", handlePointerDown);
       window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("resize", handleLayoutChange);
+      window.addEventListener("scroll", handleLayoutChange, true);
       if (searchable) searchInput?.focus();
     }, 0);
 
@@ -128,6 +169,8 @@
       window.clearTimeout(timeout);
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleLayoutChange);
+      window.removeEventListener("scroll", handleLayoutChange, true);
     };
   });
 </script>
@@ -158,7 +201,7 @@
   </button>
 
   {#if open}
-    <div class="sketch-menu" role="presentation">
+    <div class="sketch-menu" role="presentation" bind:this={menuEl} style={menuStyle}>
       {#if searchable}
         <div class="sketch-search">
           <input
@@ -196,7 +239,7 @@
       </ul>
       {#if multiple}
         <div class="sketch-multi-foot">
-          <button type="button" class="sketch-done" onclick={() => ((open = false), (query = ""))}>Done</button>
+          <button type="button" class="sketch-done" onclick={() => ((open = false), (query = ""), (menuStyle = ""))}>Done</button>
         </div>
       {/if}
     </div>
@@ -302,37 +345,25 @@
   }
 
   .sketch-menu {
-    margin: 0.2rem 0 0;
+    margin: 0;
     padding: 0.35rem 0.25rem;
-    position: absolute;
-    left: 0;
-    right: 0;
-    z-index: 30;
+    position: fixed;
+    z-index: 80;
     background: var(--surface-raised);
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
     border-radius: 2px 6px 3px 2px;
     box-shadow:
       2px 2px 0 0 var(--shadow-paper),
       2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
-    max-height: 16rem;
     display: flex;
     flex-direction: column;
     min-width: 0;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .sketch-select.compact .sketch-menu {
-    right: auto;
-    min-width: max(100%, 7.5rem);
-    z-index: 40;
-  }
-
-  .sketch-select.searchable .sketch-menu {
-    min-width: max(100%, 16rem);
-  }
-
-  .sketch-select.align-end .sketch-menu {
-    left: auto;
-    right: 0;
+    z-index: 80;
   }
 
   .sketch-search {
@@ -459,11 +490,6 @@
   }
 
   @media (max-width: 640px) {
-    .sketch-select.searchable .sketch-menu {
-      min-width: min(100%, 16rem);
-      max-width: calc(100vw - 1.5rem);
-    }
-
     .sketch-trigger {
       min-height: 2.5rem;
     }

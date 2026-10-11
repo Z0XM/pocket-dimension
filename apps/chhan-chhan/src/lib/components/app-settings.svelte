@@ -7,6 +7,7 @@
   import LogOut from "@lucide/svelte/icons/log-out";
   import Settings from "@lucide/svelte/icons/settings";
   import ThemeToggle from "$lib/components/theme-toggle.svelte";
+  import { computeFloatingPanelPlacement, floatingPanelStyle } from "$lib/floating-panel";
 
   const onControl = $derived(page.url.pathname.startsWith("/app/control"));
   const onGuide = $derived(page.url.pathname.startsWith("/app/guide"));
@@ -15,9 +16,12 @@
   let signingOut = $state(false);
   let menuOpen = $state(false);
   let menuRoot: HTMLDivElement | undefined = $state();
+  let menuEl: HTMLDivElement | undefined = $state();
+  let menuStyle = $state("");
 
   function openConfirm() {
     menuOpen = false;
+    menuStyle = "";
     confirmOpen = true;
   }
 
@@ -28,10 +32,29 @@
 
   function closeMenu() {
     menuOpen = false;
+    menuStyle = "";
   }
 
   function toggleMenu() {
     menuOpen = !menuOpen;
+    if (!menuOpen) menuStyle = "";
+  }
+
+  function syncMenuPosition() {
+    if (!menuRoot || !menuEl) return;
+    const trigger = menuRoot.querySelector(".kebab-trigger");
+    if (!(trigger instanceof HTMLElement)) return;
+    const anchor = trigger.getBoundingClientRect();
+    const preferred = Math.max(10.5 * 16, menuEl.scrollWidth);
+    const placement = computeFloatingPanelPlacement({
+      anchor,
+      panelWidth: preferred,
+      panelHeight: menuEl.scrollHeight,
+      alignEnd: true,
+      padding: 8,
+      gap: 6,
+    });
+    menuStyle = floatingPanelStyle(placement);
   }
 
   async function confirmSignOut() {
@@ -71,15 +94,24 @@
       if (event.key === "Escape") closeMenu();
     }
 
+    function handleLayoutChange() {
+      syncMenuPosition();
+    }
+
     const timeout = window.setTimeout(() => {
+      syncMenuPosition();
       window.addEventListener("pointerdown", handlePointerDown);
       window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("resize", handleLayoutChange);
+      window.addEventListener("scroll", handleLayoutChange, true);
     }, 0);
 
     return () => {
       window.clearTimeout(timeout);
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleLayoutChange);
+      window.removeEventListener("scroll", handleLayoutChange, true);
     };
   });
 </script>
@@ -126,7 +158,7 @@
     </button>
 
     {#if menuOpen}
-      <div class="settings-menu" role="menu" aria-label="Account actions">
+      <div class="settings-menu" role="menu" aria-label="Account actions" bind:this={menuEl} style={menuStyle}>
         <div class="settings-menu-item theme-slot" role="none">
           <ThemeToggle mode="menu" />
         </div>
@@ -196,10 +228,8 @@
   }
 
   .settings-menu {
-    position: absolute;
-    top: calc(100% + 0.35rem);
-    right: 0;
-    z-index: 60;
+    position: fixed;
+    z-index: 80;
     min-width: 10.5rem;
     padding: 0.35rem;
     background: var(--surface-raised);
@@ -209,6 +239,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
+    box-sizing: border-box;
+    overflow: auto;
   }
 
   .settings-menu-item {
@@ -249,29 +281,6 @@
 
   .settings-menu-item.theme-slot {
     padding: 0;
-  }
-
-  .settings-menu-item.theme-slot :global(.theme-toggle) {
-    width: 100%;
-    height: auto;
-    min-height: 2.5rem;
-    justify-content: flex-start;
-    gap: 0.55rem;
-    padding: 0.55rem 0.65rem;
-    border: none;
-    border-radius: 2px 8px 3px 7px / 7px 3px 8px 2px;
-    background: transparent;
-    box-shadow: none;
-    transform: none;
-    color: var(--ink, #1b1b1f);
-    font-family: var(--hand);
-    font-size: 1.05rem;
-  }
-
-  .settings-menu-item.theme-slot :global(.theme-toggle:hover) {
-    background: color-mix(in srgb, var(--yellow) 55%, transparent);
-    color: var(--brand);
-    transform: none;
   }
 
   .logout-backdrop {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import Check from "@lucide/svelte/icons/check";
   import ListFilter from "@lucide/svelte/icons/list-filter";
+  import { computeFloatingPanelPlacement, floatingPanelStyle } from "$lib/floating-panel";
 
   type Option = {
     id: string;
@@ -19,6 +20,7 @@
 
   let open = $state(false);
   let root: HTMLDivElement | undefined = $state();
+  let panelEl: HTMLDivElement | undefined = $state();
   let panelStyle = $state("");
 
   const buttonLabel = $derived.by(() => {
@@ -32,9 +34,17 @@
   function syncPanelPosition() {
     if (!root) return;
     const rect = root.getBoundingClientRect();
-    const width = Math.max(rect.width, 12 * 16);
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-    panelStyle = `top:${rect.bottom + 4}px;left:${left}px;width:${width}px;`;
+    const preferred = Math.max(rect.width, 12 * 16);
+    const measured = panelEl ? Math.max(panelEl.scrollWidth, preferred) : preferred;
+    const placement = computeFloatingPanelPlacement({
+      anchor: rect,
+      panelWidth: measured,
+      panelHeight: panelEl?.scrollHeight,
+      alignEnd: variant === "icon" || rect.left > window.innerWidth * 0.45,
+      padding: 8,
+      gap: 4,
+    });
+    panelStyle = floatingPanelStyle(placement);
   }
 
   function toggleOpen() {
@@ -124,7 +134,14 @@
   {/if}
 
   {#if open}
-    <div class="filter-multi-panel" role="listbox" aria-label="{label} filter" aria-multiselectable="true" style={panelStyle}>
+    <div
+      class="filter-multi-panel"
+      role="listbox"
+      aria-label="{label} filter"
+      aria-multiselectable="true"
+      bind:this={panelEl}
+      style={panelStyle}
+    >
       <div class="filter-multi-head">
         <span>{label}</span>
         {#if selected.length}
