@@ -37,7 +37,8 @@
 
 <button
   type="button"
-  class="settings-icon theme-toggle"
+  class="theme-toggle"
+  class:settings-icon={mode === "icon"}
   class:menu-mode={mode === "menu"}
   title={label}
   aria-label={ariaLabel}
@@ -58,6 +59,29 @@
   /* Fallback when used outside .forge .settings-icon rules (should rarely apply) */
   .theme-toggle {
     appearance: none;
+  }
+
+  .theme-toggle.menu-mode {
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+    height: auto;
+    min-height: 2.5rem;
+    justify-content: flex-start;
+    gap: 0.55rem;
+    padding: 0.55rem 0.65rem;
+    border: none;
+    border-radius: 2px 8px 3px 7px / 7px 3px 8px 2px;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+    color: var(--ink, #1b1b1f);
+    cursor: pointer;
+  }
+
+  .theme-toggle.menu-mode:hover {
+    background: color-mix(in srgb, var(--yellow) 55%, transparent);
+    color: var(--brand);
   }
 
   .theme-label {
