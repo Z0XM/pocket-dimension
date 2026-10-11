@@ -15,11 +15,32 @@
     </div>
     <div class="mt-10 flex flex-wrap gap-3">
       {#if data.user}
-        <a href="/library" class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"> Open library </a>
-      {:else}
-        <a href="/login?redirect=/library" class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90">
-          Sign in
+        <button
+          type="button"
+          class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+          onclick={async () => {
+            const res = await fetch("/api/sessions", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { Accept: "application/json", "Content-Type": "application/json" },
+              body: "{}",
+            });
+            const body = await res.json().catch(() => ({}));
+            if (res.ok && body?.session?.id) {
+              window.location.href = `/session/${body.session.id}`;
+              return;
+            }
+            window.location.href = "/library";
+          }}
+        >
+          Start session
+        </button>
+        <a href="/join" class="rounded border border-border bg-secondary/60 px-5 py-2.5 text-sm text-secondary-foreground hover:bg-secondary">
+          Join
         </a>
+        <a href="/library" class="rounded border border-border px-5 py-2.5 text-sm text-muted-foreground hover:bg-secondary/40"> Library </a>
+      {:else}
+        <a href="/login?redirect=/" class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"> Sign in </a>
         <a href="/sign-up" class="rounded border border-border bg-secondary/60 px-5 py-2.5 text-sm text-secondary-foreground hover:bg-secondary">
           Create account
         </a>
