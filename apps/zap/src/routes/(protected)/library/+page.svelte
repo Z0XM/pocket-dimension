@@ -149,7 +149,7 @@
   });
 </script>
 
-<audio bind:this={audioEl} preload="metadata" class="hidden"></audio>
+<audio bind:this={audioEl} preload="auto" class="hidden"></audio>
 
 <section class="space-y-6">
   <div>

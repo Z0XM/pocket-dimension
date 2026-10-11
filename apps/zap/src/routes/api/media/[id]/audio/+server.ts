@@ -1,9 +1,23 @@
 import { error } from "@sveltejs/kit";
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
+import { readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import type { RequestHandler } from "./$types";
 import { parseBytesRange } from "$lib/server/byte-range";
 import { getStorageConfig } from "$lib/server/storage";
+
+/** Local fixture for play/pause tests without R2 (`storage_key = fixture:local`). */
+function readFixtureLocal(): { buf: ArrayBuffer; contentType: string; size: number } {
+  const path = join(process.cwd(), "static", "fixture.wav");
+  const size = statSync(path).size;
+  const nodeBuf = readFileSync(path);
+  return {
+    buf: nodeBuf.buffer.slice(nodeBuf.byteOffset, nodeBuf.byteOffset + nodeBuf.byteLength),
+    contentType: "audio/wav",
+    size,
+  };
+}
 
 function createClient() {
   const config = getStorageConfig();
@@ -82,15 +96,35 @@ export const GET: RequestHandler = async ({ locals, params, request }) => {
     throw error(404, "Track not found");
   }
 
+  const rangeHeader = request.headers.get("range");
+  const storageKey = asset.storageKey;
+
+  // Local fixture path (no R2) — used for play/pause/seek verification
+  if (storageKey === "fixture:local") {
+    try {
+      const fixture = readFixtureLocal();
+      const parsed = parseBytesRange(rangeHeader, fixture.size);
+      if (parsed.type === "full") return fullResponse(fixture.buf, fixture.contentType);
+      if (parsed.type === "unsatisfiable") {
+        return new Response(null, {
+          status: 416,
+          headers: { "Content-Range": `bytes */${fixture.size}`, "Accept-Ranges": "bytes" },
+        });
+      }
+      const slice = fixture.buf.slice(parsed.start, parsed.end + 1);
+      return partialResponse(slice, fixture.contentType, parsed.start, parsed.end, fixture.size);
+    } catch (err) {
+      console.error("[zap audio fixture]", err);
+      throw error(500, "Fixture audio missing — run static/fixture.wav setup");
+    }
+  }
+
   const wired = createClient();
   if (!wired) throw error(503, "Object storage is not configured");
 
   const { client } = wired;
-  const storageKey = asset.storageKey;
   const file = client.file(storageKey);
   const contentType = asset.codec?.includes("/") ? asset.codec : "audio/mpeg";
-
-  const rangeHeader = request.headers.get("range");
 
   try {
     const size = await resolveObjectSize(client, storageKey, file);

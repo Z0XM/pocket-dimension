@@ -2,6 +2,7 @@
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
+  import { nextPlaybackAction } from "$lib/playback-action";
   import { enhance } from "$app/forms";
 
   export type TrackItem = {
@@ -34,9 +35,11 @@
   let duration = $state(0);
   let loading = $state(false);
   let error = $state<string | null>(null);
+  /** Event-synced; do not derive from audioEl.paused (not Svelte-reactive). */
+  let uiPlaying = $state(false);
 
   const isActive = $derived(activeId === track.id);
-  const isPlaying = $derived(isActive && audioEl != null && !audioEl.paused);
+  let playGen = 0;
 
   function formatTime(sec: number) {
     if (!Number.isFinite(sec) || sec < 0) return "0:00";
@@ -51,31 +54,87 @@
     return formatTime(ms / 1000);
   }
 
+  function isThisLoaded(el: HTMLAudioElement) {
+    return el.dataset.assetId === track.id && Boolean(el.currentSrc || el.src);
+  }
+
+  function syncFromElement() {
+    if (!audioEl) {
+      uiPlaying = false;
+      return;
+    }
+    const mine = isThisLoaded(audioEl);
+    uiPlaying = mine && !audioEl.paused;
+    if (mine) {
+      current = audioEl.currentTime;
+      if (Number.isFinite(audioEl.duration)) duration = audioEl.duration;
+    }
+  }
+
   function onTimeUpdate() {
-    if (!audioEl || !isActive) return;
+    if (!audioEl || !isThisLoaded(audioEl)) return;
     current = audioEl.currentTime;
     if (Number.isFinite(audioEl.duration)) duration = audioEl.duration;
   }
 
   function onEnded() {
-    if (isActive) {
-      current = 0;
-      activeId = null;
-    }
+    if (!audioEl || !isThisLoaded(audioEl)) return;
+    uiPlaying = false;
+    current = 0;
+    if (activeId === track.id) activeId = null;
   }
+
+  $effect(() => {
+    if (!isActive) uiPlaying = false;
+  });
 
   $effect(() => {
     if (!audioEl) return;
     const el = audioEl;
+    const onPlay = () => syncFromElement();
+    const onPause = () => syncFromElement();
+    el.addEventListener("play", onPlay);
+    el.addEventListener("playing", onPlay);
+    el.addEventListener("pause", onPause);
     el.addEventListener("timeupdate", onTimeUpdate);
     el.addEventListener("ended", onEnded);
     el.addEventListener("loadedmetadata", onTimeUpdate);
+    syncFromElement();
     return () => {
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("playing", onPlay);
+      el.removeEventListener("pause", onPause);
       el.removeEventListener("timeupdate", onTimeUpdate);
       el.removeEventListener("ended", onEnded);
       el.removeEventListener("loadedmetadata", onTimeUpdate);
     };
   });
+
+  async function loadAndPlay(el: HTMLAudioElement) {
+    const gen = ++playGen;
+    loading = true;
+    error = null;
+    try {
+      // Only (re)assign src when switching tracks — never on resume after pause
+      if (!isThisLoaded(el)) {
+        el.pause();
+        el.src = `/api/media/${track.id}/audio`;
+        el.dataset.assetId = track.id;
+        el.load();
+      }
+      activeId = track.id;
+      await el.play();
+      if (gen !== playGen) return;
+      uiPlaying = true;
+    } catch (err) {
+      if (gen !== playGen) return;
+      error = err instanceof Error ? err.message : "Playback failed";
+      uiPlaying = false;
+      if (activeId === track.id) activeId = null;
+    } finally {
+      if (gen === playGen) loading = false;
+    }
+  }
 
   async function togglePlay() {
     error = null;
@@ -84,39 +143,42 @@
       return;
     }
     if (!audioEl) return;
+    const el = audioEl;
+    const action = nextPlaybackAction(isThisLoaded(el), el.paused);
 
-    if (isPlaying) {
-      audioEl.pause();
+    if (action === "pause") {
+      el.pause();
+      uiPlaying = false;
+      // keep activeId so seek bar stays usable and resume can continue
       return;
     }
 
-    if (!isActive || audioEl.dataset.assetId !== track.id) {
+    if (action === "resume") {
+      const gen = ++playGen;
       loading = true;
       try {
-        audioEl.pause();
-        audioEl.src = `/api/media/${track.id}/audio`;
-        audioEl.dataset.assetId = track.id;
         activeId = track.id;
-        await audioEl.play();
-      } catch (err) {
-        error = err instanceof Error ? err.message : "Playback failed";
-        activeId = null;
+        await el.play();
+        if (gen !== playGen) return;
+        uiPlaying = true;
+      } catch {
+        // Media element may be stuck after an aborted range request — hard reload once
+        if (gen !== playGen) return;
+        el.removeAttribute("src");
+        delete el.dataset.assetId;
+        await loadAndPlay(el);
       } finally {
-        loading = false;
+        if (gen === playGen) loading = false;
       }
       return;
     }
 
-    try {
-      await audioEl.play();
-    } catch (err) {
-      error = err instanceof Error ? err.message : "Playback failed";
-    }
+    await loadAndPlay(el);
   }
 
   function seek(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
-    if (!audioEl || !isActive) return;
+    if (!audioEl || !isThisLoaded(audioEl)) return;
     const next = Number(input.value);
     if (Number.isFinite(next)) {
       audioEl.currentTime = next;
@@ -136,12 +198,12 @@
       type="button"
       class="flex size-10 shrink-0 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
       disabled={!track.playable || loading}
-      aria-label={isPlaying ? "Pause" : "Play"}
+      aria-label={uiPlaying ? "Pause" : "Play"}
       onclick={togglePlay}
     >
       {#if loading}
         <span class="font-mono text-[10px]">…</span>
-      {:else if isPlaying}
+      {:else if uiPlaying}
         <PauseIcon class="size-4" />
       {:else}
         <PlayIcon class="size-4" />
