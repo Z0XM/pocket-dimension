@@ -8,8 +8,8 @@
 
   const id = $props.id();
 
-  const redirectTo = $derived(page.url.searchParams.get("redirect") ?? "/");
-  const loginHref = $derived(redirectTo === "/" ? "/login" : `/login?redirect=${encodeURIComponent(redirectTo)}`);
+  const redirectTo = $derived(page.url.searchParams.get("redirect") ?? "/library");
+  const loginHref = $derived(redirectTo === "/library" ? "/login" : `/login?redirect=${encodeURIComponent(redirectTo)}`);
 
   let name = $state("");
   let email = $state("");
@@ -69,7 +69,7 @@
   <div class="flex flex-col gap-5">
     <div class="flex flex-col items-center gap-2 text-center">
       <h1 class="text-2xl font-bold">Create your account</h1>
-      <p class="text-balance text-sm text-muted-foreground">Sign up for Me Via You</p>
+      <p class="text-balance text-sm text-muted-foreground">Sign up for Zap</p>
     </div>
 
     <div class="grid gap-2">

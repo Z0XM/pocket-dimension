@@ -37,10 +37,10 @@
     {:else}
       <div class="flex flex-col gap-2">
         <h1 class="text-2xl font-bold">Email verified</h1>
-        <p class="text-balance text-sm text-muted-foreground">You can continue to Me Via You.</p>
+        <p class="text-balance text-sm text-muted-foreground">You can continue to Zap.</p>
       </div>
       <div class="flex w-full flex-col gap-3">
-        <button type="button" class="auth-btn w-full" onclick={() => goto("/")}> Open app </button>
+        <button type="button" class="auth-btn w-full" onclick={() => goto("/library")}> Open library </button>
         <button type="button" class="auth-btn-secondary border-border bg-background" onclick={() => window.close()}> Close window </button>
       </div>
     {/if}

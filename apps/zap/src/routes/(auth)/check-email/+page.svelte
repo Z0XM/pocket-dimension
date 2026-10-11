@@ -20,7 +20,7 @@
 
   const description = $derived.by(() => {
     if (reason === "verify") {
-      return "Verify your email to use Me Via You. Check your inbox for the verification link.";
+      return "Verify your email to use Zap. Check your inbox for the verification link.";
     }
     if (type === "signup") {
       return `We sent a verification link to ${email || "your email"}. Open it to activate your account.`;

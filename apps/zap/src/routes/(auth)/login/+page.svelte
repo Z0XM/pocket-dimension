@@ -8,8 +8,8 @@
 
   const id = $props.id();
 
-  const redirectTo = $derived(page.url.searchParams.get("redirect") ?? "/");
-  const signUpHref = $derived(redirectTo === "/" ? "/sign-up" : `/sign-up?redirect=${encodeURIComponent(redirectTo)}`);
+  const redirectTo = $derived(page.url.searchParams.get("redirect") ?? "/library");
+  const signUpHref = $derived(redirectTo === "/library" ? "/sign-up" : `/sign-up?redirect=${encodeURIComponent(redirectTo)}`);
 
   let loginBy = $state<"email" | "username">("email");
   let email = $state("");
@@ -54,7 +54,7 @@
         return;
       }
 
-      await goto(redirectTo);
+      await goto(redirectTo, { invalidateAll: true });
     } catch (err) {
       console.error(err);
       error = "Something went wrong!";
@@ -124,7 +124,7 @@
   <div class="flex flex-col gap-5">
     <div class="flex flex-col items-center gap-2 text-center">
       <h1 class="text-2xl font-bold">Welcome back</h1>
-      <p class="text-balance text-sm text-muted-foreground">Log in to Me Via You</p>
+      <p class="text-balance text-sm text-muted-foreground">Log in to Zap</p>
     </div>
 
     <div class="flex flex-col gap-2">
