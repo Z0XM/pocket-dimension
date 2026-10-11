@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
+  import { computeFloatingPanelPlacement, floatingPanelStyle } from "$lib/floating-panel";
 
   type AccountOption = {
     id: string;
@@ -20,6 +21,8 @@
   let errorMessage = $state<string | null>(null);
   let open = $state(false);
   let root: HTMLDivElement | undefined = $state();
+  let menuEl: HTMLUListElement | undefined = $state();
+  let menuStyle = $state("");
 
   const activeAccount = $derived(accounts.find((account) => account.id === activeAccountId) ?? accounts[0]);
   const canSwitch = $derived(accounts.length > 1 && !switching);
@@ -29,8 +32,26 @@
     return `background: color-mix(in srgb, ${colorHex} 72%, transparent)`;
   }
 
+  function syncMenuPosition() {
+    if (!root || !menuEl) return;
+    const trigger = root.querySelector(".account-trigger");
+    if (!(trigger instanceof HTMLElement)) return;
+    const anchor = trigger.getBoundingClientRect();
+    const preferred = Math.max(anchor.width, Math.min(22 * 16, window.innerWidth - 16));
+    const placement = computeFloatingPanelPlacement({
+      anchor,
+      panelWidth: Math.max(menuEl.scrollWidth, preferred),
+      panelHeight: menuEl.scrollHeight,
+      alignEnd: window.innerWidth <= 640,
+      padding: 8,
+      gap: 4,
+    });
+    menuStyle = floatingPanelStyle(placement);
+  }
+
   async function switchAccount(accountId: string) {
     open = false;
+    menuStyle = "";
     if (accountId === activeAccountId || switching) return;
     switching = true;
     errorMessage = null;
@@ -55,6 +76,7 @@
   function toggleOpen() {
     if (!canSwitch) return;
     open = !open;
+    if (!open) menuStyle = "";
   }
 
   $effect(() => {
@@ -64,22 +86,35 @@
       const target = event.target as Node | null;
       if (root && target && !root.contains(target)) {
         open = false;
+        menuStyle = "";
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") open = false;
+      if (event.key === "Escape") {
+        open = false;
+        menuStyle = "";
+      }
+    }
+
+    function handleLayoutChange() {
+      syncMenuPosition();
     }
 
     const timeout = window.setTimeout(() => {
+      syncMenuPosition();
       window.addEventListener("pointerdown", handlePointerDown);
       window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("resize", handleLayoutChange);
+      window.addEventListener("scroll", handleLayoutChange, true);
     }, 0);
 
     return () => {
       window.clearTimeout(timeout);
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleLayoutChange);
+      window.removeEventListener("scroll", handleLayoutChange, true);
     };
   });
 </script>
@@ -102,7 +137,7 @@
     </button>
 
     {#if open}
-      <ul class="account-menu" role="listbox" aria-label="Accounts">
+      <ul class="account-menu" role="listbox" aria-label="Accounts" bind:this={menuEl} style={menuStyle}>
         {#each accounts as account (account.id)}
           {@const selected = account.id === activeAccountId}
           <li>
@@ -188,20 +223,18 @@
 
   .account-menu {
     list-style: none;
-    margin: 0.2rem 0 0;
+    margin: 0;
     padding: 0.35rem 0.25rem;
-    position: absolute;
-    left: 0;
-    min-width: 100%;
-    z-index: 40;
+    position: fixed;
+    z-index: 80;
     background: var(--surface-raised);
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
     border-radius: 2px 6px 3px 2px;
     box-shadow:
       2px 2px 0 0 var(--shadow-paper),
       2px 2px 0 1.5px color-mix(in srgb, var(--ink) 16%, transparent);
-    max-height: 14rem;
     overflow: auto;
+    box-sizing: border-box;
   }
 
   .account-option {
@@ -242,13 +275,6 @@
       min-height: 2.5rem;
       padding: 0.35rem 0.1rem 0.35rem;
       align-items: center;
-    }
-
-    .account-menu {
-      min-width: 100%;
-      max-width: min(100vw - 1.5rem, 22rem);
-      right: 0;
-      left: auto;
     }
 
     .account-option {

@@ -6,6 +6,7 @@
     type DashboardWidgetCategory,
     type DashboardWidgetId,
   } from "$lib/finance/dashboard-widgets";
+  import { computeFloatingPanelPlacement, floatingPanelStyle } from "$lib/floating-panel";
 
   type Props = {
     enabledWidgets: DashboardWidgetId[];
@@ -16,6 +17,8 @@
 
   let open = $state(false);
   let root: HTMLDivElement | undefined = $state();
+  let panelEl: HTMLDivElement | undefined = $state();
+  let panelStyle = $state("");
 
   const categoryLabels: Record<DashboardWidgetCategory, string> = {
     summary: "Summary",
@@ -40,6 +43,28 @@
     onchange([...DEFAULT_DASHBOARD_WIDGETS]);
   }
 
+  function syncPanelPosition() {
+    if (!root || !panelEl) return;
+    const trigger = root.querySelector(".widget-picker-btn");
+    if (!(trigger instanceof HTMLElement)) return;
+    const anchor = trigger.getBoundingClientRect();
+    const preferred = Math.min(22 * 16, window.innerWidth - 24);
+    const placement = computeFloatingPanelPlacement({
+      anchor,
+      panelWidth: Math.max(panelEl.scrollWidth, preferred),
+      panelHeight: panelEl.scrollHeight,
+      alignEnd: true,
+      padding: 12,
+      gap: 6,
+    });
+    panelStyle = floatingPanelStyle(placement);
+  }
+
+  function toggleOpen() {
+    open = !open;
+    if (!open) panelStyle = "";
+  }
+
   $effect(() => {
     if (!open) return;
 
@@ -47,30 +72,47 @@
       const target = event.target as Node | null;
       if (root && target && !root.contains(target)) {
         open = false;
+        panelStyle = "";
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") open = false;
+      if (event.key === "Escape") {
+        open = false;
+        panelStyle = "";
+      }
     }
 
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
+    function handleLayoutChange() {
+      syncPanelPosition();
+    }
+
+    const timeout = window.setTimeout(() => {
+      syncPanelPosition();
+      window.addEventListener("pointerdown", handlePointerDown);
+      window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("resize", handleLayoutChange);
+      window.addEventListener("scroll", handleLayoutChange, true);
+    }, 0);
+
     return () => {
+      window.clearTimeout(timeout);
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleLayoutChange);
+      window.removeEventListener("scroll", handleLayoutChange, true);
     };
   });
 </script>
 
 <div class="widget-picker" class:open bind:this={root}>
-  <button type="button" class="widget-picker-btn" aria-expanded={open} aria-haspopup="dialog" onclick={() => (open = !open)}>
+  <button type="button" class="widget-picker-btn" aria-expanded={open} aria-haspopup="dialog" onclick={toggleOpen}>
     <LayoutGrid size={15} strokeWidth={1.6} aria-hidden="true" />
     Charts
   </button>
 
   {#if open}
-    <div class="widget-picker-panel" role="dialog" aria-label="Configure dashboard charts">
+    <div class="widget-picker-panel" role="dialog" aria-label="Configure dashboard charts" bind:this={panelEl} style={panelStyle}>
       <div class="widget-picker-head">
         <h3>Charts</h3>
         <button type="button" class="widget-reset" onclick={resetDefaults}>Reset</button>
@@ -131,12 +173,8 @@
   }
 
   .widget-picker-panel {
-    position: absolute;
-    top: calc(100% + 0.35rem);
-    right: 0;
-    z-index: 40;
-    width: min(22rem, calc(100vw - 2rem));
-    max-height: min(28rem, calc(100vh - 8rem));
+    position: fixed;
+    z-index: 80;
     overflow: auto;
     background: var(--surface-raised);
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
@@ -147,7 +185,8 @@
     padding: 0.75rem 0.7rem 0.85rem;
     font-family: var(--hand);
     color: var(--ink);
-    transform: rotate(0.35deg);
+    /* No rotate: fixed + transform expands getBoundingClientRect past the viewport pad. */
+    box-sizing: border-box;
   }
 
   .widget-picker-head {
