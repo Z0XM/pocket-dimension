@@ -193,7 +193,7 @@
   </div>
 
   {#if tab === "browse"}
-    <section class="space-y-4" role="tabpanel" id="panel-browse" aria-labelledby="tab-browse">
+    <div class="space-y-4" role="tabpanel" id="panel-browse" aria-labelledby="tab-browse">
       <p class="text-sm text-muted-foreground">Search and tag chips apply as you go. Scroll for more.</p>
 
       <div class="flex flex-col gap-4 rounded-lg border border-border/70 bg-card/50 p-4">
@@ -257,9 +257,9 @@
       {:else if !hasMore && assets.length > 0}
         <p class="text-center font-mono text-[11px] text-muted-foreground">End of catalogue</p>
       {/if}
-    </section>
+    </div>
   {:else}
-    <section class="relative z-10 space-y-4 overflow-visible" role="tabpanel" id="panel-upload" aria-labelledby="tab-upload">
+    <div class="relative z-10 space-y-4 overflow-visible" role="tabpanel" id="panel-upload" aria-labelledby="tab-upload">
       <p class="text-sm text-muted-foreground">Add a track to the shared Zap catalogue (max 10 minutes).</p>
 
       <div class="overflow-visible rounded-lg border border-border/70 bg-card/40 p-4">
@@ -307,6 +307,6 @@
           <button type="submit" class="auth-btn" disabled={!data.storageReady}>Upload to Zap</button>
         </form>
       </div>
-    </section>
+    </div>
   {/if}
 </section>
