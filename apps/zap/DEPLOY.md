@@ -31,6 +31,10 @@ Optional: `YTDLP_COOKIES_B64` or `YTDLP_COOKIES_FILE` (Netscape cookies) if YouT
 
 Create a **Google Cloud OAuth client** for Zap. Authorized redirect URI: `https://<zap-host>/api/auth/youtube/callback`. Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (and optionally `YOUTUBE_TOKEN_SECRET` for AES-GCM token encryption; defaults to `BETTER_AUTH_SECRET`). Tokens live in `zap.youtube_account_links`.
 
+### Phase 5 Discord sink
+
+Shared PD Discord bot (not per-user). Set `DISCORD_BOT_TOKEN` + `DISCORD_CLIENT_ID` on the Zap service. Host attaches a voice channel from the session UI; Zap streams the same R2/catalogue track via ffmpeg → `@discordjs/voice`. Redeploy drops the voice link until re-attached.
+
 ### Cloudflare R2 (uploads + ingest)
 
 Create an **R2 API token** (Dashboard → R2 → Manage R2 API Tokens), not a global Cloudflare Account API token.

@@ -13,6 +13,8 @@ export const sessionPlaybackState = zapSchema.enum("session_playback_state", ["i
 export const sessionMemberRole = zapSchema.enum("session_member_role", ["host", "guest"]);
 export const fetchJobStatus = zapSchema.enum("fetch_job_status", ["pending", "running", "ready", "failed"]);
 export const syncRunStatus = zapSchema.enum("sync_run_status", ["pending", "running", "completed", "failed"]);
+export const sessionSinkType = zapSchema.enum("session_sink_type", ["web", "discord"]);
+export const sessionSinkStatus = zapSchema.enum("session_sink_status", ["pending", "active", "error", "detached"]);
 
 /** Global Zap catalogue — never deleted by app logic. */
 export const mediaAssets = zapSchema.table(
@@ -230,3 +232,36 @@ export const zapYoutubeAccountLinks = zapSchema.table("youtube_account_links", {
     .notNull(),
   revokedAt: timestamp("revoked_at"),
 });
+
+/** Output sinks for a session (web is implicit; Discord is attachable). */
+export const sessionSinks = zapSchema.table(
+  "session_sinks",
+  {
+    id,
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    type: sessionSinkType("type").notNull(),
+    status: sessionSinkStatus("status").default("pending").notNull(),
+    /** Discord guild snowflake (or other sink-specific id). */
+    externalGuildId: text("external_guild_id"),
+    /** Discord voice channel snowflake. */
+    externalChannelId: text("external_channel_id"),
+    configJson: text("config_json"),
+    errorMessage: text("error_message"),
+    attachedByUserId: uuid("attached_by_user_id").references(() => auth.user.id, { onDelete: "set null" }),
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamp("updated_at")
+      .$default(() => sql`now()`)
+      .$onUpdate(() => sql`now()`)
+      .notNull(),
+    detachedAt: timestamp("detached_at"),
+  },
+  (table) => [
+    index("session_sinks_session_id_idx").on(table.sessionId),
+    index("session_sinks_type_idx").on(table.type),
+    uniqueIndex("session_sinks_one_active_discord")
+      .on(table.sessionId, table.type)
+      .where(sql`${table.type} = 'discord' AND ${table.detachedAt} IS NULL`),
+  ]
+);

@@ -87,6 +87,8 @@ async function endSessionInternal(sessionId: string, _reason: "host" | "idle") {
   const snapshot = await buildSessionSnapshot(sessionId);
   if (snapshot) sessionEventBus.publish(sessionId, snapshot);
   sessionEventBus.closeSession(sessionId);
+  // Best-effort Discord leave (dynamic import avoids circular deps at module load)
+  void import("$lib/server/discord").then((m) => m.onSessionEnded(sessionId)).catch(() => {});
   return snapshot;
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DiscordSinkPanel from "$lib/components/DiscordSinkPanel.svelte";
   import SessionPlayer from "$lib/components/SessionPlayer.svelte";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
   import type { PageData } from "./$types";
@@ -102,6 +103,10 @@
   </div>
 
   <SessionPlayer bind:snapshot bind:audioEl />
+
+  {#if snapshot.session?.status === "live" && snapshot.session.id}
+    <DiscordSinkPanel sessionId={snapshot.session.id} canManage={Boolean(snapshot.me?.canManageGuests)} />
+  {/if}
 
   {#if snapshot.session?.status === "live"}
     <div class="grid gap-6 lg:grid-cols-2">
