@@ -3,7 +3,15 @@ import { createHash } from "node:crypto";
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
 import type { Actions, PageServerLoad } from "./$types";
-import { ensureCustomTag, ensureSystemTags, listAvailableTags, listCatalogue, setUserAssetTags } from "$lib/server/catalogue";
+import {
+  CATALOGUE_PAGE_SIZE,
+  ensureCustomTag,
+  ensureSystemTags,
+  listAvailableTags,
+  listCatalogue,
+  serializeCatalogueAsset,
+  setUserAssetTags,
+} from "$lib/server/catalogue";
 import { describeStorageConfig, isStorageConfigured, putMediaObject } from "$lib/server/storage";
 
 const MAX_DURATION_MS = 10 * 60 * 1000;
@@ -23,27 +31,22 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const q = url.searchParams.get("q") ?? "";
   const tagIds = url.searchParams.getAll("tag").filter(Boolean);
 
-  const [{ assets, tagsByAsset }, availableTags] = await Promise.all([listCatalogue({ userId, scope, q, tagIds }), listAvailableTags(userId)]);
+  const [{ assets, tagsByAsset, hasMore, nextOffset }, availableTags] = await Promise.all([
+    listCatalogue({ userId, scope, q, tagIds, offset: 0, limit: CATALOGUE_PAGE_SIZE }),
+    listAvailableTags(userId),
+  ]);
 
   return {
     scope,
     q,
     selectedTagIds: tagIds,
+    pageSize: CATALOGUE_PAGE_SIZE,
+    hasMore,
+    nextOffset,
     storageReady: isStorageConfigured(),
     storageInfo: describeStorageConfig(),
     availableTags: availableTags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
-    assets: assets.map((asset) => ({
-      id: asset.id,
-      title: asset.title,
-      artists: asset.artists,
-      durationMs: asset.durationMs,
-      sourceType: asset.sourceType,
-      tags: (tagsByAsset.get(asset.id) ?? []).map((t: { id: string; name: string; kind: string }) => ({
-        id: t.id,
-        name: t.name,
-        kind: t.kind,
-      })),
-    })),
+    assets: assets.map((asset) => serializeCatalogueAsset(asset, tagsByAsset.get(asset.id) ?? [])),
   };
 };
 

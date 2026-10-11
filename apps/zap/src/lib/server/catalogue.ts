@@ -30,18 +30,35 @@ export async function ensureSystemTags() {
 
 export type CatalogueScope = "all" | "yours";
 
+export const CATALOGUE_PAGE_SIZE = 24;
+
 export type CatalogueQuery = {
   userId: string;
   q?: string;
   scope?: CatalogueScope;
   /** Tag ids that must ALL be present (AND). */
   tagIds?: string[];
+  /** 0-based page offset in items (not pages). */
+  offset?: number;
+  limit?: number;
 };
+
+export type CatalogueAsset = typeof schema.mediaAssets.$inferSelect;
+export type CatalogueTag = typeof schema.tags.$inferSelect;
 
 export async function listCatalogue(input: CatalogueQuery) {
   const scope = input.scope ?? "all";
   const q = input.q?.trim() ?? "";
   const tagIds = input.tagIds?.filter(Boolean) ?? [];
+  const limit = Math.min(Math.max(input.limit ?? CATALOGUE_PAGE_SIZE, 1), 100);
+  const offset = Math.max(input.offset ?? 0, 0);
+
+  const empty = {
+    assets: [] as CatalogueAsset[],
+    tagsByAsset: new Map<string, CatalogueTag[]>(),
+    hasMore: false,
+    nextOffset: offset,
+  };
 
   let assetIds: string[] | null = null;
 
@@ -51,7 +68,7 @@ export async function listCatalogue(input: CatalogueQuery) {
       .from(schema.mediaAssetTags)
       .where(eq(schema.mediaAssetTags.userId, input.userId));
     assetIds = tagged.map((row) => row.mediaAssetId);
-    if (assetIds.length === 0) return { assets: [], tagsByAsset: new Map<string, (typeof schema.tags.$inferSelect)[]>() };
+    if (assetIds.length === 0) return empty;
   }
 
   if (tagIds.length > 0) {
@@ -71,7 +88,7 @@ export async function listCatalogue(input: CatalogueQuery) {
     } else {
       assetIds = [...matched];
     }
-    if (assetIds.length === 0) return { assets: [], tagsByAsset: new Map() };
+    if (assetIds.length === 0) return empty;
   }
 
   const conditions = [eq(schema.mediaAssets.status, "ready")];
@@ -83,13 +100,18 @@ export async function listCatalogue(input: CatalogueQuery) {
     conditions.push(or(ilike(schema.mediaAssets.title, pattern), ilike(schema.mediaAssets.artists, pattern))!);
   }
 
-  const assets = await db
+  const rows = await db
     .select()
     .from(schema.mediaAssets)
     .where(and(...conditions))
-    .orderBy(asc(schema.mediaAssets.title));
+    .orderBy(asc(schema.mediaAssets.title), asc(schema.mediaAssets.id))
+    .limit(limit + 1)
+    .offset(offset);
 
-  const tagsByAsset = new Map<string, (typeof schema.tags.$inferSelect)[]>();
+  const hasMore = rows.length > limit;
+  const assets = hasMore ? rows.slice(0, limit) : rows;
+
+  const tagsByAsset = new Map<string, CatalogueTag[]>();
   if (assets.length > 0) {
     const links = await db
       .select({
@@ -115,7 +137,24 @@ export async function listCatalogue(input: CatalogueQuery) {
     }
   }
 
-  return { assets, tagsByAsset };
+  return {
+    assets,
+    tagsByAsset,
+    hasMore,
+    nextOffset: offset + assets.length,
+  };
+}
+
+export function serializeCatalogueAsset(asset: CatalogueAsset, tags: CatalogueTag[] | { id: string; name: string; kind: string }[]) {
+  return {
+    id: asset.id,
+    title: asset.title,
+    artists: asset.artists,
+    durationMs: asset.durationMs,
+    sourceType: asset.sourceType,
+    playable: Boolean(asset.storageKey),
+    tags: tags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
+  };
 }
 
 export async function listAvailableTags(userId: string) {
