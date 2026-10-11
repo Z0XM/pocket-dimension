@@ -10,6 +10,7 @@ export default defineConfig({
     "./src/schema/chhanchhan.ts",
     "./src/schema/meviayou.ts",
     "./src/schema/zeo.ts",
+    "./src/schema/zap.ts",
   ],
   dialect: "postgresql",
   dbCredentials: {

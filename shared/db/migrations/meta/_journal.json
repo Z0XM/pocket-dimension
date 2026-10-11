@@ -323,6 +323,13 @@
       "when": 1791600000000,
       "tag": "0045_space_settlement_pockets",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1791700000000,
+      "tag": "0046_zap_catalogue",
+      "breakpoints": true
     }
   ]
 }

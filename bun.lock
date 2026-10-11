@@ -357,6 +357,40 @@
         "vite": "^7.2.6",
       },
     },
+    "apps/zap": {
+      "name": "@pocket-dimension/zap",
+      "version": "0.0.1",
+      "dependencies": {
+        "@better-auth/core": "1.6.33",
+        "@fontsource-variable/jetbrains-mono": "^5.2.8",
+        "@fontsource-variable/space-grotesk": "^5.2.10",
+        "@lucide/svelte": "^1.17.0",
+        "@pocket-dimension/auth": "workspace:*",
+        "@pocket-dimension/db": "workspace:*",
+        "better-auth": "1.6.33",
+        "bits-ui": "^2.18.1",
+        "clsx": "^2.1.1",
+        "drizzle-orm": "^0.45.2",
+        "tailwind-merge": "^3.6.0",
+        "tailwind-variants": "^3.2.2",
+      },
+      "devDependencies": {
+        "@sveltejs/adapter-auto": "^7.0.0",
+        "@sveltejs/kit": "^2.49.1",
+        "@sveltejs/vite-plugin-svelte": "^6.2.1",
+        "@tailwindcss/forms": "^0.5.10",
+        "@tailwindcss/typography": "^0.5.19",
+        "@tailwindcss/vite": "^4.1.17",
+        "kysely": "0.28.17",
+        "svelte": "^5.45.6",
+        "svelte-adapter-bun": "^1.0.1",
+        "svelte-check": "^4.3.4",
+        "tailwindcss": "^4.1.17",
+        "tw-animate-css": "^1.4.0",
+        "typescript": "^5.9.3",
+        "vite": "^7.2.6",
+      },
+    },
     "apps/zeo": {
       "name": "@pocket-dimension/zeo",
       "version": "0.0.1",
@@ -745,6 +779,8 @@
 
     "@fontsource-variable/inter": ["@fontsource-variable/inter@5.2.8", "", {}, "sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ=="],
 
+    "@fontsource-variable/jetbrains-mono": ["@fontsource-variable/jetbrains-mono@5.3.0", "", {}, "sha512-F32xpS2NsGYoQi2ADSkKTgpJj7ozajsGgDJ8woTnqjmIB+dxDIqImjl4pXZVEExu8UFZ2ndhmX18EBS/hdz3Lw=="],
+
     "@fontsource-variable/newsreader": ["@fontsource-variable/newsreader@5.2.10", "", {}, "sha512-MdI2iRwrqWpMOU/2aV2BgfZ4dJNlj/XlYaY8Zb7t87mWqHskYW0XiUANkt1cyOCiEfW2VQ0bQ5vZgGPp6B2B4w=="],
 
     "@fontsource-variable/noto-sans-jp": ["@fontsource-variable/noto-sans-jp@5.2.10", "", {}, "sha512-m0XfZ38rZtCaGAuAQL0cBPQ6fc/RguYEOqw66zvuLOV9vNRUBf9MFqyoazTu2JVCRIcnkrxbwF29UUaHHgTKdg=="],
@@ -754,6 +790,8 @@
     "@fontsource-variable/playwrite-us-modern": ["@fontsource-variable/playwrite-us-modern@5.2.7", "", {}, "sha512-773zKXTw0eA8nfBy1rjyNUC1VWlO51Ju6EfQS4l2zFxn9qADnXt8KtCcpEaFHbc1vhGq4GiiJapgxSHkdqSymA=="],
 
     "@fontsource-variable/plus-jakarta-sans": ["@fontsource-variable/plus-jakarta-sans@5.2.8", "", {}, "sha512-iQecBizIdZxezODNHzOn4SvvRMrZL/S8k4MEXGDynCmUrImVW0VmX+tIAMqnADwH4haXlHSXqMgU6+kcfBQJdw=="],
+
+    "@fontsource-variable/space-grotesk": ["@fontsource-variable/space-grotesk@5.3.0", "", {}, "sha512-2IxmvfB08i9vnGB3Ym/AXvhRE+8XOjWMXIyDum03c+tPwH0FUoMNQfGpU8NXPxjbws0Vvss3AH0Zqt4oJBBAdw=="],
 
     "@fontsource-variable/syne": ["@fontsource-variable/syne@5.2.7", "", {}, "sha512-B2z7P0mGdNSAgz6SmtK7HXReZL22WJ8Z8sk5Z1ZuKiCSRM7DwWLjWXLwhbQ+CvmtNS/+p95jGvVEfQT9bm+UKw=="],
 
@@ -876,6 +914,8 @@
     "@pocket-dimension/utils": ["@pocket-dimension/utils@workspace:shared/utils"],
 
     "@pocket-dimension/watchlist": ["@pocket-dimension/watchlist@workspace:apps/watchlist"],
+
+    "@pocket-dimension/zap": ["@pocket-dimension/zap@workspace:apps/zap"],
 
     "@pocket-dimension/zeo": ["@pocket-dimension/zeo@workspace:apps/zeo"],
 
@@ -2422,6 +2462,8 @@
     "@pocket-dimension/watchlist/svelte-sonner": ["svelte-sonner@1.0.7", "", { "dependencies": { "runed": "^0.28.0" }, "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-1EUFYmd7q/xfs2qCHwJzGPh9n5VJ3X6QjBN10fof2vxgy8fYE7kVfZ7uGnd7i6fQaWIr5KvXcwYXE/cmTEjk5A=="],
 
     "@pocket-dimension/watchlist/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@pocket-dimension/zap/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@pocket-dimension/zeo/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
