@@ -2,11 +2,71 @@ import { error } from "@sveltejs/kit";
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
 import type { RequestHandler } from "./$types";
+import { parseBytesRange } from "$lib/server/byte-range";
 import { getStorageConfig } from "$lib/server/storage";
+
+function createClient() {
+  const config = getStorageConfig();
+  if (!config) return null;
+  return {
+    config,
+    client: new Bun.S3Client({
+      accessKeyId: config.accessKey,
+      secretAccessKey: config.secretKey,
+      bucket: config.bucket,
+      endpoint: config.endpoint,
+      region: config.region || "auto",
+      virtualHostedStyle: config.virtualHostedStyle,
+    }),
+  };
+}
+
+async function resolveObjectSize(client: Bun.S3Client, storageKey: string, file: Bun.S3File): Promise<number> {
+  // Do NOT use file.size — on S3File it is the Blob sync getter and is often 0 before HEAD,
+  // which made `Range: bytes=0-` incorrectly 416.
+  try {
+    const stats = await file.stat();
+    if (stats?.size && Number.isFinite(stats.size) && stats.size > 0) return stats.size;
+  } catch {
+    // fall through
+  }
+  try {
+    const n = await client.size(storageKey);
+    if (Number.isFinite(n) && n > 0) return n;
+  } catch {
+    // fall through
+  }
+  return 0;
+}
+
+function fullResponse(body: ArrayBuffer, contentType: string) {
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(body.byteLength),
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "private, max-age=60",
+    },
+  });
+}
+
+function partialResponse(body: ArrayBuffer, contentType: string, start: number, end: number, size: number) {
+  return new Response(body, {
+    status: 206,
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(body.byteLength),
+      "Content-Range": `bytes ${start}-${end}/${size}`,
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "private, max-age=60",
+    },
+  });
+}
 
 /**
  * Same-origin audio stream for library playback (avoids R2 browser CORS setup).
- * Auth: signed-in verified user. Source: R2 via Bun.S3Client.
+ * Supports Range so HTML5 <audio> can play + seek.
  */
 export const GET: RequestHandler = async ({ locals, params, request }) => {
   if (!locals.user) throw error(401, "Sign in required");
@@ -22,56 +82,56 @@ export const GET: RequestHandler = async ({ locals, params, request }) => {
     throw error(404, "Track not found");
   }
 
-  const config = getStorageConfig();
-  if (!config) throw error(503, "Object storage is not configured");
+  const wired = createClient();
+  if (!wired) throw error(503, "Object storage is not configured");
 
-  const client = new Bun.S3Client({
-    accessKeyId: config.accessKey,
-    secretAccessKey: config.secretKey,
-    bucket: config.bucket,
-    endpoint: config.endpoint,
-    region: config.region || "auto",
-    virtualHostedStyle: config.virtualHostedStyle,
-  });
+  const { client } = wired;
+  const storageKey = asset.storageKey;
+  const file = client.file(storageKey);
+  const contentType = asset.codec?.includes("/") ? asset.codec : "audio/mpeg";
 
-  const file = client.file(asset.storageKey);
-  const contentType = asset.codec || "audio/mpeg";
+  const rangeHeader = request.headers.get("range");
 
-  // Support Range requests for seek
-  const range = request.headers.get("range");
   try {
-    if (range) {
-      const size = await file.size;
-      const match = /bytes=(\d*)-(\d*)/.exec(range);
-      if (!match) throw error(416, "Invalid range");
-      const start = match[1] ? Number(match[1]) : 0;
-      const end = match[2] ? Number(match[2]) : Math.max(size - 1, 0);
-      if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) {
-        throw error(416, "Invalid range");
-      }
-      const chunk = file.slice(start, end + 1);
-      const buf = await chunk.arrayBuffer();
-      return new Response(buf, {
-        status: 206,
+    const size = await resolveObjectSize(client, storageKey, file);
+    const parsed = parseBytesRange(rangeHeader, size);
+
+    // Unknown/empty size: always download full object and serve 200 (never 416).
+    if (size <= 0 || parsed.type === "full") {
+      const buf = await file.arrayBuffer();
+      return fullResponse(buf, contentType);
+    }
+
+    if (parsed.type === "unsatisfiable") {
+      // RFC 7233: include Content-Range: bytes */size on 416
+      return new Response(null, {
+        status: 416,
         headers: {
-          "Content-Type": contentType,
-          "Content-Length": String(buf.byteLength),
-          "Content-Range": `bytes ${start}-${end}/${size}`,
+          "Content-Range": `bytes */${size}`,
           "Accept-Ranges": "bytes",
-          "Cache-Control": "private, max-age=60",
         },
       });
     }
 
-    const buf = await file.arrayBuffer();
-    return new Response(buf, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Length": String(buf.byteLength),
-        "Accept-Ranges": "bytes",
-        "Cache-Control": "private, max-age=60",
-      },
-    });
+    const { start, end } = parsed;
+    try {
+      // Bun S3File.slice end is exclusive (Blob semantics)
+      const chunk = file.slice(start, end + 1, contentType);
+      const buf = await chunk.arrayBuffer();
+      if (buf.byteLength === 0 && size > 0) {
+        // Upstream returned empty for a valid range — fall back to full body
+        const full = await file.arrayBuffer();
+        return fullResponse(full, contentType);
+      }
+      // If upstream returned a different length, still advertise the requested range
+      // but use actual bytes for Content-Length.
+      const actualEnd = start + buf.byteLength - 1;
+      return partialResponse(buf, contentType, start, actualEnd >= start ? actualEnd : end, size);
+    } catch (sliceErr) {
+      console.warn("[zap audio] range slice failed, falling back to full body", sliceErr);
+      const full = await file.arrayBuffer();
+      return fullResponse(full, contentType);
+    }
   } catch (err) {
     if (err && typeof err === "object" && "status" in err) throw err;
     console.error("[zap audio]", err);
