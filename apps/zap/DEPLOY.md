@@ -25,7 +25,7 @@ Copy from `.env.example`. Required in production:
 
 The Zap **Dockerfile runner is fat**: `ffmpeg`, `yt-dlp`, and `Deno` (for yt-dlp JS challenges). Railpack alone will not provide these — use the Dockerfile path for production once URL ingest is needed.
 
-Optional: `YTDLP_COOKIES_B64` or `YTDLP_COOKIES_FILE` (Netscape cookies) if YouTube blocks datacenter IPs. Public URL paste does **not** need Google OAuth (Phase 4). Tracks over **10 minutes** are skipped/rejected.
+**YouTube cookies (usually required):** set `YTDLP_COOKIES_B64` (preferred on Dokploy) or `YTDLP_COOKIES_FILE` with Netscape cookies from a logged-in browser. Without them, yt-dlp often fails with “Sign in to confirm you’re not a bot” and the Library UI shows `failed: N` plus that reason. Public URL paste does **not** need Google OAuth (Phase 4), but OAuth playlist import still uses the same yt-dlp+cookies path per video. Tracks over **10 minutes** are skipped/rejected.
 
 ### Phase 4 Connect YouTube
 

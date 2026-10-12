@@ -23,7 +23,13 @@
   let ytSelected = $state<string[]>([]);
   let ytBusy = $state(false);
   let ytError = $state<string | null>(null);
-  let ytImportSummary = $state<{ imported: number; skipped: number; failed: number } | null>(null);
+  let ytImportSummary = $state<{
+    imported: number;
+    skipped: number;
+    failed: number;
+    errorMessage?: string | null;
+    failures?: { title?: string | null; reason: string }[];
+  } | null>(null);
 
   let assets = $state<TrackItem[]>([]);
   let hasMore = $state(false);
@@ -102,7 +108,16 @@
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Import failed (${res.status})`);
-      ytImportSummary = { imported: body.imported ?? 0, skipped: body.skipped ?? 0, failed: body.failed ?? 0 };
+      ytImportSummary = {
+        imported: body.imported ?? 0,
+        skipped: body.skipped ?? 0,
+        failed: body.failed ?? 0,
+        errorMessage: body.errorMessage ?? null,
+        failures: body.failures ?? [],
+      };
+      if ((body.failed ?? 0) > 0 && (body.errorMessage || body.message)) {
+        ytError = body.errorMessage ?? body.message;
+      }
       tab = "browse";
       void fetchPage({ reset: true });
     } catch (err) {
@@ -412,6 +427,19 @@
             <p class="mt-2 text-sm text-signal">
               Import done — imported {ytImportSummary.imported}, skipped {ytImportSummary.skipped}, failed {ytImportSummary.failed}.
             </p>
+            {#if ytImportSummary.errorMessage}
+              <p class="auth-error mt-2">{ytImportSummary.errorMessage}</p>
+            {/if}
+            {#if ytImportSummary.failures && ytImportSummary.failures.length > 0}
+              <ul class="mt-2 space-y-1 font-mono text-[11px] text-muted-foreground">
+                {#each ytImportSummary.failures.slice(0, 5) as f}
+                  <li>
+                    {#if f.title}<span class="text-foreground">{f.title}</span> —
+                    {/if}{f.reason}
+                  </li>
+                {/each}
+              </ul>
+            {/if}
           {/if}
           {#if ytPlaylists.length > 0}
             <ul class="mt-3 max-h-56 space-y-1 overflow-y-auto rounded border border-border/60 p-2">
@@ -446,6 +474,19 @@
           <p class="mt-2 text-sm text-signal">
             Sync done — imported {form.ingestSummary.imported}, skipped {form.ingestSummary.skipped}, failed {form.ingestSummary.failed}.
           </p>
+          {#if form.ingestSummary.errorMessage}
+            <p class="auth-error mt-2">{form.ingestSummary.errorMessage}</p>
+          {/if}
+          {#if form.ingestSummary.failures?.length}
+            <ul class="mt-2 space-y-1 font-mono text-[11px] text-muted-foreground">
+              {#each form.ingestSummary.failures as f}
+                <li>
+                  {#if f.title}<span class="text-foreground">{f.title}</span> —
+                  {/if}{f.reason}
+                </li>
+              {/each}
+            </ul>
+          {/if}
         {/if}
         <form
           method="POST"

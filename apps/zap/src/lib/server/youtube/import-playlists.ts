@@ -1,5 +1,6 @@
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
+import { summarizeIngestItems } from "$lib/server/ingest/errors";
 import { DURATION_CAP_MESSAGE, isOverDurationCap } from "$lib/server/ingest/limits";
 import { ingestCatalogueVideo, type IngestItemResult, type SyncRunResult } from "$lib/server/ingest/pipeline";
 import { listYouTubePlaylistItems } from "./api";
@@ -53,34 +54,43 @@ export async function importConnectedPlaylists(userId: string, playlistIds: stri
       }
     }
 
-    const imported = items.filter((i) => i.status === "imported" || i.status === "reused").length;
-    const skipped = items.filter((i) => i.status === "skipped").length;
-    const failed = items.filter((i) => i.status === "failed").length;
+    const summary = summarizeIngestItems(items);
 
     await db
       .update(schema.syncRuns)
       .set({
         status: "completed",
-        importedCount: imported,
-        skippedCount: skipped,
-        failedCount: failed,
-        summaryJson: JSON.stringify({ playlists: uniqueIds, items }),
+        importedCount: summary.imported,
+        skippedCount: summary.skipped,
+        failedCount: summary.failed,
+        errorMessage: summary.errorMessage,
+        summaryJson: JSON.stringify({ playlists: uniqueIds, items, failures: summary.failures }),
         finishedAt: new Date(),
       })
       .where(eq(schema.syncRuns.id, run.id));
 
-    return { syncRunId: run.id, imported, skipped, failed, items, playlists: uniqueIds };
+    return {
+      syncRunId: run.id,
+      imported: summary.imported,
+      skipped: summary.skipped,
+      failed: summary.failed,
+      items,
+      errorMessage: summary.errorMessage,
+      failures: summary.failures,
+      playlists: uniqueIds,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Playlist import failed";
+    const summary = summarizeIngestItems(items);
     await db
       .update(schema.syncRuns)
       .set({
         status: "failed",
         errorMessage: message,
-        importedCount: items.filter((i) => i.status === "imported" || i.status === "reused").length,
-        skippedCount: items.filter((i) => i.status === "skipped").length,
-        failedCount: items.filter((i) => i.status === "failed").length,
-        summaryJson: JSON.stringify({ playlists: uniqueIds, items }),
+        importedCount: summary.imported,
+        skippedCount: summary.skipped,
+        failedCount: summary.failed,
+        summaryJson: JSON.stringify({ playlists: uniqueIds, items, failures: summary.failures }),
         finishedAt: new Date(),
       })
       .where(eq(schema.syncRuns.id, run.id));

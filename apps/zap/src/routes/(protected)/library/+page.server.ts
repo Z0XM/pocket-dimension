@@ -181,6 +181,11 @@ export const actions: Actions = {
           skipped: result.skipped,
           failed: result.failed,
           syncRunId: result.syncRunId,
+          errorMessage: result.errorMessage ?? null,
+          failures: (result.failures ?? []).slice(0, 8).map((f) => ({
+            title: f.title ?? null,
+            reason: f.reason,
+          })),
         },
       };
     } catch (err) {
