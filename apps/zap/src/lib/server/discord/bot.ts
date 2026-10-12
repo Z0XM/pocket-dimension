@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, ChannelType, type VoiceBasedChannel } from "discord.js";
+import { Client, ChannelType, Events, GatewayIntentBits, type VoiceBasedChannel } from "discord.js";
 import { discordBotToken, isDiscordConfigured } from "./config";
 
 let clientPromise: Promise<Client> | null = null;
@@ -15,8 +15,9 @@ export async function getDiscordClient(): Promise<Client | null> {
       });
 
       await new Promise<void>((resolve, reject) => {
-        client.once("ready", () => resolve());
-        client.once("error", reject);
+        // discord.js ≥14.22: `ready` is deprecated — use `clientReady` / Events.ClientReady
+        client.once(Events.ClientReady, () => resolve());
+        client.once(Events.Error, reject);
         client.login(token).catch(reject);
       });
 
