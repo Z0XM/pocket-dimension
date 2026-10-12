@@ -51,6 +51,10 @@ function killFfmpeg(runtime: SessionVoiceRuntime) {
   runtime.ffmpeg = null;
 }
 
+/**
+ * Encode to Ogg Opus in ffmpeg so @discordjs/voice can demux without a native
+ * opus addon (@discordjs/opus / opusscript). Raw PCM + inlineVolume forces those.
+ */
 function startFfmpegResource(url: string, positionMs: number) {
   const seekSec = Math.max(0, positionMs / 1000);
   const args = [
@@ -67,12 +71,16 @@ function startFfmpegResource(url: string, positionMs: number) {
     "0",
     "-loglevel",
     "error",
+    "-acodec",
+    "libopus",
     "-f",
-    "s16le",
+    "ogg",
     "-ar",
     "48000",
     "-ac",
     "2",
+    "-b:a",
+    "96k",
     "pipe:1",
   ];
   const ffmpeg = spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -81,8 +89,7 @@ function startFfmpegResource(url: string, positionMs: number) {
     if (text.trim()) console.warn("[zap discord ffmpeg]", text.trim());
   });
   const resource = createAudioResource(ffmpeg.stdout!, {
-    inputType: StreamType.Raw,
-    inlineVolume: true,
+    inputType: StreamType.OggOpus,
   });
   return { ffmpeg, resource };
 }

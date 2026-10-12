@@ -32,7 +32,6 @@
   },
   "dependencies": {
     "@better-auth/core": "1.6.33",
-    "@discordjs/opus": "^0.10.0",
     "@discordjs/voice": "^0.19.2",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@fontsource-variable/space-grotesk": "^5.2.10",
@@ -44,6 +43,7 @@
     "clsx": "^2.1.1",
     "discord.js": "^14.27.0",
     "drizzle-orm": "^0.45.2",
+    "opusscript": "^0.0.8",
     "sodium-native": "^5.1.0",
     "tailwind-merge": "^3.6.0",
     "tailwind-variants": "^3.2.2"
