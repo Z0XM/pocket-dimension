@@ -2,6 +2,7 @@
   import { enhance } from "$app/forms";
   import { replaceState } from "$app/navigation";
   import { page } from "$app/state";
+  import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -220,11 +221,25 @@
 <audio bind:this={audioEl} preload="auto" class="hidden"></audio>
 
 <section class="space-y-6">
-  <div>
-    <h1 class="text-3xl font-semibold tracking-tight">Library</h1>
-    <p class="mt-1 text-sm text-muted-foreground">
-      Browse the Zap catalogue, or upload into it. Tag filters use <span class="font-mono text-signal">AND</span>.
-    </p>
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight">Library</h1>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Browse the catalogue, or open <span class="font-mono text-signal">Add</span> for upload / URL / YouTube. Tag filters use
+        <span class="font-mono text-signal">AND</span>.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <StartSessionButton />
+      <a href="/join" class="rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary/60">Join</a>
+      <button
+        type="button"
+        class="rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary/60"
+        onclick={() => setTab("upload")}
+      >
+        Add music
+      </button>
+    </div>
   </div>
 
   <div class="flex gap-1 rounded-lg border border-border/70 bg-card/40 p-1" role="tablist" aria-label="Library sections">
@@ -256,13 +271,15 @@
       }`}
       onclick={() => setTab("upload")}
     >
-      Upload
+      Add
     </button>
   </div>
 
   {#if tab === "browse"}
     <div class="space-y-4" role="tabpanel" id="panel-browse" aria-labelledby="tab-browse">
-      <p class="text-sm text-muted-foreground">Search and tag chips apply as you go. Scroll for more.</p>
+      <p class="text-sm text-muted-foreground">
+        Search and tag chips apply as you go. Scroll for more. Sessions play from this catalogue — Discord attaches inside a session.
+      </p>
 
       <div class="flex flex-col gap-4 rounded-lg border border-border/70 bg-card/50 p-4">
         <div class="flex flex-wrap gap-2">
@@ -311,7 +328,7 @@
         {#if loading && assets.length === 0}
           <li class="px-4 py-10 text-center font-mono text-xs text-muted-foreground">Scanning catalogue…</li>
         {:else if assets.length === 0}
-          <li class="px-4 py-10 text-center text-sm text-muted-foreground">No tracks match. Switch to Upload or clear filters.</li>
+          <li class="px-4 py-10 text-center text-sm text-muted-foreground">No tracks match. Open Add or clear filters.</li>
         {:else}
           {#each assets as track (track.id)}
             <TrackRow {track} availableTags={data.availableTags} bind:activeId bind:audioEl />
@@ -353,11 +370,15 @@
 
         <h2 class="mt-4 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Connect YouTube</h2>
         {#if !data.youtubeOauthConfigured}
-          <p class="mt-2 text-sm text-muted-foreground">
-            Set <span class="font-mono text-signal">GOOGLE_CLIENT_ID</span> /
-            <span class="font-mono text-signal">GOOGLE_CLIENT_SECRET</span> (redirect
-            <span class="font-mono">/api/auth/youtube/callback</span>) to enable Connect YouTube.
-          </p>
+          <div class="mt-2 space-y-2 rounded border border-border/60 bg-background/30 p-3">
+            <button type="button" class="auth-btn opacity-50" disabled title="Google OAuth not configured">Connect YouTube</button>
+            <p class="text-sm text-muted-foreground">
+              Set <span class="font-mono text-signal">GOOGLE_CLIENT_ID</span> /
+              <span class="font-mono text-signal">GOOGLE_CLIENT_SECRET</span> (redirect
+              <span class="font-mono">/api/auth/youtube/callback</span>) to enable. Optional:
+              <span class="font-mono">YOUTUBE_TOKEN_SECRET</span> (else <span class="font-mono">BETTER_AUTH_SECRET</span>).
+            </p>
+          </div>
         {:else if !ytLinked}
           <p class="mt-2 text-sm text-muted-foreground">Link your Google account to import private playlists and Liked videos.</p>
           <a class="auth-btn mt-2 inline-flex w-fit" href="/api/auth/youtube/start?returnTo=/library?tab=upload"> Connect YouTube </a>
@@ -450,10 +471,22 @@
             placeholder="https://www.youtube.com/watch?v=… or playlist URL"
             bind:value={ingestUrl}
             required
+            disabled={!data.ingestReady}
           />
           <button type="submit" class="auth-btn" disabled={!data.ingestReady || ingestBusy}>
             {ingestBusy ? "Importing…" : "Import URL"}
           </button>
+          {#if !data.ingestReady}
+            <p class="text-sm text-muted-foreground">
+              Needs R2 (<span class="font-mono text-signal">S3_*</span>) and
+              <span class="font-mono text-signal">yt-dlp</span> on the Zap host
+              {#if data.storageReady && !data.ytDlpReady}
+                — yt-dlp missing
+              {:else if !data.storageReady}
+                — storage not configured
+              {/if}.
+            </p>
+          {/if}
         </form>
 
         <h2 class="mt-6 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">File upload</h2>

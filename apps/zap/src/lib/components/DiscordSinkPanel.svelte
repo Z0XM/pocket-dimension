@@ -132,9 +132,11 @@
     </div>
 
     {#if !configured}
+      <button type="button" class="auth-btn opacity-50" disabled title="Discord bot not configured">Attach Discord</button>
       <p class="text-sm text-muted-foreground">
         Set <span class="font-mono text-signal">DISCORD_BOT_TOKEN</span> and
-        <span class="font-mono text-signal">DISCORD_CLIENT_ID</span> to attach a voice channel.
+        <span class="font-mono text-signal">DISCORD_CLIENT_ID</span> (or
+        <span class="font-mono">DISCORD_APPLICATION_ID</span>) to enable. Attach from a live session after inviting the bot.
       </p>
     {:else if !canManage}
       <p class="font-mono text-[11px] text-muted-foreground">
