@@ -4,6 +4,7 @@ import { summarizeIngestItems } from "$lib/server/ingest/errors";
 import { DURATION_CAP_MESSAGE, isOverDurationCap } from "$lib/server/ingest/limits";
 import { mapPool, youtubeIngestConcurrency } from "$lib/server/ingest/map-pool";
 import { ingestCatalogueVideo, type IngestItemResult, type SyncRunResult } from "$lib/server/ingest/pipeline";
+import type { SongProgress } from "$lib/server/ingest/progress";
 import { listYouTubePlaylistItems, type ZapYouTubePlaylistItem } from "./api";
 
 export type PlaylistImportProgress = {
@@ -14,6 +15,8 @@ export type PlaylistImportProgress = {
   skipped: number;
   failed: number;
   currentTitle?: string | null;
+  /** In-flight / recent songs with download→upload percents (parallel workers). */
+  songs?: SongProgress[];
 };
 
 type WorkItem = { kind: "skip"; entry: ZapYouTubePlaylistItem; reason: string } | { kind: "ingest"; entry: ZapYouTubePlaylistItem };
@@ -57,6 +60,38 @@ export async function importConnectedPlaylists(
   const concurrency = youtubeIngestConcurrency();
   /** Serialize progress/DB writes so concurrent workers don't clobber tallies. */
   let progressGate: Promise<void> = Promise.resolve();
+  const activeSongs = new Map<string, SongProgress>();
+
+  const publish = (extra?: { currentTitle?: string | null }) => {
+    const counts = tally(items);
+    const done = items.length;
+    const snapshot: PlaylistImportProgress = {
+      total: workTotal,
+      done,
+      remaining: Math.max(0, workTotal - done),
+      ...counts,
+      currentTitle: extra?.currentTitle,
+      songs: [...activeSongs.values()],
+    };
+    progressGate = progressGate
+      .then(async () => {
+        await onProgress?.(snapshot);
+        await db
+          .update(schema.syncRuns)
+          .set({
+            importedCount: snapshot.imported,
+            skippedCount: snapshot.skipped,
+            failedCount: snapshot.failed,
+          })
+          .where(eq(schema.syncRuns.id, run.id));
+      })
+      .catch((err) => {
+        console.warn("[zap youtube import progress]", err);
+      });
+    return progressGate;
+  };
+
+  let workTotal = 0;
 
   try {
     const entryLists = await Promise.all(uniqueIds.map((playlistId) => listYouTubePlaylistItems(userId, playlistId)));
@@ -72,60 +107,79 @@ export async function importConnectedPlaylists(
       }
     }
 
-    const total = work.length;
+    workTotal = work.length;
     await onProgress?.({
-      total,
+      total: workTotal,
       done: 0,
-      remaining: total,
+      remaining: workTotal,
       imported: 0,
       skipped: 0,
       failed: 0,
+      songs: [],
     });
 
     await mapPool(work, concurrency, async (job) => {
+      const identityKey = `youtube:${job.entry.videoId}`;
       let result: IngestItemResult;
       if (job.kind === "skip") {
         result = {
           status: "skipped",
           reason: job.reason,
-          identityKey: `youtube:${job.entry.videoId}`,
+          identityKey,
           title: job.entry.title,
         };
+        activeSongs.set(identityKey, {
+          identityKey,
+          title: job.entry.title,
+          phase: "skipped",
+          percent: 100,
+        });
       } else {
+        activeSongs.set(identityKey, {
+          identityKey,
+          title: job.entry.title,
+          phase: "probing",
+          percent: 0,
+        });
+        await publish({ currentTitle: job.entry.title });
         result = await ingestCatalogueVideo({
           userId,
           url: job.entry.url,
-          identityKey: `youtube:${job.entry.videoId}`,
+          identityKey,
           titleHint: job.entry.title,
+          onSongProgress: async (song) => {
+            activeSongs.set(identityKey, song);
+            await publish({ currentTitle: song.title ?? job.entry.title });
+          },
         });
       }
 
       items.push(result);
-      const counts = tally(items);
-      const done = items.length;
-      const snapshot: PlaylistImportProgress = {
-        total,
-        done,
-        remaining: Math.max(0, total - done),
-        ...counts,
-        currentTitle: job.entry.title,
-      };
-      progressGate = progressGate
-        .then(async () => {
-          await onProgress?.(snapshot);
-          await db
-            .update(schema.syncRuns)
-            .set({
-              importedCount: snapshot.imported,
-              skippedCount: snapshot.skipped,
-              failedCount: snapshot.failed,
-            })
-            .where(eq(schema.syncRuns.id, run.id));
-        })
-        .catch((err) => {
-          console.warn("[zap youtube import progress]", err);
+      if (result.status === "failed") {
+        activeSongs.set(identityKey, {
+          identityKey,
+          title: job.entry.title,
+          phase: "failed",
+          percent: 0,
         });
-      await progressGate;
+      } else if (result.status === "skipped") {
+        activeSongs.set(identityKey, {
+          identityKey,
+          title: job.entry.title,
+          phase: "skipped",
+          percent: 100,
+        });
+      } else {
+        activeSongs.set(identityKey, {
+          identityKey,
+          title: job.entry.title,
+          phase: "done",
+          percent: 100,
+        });
+      }
+      await publish({ currentTitle: job.entry.title });
+      // Drop finished songs from the active list shortly so the UI stays focused on in-flight work
+      activeSongs.delete(identityKey);
       return result;
     });
 

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { formatYtDlpFailure } from "./errors";
 import { DURATION_CAP_MESSAGE, isOverDurationCap } from "./limits";
+import { createPercentThrottle, parseYtDlpDownloadPercent } from "./progress";
 
 const YOUTUBE_CLIENT_FALLBACK = "youtube:player_client=android,web,tv,web_safari";
 
@@ -97,11 +98,14 @@ async function baseArgs(): Promise<string[]> {
   return args;
 }
 
-async function runYtDlp(extra: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+async function runYtDlp(
+  extra: string[],
+  opts?: { onDownloadPercent?: (percent: number) => void }
+): Promise<{ code: number; stdout: string; stderr: string }> {
   const bin = await resolveYtDlpBin();
   if (!bin) throw new Error("yt-dlp is not installed (deploy Zap with the fat Dockerfile)");
 
-  const args = [...(await baseArgs()), ...extra];
+  const args = [...(await baseArgs()), ...(opts?.onDownloadPercent ? ["--newline"] : []), ...extra];
   // playlist listing should allow playlists
   const cleaned = args.includes("--flat-playlist") ? args.filter((a) => a !== "--no-playlist") : args;
 
@@ -110,7 +114,40 @@ async function runYtDlp(extra: string[]): Promise<{ code: number; stdout: string
     stderr: "pipe",
     env: { ...process.env, PATH: `${process.env.HOME ?? ""}/bin:${process.env.PATH ?? ""}` },
   });
-  const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+
+  if (!opts?.onDownloadPercent) {
+    const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+    return { code, stdout, stderr };
+  }
+
+  const emit = createPercentThrottle(opts.onDownloadPercent);
+  const readStderr = async () => {
+    const reader = proc.stderr.getReader();
+    const decoder = new TextDecoder();
+    let stderr = "";
+    let pending = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      stderr += chunk;
+      pending += chunk;
+      const lines = pending.split(/\r?\n/);
+      pending = lines.pop() ?? "";
+      for (const line of lines) {
+        const pct = parseYtDlpDownloadPercent(line);
+        if (pct != null) emit(pct);
+      }
+    }
+    if (pending) {
+      const pct = parseYtDlpDownloadPercent(pending);
+      if (pct != null) emit(pct);
+    }
+    return stderr;
+  };
+
+  const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), readStderr(), proc.exited]);
+  emit(100);
   return { code, stdout, stderr };
 }
 
@@ -189,7 +226,10 @@ export async function listPlaylistEntries(playlistUrl: string): Promise<{ id: st
     .filter(Boolean) as { id: string; title: string; url: string; durationMs: number | null }[];
 }
 
-export async function downloadBestAudio(url: string): Promise<YtDlpDownload & { workDir: string }> {
+export async function downloadBestAudio(
+  url: string,
+  opts?: { onDownloadPercent?: (percent: number) => void }
+): Promise<YtDlpDownload & { workDir: string }> {
   const probe = await probeUrl(url);
   if (isOverDurationCap(probe.durationMs)) {
     throw new Error(DURATION_CAP_MESSAGE);
@@ -207,7 +247,7 @@ export async function downloadBestAudio(url: string): Promise<YtDlpDownload & { 
   let lastStderr = "";
   let code = 1;
   for (const extra of attempts) {
-    ({ code, stderr: lastStderr } = await runYtDlp(extra));
+    ({ code, stderr: lastStderr } = await runYtDlp(extra, { onDownloadPercent: opts?.onDownloadPercent }));
     if (code === 0) break;
   }
 

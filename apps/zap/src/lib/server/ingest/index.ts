@@ -5,3 +5,4 @@ export { formatYtDlpFailure, summarizeIngestItems } from "./errors";
 export type { IngestItemResult, SyncRunResult } from "./pipeline";
 export { resolveYtDlpBin, probeUrl } from "./ytdlp";
 export { mapPool, youtubeIngestConcurrency } from "./map-pool";
+export type { SongProgress, SongProgressPhase } from "./progress";
