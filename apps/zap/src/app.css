@@ -116,6 +116,33 @@
     @apply text-signal;
     box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--signal) 70%, transparent);
   }
+
+  .zap-busy {
+    @apply mt-3 flex items-center gap-3 rounded border border-signal/30 bg-signal/5 px-3 py-2.5;
+  }
+
+  .zap-busy-bars {
+    @apply flex h-3.5 items-end gap-0.5;
+  }
+
+  .zap-busy-bars span {
+    @apply w-0.5 rounded-sm bg-signal;
+    animation: zap-wave 1.1s ease-in-out infinite;
+    transform-origin: center bottom;
+  }
+
+  .zap-busy-bars span:nth-child(1) {
+    height: 40%;
+    animation-delay: 0s;
+  }
+  .zap-busy-bars span:nth-child(2) {
+    height: 85%;
+    animation-delay: 0.12s;
+  }
+  .zap-busy-bars span:nth-child(3) {
+    height: 55%;
+    animation-delay: 0.24s;
+  }
 }
 
 @keyframes zap-wave {
