@@ -1,6 +1,7 @@
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
 import { isStorageConfigured, putMediaObject } from "$lib/server/storage";
+import { summarizeIngestItems } from "./errors";
 import { DURATION_CAP_MESSAGE, isOverDurationCap } from "./limits";
 import { parseMediaUrl } from "./url-parse";
 import { cleanupWorkDir, downloadBestAudio, listPlaylistEntries, probeUrl, resolveYtDlpBin } from "./ytdlp";
@@ -17,7 +18,8 @@ export type SyncRunResult = {
   skipped: number;
   failed: number;
   items: IngestItemResult[];
-  errorMessage?: string;
+  errorMessage?: string | null;
+  failures?: { title?: string; identityKey?: string; reason: string }[];
 };
 
 export class IngestError extends Error {
@@ -255,34 +257,42 @@ export async function ingestPublicUrl(userId: string, rawUrl: string): Promise<S
       );
     }
 
-    const imported = items.filter((i) => i.status === "imported" || i.status === "reused").length;
-    const skipped = items.filter((i) => i.status === "skipped").length;
-    const failed = items.filter((i) => i.status === "failed").length;
+    const summary = summarizeIngestItems(items);
 
     await db
       .update(schema.syncRuns)
       .set({
         status: "completed",
-        importedCount: imported,
-        skippedCount: skipped,
-        failedCount: failed,
-        summaryJson: JSON.stringify(items),
+        importedCount: summary.imported,
+        skippedCount: summary.skipped,
+        failedCount: summary.failed,
+        errorMessage: summary.errorMessage,
+        summaryJson: JSON.stringify({ items, failures: summary.failures }),
         finishedAt: new Date(),
       })
       .where(eq(schema.syncRuns.id, run.id));
 
-    return { syncRunId: run.id, imported, skipped, failed, items };
+    return {
+      syncRunId: run.id,
+      imported: summary.imported,
+      skipped: summary.skipped,
+      failed: summary.failed,
+      items,
+      errorMessage: summary.errorMessage,
+      failures: summary.failures,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed";
+    const summary = summarizeIngestItems(items);
     await db
       .update(schema.syncRuns)
       .set({
         status: "failed",
         errorMessage: message,
-        importedCount: items.filter((i) => i.status === "imported" || i.status === "reused").length,
-        skippedCount: items.filter((i) => i.status === "skipped").length,
-        failedCount: items.filter((i) => i.status === "failed").length + (items.length === 0 ? 1 : 0),
-        summaryJson: JSON.stringify(items),
+        importedCount: summary.imported,
+        skippedCount: summary.skipped,
+        failedCount: summary.failed + (items.length === 0 ? 1 : 0),
+        summaryJson: JSON.stringify({ items, failures: summary.failures }),
         finishedAt: new Date(),
       })
       .where(eq(schema.syncRuns.id, run.id));

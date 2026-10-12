@@ -1,7 +1,10 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { formatYtDlpFailure } from "./errors";
 import { DURATION_CAP_MESSAGE, isOverDurationCap } from "./limits";
+
+const YOUTUBE_CLIENT_FALLBACK = "youtube:player_client=android,web,tv,web_safari";
 
 export type YtDlpProbe = {
   id: string;
@@ -83,7 +86,8 @@ async function resolveCookiesPath(): Promise<string | null> {
 }
 
 async function baseArgs(): Promise<string[]> {
-  const args: string[] = ["--no-playlist", "--no-warnings", "-q"];
+  // Avoid -q so ERROR lines stay on stderr when YouTube bot-checks
+  const args: string[] = ["--no-playlist", "--no-warnings"];
   const deno = await resolveDenoBin();
   if (deno) args.push("--js-runtimes", `deno:${deno}`);
   else args.push("--js-runtimes", "bun");
@@ -110,6 +114,42 @@ async function runYtDlp(extra: string[]): Promise<{ code: number; stdout: string
   return { code, stdout, stderr };
 }
 
+function assertYtDlpJson(code: number, stdout: string, stderr: string, label: string): Record<string, unknown> {
+  const trimmed = stdout.trim();
+  const looksFailed = code !== 0 || !trimmed || trimmed === "null" || /^ERROR:/im.test(stderr) || /Sign in to confirm you’re not a bot/i.test(stderr);
+  if (looksFailed) {
+    throw new Error(formatYtDlpFailure(stderr, stdout) || `${label} failed`);
+  }
+  try {
+    const json = JSON.parse(trimmed) as unknown;
+    if (!json || typeof json !== "object") {
+      throw new Error(formatYtDlpFailure(stderr, stdout) || `${label} returned no metadata`);
+    }
+    return json as Record<string, unknown>;
+  } catch (err) {
+    if (err instanceof Error && /YouTube blocked|yt-dlp|bot check/i.test(err.message)) throw err;
+    throw new Error(formatYtDlpFailure(stderr, stdout) || `${label} returned invalid JSON`);
+  }
+}
+
+async function runYtDlpJson(extra: string[], label: string): Promise<Record<string, unknown>> {
+  let result = await runYtDlp(extra);
+  try {
+    return assertYtDlpJson(result.code, result.stdout, result.stderr, label);
+  } catch (first) {
+    // Retry with alternate YouTube clients (helps some bot checks; cookies still preferred)
+    if (!extra.includes("--extractor-args")) {
+      result = await runYtDlp(["--extractor-args", YOUTUBE_CLIENT_FALLBACK, ...extra]);
+      try {
+        return assertYtDlpJson(result.code, result.stdout, result.stderr, label);
+      } catch (second) {
+        throw second instanceof Error ? second : first;
+      }
+    }
+    throw first;
+  }
+}
+
 function probeFromJson(raw: Record<string, unknown>): YtDlpProbe {
   const durationSec = typeof raw.duration === "number" ? raw.duration : null;
   return {
@@ -123,11 +163,7 @@ function probeFromJson(raw: Record<string, unknown>): YtDlpProbe {
 }
 
 export async function probeUrl(url: string): Promise<YtDlpProbe> {
-  const { code, stdout, stderr } = await runYtDlp(["-J", url]);
-  if (code !== 0) {
-    throw new Error(stderr.trim() || stdout.trim() || "yt-dlp probe failed");
-  }
-  const json = JSON.parse(stdout) as Record<string, unknown>;
+  const json = await runYtDlpJson(["-J", url], "yt-dlp probe");
   // Playlist JSON has entries
   if (Array.isArray(json.entries) && !json.id) {
     throw new Error("URL is a playlist — expand entries first");
@@ -136,12 +172,8 @@ export async function probeUrl(url: string): Promise<YtDlpProbe> {
 }
 
 export async function listPlaylistEntries(playlistUrl: string): Promise<{ id: string; title: string; url: string; durationMs: number | null }[]> {
-  const { code, stdout, stderr } = await runYtDlp(["--flat-playlist", "-J", playlistUrl]);
-  if (code !== 0) {
-    throw new Error(stderr.trim() || "yt-dlp playlist probe failed");
-  }
-  const json = JSON.parse(stdout) as { entries?: Record<string, unknown>[] };
-  const entries = json.entries ?? [];
+  const json = await runYtDlpJson(["--flat-playlist", "-J", playlistUrl], "yt-dlp playlist probe");
+  const entries = (json.entries as Record<string, unknown>[] | undefined) ?? [];
   return entries
     .map((e) => {
       const id = String(e.id ?? "");
@@ -166,15 +198,22 @@ export async function downloadBestAudio(url: string): Promise<YtDlpDownload & { 
   const workDir = await mkdtemp(join(tmpdir(), "zap-ingest-"));
   const outTemplate = join(workDir, "audio.%(ext)s");
 
-  // Prefer source bestaudio (no forced re-encode). Fallback: extract to m4a via ffmpeg.
-  let { code, stderr } = await runYtDlp(["-f", "bestaudio/best", "-o", outTemplate, url]);
-  if (code !== 0) {
-    ({ code, stderr } = await runYtDlp(["-f", "bestaudio/best", "-x", "--audio-format", "m4a", "--audio-quality", "0", "-o", outTemplate, url]));
+  const attempts: string[][] = [
+    ["-f", "bestaudio/best", "-o", outTemplate, url],
+    ["-f", "bestaudio/best", "-x", "--audio-format", "m4a", "--audio-quality", "0", "-o", outTemplate, url],
+    ["--extractor-args", YOUTUBE_CLIENT_FALLBACK, "-f", "bestaudio/best", "-o", outTemplate, url],
+  ];
+
+  let lastStderr = "";
+  let code = 1;
+  for (const extra of attempts) {
+    ({ code, stderr: lastStderr } = await runYtDlp(extra));
+    if (code === 0) break;
   }
 
   if (code !== 0) {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
-    throw new Error(stderr.trim() || "yt-dlp download failed");
+    throw new Error(formatYtDlpFailure(lastStderr) || "yt-dlp download failed");
   }
 
   const glob = new Bun.Glob("audio.*");
