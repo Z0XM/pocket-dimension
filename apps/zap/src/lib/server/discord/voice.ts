@@ -58,6 +58,9 @@ function killFfmpeg(runtime: SessionVoiceRuntime) {
 /**
  * Encode to Ogg Opus in ffmpeg so @discordjs/voice can demux without a native
  * opus addon (@discordjs/opus / opusscript). Raw PCM + inlineVolume forces those.
+ *
+ * Must map audio only (`-vn` / `-map 0:a:0`): the ogg muxer’s default video
+ * codec is Theora, which produced Broken pipe / libtheora errors on A/V inputs.
  */
 function startFfmpegResource(url: string, positionMs: number) {
   const seekSec = Math.max(0, positionMs / 1000);
@@ -71,30 +74,38 @@ function startFfmpegResource(url: string, positionMs: number) {
     ...(seekSec > 0.25 ? ["-ss", String(seekSec)] : []),
     "-i",
     url,
+    "-map",
+    "0:a:0",
+    "-vn",
+    "-sn",
+    "-dn",
     "-analyzeduration",
     "0",
     "-loglevel",
     "error",
-    "-acodec",
+    "-c:a",
     "libopus",
     "-application",
     "audio",
     "-frame_duration",
     "20",
-    "-f",
-    "ogg",
     "-ar",
     "48000",
     "-ac",
     "2",
     "-b:a",
     "96k",
+    "-f",
+    "ogg",
     "pipe:1",
   ];
   const ffmpeg = spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "pipe"] });
   ffmpeg.stderr?.on("data", (chunk) => {
-    const text = String(chunk);
-    if (text.trim()) console.warn("[zap discord ffmpeg]", text.trim());
+    const text = String(chunk).trim();
+    if (!text) return;
+    // Consumer closed early (skip / detach / demux end) — expected, not actionable.
+    if (/Broken pipe|Error writing trailer|Error closing file|Error muxing a packet/i.test(text)) return;
+    console.warn("[zap discord ffmpeg]", text);
   });
   const resource = createAudioResource(ffmpeg.stdout!, {
     inputType: StreamType.OggOpus,
