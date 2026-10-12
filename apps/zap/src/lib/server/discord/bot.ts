@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, type Client as DiscordClient, type VoiceBasedChannel } from "discord.js";
+import { ChannelType, Client, Events, GatewayIntentBits, type Client as DiscordClient, type VoiceBasedChannel } from "discord.js";
 import { discordBotToken, isDiscordConfigured } from "./config";
 
 let clientPromise: Promise<DiscordClient> | null = null;
