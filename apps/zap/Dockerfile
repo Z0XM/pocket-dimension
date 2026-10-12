@@ -1,5 +1,8 @@
 # Deploy from monorepo root. Dokploy: Build Path /, Context Path . (or Context / if Build Path is apps/zap).
 # Local: docker build -f apps/zap/Dockerfile -t zap .
+#
+# Phase 3+: runner is a fat image (ffmpeg + yt-dlp + Deno) for public URL ingest.
+# Same tool pattern as apps/zeo-music-worker/Dockerfile — do not expect Railpack to provide these.
 
 FROM oven/bun:1.3.5 AS builder
 WORKDIR /app
@@ -31,6 +34,37 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3013
+ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# ffmpeg + yt-dlp + Deno (YouTube EJS challenge solving for yt-dlp)
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    ffmpeg \
+    python3 \
+    unzip \
+  && curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+    -o /usr/local/bin/yt-dlp \
+  && chmod a+rx /usr/local/bin/yt-dlp \
+  && arch="$(dpkg --print-architecture)" \
+  && case "$arch" in \
+       amd64) denofile=deno-x86_64-unknown-linux-gnu.zip ;; \
+       arm64) denofile=deno-aarch64-unknown-linux-gnu.zip ;; \
+       *) echo "unsupported arch: $arch" >&2; exit 1 ;; \
+     esac \
+  && curl -fsSL "https://github.com/denoland/deno/releases/latest/download/${denofile}" \
+    -o /tmp/deno.zip \
+  && unzip -o /tmp/deno.zip -d /usr/local/bin \
+  && chmod a+rx /usr/local/bin/deno \
+  && rm -f /tmp/deno.zip \
+  && apt-get purge -y unzip \
+  && apt-get autoremove -y \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/* \
+  && ffmpeg -version | head -n 1 \
+  && yt-dlp --version \
+  && deno --version
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/shared ./shared
@@ -40,4 +74,5 @@ COPY --from=builder /app/apps/zap/package.json ./apps/zap/package.json
 WORKDIR /app/apps/zap
 EXPOSE 3013
 
+# Env: DATABASE_URL, BETTER_AUTH_*, S3_*, optional YTDLP_COOKIES_B64 / YTDLP_COOKIES_FILE
 CMD ["bun", "./build/index.js"]

@@ -330,6 +330,34 @@
       "when": 1791700000000,
       "tag": "0046_zap_catalogue",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791800000000,
+      "tag": "0047_zap_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1791900000000,
+      "tag": "0048_zap_ingest",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792000000000,
+      "tag": "0049_zap_youtube_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792100000000,
+      "tag": "0050_zap_session_sinks",
+      "breakpoints": true
     }
   ]
 }
