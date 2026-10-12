@@ -2,6 +2,7 @@
   import { enhance } from "$app/forms";
   import { replaceState } from "$app/navigation";
   import { page } from "$app/state";
+  import BusyStatus from "$lib/components/BusyStatus.svelte";
   import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
@@ -10,6 +11,7 @@
   let { data, form }: { data: PageData; form: ActionData } = $props();
 
   type LibraryTab = "browse" | "upload";
+  type YtPhase = "idle" | "linking" | "loading" | "importing" | "disconnecting";
 
   let tab = $state<LibraryTab>(page.url.searchParams.get("tab") === "upload" ? "upload" : "browse");
   let scope = $state<"all" | "yours">("all");
@@ -18,11 +20,14 @@
   let uploadTagIds = $state<string[]>([]);
   let ingestUrl = $state("");
   let ingestBusy = $state(false);
+  let uploadBusy = $state(false);
   let ytLinked = $state(false);
   let ytPlaylists = $state<{ id: string; title: string; itemCount: number | null }[]>([]);
   let ytSelected = $state<string[]>([]);
-  let ytBusy = $state(false);
+  let ytPhase = $state<YtPhase>("idle");
   let ytError = $state<string | null>(null);
+  const ytBusy = $derived(ytPhase !== "idle");
+  const addBusy = $derived(uploadBusy || ingestBusy || ytBusy);
   let ytImportSummary = $state<{
     imported: number;
     skipped: number;
@@ -59,9 +64,18 @@
     ytLinked = data.youtubeLinked;
   });
 
+  function startYoutubeLink(event: MouseEvent) {
+    if (addBusy) {
+      event.preventDefault();
+      return;
+    }
+    ytPhase = "linking";
+    ytError = null;
+  }
+
   async function loadYtPlaylists() {
     ytError = null;
-    ytBusy = true;
+    ytPhase = "loading";
     try {
       const res = await fetch("/api/youtube/playlists", { credentials: "same-origin" });
       const body = await res.json().catch(() => ({}));
@@ -70,12 +84,12 @@
     } catch (err) {
       ytError = err instanceof Error ? err.message : "Could not load playlists";
     } finally {
-      ytBusy = false;
+      ytPhase = "idle";
     }
   }
 
   async function disconnectYoutube() {
-    ytBusy = true;
+    ytPhase = "disconnecting";
     ytError = null;
     try {
       const res = await fetch("/api/me/youtube-link", { method: "DELETE", credentials: "same-origin" });
@@ -86,17 +100,18 @@
     } catch (err) {
       ytError = err instanceof Error ? err.message : "Disconnect failed";
     } finally {
-      ytBusy = false;
+      ytPhase = "idle";
     }
   }
 
   function toggleYtPlaylist(id: string) {
+    if (ytBusy) return;
     ytSelected = ytSelected.includes(id) ? ytSelected.filter((x) => x !== id) : [...ytSelected, id];
   }
 
   async function importSelectedPlaylists() {
-    if (ytSelected.length === 0) return;
-    ytBusy = true;
+    if (ytSelected.length === 0 || ytBusy) return;
+    ytPhase = "importing";
     ytError = null;
     ytImportSummary = null;
     try {
@@ -123,7 +138,7 @@
     } catch (err) {
       ytError = err instanceof Error ? err.message : "Import failed";
     } finally {
-      ytBusy = false;
+      ytPhase = "idle";
     }
   }
 
@@ -396,7 +411,17 @@
           </div>
         {:else if !ytLinked}
           <p class="mt-2 text-sm text-muted-foreground">Link your Google account to import private playlists and Liked videos.</p>
-          <a class="auth-btn mt-2 inline-flex w-fit" href="/api/auth/youtube/start?returnTo=/library?tab=upload"> Connect YouTube </a>
+          <a
+            class="auth-btn mt-2 inline-flex w-fit {ytPhase === 'linking' ? 'pointer-events-none opacity-70' : ''}"
+            href="/api/auth/youtube/start?returnTo=/library?tab=upload"
+            aria-busy={ytPhase === "linking"}
+            onclick={startYoutubeLink}
+          >
+            {ytPhase === "linking" ? "Redirecting to Google…" : "Connect YouTube"}
+          </a>
+          {#if ytPhase === "linking"}
+            <BusyStatus label="Opening Google OAuth…" detail="Complete consent, then you’ll return here." />
+          {/if}
         {:else}
           <div class="mt-2 flex flex-wrap items-center gap-2">
             <p class="font-mono text-[11px] text-signal">
@@ -406,20 +431,30 @@
             <button
               type="button"
               class="rounded border border-border px-2 py-1 font-mono text-[10px]"
-              disabled={ytBusy}
+              disabled={ytBusy || uploadBusy || ingestBusy}
               onclick={() => void loadYtPlaylists()}
             >
-              {ytPlaylists.length ? "Refresh playlists" : "Load playlists"}
+              {ytPhase === "loading" ? "Loading…" : ytPlaylists.length ? "Refresh playlists" : "Load playlists"}
             </button>
             <button
               type="button"
               class="rounded border border-border px-2 py-1 font-mono text-[10px] text-destructive"
-              disabled={ytBusy}
+              disabled={ytBusy || uploadBusy || ingestBusy}
               onclick={() => void disconnectYoutube()}
             >
-              Disconnect
+              {ytPhase === "disconnecting" ? "Disconnecting…" : "Disconnect"}
             </button>
           </div>
+          {#if ytPhase === "loading"}
+            <BusyStatus label="Loading playlists…" detail="Fetching from your connected Google account." />
+          {:else if ytPhase === "importing"}
+            <BusyStatus
+              label="Importing from YouTube…"
+              detail={`${ytSelected.length} playlist${ytSelected.length === 1 ? "" : "s"} · yt-dlp + R2 (can take a minute)`}
+            />
+          {:else if ytPhase === "disconnecting"}
+            <BusyStatus label="Disconnecting YouTube…" />
+          {/if}
           {#if ytError}
             <p class="auth-error mt-2">{ytError}</p>
           {/if}
@@ -442,11 +477,17 @@
             {/if}
           {/if}
           {#if ytPlaylists.length > 0}
-            <ul class="mt-3 max-h-56 space-y-1 overflow-y-auto rounded border border-border/60 p-2">
+            <ul class="mt-3 max-h-56 space-y-1 overflow-y-auto rounded border border-border/60 p-2 {ytBusy ? 'pointer-events-none opacity-60' : ''}">
               {#each ytPlaylists as pl}
                 <li>
                   <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary/40">
-                    <input class="zap-checkbox" type="checkbox" checked={ytSelected.includes(pl.id)} onchange={() => toggleYtPlaylist(pl.id)} />
+                    <input
+                      class="zap-checkbox"
+                      type="checkbox"
+                      checked={ytSelected.includes(pl.id)}
+                      disabled={ytBusy}
+                      onchange={() => toggleYtPlaylist(pl.id)}
+                    />
                     <span class="min-w-0 flex-1 truncate text-sm">{pl.title}</span>
                     {#if pl.itemCount != null}
                       <span class="font-mono text-[10px] text-muted-foreground">{pl.itemCount}</span>
@@ -458,10 +499,10 @@
             <button
               type="button"
               class="auth-btn mt-2"
-              disabled={ytBusy || ytSelected.length === 0 || !data.ingestReady}
+              disabled={ytBusy || uploadBusy || ingestBusy || ytSelected.length === 0 || !data.ingestReady}
               onclick={() => void importSelectedPlaylists()}
             >
-              {ytBusy ? "Importing…" : `Import selected (${ytSelected.length})`}
+              {ytPhase === "importing" ? "Importing…" : `Import selected (${ytSelected.length})`}
             </button>
           {/if}
         {/if}
@@ -492,15 +533,22 @@
           method="POST"
           action="?/ingestUrl"
           class="mt-2 space-y-3"
-          use:enhance={() => {
+          use:enhance={({ cancel }) => {
+            if (uploadBusy || ytBusy || ingestBusy) {
+              cancel();
+              return;
+            }
             ingestBusy = true;
             return async ({ result, update }) => {
-              await update();
-              ingestBusy = false;
-              if (result.type === "success") {
-                ingestUrl = "";
-                tab = "browse";
-                void fetchPage({ reset: true });
+              try {
+                await update();
+                if (result.type === "success") {
+                  ingestUrl = "";
+                  tab = "browse";
+                  void fetchPage({ reset: true });
+                }
+              } finally {
+                ingestBusy = false;
               }
             };
           }}
@@ -512,11 +560,14 @@
             placeholder="https://www.youtube.com/watch?v=… or playlist URL"
             bind:value={ingestUrl}
             required
-            disabled={!data.ingestReady}
+            disabled={!data.ingestReady || ingestBusy || uploadBusy || ytBusy}
           />
-          <button type="submit" class="auth-btn" disabled={!data.ingestReady || ingestBusy}>
+          <button type="submit" class="auth-btn" disabled={!data.ingestReady || ingestBusy || uploadBusy || ytBusy}>
             {ingestBusy ? "Importing…" : "Import URL"}
           </button>
+          {#if ingestBusy}
+            <BusyStatus label="Importing URL…" detail="yt-dlp probe + download · R2 upload" />
+          {/if}
           {#if !data.ingestReady}
             <p class="text-sm text-muted-foreground">
               Needs R2 (<span class="font-mono text-signal">S3_*</span>) and
@@ -542,25 +593,52 @@
           action="?/upload"
           enctype="multipart/form-data"
           class="mt-2 space-y-3"
-          use:enhance={() => {
+          use:enhance={({ cancel }) => {
+            if (uploadBusy || ingestBusy || ytBusy) {
+              cancel();
+              return;
+            }
+            uploadBusy = true;
             return async ({ result, update }) => {
-              await update();
-              uploadTagIds = [];
-              if (result.type === "success") {
-                tab = "browse";
-                void fetchPage({ reset: true });
+              try {
+                await update();
+                uploadTagIds = [];
+                if (result.type === "success") {
+                  tab = "browse";
+                  void fetchPage({ reset: true });
+                }
+              } finally {
+                uploadBusy = false;
               }
             };
           }}
         >
-          <input class="auth-field" type="text" name="title" placeholder="Title (optional)" />
-          <input class="auth-field" type="file" name="file" accept="audio/*" required />
-          <div>
+          <input class="auth-field" type="text" name="title" placeholder="Title (optional)" disabled={uploadBusy || ingestBusy || ytBusy} />
+          <input
+            class="auth-field"
+            type="file"
+            name="file"
+            accept="audio/*"
+            required
+            disabled={!data.storageReady || uploadBusy || ingestBusy || ytBusy}
+          />
+          <div class={uploadBusy || ingestBusy || ytBusy ? "pointer-events-none opacity-60" : ""}>
             <p class="mb-1 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Tags (many allowed)</p>
             <TagMultiSelect options={data.availableTags} bind:selected={uploadTagIds} name="tagIds" placeholder="Select tags…" />
           </div>
-          <input class="auth-field" type="text" name="customTag" placeholder="New custom tag (optional)" />
-          <button type="submit" class="auth-btn" disabled={!data.storageReady}>Upload to Zap</button>
+          <input
+            class="auth-field"
+            type="text"
+            name="customTag"
+            placeholder="New custom tag (optional)"
+            disabled={uploadBusy || ingestBusy || ytBusy}
+          />
+          <button type="submit" class="auth-btn" disabled={!data.storageReady || uploadBusy || ingestBusy || ytBusy}>
+            {uploadBusy ? "Uploading…" : "Upload to Zap"}
+          </button>
+          {#if uploadBusy}
+            <BusyStatus label="Uploading to Zap…" detail="Hashing file · writing to R2 · updating catalogue" />
+          {/if}
         </form>
       </div>
     </div>
