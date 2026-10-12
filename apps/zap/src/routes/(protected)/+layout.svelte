@@ -33,8 +33,10 @@
         <a href="/join" class={`zap-nav-link ${joinActive ? "zap-nav-link-active" : ""}`} aria-current={joinActive ? "page" : undefined}> Join </a>
         <StartSessionButton
           label="Session"
-          class={`rounded border px-2 py-1 text-[11px] disabled:opacity-40 ${
-            sessionActive ? "border-signal bg-signal/20 text-signal" : "border-signal/40 bg-signal/10 text-signal hover:bg-signal/20"
+          class={`text-[11px] disabled:opacity-40 ${
+            sessionActive
+              ? "zap-nav-link zap-nav-link-active"
+              : "rounded border border-signal/40 bg-signal/10 px-2 py-1 text-signal hover:bg-signal/20"
           }`}
         />
         <span class="hidden text-muted-foreground sm:inline">{data.user?.username ?? data.user?.email}</span>
