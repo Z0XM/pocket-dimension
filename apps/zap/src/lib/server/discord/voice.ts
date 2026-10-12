@@ -37,7 +37,6 @@ async function audioUrlForAsset(mediaAssetId: string): Promise<string> {
   if (!asset?.storageKey || asset.status !== "ready") {
     throw new Error("Track not playable for Discord sink");
   }
-  // Local fixture: serve absolute same-origin path via ORIGIN or fetch from disk through public URL
   if (asset.storageKey === "fixture:local") {
     const origin = (Bun.env.ORIGIN || Bun.env.PUBLIC_ZAP_ORIGIN || "http://localhost:3013").replace(/\/$/, "");
     return `${origin}/api/media/${mediaAssetId}/audio`;
@@ -88,6 +87,31 @@ function startFfmpegResource(url: string, positionMs: number) {
   return { ffmpeg, resource };
 }
 
+/** Guide pattern: real disconnect vs channel-move reconnect. */
+function wireConnectionLifecycle(sessionId: string, connection: VoiceConnection) {
+  connection.on(VoiceConnectionStatus.Disconnected, async () => {
+    try {
+      await Promise.race([
+        entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+        entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+      ]);
+      // Reconnecting / moving channels — keep runtime
+    } catch {
+      console.warn(`[zap discord] voice disconnected for session ${sessionId}; destroying connection`);
+      try {
+        connection.destroy();
+      } catch {
+        // already destroyed
+      }
+      const runtime = runtimes.get(sessionId);
+      if (runtime?.connection === connection) {
+        killFfmpeg(runtime);
+        runtimes.delete(sessionId);
+      }
+    }
+  });
+}
+
 export async function ensureVoiceJoined(sessionId: string, channel: VoiceBasedChannel) {
   const existing = runtimes.get(sessionId);
   if (existing && existing.channelId === channel.id && existing.connection.state.status !== VoiceConnectionStatus.Destroyed) {
@@ -102,12 +126,27 @@ export async function ensureVoiceJoined(sessionId: string, channel: VoiceBasedCh
     guildId: channel.guild.id,
     adapterCreator: channel.guild.voiceAdapterCreator,
     selfDeaf: true,
+    selfMute: false,
   });
 
-  await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+  wireConnectionLifecycle(sessionId, connection);
+
+  try {
+    await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
+  } catch (err) {
+    try {
+      connection.destroy();
+    } catch {
+      // ignore
+    }
+    throw err instanceof Error ? err : new Error("Failed to enter voice Ready state");
+  }
 
   const player = createAudioPlayer({
     behaviors: { noSubscriber: NoSubscriberBehavior.Play },
+  });
+  player.on("error", (err) => {
+    console.error(`[zap discord] audio player error session=${sessionId}`, err.message);
   });
   connection.subscribe(player);
 
@@ -144,7 +183,6 @@ export async function applyPlaybackCommand(sessionId: string, command: DiscordPl
     return;
   }
 
-  // play
   const needsHardResync = shouldResync(runtime.appliedGeneration, command.generation, runtime.appliedAssetId, command.mediaAssetId);
 
   if (!needsHardResync && runtime.player.state.status === AudioPlayerStatus.Paused) {
@@ -163,6 +201,11 @@ export async function applyPlaybackCommand(sessionId: string, command: DiscordPl
   const { ffmpeg, resource } = startFfmpegResource(url, command.positionMs);
   runtime.ffmpeg = ffmpeg;
   runtime.player.play(resource);
+  try {
+    await entersState(runtime.player, AudioPlayerStatus.Playing, 8_000);
+  } catch (err) {
+    console.warn(`[zap discord] player did not enter Playing in time session=${sessionId}`, err);
+  }
   runtime.appliedGeneration = command.generation;
   runtime.appliedAssetId = command.mediaAssetId;
 }
@@ -177,7 +220,9 @@ export async function leaveVoice(sessionId: string) {
     // ignore
   }
   try {
-    runtime.connection.destroy();
+    if (runtime.connection.state.status !== VoiceConnectionStatus.Destroyed) {
+      runtime.connection.destroy();
+    }
   } catch {
     // ignore
   }

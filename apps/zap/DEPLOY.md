@@ -33,7 +33,7 @@ Create a **Google Cloud OAuth client** for Zap. Authorized redirect URI: `https:
 
 ### Phase 5 Discord sink
 
-Shared PD Discord bot (not per-user). Set `DISCORD_BOT_TOKEN` + `DISCORD_CLIENT_ID` on the Zap service. Host attaches a voice channel from the session UI; Zap streams the same R2/catalogue track via ffmpeg → `@discordjs/voice`. Redeploy drops the voice link until re-attached.
+Shared PD Discord bot (not per-user). Set `DISCORD_BOT_TOKEN` + `DISCORD_CLIENT_ID` on the Zap service. Host attaches a voice channel from the session UI; Zap streams the same R2/catalogue track via ffmpeg → `@discordjs/voice` (0.19+ / DAVE). Bot login uses discord.js `Events.ClientReady` (not deprecated `ready`). Redeploy drops the voice link until re-attached.
 
 ### Cloudflare R2 (uploads + ingest)
 
