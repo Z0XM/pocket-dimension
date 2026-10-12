@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { enhance } from "$app/forms";
   import { replaceState } from "$app/navigation";
   import { page } from "$app/state";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
+  import SongProgressList, { type SongProgressView } from "$lib/components/SongProgressList.svelte";
   import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
@@ -18,6 +18,9 @@
   let q = $state("");
   let selected = $state<string[]>([]);
   let uploadTagIds = $state<string[]>([]);
+  let uploadCustomTag = $state("");
+  let uploadTitle = $state("");
+  let uploadFileInput = $state<HTMLInputElement | null>(null);
   let ingestUrl = $state("");
   let ingestBusy = $state(false);
   let uploadBusy = $state(false);
@@ -35,6 +38,89 @@
     errorMessage?: string | null;
     failures?: { title?: string | null; reason: string }[];
   } | null>(null);
+  let ytImportProgress = $state<{
+    total: number;
+    done: number;
+    remaining: number;
+    imported: number;
+    skipped: number;
+    failed: number;
+    currentTitle?: string | null;
+    songs?: SongProgressView[];
+  } | null>(null);
+  let urlSongProgress = $state<SongProgressView[]>([]);
+  let uploadSongProgress = $state<SongProgressView[]>([]);
+  let uploadError = $state<string | null>(null);
+  let ingestError = $state<string | null>(null);
+
+  async function readNdjsonStream(res: Response, onEvent: (ev: Record<string, unknown>) => void): Promise<void> {
+    if (!res.body) throw new Error("Response stream missing");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        onEvent(JSON.parse(line) as Record<string, unknown>);
+      }
+    }
+    if (buffer.trim()) onEvent(JSON.parse(buffer) as Record<string, unknown>);
+  }
+
+  function xhrFormNdjson(
+    url: string,
+    formData: FormData,
+    onUploadPercent: (percent: number) => void,
+    onEvent: (ev: Record<string, unknown>) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url);
+      xhr.withCredentials = true;
+      let seen = 0;
+      let lineBuf = "";
+      const consume = (chunk: string) => {
+        lineBuf += chunk;
+        const lines = lineBuf.split("\n");
+        lineBuf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          onEvent(JSON.parse(line) as Record<string, unknown>);
+        }
+      };
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable || e.total <= 0) return;
+        onUploadPercent(Math.max(0, Math.min(100, Math.round((e.loaded / e.total) * 100))));
+      };
+      xhr.onprogress = () => {
+        const text = xhr.responseText.slice(seen);
+        seen = xhr.responseText.length;
+        try {
+          consume(text);
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error("Bad progress event"));
+        }
+      };
+      xhr.onload = () => {
+        try {
+          consume(xhr.responseText.slice(seen));
+          if (lineBuf.trim()) onEvent(JSON.parse(lineBuf) as Record<string, unknown>);
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error("Bad upload response"));
+          return;
+        }
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error(`Upload failed (${xhr.status})`));
+      };
+      xhr.onerror = () => reject(new Error("Upload failed"));
+      xhr.send(formData);
+    });
+  }
 
   let assets = $state<TrackItem[]>([]);
   let hasMore = $state(false);
@@ -114,31 +200,173 @@
     ytPhase = "importing";
     ytError = null;
     ytImportSummary = null;
+    ytImportProgress = { total: 0, done: 0, remaining: 0, imported: 0, skipped: 0, failed: 0, songs: [] };
     try {
       const res = await fetch("/api/youtube/import", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
         body: JSON.stringify({ playlistIds: ytSelected }),
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.message ?? `Import failed (${res.status})`);
-      ytImportSummary = {
-        imported: body.imported ?? 0,
-        skipped: body.skipped ?? 0,
-        failed: body.failed ?? 0,
-        errorMessage: body.errorMessage ?? null,
-        failures: body.failures ?? [],
-      };
-      if ((body.failed ?? 0) > 0 && (body.errorMessage || body.message)) {
-        ytError = body.errorMessage ?? body.message;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message ?? `Import failed (${res.status})`);
       }
+
+      let sawDone = false;
+      await readNdjsonStream(res, (ev) => {
+        if (ev.type === "progress") {
+          ytImportProgress = {
+            total: Number(ev.total ?? 0),
+            done: Number(ev.done ?? 0),
+            remaining: Number(ev.remaining ?? 0),
+            imported: Number(ev.imported ?? 0),
+            skipped: Number(ev.skipped ?? 0),
+            failed: Number(ev.failed ?? 0),
+            currentTitle: typeof ev.currentTitle === "string" ? ev.currentTitle : null,
+            songs: Array.isArray(ev.songs) ? (ev.songs as SongProgressView[]) : [],
+          };
+        } else if (ev.type === "done") {
+          sawDone = true;
+          ytImportSummary = {
+            imported: Number(ev.imported ?? 0),
+            skipped: Number(ev.skipped ?? 0),
+            failed: Number(ev.failed ?? 0),
+            errorMessage: (ev.errorMessage as string | null) ?? null,
+            failures: (ev.failures as { title?: string | null; reason: string }[]) ?? [],
+          };
+          if ((ytImportSummary.failed ?? 0) > 0 && ytImportSummary.errorMessage) {
+            ytError = ytImportSummary.errorMessage;
+          }
+        } else if (ev.type === "error") {
+          throw new Error(typeof ev.message === "string" ? ev.message : "Import failed");
+        }
+      });
+
+      if (!sawDone) throw new Error("Import ended without a result");
       tab = "browse";
       void fetchPage({ reset: true });
     } catch (err) {
       ytError = err instanceof Error ? err.message : "Import failed";
     } finally {
       ytPhase = "idle";
+      ytImportProgress = null;
+    }
+  }
+
+  async function importUrlSubmit(event: Event) {
+    event.preventDefault();
+    if (!ingestUrl.trim() || addBusy || !data.ingestReady) return;
+    ingestBusy = true;
+    ingestError = null;
+    urlSongProgress = [];
+    try {
+      const res = await fetch("/api/ingest/url", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
+        body: JSON.stringify({ url: ingestUrl.trim() }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message ?? `Import failed (${res.status})`);
+      }
+      let sawDone = false;
+      await readNdjsonStream(res, (ev) => {
+        if (ev.type === "song") {
+          const song: SongProgressView = {
+            identityKey: typeof ev.identityKey === "string" ? ev.identityKey : "url",
+            title: typeof ev.title === "string" ? ev.title : ingestUrl,
+            phase: String(ev.phase ?? "downloading"),
+            percent: Number(ev.percent ?? 0),
+          };
+          urlSongProgress = [song];
+        } else if (ev.type === "done") {
+          sawDone = true;
+        } else if (ev.type === "error") {
+          throw new Error(typeof ev.message === "string" ? ev.message : "Import failed");
+        }
+      });
+      if (!sawDone) throw new Error("Import ended without a result");
+      ingestUrl = "";
+      tab = "browse";
+      void fetchPage({ reset: true });
+    } catch (err) {
+      ingestError = err instanceof Error ? err.message : "Import failed";
+    } finally {
+      ingestBusy = false;
+      urlSongProgress = [];
+    }
+  }
+
+  async function uploadFileSubmit(event: Event) {
+    event.preventDefault();
+    if (addBusy || !data.storageReady) return;
+    const file = uploadFileInput?.files?.[0];
+    if (!file) {
+      uploadError = "Choose an audio file.";
+      return;
+    }
+    uploadBusy = true;
+    uploadError = null;
+    uploadSongProgress = [
+      {
+        identityKey: "upload:local",
+        title: uploadTitle || file.name,
+        phase: "downloading",
+        percent: 0,
+      },
+    ];
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      if (uploadTitle.trim()) formData.set("title", uploadTitle.trim());
+      for (const id of uploadTagIds) formData.append("tagIds", id);
+      if (uploadCustomTag.trim()) formData.set("customTag", uploadCustomTag.trim());
+
+      let sawDone = false;
+      await xhrFormNdjson(
+        "/api/ingest/upload",
+        formData,
+        (percent) => {
+          uploadSongProgress = [
+            {
+              identityKey: "upload:local",
+              title: uploadTitle || file.name,
+              phase: "downloading",
+              percent,
+            },
+          ];
+        },
+        (ev) => {
+          if (ev.type === "song") {
+            uploadSongProgress = [
+              {
+                identityKey: typeof ev.identityKey === "string" ? ev.identityKey : "upload",
+                title: typeof ev.title === "string" ? ev.title : file.name,
+                phase: String(ev.phase ?? "uploading"),
+                percent: Number(ev.percent ?? 0),
+              },
+            ];
+          } else if (ev.type === "done") {
+            sawDone = true;
+          } else if (ev.type === "error") {
+            throw new Error(typeof ev.message === "string" ? ev.message : "Upload failed");
+          }
+        }
+      );
+      if (!sawDone) throw new Error("Upload ended without a result");
+      uploadTagIds = [];
+      uploadCustomTag = "";
+      uploadTitle = "";
+      if (uploadFileInput) uploadFileInput.value = "";
+      tab = "browse";
+      void fetchPage({ reset: true });
+    } catch (err) {
+      uploadError = err instanceof Error ? err.message : "Upload failed";
+    } finally {
+      uploadBusy = false;
+      uploadSongProgress = [];
     }
   }
 
@@ -450,8 +678,11 @@
           {:else if ytPhase === "importing"}
             <BusyStatus
               label="Importing from YouTube…"
-              detail={`${ytSelected.length} playlist${ytSelected.length === 1 ? "" : "s"} · yt-dlp + R2 (can take a minute)`}
+              detail={ytImportProgress && ytImportProgress.total > 0
+                ? `${ytImportProgress.done}/${ytImportProgress.total} done · ${ytImportProgress.imported} ok · ${ytImportProgress.skipped} skipped · ${ytImportProgress.failed} failed · ${ytImportProgress.remaining} left`
+                : `${ytSelected.length} playlist${ytSelected.length === 1 ? "" : "s"} · expanding & downloading in parallel…`}
             />
+            <SongProgressList songs={ytImportProgress?.songs ?? []} />
           {:else if ytPhase === "disconnecting"}
             <BusyStatus label="Disconnecting YouTube…" />
           {/if}
@@ -511,48 +742,15 @@
         {#if form?.ingestError}
           <p class="auth-error mt-2">{form.ingestError}</p>
         {/if}
+        {#if ingestError}
+          <p class="auth-error mt-2">{ingestError}</p>
+        {/if}
         {#if form?.ingestOk && form.ingestSummary}
           <p class="mt-2 text-sm text-signal">
             Sync done — imported {form.ingestSummary.imported}, skipped {form.ingestSummary.skipped}, failed {form.ingestSummary.failed}.
           </p>
-          {#if form.ingestSummary.errorMessage}
-            <p class="auth-error mt-2">{form.ingestSummary.errorMessage}</p>
-          {/if}
-          {#if form.ingestSummary.failures?.length}
-            <ul class="mt-2 space-y-1 font-mono text-[11px] text-muted-foreground">
-              {#each form.ingestSummary.failures as f}
-                <li>
-                  {#if f.title}<span class="text-foreground">{f.title}</span> —
-                  {/if}{f.reason}
-                </li>
-              {/each}
-            </ul>
-          {/if}
         {/if}
-        <form
-          method="POST"
-          action="?/ingestUrl"
-          class="mt-2 space-y-3"
-          use:enhance={({ cancel }) => {
-            if (uploadBusy || ytBusy || ingestBusy) {
-              cancel();
-              return;
-            }
-            ingestBusy = true;
-            return async ({ result, update }) => {
-              try {
-                await update();
-                if (result.type === "success") {
-                  ingestUrl = "";
-                  tab = "browse";
-                  void fetchPage({ reset: true });
-                }
-              } finally {
-                ingestBusy = false;
-              }
-            };
-          }}
-        >
+        <form class="mt-2 space-y-3" onsubmit={(e) => void importUrlSubmit(e)}>
           <input
             class="auth-field"
             type="url"
@@ -566,7 +764,8 @@
             {ingestBusy ? "Importing…" : "Import URL"}
           </button>
           {#if ingestBusy}
-            <BusyStatus label="Importing URL…" detail="yt-dlp probe + download · R2 upload" />
+            <BusyStatus label="Importing URL…" detail="Download then upload to R2" />
+            <SongProgressList songs={urlSongProgress} />
           {/if}
           {#if !data.ingestReady}
             <p class="text-sm text-muted-foreground">
@@ -585,41 +784,28 @@
         {#if form?.uploadError}
           <p class="auth-error mt-2">{form.uploadError}</p>
         {/if}
+        {#if uploadError}
+          <p class="auth-error mt-2">{uploadError}</p>
+        {/if}
         {#if form?.uploadOk}
           <p class="mt-2 text-sm text-signal">Added to catalogue.</p>
         {/if}
-        <form
-          method="POST"
-          action="?/upload"
-          enctype="multipart/form-data"
-          class="mt-2 space-y-3"
-          use:enhance={({ cancel }) => {
-            if (uploadBusy || ingestBusy || ytBusy) {
-              cancel();
-              return;
-            }
-            uploadBusy = true;
-            return async ({ result, update }) => {
-              try {
-                await update();
-                uploadTagIds = [];
-                if (result.type === "success") {
-                  tab = "browse";
-                  void fetchPage({ reset: true });
-                }
-              } finally {
-                uploadBusy = false;
-              }
-            };
-          }}
-        >
-          <input class="auth-field" type="text" name="title" placeholder="Title (optional)" disabled={uploadBusy || ingestBusy || ytBusy} />
+        <form class="mt-2 space-y-3" enctype="multipart/form-data" onsubmit={(e) => void uploadFileSubmit(e)}>
+          <input
+            class="auth-field"
+            type="text"
+            name="title"
+            placeholder="Title (optional)"
+            bind:value={uploadTitle}
+            disabled={uploadBusy || ingestBusy || ytBusy}
+          />
           <input
             class="auth-field"
             type="file"
             name="file"
             accept="audio/*"
             required
+            bind:this={uploadFileInput}
             disabled={!data.storageReady || uploadBusy || ingestBusy || ytBusy}
           />
           <div class={uploadBusy || ingestBusy || ytBusy ? "pointer-events-none opacity-60" : ""}>
@@ -631,13 +817,15 @@
             type="text"
             name="customTag"
             placeholder="New custom tag (optional)"
+            bind:value={uploadCustomTag}
             disabled={uploadBusy || ingestBusy || ytBusy}
           />
           <button type="submit" class="auth-btn" disabled={!data.storageReady || uploadBusy || ingestBusy || ytBusy}>
             {uploadBusy ? "Uploading…" : "Upload to Zap"}
           </button>
           {#if uploadBusy}
-            <BusyStatus label="Uploading to Zap…" detail="Hashing file · writing to R2 · updating catalogue" />
+            <BusyStatus label="Uploading to Zap…" detail="Sending file, then storing on R2" />
+            <SongProgressList songs={uploadSongProgress} sendingLabel="Sending" />
           {/if}
         </form>
       </div>

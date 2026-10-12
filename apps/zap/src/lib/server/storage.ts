@@ -168,6 +168,7 @@ export async function putMediaObject(input: {
   body: Uint8Array | Blob;
   contentType: string;
   ext?: string;
+  onUploadPercent?: (percent: number) => void;
 }): Promise<{ storageKey: string }> {
   const config = getStorageConfig();
   if (!config) {
@@ -178,12 +179,33 @@ export async function putMediaObject(input: {
 
   const storageKey = mediaObjectKey(input.identityKey, input.ext);
   const client = createS3Client(config);
+
+  const bytes = input.body instanceof Uint8Array ? input.body : new Uint8Array(await (input.body as Blob).arrayBuffer());
+  let lastEmit = -1;
+  const emit = (n: number) => {
+    const pct = Math.max(0, Math.min(100, Math.round(n)));
+    if (pct === lastEmit) return;
+    lastEmit = pct;
+    input.onUploadPercent?.(pct);
+  };
+  emit(0);
+
+  // Bun's S3 write doesn't expose byte-level upload progress; pulse while the PUT is in flight.
+  let pulse = 5;
+  const pulseTimer = setInterval(() => {
+    pulse = Math.min(90, pulse + 5);
+    emit(pulse);
+  }, 200);
+
   try {
-    await client.write(storageKey, input.body, {
+    await client.write(storageKey, bytes, {
       type: input.contentType || "application/octet-stream",
     });
+    emit(100);
   } catch (err) {
     throw formatStorageError(err, config);
+  } finally {
+    clearInterval(pulseTimer);
   }
   return { storageKey };
 }

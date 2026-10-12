@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { isStorageConfigured, putMediaObject } from "$lib/server/storage";
 import { summarizeIngestItems } from "./errors";
 import { DURATION_CAP_MESSAGE, isOverDurationCap } from "./limits";
+import type { SongProgress } from "./progress";
 import { parseMediaUrl } from "./url-parse";
 import { cleanupWorkDir, downloadBestAudio, listPlaylistEntries, probeUrl, resolveYtDlpBin } from "./ytdlp";
 
@@ -84,11 +85,21 @@ export async function ingestCatalogueVideo(opts: {
   url: string;
   identityKey: string;
   titleHint?: string;
+  onSongProgress?: (progress: SongProgress) => void | Promise<void>;
 }): Promise<IngestItemResult> {
   const { userId, url, identityKey } = opts;
+  const emit = async (phase: SongProgress["phase"], percent: number, title?: string | null) => {
+    await opts.onSongProgress?.({
+      identityKey,
+      title: title ?? opts.titleHint ?? null,
+      phase,
+      percent,
+    });
+  };
 
   const existingAsset = await findReadyAsset(identityKey);
   if (existingAsset?.status === "ready" && existingAsset.storageKey) {
+    await emit("done", 100, existingAsset.title);
     return {
       status: "reused",
       mediaAssetId: existingAsset.id,
@@ -98,9 +109,11 @@ export async function ingestCatalogueVideo(opts: {
   }
 
   if (!(await resolveYtDlpBin())) {
+    await emit("failed", 0);
     return { status: "failed", reason: "yt-dlp is not installed", identityKey, title: opts.titleHint };
   }
   if (!isStorageConfigured()) {
+    await emit("failed", 0);
     return { status: "failed", reason: "Object storage is not configured", identityKey, title: opts.titleHint };
   }
 
@@ -108,35 +121,52 @@ export async function ingestCatalogueVideo(opts: {
   if (claim.kind === "ready" && claim.job.mediaAssetId) {
     const asset = await findReadyAsset(identityKey);
     if (asset?.status === "ready") {
+      await emit("done", 100, asset.title);
       return { status: "reused", mediaAssetId: asset.id, identityKey, title: asset.title };
     }
   }
   if (claim.kind === "running") {
     const asset = await waitForReadyAsset(identityKey);
     if (asset?.status === "ready" && asset.storageKey) {
+      await emit("done", 100, asset.title);
       return { status: "reused", mediaAssetId: asset.id, identityKey, title: asset.title };
     }
+    await emit("failed", 0);
     return { status: "failed", reason: "Concurrent fetch did not finish", identityKey, title: opts.titleHint };
   }
 
   let workDir: string | null = null;
   try {
+    await emit("probing", 0);
     // Probe first for duration gate (also re-checked in download)
     const probe = await probeUrl(url);
     if (isOverDurationCap(probe.durationMs)) {
       await db.update(schema.fetchJobs).set({ status: "failed", errorMessage: DURATION_CAP_MESSAGE }).where(eq(schema.fetchJobs.id, claim.job.id));
+      await emit("skipped", 100, probe.title);
       return { status: "skipped", reason: DURATION_CAP_MESSAGE, identityKey, title: probe.title };
     }
 
-    const downloaded = await downloadBestAudio(url);
+    await emit("downloading", 0, probe.title);
+    const downloaded = await downloadBestAudio(url, {
+      onDownloadPercent: (percent) => {
+        void emit("downloading", percent, probe.title);
+      },
+    });
     workDir = downloaded.workDir;
+    await emit("downloading", 100, downloaded.probe.title);
 
+    await emit("uploading", 0, downloaded.probe.title);
     const put = await putMediaObject({
       identityKey,
       body: downloaded.bytes,
       contentType: downloaded.contentType,
       ext: downloaded.ext,
+      onUploadPercent: (percent) => {
+        void emit("uploading", percent, downloaded.probe.title);
+      },
     });
+    await emit("uploading", 100, downloaded.probe.title);
+    await emit("finalizing", 50, downloaded.probe.title);
 
     let asset = await findReadyAsset(identityKey);
     if (!asset) {
@@ -178,6 +208,7 @@ export async function ingestCatalogueVideo(opts: {
       .set({ status: "ready", mediaAssetId: asset.id, errorMessage: null })
       .where(eq(schema.fetchJobs.id, claim.job.id));
 
+    await emit("done", 100, asset.title);
     return {
       status: existingAsset ? "reused" : "imported",
       mediaAssetId: asset.id,
@@ -189,15 +220,21 @@ export async function ingestCatalogueVideo(opts: {
     const skipped = message.includes("10 minutes");
     await db.update(schema.fetchJobs).set({ status: "failed", errorMessage: message }).where(eq(schema.fetchJobs.id, claim.job.id));
     if (skipped) {
+      await emit("skipped", 100);
       return { status: "skipped", reason: message, identityKey, title: opts.titleHint };
     }
+    await emit("failed", 0);
     return { status: "failed", reason: message, identityKey, title: opts.titleHint };
   } finally {
     if (workDir) await cleanupWorkDir(workDir);
   }
 }
 
-export async function ingestPublicUrl(userId: string, rawUrl: string): Promise<SyncRunResult> {
+export async function ingestPublicUrl(
+  userId: string,
+  rawUrl: string,
+  onSongProgress?: (progress: SongProgress) => void | Promise<void>
+): Promise<SyncRunResult> {
   const parsed = parseMediaUrl(rawUrl);
   if (!parsed) throw new IngestError("Enter a valid http(s) URL");
 
@@ -236,6 +273,7 @@ export async function ingestPublicUrl(userId: string, rawUrl: string): Promise<S
           url: entry.url,
           identityKey: `youtube:${entry.id}`,
           titleHint: entry.title,
+          onSongProgress,
         });
         items.push(result);
       }
@@ -245,6 +283,7 @@ export async function ingestPublicUrl(userId: string, rawUrl: string): Promise<S
           userId,
           url: parsed.canonicalUrl,
           identityKey: parsed.identityKey,
+          onSongProgress,
         })
       );
     } else {
@@ -253,6 +292,7 @@ export async function ingestPublicUrl(userId: string, rawUrl: string): Promise<S
           userId,
           url: parsed.canonicalUrl,
           identityKey: parsed.identityKey,
+          onSongProgress,
         })
       );
     }

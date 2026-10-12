@@ -10,4 +10,4 @@ export {
   zapOrigin,
 } from "./oauth";
 export { getYoutubeLinkStatus, revokeYoutubeLink, listYouTubePlaylists, listYouTubePlaylistItems, getYouTubeAccessTokenForUser } from "./api";
-export { importConnectedPlaylists } from "./import-playlists";
+export { importConnectedPlaylists, type PlaylistImportProgress } from "./import-playlists";
