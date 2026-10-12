@@ -26,8 +26,11 @@
   let error = $state<string | null>(null);
   let loaded = $state(false);
 
-  async function refresh() {
-    const res = await fetch(`/api/sessions/${sessionId}/discord`, { credentials: "same-origin" });
+  async function refresh(signal?: AbortSignal) {
+    const res = await fetch(`/api/sessions/${sessionId}/discord`, {
+      credentials: "same-origin",
+      signal,
+    });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body?.message ?? `Status ${res.status}`);
     configured = Boolean(body.configured);
@@ -109,16 +112,27 @@
     }
   }
 
+  // One status fetch per sessionId mount — not on every parent snapshot tick
   $effect(() => {
+    const id = sessionId;
+    if (!id) return;
+
+    const ac = new AbortController();
+    loaded = false;
+    error = null;
+
     void (async () => {
       try {
-        await refresh();
+        await refresh(ac.signal);
       } catch (err) {
+        if (ac.signal.aborted) return;
         error = err instanceof Error ? err.message : "Failed to load Discord status";
       } finally {
-        loaded = true;
+        if (!ac.signal.aborted) loaded = true;
       }
     })();
+
+    return () => ac.abort();
   });
 </script>
 
@@ -126,9 +140,28 @@
   <div class="space-y-3 rounded-lg border border-border/70 bg-card/30 p-4">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Discord sink</h2>
-      {#if sink}
-        <span class="font-mono text-[10px] text-signal">{sink.status} · {sink.guildName ?? sink.guildId} / {sink.channelName ?? sink.channelId}</span>
-      {/if}
+      <div class="flex items-center gap-2">
+        {#if sink}
+          <span class="font-mono text-[10px] text-signal"
+            >{sink.status} · {sink.guildName ?? sink.guildId} / {sink.channelName ?? sink.channelId}</span
+          >
+        {/if}
+        {#if canManage}
+          <button
+            type="button"
+            class="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-signal disabled:opacity-40"
+            disabled={busy}
+            onclick={() => {
+              error = null;
+              void refresh().catch((err) => {
+                error = err instanceof Error ? err.message : "Refresh failed";
+              });
+            }}
+          >
+            Refresh
+          </button>
+        {/if}
+      </div>
     </div>
 
     {#if !configured}
@@ -189,4 +222,6 @@
       <p class="auth-error">{error}</p>
     {/if}
   </div>
+{:else}
+  <div class="rounded-lg border border-border/70 bg-card/30 px-4 py-3 font-mono text-[11px] text-muted-foreground">Loading Discord sink…</div>
 {/if}
