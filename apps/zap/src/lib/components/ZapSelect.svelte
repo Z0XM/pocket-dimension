@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import CheckIcon from "@lucide/svelte/icons/check";
+  import { measureDropdownPlacement, type DropdownPlacement } from "$lib/utils/dropdown-placement";
 
   type Option = { value: string; label: string };
 
@@ -20,8 +21,15 @@
 
   let open = $state(false);
   let rootEl = $state<HTMLDivElement | null>(null);
+  let triggerEl = $state<HTMLButtonElement | null>(null);
+  let placement = $state<DropdownPlacement>({ openUp: false, maxHeightPx: 224 });
 
   const selected = $derived(options.find((o) => o.value === value) ?? null);
+
+  function refreshPlacement() {
+    if (!triggerEl) return;
+    placement = measureDropdownPlacement(triggerEl);
+  }
 
   function pick(next: string) {
     value = next;
@@ -38,17 +46,24 @@
     e.preventDefault();
     e.stopPropagation();
     if (disabled) return;
+    if (!open) refreshPlacement();
     open = !open;
   }
 
   $effect(() => {
     if (!open) return;
+    refreshPlacement();
+    const onResize = () => refreshPlacement();
     const id = window.setTimeout(() => {
       document.addEventListener("pointerdown", onDocPointerDown);
     }, 0);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onResize, true);
     return () => {
       window.clearTimeout(id);
       document.removeEventListener("pointerdown", onDocPointerDown);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onResize, true);
     };
   });
 </script>
@@ -57,6 +72,7 @@
   <button
     type="button"
     class="auth-field flex w-full items-center justify-between gap-2 text-left"
+    bind:this={triggerEl}
     {disabled}
     aria-haspopup="listbox"
     aria-expanded={open}
@@ -70,7 +86,10 @@
 
   {#if open}
     <div
-      class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded border border-border bg-popover shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_12%,transparent)]"
+      class={`absolute z-50 w-full overflow-y-auto overscroll-contain rounded border border-border bg-popover shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_12%,transparent)] ${
+        placement.openUp ? "bottom-full mb-1" : "top-full mt-1"
+      }`}
+      style={`max-height: ${placement.maxHeightPx}px`}
       role="listbox"
     >
       <button

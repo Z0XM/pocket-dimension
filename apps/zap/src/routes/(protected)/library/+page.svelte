@@ -389,7 +389,7 @@
           </p>
         {:else if data.storageInfo.configured}
           <p class="font-mono text-[11px] text-muted-foreground">
-            R2 ready · {data.storageInfo.bucket} · {data.storageInfo.endpoint}
+            R2 ready
             {#if data.ytDlpReady}
               · yt-dlp ready
             {:else}
