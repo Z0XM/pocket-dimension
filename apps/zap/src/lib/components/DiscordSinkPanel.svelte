@@ -4,9 +4,12 @@
   let {
     sessionId,
     canManage = false,
+    active = $bindable(false),
   }: {
     sessionId: string;
     canManage?: boolean;
+    /** True while a Discord sink is attached (pending/active/error until detached). */
+    active?: boolean;
   } = $props();
 
   let configured = $state(false);
@@ -20,6 +23,10 @@
     channelName: string | null;
     errorMessage: string | null;
   } | null>(null);
+
+  function syncActive() {
+    active = Boolean(sink && sink.status !== "detached");
+  }
   let guilds = $state<{ id: string; name: string }[]>([]);
   let channels = $state<{ id: string; name: string }[]>([]);
   let guildId = $state("");
@@ -38,6 +45,7 @@
     configured = Boolean(body.configured);
     inviteUrl = body.inviteUrl ?? null;
     sink = body.sink ?? null;
+    syncActive();
   }
 
   async function loadGuilds() {
@@ -89,6 +97,7 @@
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Attach failed (${res.status})`);
       sink = body.sink ?? null;
+      syncActive();
     } catch (err) {
       error = err instanceof Error ? err.message : "Attach failed";
     } finally {
@@ -107,6 +116,7 @@
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Detach failed (${res.status})`);
       sink = null;
+      syncActive();
     } catch (err) {
       error = err instanceof Error ? err.message : "Detach failed";
     } finally {
@@ -181,6 +191,9 @@
       {#if sink.errorMessage}
         <p class="auth-error">{sink.errorMessage}</p>
       {/if}
+      <p class="font-mono text-[11px] text-muted-foreground">
+        Audio goes to Discord. This browser is muted by default — enable “This browser” under Outputs to monitor locally.
+      </p>
       <button type="button" class="rounded border border-border px-3 py-1.5 font-mono text-[11px]" disabled={busy} onclick={() => void detach()}>
         Detach Discord
       </button>

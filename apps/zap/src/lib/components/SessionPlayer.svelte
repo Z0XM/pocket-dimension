@@ -8,21 +8,27 @@
   let {
     snapshot = $bindable<SessionSnapshot>(),
     audioEl = $bindable<HTMLAudioElement | null>(null),
+    discordSinkActive = false,
   }: {
     snapshot: SessionSnapshot;
     audioEl?: HTMLAudioElement | null;
+    /** When Discord is attached, browser audio defaults off (Discord-only). */
+    discordSinkActive?: boolean;
   } = $props();
 
   let busy = $state(false);
   let localError = $state<string | null>(null);
   let appliedGen = $state(-1);
   let endConfirmOpen = $state(false);
+  /** null = follow default (off when Discord active, on otherwise). */
+  let browserOutputOverride = $state<boolean | null>(null);
 
   const session = $derived(snapshot.session);
   const current = $derived(snapshot.currentItem);
   const canControl = $derived(Boolean(snapshot.me?.canControl));
   const canAdd = $derived(Boolean(snapshot.me?.canAdd));
   const canManage = $derived(Boolean(snapshot.me?.canManageGuests));
+  const browserOutputEnabled = $derived(browserOutputOverride ?? !discordSinkActive);
 
   function estimatedPositionMs(): number {
     if (!session) return 0;
@@ -31,8 +37,24 @@
     return Math.max(0, session.positionMs + (Date.now() - base));
   }
 
+  function stopBrowserAudio() {
+    if (!audioEl) return;
+    audioEl.pause();
+    audioEl.removeAttribute("src");
+    audioEl.load();
+    delete audioEl.dataset.assetId;
+  }
+
   async function applyTransport() {
-    if (!audioEl || !session || !current?.playable) return;
+    if (!audioEl || !session) return;
+
+    // Discord-only: don't pull media bytes into this browser.
+    if (!browserOutputEnabled || !current?.playable) {
+      stopBrowserAudio();
+      appliedGen = session.playbackGeneration;
+      return;
+    }
+
     const url = `/api/media/${current.mediaAssetId}/audio`;
     const needSrc = audioEl.dataset.assetId !== current.mediaAssetId;
     if (needSrc) {
@@ -62,7 +84,17 @@
 
   $effect(() => {
     if (!session) return;
-    if (session.playbackGeneration === appliedGen && audioEl?.dataset.assetId === current?.mediaAssetId) return;
+    void browserOutputEnabled;
+    void session.playbackGeneration;
+    void session.playbackState;
+    void current?.mediaAssetId;
+    void audioEl;
+    if (browserOutputEnabled && session.playbackGeneration === appliedGen && audioEl?.dataset.assetId === current?.mediaAssetId) {
+      return;
+    }
+    if (!browserOutputEnabled && session.playbackGeneration === appliedGen && !audioEl?.dataset.assetId) {
+      return;
+    }
     void applyTransport();
   });
 
@@ -185,6 +217,29 @@
       <span class="font-mono text-[11px] text-muted-foreground">Listen-only</span>
     {/if}
   </div>
+
+  {#if session?.status === "live"}
+    <div class="flex flex-wrap items-center gap-4 border-t border-border/50 pt-3 font-mono text-[11px]">
+      <span class="tracking-[0.14em] text-muted-foreground uppercase">Outputs</span>
+      <label class="flex items-center gap-2" title={discordSinkActive ? "Off by default while Discord is attached" : "Play audio in this browser"}>
+        <input
+          class="zap-checkbox"
+          type="checkbox"
+          checked={browserOutputEnabled}
+          onchange={(e) => {
+            browserOutputOverride = (e.currentTarget as HTMLInputElement).checked;
+          }}
+        />
+        This browser
+        {#if discordSinkActive && !browserOutputEnabled}
+          <span class="text-muted-foreground">(Discord only)</span>
+        {/if}
+      </label>
+      {#if discordSinkActive}
+        <span class="text-signal">Discord</span>
+      {/if}
+    </div>
+  {/if}
 
   {#if canManage && session?.status === "live"}
     <div class="flex flex-wrap gap-4 border-t border-border/50 pt-3 font-mono text-[11px]">

@@ -17,6 +17,7 @@
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
   let queueBusy = $state<string | null>(null);
   let queueError = $state<string | null>(null);
+  let discordSinkActive = $state(false);
 
   /** Stable route id — do not read snapshot.session.id inside the SSE effect (that re-subscribes forever). */
   const sessionRouteId = $derived(page.params.id ?? "");
@@ -35,6 +36,12 @@
       q = nextQ;
       scope = nextScope;
     });
+  });
+
+  // Reset browser/Discord output coupling when navigating between sessions
+  $effect(() => {
+    void sessionRouteId;
+    discordSinkActive = false;
   });
 
   // One EventSource per session route id while live. Must NOT depend on snapshot object identity —
@@ -124,11 +131,11 @@
     {/if}
   </div>
 
-  <SessionPlayer bind:snapshot bind:audioEl />
+  <SessionPlayer bind:snapshot bind:audioEl {discordSinkActive} />
 
   {#if sessionLive && sessionRouteId}
     {#key sessionRouteId}
-      <DiscordSinkPanel sessionId={sessionRouteId} canManage={canManageGuests} />
+      <DiscordSinkPanel sessionId={sessionRouteId} canManage={canManageGuests} bind:active={discordSinkActive} />
     {/key}
   {/if}
 
