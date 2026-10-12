@@ -2,6 +2,7 @@
   import { enhance } from "$app/forms";
   import { replaceState } from "$app/navigation";
   import { page } from "$app/state";
+  import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -15,6 +16,14 @@
   let q = $state("");
   let selected = $state<string[]>([]);
   let uploadTagIds = $state<string[]>([]);
+  let ingestUrl = $state("");
+  let ingestBusy = $state(false);
+  let ytLinked = $state(false);
+  let ytPlaylists = $state<{ id: string; title: string; itemCount: number | null }[]>([]);
+  let ytSelected = $state<string[]>([]);
+  let ytBusy = $state(false);
+  let ytError = $state<string | null>(null);
+  let ytImportSummary = $state<{ imported: number; skipped: number; failed: number } | null>(null);
 
   let assets = $state<TrackItem[]>([]);
   let hasMore = $state(false);
@@ -41,7 +50,67 @@
     assets = data.assets.map((a) => ({ ...a, playable: Boolean(a.playable) }));
     hasMore = data.hasMore;
     nextOffset = data.nextOffset;
+    ytLinked = data.youtubeLinked;
   });
+
+  async function loadYtPlaylists() {
+    ytError = null;
+    ytBusy = true;
+    try {
+      const res = await fetch("/api/youtube/playlists", { credentials: "same-origin" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? `Failed (${res.status})`);
+      ytPlaylists = body.playlists ?? [];
+    } catch (err) {
+      ytError = err instanceof Error ? err.message : "Could not load playlists";
+    } finally {
+      ytBusy = false;
+    }
+  }
+
+  async function disconnectYoutube() {
+    ytBusy = true;
+    ytError = null;
+    try {
+      const res = await fetch("/api/me/youtube-link", { method: "DELETE", credentials: "same-origin" });
+      if (!res.ok) throw new Error("Disconnect failed");
+      ytLinked = false;
+      ytPlaylists = [];
+      ytSelected = [];
+    } catch (err) {
+      ytError = err instanceof Error ? err.message : "Disconnect failed";
+    } finally {
+      ytBusy = false;
+    }
+  }
+
+  function toggleYtPlaylist(id: string) {
+    ytSelected = ytSelected.includes(id) ? ytSelected.filter((x) => x !== id) : [...ytSelected, id];
+  }
+
+  async function importSelectedPlaylists() {
+    if (ytSelected.length === 0) return;
+    ytBusy = true;
+    ytError = null;
+    ytImportSummary = null;
+    try {
+      const res = await fetch("/api/youtube/import", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ playlistIds: ytSelected }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? `Import failed (${res.status})`);
+      ytImportSummary = { imported: body.imported ?? 0, skipped: body.skipped ?? 0, failed: body.failed ?? 0 };
+      tab = "browse";
+      void fetchPage({ reset: true });
+    } catch (err) {
+      ytError = err instanceof Error ? err.message : "Import failed";
+    } finally {
+      ytBusy = false;
+    }
+  }
 
   // After a successful upload action, land on Browse with refreshed list
   $effect(() => {
@@ -152,11 +221,25 @@
 <audio bind:this={audioEl} preload="auto" class="hidden"></audio>
 
 <section class="space-y-6">
-  <div>
-    <h1 class="text-3xl font-semibold tracking-tight">Library</h1>
-    <p class="mt-1 text-sm text-muted-foreground">
-      Browse the Zap catalogue, or upload into it. Tag filters use <span class="font-mono text-signal">AND</span>.
-    </p>
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight">Library</h1>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Browse the catalogue, or open <span class="font-mono text-signal">Add</span> for upload / URL / YouTube. Tag filters use
+        <span class="font-mono text-signal">AND</span>.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <StartSessionButton />
+      <a href="/join" class="rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary/60">Join</a>
+      <button
+        type="button"
+        class="rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary/60"
+        onclick={() => setTab("upload")}
+      >
+        Add music
+      </button>
+    </div>
   </div>
 
   <div class="flex gap-1 rounded-lg border border-border/70 bg-card/40 p-1" role="tablist" aria-label="Library sections">
@@ -188,13 +271,15 @@
       }`}
       onclick={() => setTab("upload")}
     >
-      Upload
+      Add
     </button>
   </div>
 
   {#if tab === "browse"}
     <div class="space-y-4" role="tabpanel" id="panel-browse" aria-labelledby="tab-browse">
-      <p class="text-sm text-muted-foreground">Search and tag chips apply as you go. Scroll for more.</p>
+      <p class="text-sm text-muted-foreground">
+        Search and tag chips apply as you go. Scroll for more. Sessions play from this catalogue — Discord attaches inside a session.
+      </p>
 
       <div class="flex flex-col gap-4 rounded-lg border border-border/70 bg-card/50 p-4">
         <div class="flex flex-wrap gap-2">
@@ -243,7 +328,7 @@
         {#if loading && assets.length === 0}
           <li class="px-4 py-10 text-center font-mono text-xs text-muted-foreground">Scanning catalogue…</li>
         {:else if assets.length === 0}
-          <li class="px-4 py-10 text-center text-sm text-muted-foreground">No tracks match. Switch to Upload or clear filters.</li>
+          <li class="px-4 py-10 text-center text-sm text-muted-foreground">No tracks match. Open Add or clear filters.</li>
         {:else}
           {#each assets as track (track.id)}
             <TrackRow {track} availableTags={data.availableTags} bind:activeId bind:audioEl />
@@ -260,12 +345,14 @@
     </div>
   {:else}
     <div class="relative z-10 space-y-4 overflow-visible" role="tabpanel" id="panel-upload" aria-labelledby="tab-upload">
-      <p class="text-sm text-muted-foreground">Add a track to the shared Zap catalogue (max 10 minutes).</p>
+      <p class="text-sm text-muted-foreground">
+        Add to the shared Zap catalogue (max 10 minutes per track). Connect YouTube for your playlists, paste a public URL, or upload a file.
+      </p>
 
       <div class="overflow-visible rounded-lg border border-border/70 bg-card/40 p-4">
         {#if !data.storageReady}
           <p class="text-sm text-muted-foreground">
-            Configure R2 env to enable uploads. Use account endpoint
+            Configure R2 env to enable uploads/URL ingest. Use account endpoint
             <span class="font-mono text-signal">https://&lt;ACCOUNT_ID&gt;.r2.cloudflarestorage.com</span>,
             <span class="font-mono">S3_ACCESS_KEY</span> / <span class="font-mono">S3_SECRET_KEY</span>,
             <span class="font-mono">S3_BUCKET</span>, <span class="font-mono">S3_REGION=auto</span>.
@@ -273,19 +360,147 @@
         {:else if data.storageInfo.configured}
           <p class="font-mono text-[11px] text-muted-foreground">
             R2 ready · {data.storageInfo.bucket} · {data.storageInfo.endpoint}
+            {#if data.ytDlpReady}
+              · yt-dlp ready
+            {:else}
+              · yt-dlp missing (URL ingest disabled)
+            {/if}
           </p>
         {/if}
+
+        <h2 class="mt-4 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Connect YouTube</h2>
+        {#if !data.youtubeOauthConfigured}
+          <div class="mt-2 space-y-2 rounded border border-border/60 bg-background/30 p-3">
+            <button type="button" class="auth-btn opacity-50" disabled title="Google OAuth not configured">Connect YouTube</button>
+            <p class="text-sm text-muted-foreground">
+              Set <span class="font-mono text-signal">GOOGLE_CLIENT_ID</span> /
+              <span class="font-mono text-signal">GOOGLE_CLIENT_SECRET</span> (redirect
+              <span class="font-mono">/api/auth/youtube/callback</span>) to enable. Optional:
+              <span class="font-mono">YOUTUBE_TOKEN_SECRET</span> (else <span class="font-mono">BETTER_AUTH_SECRET</span>).
+            </p>
+          </div>
+        {:else if !ytLinked}
+          <p class="mt-2 text-sm text-muted-foreground">Link your Google account to import private playlists and Liked videos.</p>
+          <a class="auth-btn mt-2 inline-flex w-fit" href="/api/auth/youtube/start?returnTo=/library?tab=upload"> Connect YouTube </a>
+        {:else}
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <p class="font-mono text-[11px] text-signal">
+              Connected{#if data.youtubeLinkedAt}
+                · {new Date(data.youtubeLinkedAt).toLocaleDateString()}{/if}
+            </p>
+            <button
+              type="button"
+              class="rounded border border-border px-2 py-1 font-mono text-[10px]"
+              disabled={ytBusy}
+              onclick={() => void loadYtPlaylists()}
+            >
+              {ytPlaylists.length ? "Refresh playlists" : "Load playlists"}
+            </button>
+            <button
+              type="button"
+              class="rounded border border-border px-2 py-1 font-mono text-[10px] text-destructive"
+              disabled={ytBusy}
+              onclick={() => void disconnectYoutube()}
+            >
+              Disconnect
+            </button>
+          </div>
+          {#if ytError}
+            <p class="auth-error mt-2">{ytError}</p>
+          {/if}
+          {#if ytImportSummary}
+            <p class="mt-2 text-sm text-signal">
+              Import done — imported {ytImportSummary.imported}, skipped {ytImportSummary.skipped}, failed {ytImportSummary.failed}.
+            </p>
+          {/if}
+          {#if ytPlaylists.length > 0}
+            <ul class="mt-3 max-h-56 space-y-1 overflow-y-auto rounded border border-border/60 p-2">
+              {#each ytPlaylists as pl}
+                <li>
+                  <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary/40">
+                    <input type="checkbox" checked={ytSelected.includes(pl.id)} onchange={() => toggleYtPlaylist(pl.id)} />
+                    <span class="min-w-0 flex-1 truncate text-sm">{pl.title}</span>
+                    {#if pl.itemCount != null}
+                      <span class="font-mono text-[10px] text-muted-foreground">{pl.itemCount}</span>
+                    {/if}
+                  </label>
+                </li>
+              {/each}
+            </ul>
+            <button
+              type="button"
+              class="auth-btn mt-2"
+              disabled={ytBusy || ytSelected.length === 0 || !data.ingestReady}
+              onclick={() => void importSelectedPlaylists()}
+            >
+              {ytBusy ? "Importing…" : `Import selected (${ytSelected.length})`}
+            </button>
+          {/if}
+        {/if}
+
+        <h2 class="mt-6 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Public URL</h2>
+        {#if form?.ingestError}
+          <p class="auth-error mt-2">{form.ingestError}</p>
+        {/if}
+        {#if form?.ingestOk && form.ingestSummary}
+          <p class="mt-2 text-sm text-signal">
+            Sync done — imported {form.ingestSummary.imported}, skipped {form.ingestSummary.skipped}, failed {form.ingestSummary.failed}.
+          </p>
+        {/if}
+        <form
+          method="POST"
+          action="?/ingestUrl"
+          class="mt-2 space-y-3"
+          use:enhance={() => {
+            ingestBusy = true;
+            return async ({ result, update }) => {
+              await update();
+              ingestBusy = false;
+              if (result.type === "success") {
+                ingestUrl = "";
+                tab = "browse";
+                void fetchPage({ reset: true });
+              }
+            };
+          }}
+        >
+          <input
+            class="auth-field"
+            type="url"
+            name="url"
+            placeholder="https://www.youtube.com/watch?v=… or playlist URL"
+            bind:value={ingestUrl}
+            required
+            disabled={!data.ingestReady}
+          />
+          <button type="submit" class="auth-btn" disabled={!data.ingestReady || ingestBusy}>
+            {ingestBusy ? "Importing…" : "Import URL"}
+          </button>
+          {#if !data.ingestReady}
+            <p class="text-sm text-muted-foreground">
+              Needs R2 (<span class="font-mono text-signal">S3_*</span>) and
+              <span class="font-mono text-signal">yt-dlp</span> on the Zap host
+              {#if data.storageReady && !data.ytDlpReady}
+                — yt-dlp missing
+              {:else if !data.storageReady}
+                — storage not configured
+              {/if}.
+            </p>
+          {/if}
+        </form>
+
+        <h2 class="mt-6 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">File upload</h2>
         {#if form?.uploadError}
-          <p class="auth-error mt-3">{form.uploadError}</p>
+          <p class="auth-error mt-2">{form.uploadError}</p>
         {/if}
         {#if form?.uploadOk}
-          <p class="mt-3 text-sm text-signal">Added to catalogue.</p>
+          <p class="mt-2 text-sm text-signal">Added to catalogue.</p>
         {/if}
         <form
           method="POST"
           action="?/upload"
           enctype="multipart/form-data"
-          class="mt-3 space-y-3"
+          class="mt-2 space-y-3"
           use:enhance={() => {
             return async ({ result, update }) => {
               await update();

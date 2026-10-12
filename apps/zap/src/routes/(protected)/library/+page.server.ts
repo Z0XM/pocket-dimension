@@ -12,9 +12,12 @@ import {
   serializeCatalogueAsset,
   setUserAssetTags,
 } from "$lib/server/catalogue";
+import { IngestError, ingestPublicUrl, resolveYtDlpBin } from "$lib/server/ingest";
+import { MAX_TRACK_DURATION_MS } from "$lib/server/ingest/limits";
 import { describeStorageConfig, isStorageConfigured, putMediaObject } from "$lib/server/storage";
+import { getYoutubeLinkStatus, isGoogleOAuthConfigured } from "$lib/server/youtube";
 
-const MAX_DURATION_MS = 10 * 60 * 1000;
+const MAX_DURATION_MS = MAX_TRACK_DURATION_MS;
 
 function readTagIds(form: FormData): string[] {
   return form
@@ -36,6 +39,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     listAvailableTags(userId),
   ]);
 
+  const ytDlpReady = Boolean(await resolveYtDlpBin());
+  const storageReady = isStorageConfigured();
+  const youtubeOauthConfigured = isGoogleOAuthConfigured();
+  const youtubeLink = await getYoutubeLinkStatus(userId);
+
   return {
     scope,
     q,
@@ -43,8 +51,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     pageSize: CATALOGUE_PAGE_SIZE,
     hasMore,
     nextOffset,
-    storageReady: isStorageConfigured(),
+    storageReady,
+    ingestReady: storageReady && ytDlpReady,
+    ytDlpReady,
     storageInfo: describeStorageConfig(),
+    youtubeOauthConfigured,
+    youtubeLinked: youtubeLink.linked,
+    youtubeLinkedAt: youtubeLink.linked ? youtubeLink.linkedAt : null,
     availableTags: availableTags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
     assets: assets.map((asset) => serializeCatalogueAsset(asset, tagsByAsset.get(asset.id) ?? [])),
   };
@@ -148,5 +161,33 @@ export const actions: Actions = {
 
     await setUserAssetTags(userId, mediaAssetId, nextTagIds);
     return { tagOk: true, mediaAssetId };
+  },
+
+  ingestUrl: async ({ request, locals }) => {
+    const userId = locals.user!.id;
+    const form = await request.formData();
+    const url = String(form.get("url") ?? "").trim();
+    if (!url) {
+      return fail(400, { ingestError: "Paste a public song or playlist URL." });
+    }
+
+    try {
+      const result = await ingestPublicUrl(userId, url);
+      return {
+        ingestOk: true,
+        ingestSummary: {
+          imported: result.imported,
+          skipped: result.skipped,
+          failed: result.failed,
+          syncRunId: result.syncRunId,
+        },
+      };
+    } catch (err) {
+      if (err instanceof IngestError) {
+        return fail(err.status, { ingestError: err.message });
+      }
+      console.error("[zap ingestUrl]", err);
+      return fail(502, { ingestError: err instanceof Error ? err.message : "Ingest failed" });
+    }
   },
 };
