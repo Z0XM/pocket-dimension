@@ -15,8 +15,12 @@ import type { VoiceBasedChannel } from "discord.js";
 import { getPresignedGetUrl } from "$lib/server/storage";
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
+import { ensureOpusRuntime } from "./opus-runtime";
 import type { DiscordPlaybackCommand } from "./sync";
 import { shouldResync } from "./sync";
+
+// Prefer opusscript before any prism-media encoder path can probe @discordjs/opus.
+ensureOpusRuntime();
 
 type SessionVoiceRuntime = {
   connection: VoiceConnection;
@@ -73,6 +77,10 @@ function startFfmpegResource(url: string, positionMs: number) {
     "error",
     "-acodec",
     "libopus",
+    "-application",
+    "audio",
+    "-frame_duration",
+    "20",
     "-f",
     "ogg",
     "-ar",
