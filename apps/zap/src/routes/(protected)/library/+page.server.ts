@@ -42,7 +42,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const ytDlpReady = Boolean(await resolveYtDlpBin());
   const storageReady = isStorageConfigured();
   const youtubeOauthConfigured = isGoogleOAuthConfigured();
-  const youtubeLink = await getYoutubeLinkStatus(userId);
+  // Status is soft-fail; never block catalogue on YouTube/schema wiring
+  const youtubeLink = await getYoutubeLinkStatus(userId).catch(() => ({ linked: false as const }));
 
   return {
     scope,

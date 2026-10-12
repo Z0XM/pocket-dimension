@@ -418,7 +418,7 @@
               {#each ytPlaylists as pl}
                 <li>
                   <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary/40">
-                    <input type="checkbox" checked={ytSelected.includes(pl.id)} onchange={() => toggleYtPlaylist(pl.id)} />
+                    <input class="zap-checkbox" type="checkbox" checked={ytSelected.includes(pl.id)} onchange={() => toggleYtPlaylist(pl.id)} />
                     <span class="min-w-0 flex-1 truncate text-sm">{pl.title}</span>
                     {#if pl.itemCount != null}
                       <span class="font-mono text-[10px] text-muted-foreground">{pl.itemCount}</span>

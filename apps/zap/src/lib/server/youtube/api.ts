@@ -59,13 +59,25 @@ function bestThumbnail(thumbnails: unknown) {
   return values.sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0]?.url ?? null;
 }
 
-export async function getYouTubeAccessTokenForUser(userId: string) {
-  const link = await db.query.zapYoutubeAccountLinks.findFirst({
-    where: and(eq(schema.zapYoutubeAccountLinks.userId, userId), isNull(schema.zapYoutubeAccountLinks.revokedAt)),
-  });
-  if (!link) return null;
+const youtubeLinks = () => schema.zapYoutubeAccountLinks;
 
+/** Prefer select() over db.query — relational API can miss tables when shared/db dist is stale or Vite SSR duplicates drizzle. */
+async function findActiveYoutubeLink(userId: string) {
+  const table = youtubeLinks();
+  if (!table) return null;
+  const [link] = await db
+    .select()
+    .from(table)
+    .where(and(eq(table.userId, userId), isNull(table.revokedAt)))
+    .limit(1);
+  return link ?? null;
+}
+
+export async function getYouTubeAccessTokenForUser(userId: string) {
   try {
+    const link = await findActiveYoutubeLink(userId);
+    if (!link) return null;
+
     if (link.accessExpiresAt.getTime() > Date.now() + 60_000) {
       return decryptToken(link.accessTokenEnc);
     }
@@ -74,15 +86,16 @@ export async function getYouTubeAccessTokenForUser(userId: string) {
     const refreshed = await tryRefreshYouTubeAccessToken(refreshToken);
     if (!refreshed) return null;
 
+    const table = youtubeLinks();
     await db
-      .update(schema.zapYoutubeAccountLinks)
+      .update(table)
       .set({
         accessTokenEnc: encryptToken(refreshed.accessToken),
         accessExpiresAt: refreshed.accessExpiresAt,
         scopes: refreshed.scopes,
         revokedAt: null,
       })
-      .where(eq(schema.zapYoutubeAccountLinks.userId, userId));
+      .where(eq(table.userId, userId));
 
     return refreshed.accessToken;
   } catch {
@@ -127,19 +140,24 @@ async function youtubeFetch<T>(
 }
 
 export async function getYoutubeLinkStatus(userId: string) {
-  const link = await db.query.zapYoutubeAccountLinks.findFirst({
-    where: and(eq(schema.zapYoutubeAccountLinks.userId, userId), isNull(schema.zapYoutubeAccountLinks.revokedAt)),
-  });
-  if (!link) return { linked: false as const };
-  return {
-    linked: true as const,
-    linkedAt: link.linkedAt.toISOString(),
-    scopes: link.scopes,
-  };
+  try {
+    const link = await findActiveYoutubeLink(userId);
+    if (!link) return { linked: false as const };
+    return {
+      linked: true as const,
+      linkedAt: link.linkedAt.toISOString(),
+      scopes: link.scopes,
+    };
+  } catch {
+    // Library must load without YouTube env / before migration / with stale db.query wiring
+    return { linked: false as const };
+  }
 }
 
 export async function revokeYoutubeLink(userId: string) {
-  await db.update(schema.zapYoutubeAccountLinks).set({ revokedAt: new Date() }).where(eq(schema.zapYoutubeAccountLinks.userId, userId));
+  const table = youtubeLinks();
+  if (!table) throw error(503, "YouTube link schema is not available — rebuild @pocket-dimension/db");
+  await db.update(table).set({ revokedAt: new Date() }).where(eq(table.userId, userId));
 }
 
 export async function listYouTubePlaylists(userId: string): Promise<ZapYouTubePlaylist[]> {
