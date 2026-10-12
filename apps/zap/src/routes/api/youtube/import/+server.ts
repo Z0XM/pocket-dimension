@@ -1,4 +1,4 @@
-import { json, error } from "@sveltejs/kit";
+import { error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { getYoutubeLinkStatus, importConnectedPlaylists } from "$lib/server/youtube";
 import { isStorageConfigured } from "$lib/server/storage";
@@ -19,11 +19,44 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     throw error(400, "playlistIds required");
   }
 
-  try {
-    const result = await importConnectedPlaylists(locals.user.id, playlistIds);
-    return json(result);
-  } catch (err) {
-    console.error("[zap youtube import]", err);
-    throw error(502, err instanceof Error ? err.message : "Import failed");
-  }
+  const userId = locals.user.id;
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const send = (payload: Record<string, unknown>) => {
+        controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+      };
+
+      try {
+        const result = await importConnectedPlaylists(userId, playlistIds, (progress) => {
+          send({ type: "progress", ...progress });
+        });
+        send({
+          type: "done",
+          syncRunId: result.syncRunId,
+          imported: result.imported,
+          skipped: result.skipped,
+          failed: result.failed,
+          errorMessage: result.errorMessage ?? null,
+          failures: result.failures ?? [],
+          playlists: result.playlists,
+        });
+      } catch (err) {
+        console.error("[zap youtube import]", err);
+        send({
+          type: "error",
+          message: err instanceof Error ? err.message : "Import failed",
+        });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
 };

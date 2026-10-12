@@ -15,7 +15,7 @@
   <div class="min-w-0">
     <p class="font-mono text-[11px] tracking-wide text-signal">{label}</p>
     {#if detail}
-      <p class="mt-0.5 truncate text-xs text-muted-foreground">{detail}</p>
+      <p class="mt-0.5 text-xs break-words text-muted-foreground">{detail}</p>
     {/if}
   </div>
 </div>

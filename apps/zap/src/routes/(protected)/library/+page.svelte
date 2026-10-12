@@ -35,6 +35,15 @@
     errorMessage?: string | null;
     failures?: { title?: string | null; reason: string }[];
   } | null>(null);
+  let ytImportProgress = $state<{
+    total: number;
+    done: number;
+    remaining: number;
+    imported: number;
+    skipped: number;
+    failed: number;
+    currentTitle?: string | null;
+  } | null>(null);
 
   let assets = $state<TrackItem[]>([]);
   let hasMore = $state(false);
@@ -114,31 +123,70 @@
     ytPhase = "importing";
     ytError = null;
     ytImportSummary = null;
+    ytImportProgress = { total: 0, done: 0, remaining: 0, imported: 0, skipped: 0, failed: 0 };
     try {
       const res = await fetch("/api/youtube/import", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
         body: JSON.stringify({ playlistIds: ytSelected }),
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.message ?? `Import failed (${res.status})`);
-      ytImportSummary = {
-        imported: body.imported ?? 0,
-        skipped: body.skipped ?? 0,
-        failed: body.failed ?? 0,
-        errorMessage: body.errorMessage ?? null,
-        failures: body.failures ?? [],
-      };
-      if ((body.failed ?? 0) > 0 && (body.errorMessage || body.message)) {
-        ytError = body.errorMessage ?? body.message;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message ?? `Import failed (${res.status})`);
       }
+      if (!res.body) throw new Error("Import stream missing");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let sawDone = false;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const ev = JSON.parse(line) as Record<string, unknown>;
+          if (ev.type === "progress") {
+            ytImportProgress = {
+              total: Number(ev.total ?? 0),
+              done: Number(ev.done ?? 0),
+              remaining: Number(ev.remaining ?? 0),
+              imported: Number(ev.imported ?? 0),
+              skipped: Number(ev.skipped ?? 0),
+              failed: Number(ev.failed ?? 0),
+              currentTitle: typeof ev.currentTitle === "string" ? ev.currentTitle : null,
+            };
+          } else if (ev.type === "done") {
+            sawDone = true;
+            ytImportSummary = {
+              imported: Number(ev.imported ?? 0),
+              skipped: Number(ev.skipped ?? 0),
+              failed: Number(ev.failed ?? 0),
+              errorMessage: (ev.errorMessage as string | null) ?? null,
+              failures: (ev.failures as { title?: string | null; reason: string }[]) ?? [],
+            };
+            if ((ytImportSummary.failed ?? 0) > 0 && ytImportSummary.errorMessage) {
+              ytError = ytImportSummary.errorMessage;
+            }
+          } else if (ev.type === "error") {
+            throw new Error(typeof ev.message === "string" ? ev.message : "Import failed");
+          }
+        }
+      }
+
+      if (!sawDone) throw new Error("Import ended without a result");
       tab = "browse";
       void fetchPage({ reset: true });
     } catch (err) {
       ytError = err instanceof Error ? err.message : "Import failed";
     } finally {
       ytPhase = "idle";
+      ytImportProgress = null;
     }
   }
 
@@ -450,7 +498,11 @@
           {:else if ytPhase === "importing"}
             <BusyStatus
               label="Importing from YouTube…"
-              detail={`${ytSelected.length} playlist${ytSelected.length === 1 ? "" : "s"} · yt-dlp + R2 (can take a minute)`}
+              detail={ytImportProgress && ytImportProgress.total > 0
+                ? `${ytImportProgress.done}/${ytImportProgress.total} done · ${ytImportProgress.imported} ok · ${ytImportProgress.skipped} skipped · ${ytImportProgress.failed} failed · ${ytImportProgress.remaining} left${
+                    ytImportProgress.currentTitle ? ` · ${ytImportProgress.currentTitle}` : ""
+                  }`
+                : `${ytSelected.length} playlist${ytSelected.length === 1 ? "" : "s"} · expanding & downloading in parallel…`}
             />
           {:else if ytPhase === "disconnecting"}
             <BusyStatus label="Disconnecting YouTube…" />
