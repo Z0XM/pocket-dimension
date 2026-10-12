@@ -2,6 +2,7 @@
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
   import SkipForwardIcon from "@lucide/svelte/icons/skip-forward";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
 
   let {
@@ -15,6 +16,7 @@
   let busy = $state(false);
   let localError = $state<string | null>(null);
   let appliedGen = $state(-1);
+  let endConfirmOpen = $state(false);
 
   const session = $derived(snapshot.session);
   const current = $derived(snapshot.currentItem);
@@ -107,13 +109,14 @@
 
   async function endSession() {
     if (!session) return;
-    if (!confirm("End this session for everyone?")) return;
     busy = true;
+    localError = null;
     try {
       const res = await fetch(`/api/sessions/${session.id}`, { method: "DELETE", credentials: "same-origin" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? "End failed");
       snapshot = body as SessionSnapshot;
+      endConfirmOpen = false;
     } catch (err) {
       localError = err instanceof Error ? err.message : "End failed";
     } finally {
@@ -187,6 +190,7 @@
     <div class="flex flex-wrap gap-4 border-t border-border/50 pt-3 font-mono text-[11px]">
       <label class="flex items-center gap-2">
         <input
+          class="zap-checkbox"
           type="checkbox"
           checked={session.guestsCanAdd}
           disabled={busy}
@@ -196,6 +200,7 @@
       </label>
       <label class="flex items-center gap-2">
         <input
+          class="zap-checkbox"
           type="checkbox"
           checked={session.guestsCanControl}
           disabled={busy}
@@ -203,9 +208,19 @@
         />
         Guests can control
       </label>
-      <button type="button" class="text-destructive hover:underline" disabled={busy} onclick={() => void endSession()}> End session </button>
+      <button type="button" class="text-destructive hover:underline" disabled={busy} onclick={() => (endConfirmOpen = true)}> End session </button>
     </div>
   {/if}
+
+  <ConfirmDialog
+    bind:open={endConfirmOpen}
+    title="End session?"
+    body="Stops playback for everyone and closes the join code."
+    confirmLabel="End session"
+    danger
+    {busy}
+    onconfirm={endSession}
+  />
 
   {#if localError}
     <p class="font-mono text-[11px] text-destructive">{localError}</p>
