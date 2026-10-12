@@ -30,7 +30,7 @@ export async function ensureSystemTags() {
 
 export type CatalogueScope = "all" | "yours";
 
-export const CATALOGUE_PAGE_SIZE = 24;
+export const CATALOGUE_PAGE_SIZE = 25;
 
 export type CatalogueQuery = {
   userId: string;

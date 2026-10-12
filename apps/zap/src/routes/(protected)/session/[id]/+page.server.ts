@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
     const scope = url.searchParams.get("scope") === "yours" ? "yours" : "all";
     const selectedTagIds = url.searchParams.getAll("tag").filter(Boolean);
 
-    const [{ assets, tagsByAsset }, availableTags] = await Promise.all([
+    const [{ assets, tagsByAsset, hasMore, nextOffset }, availableTags] = await Promise.all([
       listCatalogue({
         userId: locals.user.id,
         scope,
@@ -28,6 +28,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
     return {
       snapshot,
       catalogue: assets.map((a) => serializeCatalogueAsset(a, tagsByAsset.get(a.id) ?? [])),
+      catalogueHasMore: hasMore,
+      catalogueNextOffset: nextOffset,
+      cataloguePageSize: CATALOGUE_PAGE_SIZE,
       availableTags,
       catalogueQ: q,
       catalogueScope: scope,
