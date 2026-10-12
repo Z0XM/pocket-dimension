@@ -3,7 +3,9 @@
   import SessionPlayer from "$lib/components/SessionPlayer.svelte";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
   import type { PageData } from "./$types";
+  import { page } from "$app/state";
   import { goto } from "$app/navigation";
+  import { untrack } from "svelte";
 
   let { data }: { data: PageData } = $props();
 
@@ -16,29 +18,49 @@
   let queueBusy = $state<string | null>(null);
   let queueError = $state<string | null>(null);
 
+  /** Stable route id — do not read snapshot.session.id inside the SSE effect (that re-subscribes forever). */
+  const sessionRouteId = $derived(page.params.id ?? "");
+  const sessionLive = $derived(snapshot.session?.status === "live");
+  const canManageGuests = $derived(Boolean(snapshot.me?.canManageGuests));
+
   $effect(() => {
-    snapshot = data.snapshot as SessionSnapshot;
-    catalogue = data.catalogue;
-    q = data.catalogueQ;
-    scope = data.catalogueScope === "yours" ? "yours" : "all";
+    // Hydrate from SSR/load navigations only — untrack so we don't fight SSE updates
+    const next = data.snapshot as SessionSnapshot;
+    const nextCatalogue = data.catalogue;
+    const nextQ = data.catalogueQ;
+    const nextScope = data.catalogueScope === "yours" ? "yours" : "all";
+    untrack(() => {
+      snapshot = next;
+      catalogue = nextCatalogue;
+      q = nextQ;
+      scope = nextScope;
+    });
   });
 
-  // SSE sync
+  // One EventSource per session route id while live. Must NOT depend on snapshot object identity —
+  // the server sends an initial snapshot on connect; writing that used to re-run this effect → reconnect storm.
   $effect(() => {
-    const id = snapshot.session?.id;
-    if (!id || snapshot.session?.status !== "live") return;
+    const id = sessionRouteId;
+    if (!id) return;
+
+    const live = untrack(() => snapshot.session?.status === "live");
+    if (!live) return;
 
     const es = new EventSource(`/api/sessions/${id}/events`);
     const onSnapshot = (ev: MessageEvent) => {
       try {
-        snapshot = JSON.parse(ev.data) as SessionSnapshot;
+        const next = JSON.parse(ev.data) as SessionSnapshot;
+        snapshot = next;
+        if (next.session?.status !== "live") {
+          es.close();
+        }
       } catch {
         // ignore malformed
       }
     };
     es.addEventListener("snapshot", onSnapshot);
     es.onerror = () => {
-      // browser will reconnect; no-op
+      // Browser auto-reconnects the same EventSource; do not open a second one here.
     };
     return () => {
       es.removeEventListener("snapshot", onSnapshot);
@@ -97,18 +119,20 @@
         <a class="text-signal hover:underline" href="/library">Library</a>
       </p>
     </div>
-    {#if snapshot.session?.status === "ended"}
+    {#if !sessionLive}
       <a href="/" class="auth-btn">Back home</a>
     {/if}
   </div>
 
   <SessionPlayer bind:snapshot bind:audioEl />
 
-  {#if snapshot.session?.status === "live" && snapshot.session.id}
-    <DiscordSinkPanel sessionId={snapshot.session.id} canManage={Boolean(snapshot.me?.canManageGuests)} />
+  {#if sessionLive && sessionRouteId}
+    {#key sessionRouteId}
+      <DiscordSinkPanel sessionId={sessionRouteId} canManage={canManageGuests} />
+    {/key}
   {/if}
 
-  {#if snapshot.session?.status === "live"}
+  {#if sessionLive}
     <div class="grid gap-6 lg:grid-cols-2">
       <div class="space-y-3">
         <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Queue</h2>
