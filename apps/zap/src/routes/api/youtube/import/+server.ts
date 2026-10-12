@@ -13,11 +13,17 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   if (!isStorageConfigured()) throw error(503, "Object storage is not configured");
   if (!(await resolveYtDlpBin())) throw error(503, "yt-dlp is not installed");
 
-  const body = (await request.json().catch(() => ({}))) as { playlistIds?: string[] };
+  const body = (await request.json().catch(() => ({}))) as {
+    playlistIds?: string[];
+    tagIds?: string[];
+    customTag?: string;
+  };
   const playlistIds = body.playlistIds ?? [];
   if (!Array.isArray(playlistIds) || playlistIds.length === 0) {
     throw error(400, "playlistIds required");
   }
+  const tagIds = Array.isArray(body.tagIds) ? body.tagIds.map((id) => String(id)) : [];
+  const customTag = typeof body.customTag === "string" ? body.customTag : "";
 
   const userId = locals.user.id;
   const stream = new ReadableStream<Uint8Array>({
@@ -28,9 +34,14 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       };
 
       try {
-        const result = await importConnectedPlaylists(userId, playlistIds, (progress) => {
-          send({ type: "progress", ...progress });
-        });
+        const result = await importConnectedPlaylists(
+          userId,
+          playlistIds,
+          (progress) => {
+            send({ type: "progress", ...progress });
+          },
+          { tagIds, customTag }
+        );
         send({
           type: "done",
           syncRunId: result.syncRunId,

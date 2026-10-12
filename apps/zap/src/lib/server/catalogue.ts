@@ -242,4 +242,13 @@ export async function setUserAssetTags(userId: string, mediaAssetId: string, tag
   return tags;
 }
 
+/** Add tags without removing existing ones (playlist import). */
+export async function addUserAssetTags(userId: string, mediaAssetId: string, tagIds: string[]) {
+  const tags = await resolveUserTagIds(userId, tagIds);
+  for (const tag of tags) {
+    await db.insert(schema.mediaAssetTags).values({ userId, mediaAssetId, tagId: tag.id }).onConflictDoNothing();
+  }
+  return tags;
+}
+
 export { SYSTEM_TAG_SEEDS };

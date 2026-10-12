@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
 import type { Actions, PageServerLoad } from "./$types";
+import { listUserLibraryActivity } from "$lib/server/activity";
 import {
   CATALOGUE_PAGE_SIZE,
   ensureCustomTag,
@@ -34,9 +35,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const q = url.searchParams.get("q") ?? "";
   const tagIds = url.searchParams.getAll("tag").filter(Boolean);
 
-  const [{ assets, tagsByAsset, hasMore, nextOffset }, availableTags] = await Promise.all([
+  const [{ assets, tagsByAsset, hasMore, nextOffset }, availableTags, activity] = await Promise.all([
     listCatalogue({ userId, scope, q, tagIds, offset: 0, limit: CATALOGUE_PAGE_SIZE }),
     listAvailableTags(userId),
+    listUserLibraryActivity(userId, 50),
   ]);
 
   const ytDlpReady = Boolean(await resolveYtDlpBin());
@@ -61,6 +63,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     youtubeLinkedAt: youtubeLink.linked ? youtubeLink.linkedAt : null,
     availableTags: availableTags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
     assets: assets.map((asset) => serializeCatalogueAsset(asset, tagsByAsset.get(asset.id) ?? [])),
+    activity,
   };
 };
 
