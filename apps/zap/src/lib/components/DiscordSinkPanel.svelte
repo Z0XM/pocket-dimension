@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ZapSelect from "$lib/components/ZapSelect.svelte";
+
   let {
     sessionId,
     canManage = false,
@@ -198,20 +200,21 @@
         </button>
       </div>
       {#if guilds.length > 0}
-        <select class="auth-field" bind:value={guildId} onchange={(e) => void loadChannels((e.currentTarget as HTMLSelectElement).value)}>
-          <option value="">Select server…</option>
-          {#each guilds as g}
-            <option value={g.id}>{g.name}</option>
-          {/each}
-        </select>
+        <ZapSelect
+          options={guilds.map((g) => ({ value: g.id, label: g.name }))}
+          bind:value={guildId}
+          placeholder="Select server…"
+          disabled={busy}
+          onChange={(id) => void loadChannels(id)}
+        />
       {/if}
       {#if channels.length > 0}
-        <select class="auth-field" bind:value={channelId}>
-          <option value="">Select voice channel…</option>
-          {#each channels as c}
-            <option value={c.id}>{c.name}</option>
-          {/each}
-        </select>
+        <ZapSelect
+          options={channels.map((c) => ({ value: c.id, label: c.name }))}
+          bind:value={channelId}
+          placeholder="Select voice channel…"
+          disabled={busy}
+        />
         <button type="button" class="auth-btn" disabled={busy || !guildId || !channelId} onclick={() => void attach()}>
           {busy ? "Joining…" : "Attach"}
         </button>

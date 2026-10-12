@@ -109,12 +109,11 @@
   }
 
   .zap-nav-link {
-    @apply rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:text-signal;
+    @apply border-b border-transparent px-1 py-1 text-muted-foreground transition-colors hover:text-signal;
   }
 
   .zap-nav-link-active {
-    @apply text-signal;
-    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--signal) 70%, transparent);
+    @apply border-signal text-signal;
   }
 
   .zap-busy {
