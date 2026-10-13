@@ -15,10 +15,13 @@ export {
   pause,
   seek,
   skip,
+  onTrackEnded,
   removeQueueItem,
   clearQueue,
   moveQueueItem,
   endIdleSessions,
   findLiveSessionForUser,
+  listLiveSessionsForUser,
 } from "./sessions";
+export type { LiveSessionSummary } from "./sessions";
 export type * from "./types";

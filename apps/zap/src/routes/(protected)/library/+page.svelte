@@ -12,12 +12,12 @@
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
 
-  type LibraryTab = "browse" | "upload" | "history";
+  type LibraryTab = "browse" | "upload" | "playlists" | "history";
   type YtPhase = "idle" | "linking" | "loading" | "importing" | "disconnecting";
 
   function initialTab(): LibraryTab {
     const t = page.url.searchParams.get("tab");
-    if (t === "upload" || t === "history") return t;
+    if (t === "upload" || t === "history" || t === "playlists") return t;
     return "browse";
   }
 
@@ -70,6 +70,24 @@
   let uploadSongProgress = $state<SongProgressView[]>([]);
   let uploadError = $state<string | null>(null);
   let ingestError = $state<string | null>(null);
+
+  let playlists = $state(data.playlists ?? []);
+  let playlistBusy = $state(false);
+  let playlistError = $state<string | null>(null);
+  let newPlaylistName = $state("");
+  let buildTagIds = $state<string[]>([]);
+  let selectedPlaylistId = $state<string | null>(null);
+  let playlistDetail = $state<{
+    id: string;
+    name: string;
+    visibility: string;
+    canEdit: boolean;
+    items: { mediaAssetId: string; title: string; artists: string | null }[];
+    exclusions: { mediaAssetId: string; title: string }[];
+    collaborators: { userId: string; role: string; displayName: string }[];
+  } | null>(null);
+  let mergeIds = $state<string[]>([]);
+  let collabQuery = $state("");
 
   async function readNdjsonStream(res: Response, onEvent: (ev: Record<string, unknown>) => void): Promise<void> {
     if (!res.body) throw new Error("Response stream missing");
@@ -443,9 +461,108 @@
     return params;
   }
 
+  async function refreshPlaylists() {
+    const res = await fetch("/api/playlists", { credentials: "same-origin" });
+    if (!res.ok) return;
+    const body = await res.json();
+    playlists = body.playlists ?? [];
+  }
+
+  async function createPlaylist() {
+    if (!newPlaylistName.trim() || playlistBusy) return;
+    playlistBusy = true;
+    playlistError = null;
+    try {
+      const res = await fetch("/api/playlists", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newPlaylistName.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? "Create failed");
+      newPlaylistName = "";
+      await refreshPlaylists();
+      selectedPlaylistId = body.id;
+      await loadPlaylistDetail(body.id);
+    } catch (err) {
+      playlistError = err instanceof Error ? err.message : "Create failed";
+    } finally {
+      playlistBusy = false;
+    }
+  }
+
+  async function loadPlaylistDetail(id: string) {
+    selectedPlaylistId = id;
+    playlistError = null;
+    try {
+      const res = await fetch(`/api/playlists/${id}`, { credentials: "same-origin" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? "Load failed");
+      playlistDetail = body;
+    } catch (err) {
+      playlistError = err instanceof Error ? err.message : "Load failed";
+      playlistDetail = null;
+    }
+  }
+
+  async function playlistAction(action: string, extra: Record<string, unknown> = {}) {
+    if (!selectedPlaylistId || playlistBusy) return;
+    playlistBusy = true;
+    playlistError = null;
+    try {
+      const res = await fetch(`/api/playlists/${selectedPlaylistId}`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...extra }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? "Action failed");
+      playlistDetail = body;
+      await refreshPlaylists();
+    } catch (err) {
+      playlistError = err instanceof Error ? err.message : "Action failed";
+    } finally {
+      playlistBusy = false;
+    }
+  }
+
+  async function mergeSelectedPlaylists() {
+    if (mergeIds.length < 2 || playlistBusy) return;
+    playlistBusy = true;
+    playlistError = null;
+    try {
+      const res = await fetch("/api/playlists", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "merge",
+          name: `Merge ${new Date().toLocaleDateString()}`,
+          sourcePlaylistIds: mergeIds,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? "Merge failed");
+      mergeIds = [];
+      await refreshPlaylists();
+      selectedPlaylistId = body.id;
+      playlistDetail = body;
+    } catch (err) {
+      playlistError = err instanceof Error ? err.message : "Merge failed";
+    } finally {
+      playlistBusy = false;
+    }
+  }
+
+  function toggleMergeId(id: string) {
+    mergeIds = mergeIds.includes(id) ? mergeIds.filter((x) => x !== id) : [...mergeIds, id];
+  }
+
   function updateUrl() {
     const params = new URLSearchParams();
-    if (tab === "upload" || tab === "history") params.set("tab", tab);
+    if (tab === "upload" || tab === "history" || tab === "playlists") params.set("tab", tab);
     if (scope === "yours") params.set("scope", "yours");
     if (q.trim()) params.set("q", q.trim());
     const tq = tagQuery.trim();
@@ -631,6 +748,26 @@
     </div>
   </div>
 
+  {#if data.liveSessions?.length}
+    <div class="rounded-lg border border-signal/40 bg-signal/10 px-4 py-3">
+      <p class="font-mono text-[10px] tracking-[0.18em] text-signal uppercase">Live sessions — resume where you left off</p>
+      <ul class="mt-2 space-y-1">
+        {#each data.liveSessions as live (live.id)}
+          <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span>
+              <span class="font-mono text-signal">{live.joinCode}</span>
+              <span class="text-muted-foreground"> · {live.role} · {live.playbackState}</span>
+              {#if live.currentTitle}
+                <span class="text-foreground"> — {live.currentTitle}</span>
+              {/if}
+            </span>
+            <a href={`/session/${live.id}`} class="rounded border border-border px-2 py-1 font-mono text-[10px] hover:bg-secondary/60"> Resume </a>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
+
   <div class="flex gap-1 rounded-lg border border-border/70 bg-card/40 p-1" role="tablist" aria-label="Library sections">
     <button
       type="button"
@@ -661,6 +798,21 @@
       onclick={() => setTab("upload")}
     >
       Add
+    </button>
+    <button
+      type="button"
+      role="tab"
+      id="tab-playlists"
+      aria-controls="panel-playlists"
+      aria-selected={tab === "playlists"}
+      class={`flex-1 rounded-md px-4 py-2.5 font-mono text-xs tracking-[0.18em] uppercase transition ${
+        tab === "playlists"
+          ? "bg-primary text-primary-foreground shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_35%,transparent)]"
+          : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+      }`}
+      onclick={() => setTab("playlists")}
+    >
+      Playlists
     </button>
     <button
       type="button"
@@ -1035,6 +1187,228 @@
             <SongProgressList songs={uploadSongProgress} sendingLabel="Sending" />
           {/if}
         </form>
+      </div>
+    </div>
+  {/if}
+
+  {#if tab === "playlists"}
+    <div id="panel-playlists" role="tabpanel" aria-labelledby="tab-playlists" class="space-y-6">
+      <p class="text-sm text-muted-foreground">
+        Owned playlists, build from tags (with exclusions), invite collaborators, or merge two playlists into a new one.
+      </p>
+
+      <div class="flex flex-col gap-3 rounded-lg border border-border/70 bg-card/50 p-4 sm:flex-row sm:items-end">
+        <label class="flex-1 space-y-1">
+          <span class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">New playlist</span>
+          <input class="auth-field" bind:value={newPlaylistName} placeholder="Name…" maxlength="80" />
+        </label>
+        <button
+          type="button"
+          class="rounded bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
+          disabled={playlistBusy || !newPlaylistName.trim()}
+          onclick={() => void createPlaylist()}
+        >
+          Create
+        </button>
+      </div>
+
+      {#if playlistError}
+        <p class="auth-error">{playlistError}</p>
+      {/if}
+
+      <div class="grid gap-4 lg:grid-cols-2">
+        <div class="space-y-2">
+          <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Your playlists</h2>
+          {#if playlists.length === 0}
+            <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">No playlists yet.</p>
+          {:else}
+            <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
+              {#each playlists as pl (pl.id)}
+                <li class="flex items-center gap-2 px-3 py-2">
+                  <input
+                    class="zap-checkbox"
+                    type="checkbox"
+                    checked={mergeIds.includes(pl.id)}
+                    onchange={() => toggleMergeId(pl.id)}
+                    title="Select for merge"
+                  />
+                  <button
+                    type="button"
+                    class={`min-w-0 flex-1 text-left text-sm ${selectedPlaylistId === pl.id ? "text-signal" : ""}`}
+                    onclick={() => void loadPlaylistDetail(pl.id)}
+                  >
+                    <span class="font-medium">{pl.name}</span>
+                    <span class="ml-2 font-mono text-[10px] text-muted-foreground"
+                      >{pl.trackCount} · {pl.visibility}{#if !pl.canEdit}
+                        · collab{/if}</span
+                    >
+                  </button>
+                </li>
+              {/each}
+            </ul>
+            <button
+              type="button"
+              class="rounded border border-border px-3 py-1.5 font-mono text-[10px] text-muted-foreground hover:bg-secondary/60 disabled:opacity-40"
+              disabled={mergeIds.length < 2 || playlistBusy}
+              onclick={() => void mergeSelectedPlaylists()}
+            >
+              Merge selected ({mergeIds.length})
+            </button>
+          {/if}
+        </div>
+
+        <div class="space-y-3 rounded-lg border border-border/70 bg-card/40 p-4">
+          {#if !playlistDetail}
+            <p class="text-sm text-muted-foreground">Select a playlist to edit.</p>
+          {:else}
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 class="text-lg font-semibold">{playlistDetail.name}</h3>
+                <p class="font-mono text-[10px] text-muted-foreground uppercase">{playlistDetail.visibility}</p>
+              </div>
+              {#if playlistDetail.canEdit}
+                <button
+                  type="button"
+                  class="rounded border border-border px-2 py-1 font-mono text-[10px]"
+                  disabled={playlistBusy}
+                  onclick={() =>
+                    void fetch(`/api/playlists/${playlistDetail!.id}`, {
+                      method: "PATCH",
+                      credentials: "same-origin",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        visibility: playlistDetail!.visibility === "public" ? "private" : "public",
+                      }),
+                    }).then(async (res) => {
+                      const body = await res.json();
+                      if (res.ok) {
+                        playlistDetail = body;
+                        await refreshPlaylists();
+                      }
+                    })}
+                >
+                  Make {playlistDetail.visibility === "public" ? "private" : "public"}
+                </button>
+              {/if}
+            </div>
+
+            {#if playlistDetail.canEdit}
+              <div class="space-y-2 border-t border-border/50 pt-3">
+                <p class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Build from tags (AND)</p>
+                <div class="flex flex-wrap gap-2">
+                  {#each data.availableTags as tag}
+                    <button
+                      type="button"
+                      class={`rounded-full border px-2 py-0.5 font-mono text-[10px] ${
+                        buildTagIds.includes(tag.id) ? "border-signal text-signal" : "border-border text-muted-foreground"
+                      }`}
+                      onclick={() => {
+                        buildTagIds = buildTagIds.includes(tag.id) ? buildTagIds.filter((t) => t !== tag.id) : [...buildTagIds, tag.id];
+                      }}
+                    >
+                      {tag.name}
+                    </button>
+                  {/each}
+                </div>
+                <button
+                  type="button"
+                  class="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-40"
+                  disabled={playlistBusy || buildTagIds.length === 0}
+                  onclick={() => void playlistAction("buildFromTags", { tagIds: buildTagIds })}
+                >
+                  Rebuild from tags
+                </button>
+              </div>
+
+              <div class="space-y-2 border-t border-border/50 pt-3">
+                <p class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Add collaborator</p>
+                <div class="flex gap-2">
+                  <input class="auth-field flex-1" bind:value={collabQuery} placeholder="email or username" />
+                  <button
+                    type="button"
+                    class="rounded border border-border px-2 py-1 font-mono text-[10px] disabled:opacity-40"
+                    disabled={playlistBusy || !collabQuery.trim()}
+                    onclick={() => void playlistAction("addCollaborator", { collaborator: collabQuery.trim() })}
+                  >
+                    Invite
+                  </button>
+                </div>
+              </div>
+            {/if}
+
+            {#if playlistDetail.collaborators.length}
+              <ul class="font-mono text-[11px] text-muted-foreground">
+                {#each playlistDetail.collaborators as c}
+                  <li>{c.displayName} · {c.role}</li>
+                {/each}
+              </ul>
+            {/if}
+
+            <div class="border-t border-border/50 pt-3">
+              <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+                Tracks ({playlistDetail.items.length})
+              </p>
+              {#if playlistDetail.items.length === 0}
+                <p class="text-sm text-muted-foreground">Empty — build from tags or add from Browse later.</p>
+              {:else}
+                <ul class="max-h-72 space-y-1 overflow-y-auto">
+                  {#each playlistDetail.items as item}
+                    <li class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-secondary/40">
+                      <span class="min-w-0 truncate">
+                        {item.title}
+                        <span class="font-mono text-[10px] text-muted-foreground"> · {item.artists ?? "—"}</span>
+                      </span>
+                      {#if playlistDetail.canEdit}
+                        <span class="flex shrink-0 gap-1">
+                          <button
+                            type="button"
+                            class="font-mono text-[10px] text-muted-foreground hover:text-signal"
+                            disabled={playlistBusy}
+                            onclick={() => void playlistAction("exclude", { mediaAssetId: item.mediaAssetId, excluded: true })}
+                            title="Exclude from tag rebuilds"
+                          >
+                            exclude
+                          </button>
+                          <button
+                            type="button"
+                            class="font-mono text-[10px] text-destructive"
+                            disabled={playlistBusy}
+                            onclick={() => void playlistAction("removeTrack", { mediaAssetId: item.mediaAssetId })}
+                          >
+                            remove
+                          </button>
+                        </span>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+
+            {#if playlistDetail.exclusions.length}
+              <div class="border-t border-border/50 pt-3">
+                <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Excluded</p>
+                <ul class="space-y-1 font-mono text-[11px]">
+                  {#each playlistDetail.exclusions as ex}
+                    <li class="flex justify-between gap-2">
+                      <span>{ex.title}</span>
+                      {#if playlistDetail.canEdit}
+                        <button
+                          type="button"
+                          class="text-signal"
+                          disabled={playlistBusy}
+                          onclick={() => void playlistAction("exclude", { mediaAssetId: ex.mediaAssetId, excluded: false })}
+                        >
+                          restore
+                        </button>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+          {/if}
+        </div>
       </div>
     </div>
   {/if}

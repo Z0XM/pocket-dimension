@@ -1,8 +1,9 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { pickAutoPlayTrack, type AutoPlayCandidate } from "$lib/server/autoplay";
+import { isLiveSessionIdle } from "$lib/server/idle-session";
 import { recordPlayEvent } from "$lib/server/play-history";
 import { sessionEventBus } from "./event-bus";
-import { isSessionIdle } from "./idle";
 import { generateJoinCode, normalizeJoinCode } from "./join-code";
 import { canAddToQueue, canControlTransport, canEndSession, canManageGuestPermissions } from "./permissions";
 import { buildSessionSnapshot } from "./snapshot";
@@ -40,7 +41,12 @@ async function requireLiveSession(sessionId: string) {
   if (!session) throw new SessionError("Session not found", 404);
   if (session.status !== "live" || session.endedAt) throw new SessionError("Session has ended", 410);
 
-  if (isSessionIdle(session.lastActivityAt)) {
+  if (
+    isLiveSessionIdle({
+      lastActivityAt: session.lastActivityAt,
+      playbackState: session.playbackState,
+    })
+  ) {
     await endSessionInternal(session.id, "idle");
     throw new SessionError("Session ended due to inactivity", 410);
   }
@@ -149,7 +155,12 @@ export async function joinSessionByCode(userId: string, rawCode: string): Promis
   });
   if (!session) throw new SessionError("No live session for that code", 404);
 
-  if (isSessionIdle(session.lastActivityAt)) {
+  if (
+    isLiveSessionIdle({
+      lastActivityAt: session.lastActivityAt,
+      playbackState: session.playbackState,
+    })
+  ) {
     await endSessionInternal(session.id, "idle");
     throw new SessionError("Session ended due to inactivity", 410);
   }
@@ -194,7 +205,7 @@ export async function endSession(sessionId: string, userId: string): Promise<Ses
 export async function setGuestPermissions(
   sessionId: string,
   userId: string,
-  flags: { guestsCanAdd?: boolean; guestsCanControl?: boolean }
+  flags: { guestsCanAdd?: boolean; guestsCanControl?: boolean; autoPlay?: boolean }
 ): Promise<SessionSnapshot> {
   await requireLiveSession(sessionId);
   const member = await requireMember(sessionId, userId);
@@ -207,6 +218,7 @@ export async function setGuestPermissions(
     .set({
       ...(flags.guestsCanAdd !== undefined ? { guestsCanAdd: flags.guestsCanAdd } : {}),
       ...(flags.guestsCanControl !== undefined ? { guestsCanControl: flags.guestsCanControl } : {}),
+      ...(flags.autoPlay !== undefined ? { autoPlay: flags.autoPlay } : {}),
       lastActivityAt: sql`now()`,
     })
     .where(eq(schema.sessions.id, sessionId));
@@ -337,40 +349,163 @@ export async function seek(sessionId: string, userId: string, positionMs: number
   return snapshot;
 }
 
-export async function skip(sessionId: string, userId: string): Promise<SessionSnapshot> {
-  const session = await requireLiveSession(sessionId);
-  const member = await requireMember(sessionId, userId);
-  if (!canControlTransport(member.role, { guestsCanAdd: session.guestsCanAdd, guestsCanControl: session.guestsCanControl })) {
-    throw new SessionError("You can't control playback", 403);
+async function resolveAutoPlayAssetId(sessionId: string, hostUserId: string, queueAssetIds: string[]): Promise<string | null> {
+  const recentPlays = await db.query.playEvents.findMany({
+    where: eq(schema.playEvents.userId, hostUserId),
+    orderBy: [desc(schema.playEvents.playedAt)],
+    limit: 40,
+  });
+  const exclude = new Set<string>([...queueAssetIds, ...recentPlays.slice(0, 12).map((p) => p.mediaAssetId)]);
+
+  // Seed tags from queue assets (host's tags).
+  const seedTagRows =
+    queueAssetIds.length === 0
+      ? []
+      : await db
+          .select({ tagId: schema.mediaAssetTags.tagId })
+          .from(schema.mediaAssetTags)
+          .where(and(eq(schema.mediaAssetTags.userId, hostUserId), inArray(schema.mediaAssetTags.mediaAssetId, queueAssetIds)));
+  const seedTagIds = [...new Set(seedTagRows.map((r) => r.tagId))];
+
+  const candidates = await db
+    .select({
+      id: schema.mediaAssets.id,
+      title: schema.mediaAssets.title,
+      addedByUserId: schema.mediaAssets.addedByUserId,
+    })
+    .from(schema.mediaAssets)
+    .where(and(eq(schema.mediaAssets.status, "ready"), isNotNull(schema.mediaAssets.storageKey)))
+    .orderBy(desc(schema.mediaAssets.createdAt))
+    .limit(120);
+
+  const candidateIds = candidates.map((c) => c.id).filter((id) => !exclude.has(id));
+  if (candidateIds.length === 0) return null;
+
+  const tagLinks = await db
+    .select({
+      mediaAssetId: schema.mediaAssetTags.mediaAssetId,
+      tagId: schema.mediaAssetTags.tagId,
+    })
+    .from(schema.mediaAssetTags)
+    .where(and(eq(schema.mediaAssetTags.userId, hostUserId), inArray(schema.mediaAssetTags.mediaAssetId, candidateIds)));
+
+  const tagsByAsset = new Map<string, string[]>();
+  for (const link of tagLinks) {
+    const list = tagsByAsset.get(link.mediaAssetId) ?? [];
+    list.push(link.tagId);
+    tagsByAsset.set(link.mediaAssetId, list);
   }
 
+  const lastPlayByAsset = new Map<string, number>();
+  for (const p of recentPlays) {
+    if (!lastPlayByAsset.has(p.mediaAssetId)) lastPlayByAsset.set(p.mediaAssetId, p.playedAt.getTime());
+  }
+  const now = Date.now();
+
+  const scored: AutoPlayCandidate[] = candidates
+    .filter((c) => !exclude.has(c.id))
+    .map((c) => {
+      const last = lastPlayByAsset.get(c.id);
+      return {
+        id: c.id,
+        title: c.title,
+        tagIds: tagsByAsset.get(c.id) ?? [],
+        msSinceLastPlay: last == null ? Number.POSITIVE_INFINITY : Math.max(0, now - last),
+        addedByOther: Boolean(c.addedByUserId && c.addedByUserId !== hostUserId),
+      };
+    });
+
+  const pick = pickAutoPlayTrack(scored, { seedTagIds, excludeAssetIds: exclude });
+  return pick?.id ?? null;
+}
+
+async function advanceOrAutoPlay(
+  sessionId: string,
+  userId: string,
+  session: typeof schema.sessions.$inferSelect,
+  opts: { allowEmptyQueue: boolean }
+): Promise<SessionSnapshot> {
   const queue = await db.query.queueItems.findMany({
     where: eq(schema.queueItems.sessionId, sessionId),
     orderBy: [asc(schema.queueItems.position)],
   });
-  if (queue.length === 0) throw new SessionError("Queue is empty", 400);
+  if (queue.length === 0 && !opts.allowEmptyQueue) throw new SessionError("Queue is empty", 400);
 
   const idx = session.currentQueueItemId ? queue.findIndex((q) => q.id === session.currentQueueItemId) : -1;
   const next = queue[idx + 1] ?? null;
 
-  if (!next) {
-    await bumpGeneration(sessionId, session.playbackGeneration, {
-      playbackState: "idle",
-      currentQueueItemId: null,
-      positionMs: 0,
-    });
-  } else {
+  if (next) {
     await bumpGeneration(sessionId, session.playbackGeneration, {
       playbackState: "playing",
       currentQueueItemId: next.id,
       positionMs: 0,
     });
     await recordPlayEvent({ userId, sessionId, mediaAssetId: next.mediaAssetId });
+    const snapshot = await publish(sessionId, userId);
+    if (!snapshot) throw new SessionError("Session not found", 404);
+    return snapshot;
   }
 
+  // Queue exhausted — optional auto-play
+  if (session.autoPlay) {
+    const assetId = await resolveAutoPlayAssetId(
+      sessionId,
+      session.hostUserId,
+      queue.map((q) => q.mediaAssetId)
+    );
+    if (assetId) {
+      const last = queue[queue.length - 1];
+      const position = (last?.position ?? -1) + 1;
+      const [item] = await db
+        .insert(schema.queueItems)
+        .values({
+          sessionId,
+          mediaAssetId: assetId,
+          position,
+          addedByUserId: userId,
+        })
+        .returning();
+      if (item) {
+        await bumpGeneration(sessionId, session.playbackGeneration, {
+          playbackState: "playing",
+          currentQueueItemId: item.id,
+          positionMs: 0,
+        });
+        await recordPlayEvent({ userId, sessionId, mediaAssetId: assetId });
+        const snapshot = await publish(sessionId, userId);
+        if (!snapshot) throw new SessionError("Session not found", 404);
+        return snapshot;
+      }
+    }
+  }
+
+  await bumpGeneration(sessionId, session.playbackGeneration, {
+    playbackState: "idle",
+    currentQueueItemId: null,
+    positionMs: 0,
+  });
   const snapshot = await publish(sessionId, userId);
   if (!snapshot) throw new SessionError("Session not found", 404);
   return snapshot;
+}
+
+export async function skip(sessionId: string, userId: string): Promise<SessionSnapshot> {
+  const session = await requireLiveSession(sessionId);
+  const member = await requireMember(sessionId, userId);
+  if (!canControlTransport(member.role, { guestsCanAdd: session.guestsCanAdd, guestsCanControl: session.guestsCanControl })) {
+    throw new SessionError("You can't control playback", 403);
+  }
+  return advanceOrAutoPlay(sessionId, userId, session, { allowEmptyQueue: false });
+}
+
+/** Client reports current track finished — advance queue or auto-play. */
+export async function onTrackEnded(sessionId: string, userId: string): Promise<SessionSnapshot> {
+  const session = await requireLiveSession(sessionId);
+  const member = await requireMember(sessionId, userId);
+  if (!canControlTransport(member.role, { guestsCanAdd: session.guestsCanAdd, guestsCanControl: session.guestsCanControl })) {
+    throw new SessionError("You can't control playback", 403);
+  }
+  return advanceOrAutoPlay(sessionId, userId, session, { allowEmptyQueue: true });
 }
 
 export async function removeQueueItem(sessionId: string, userId: string, queueItemId: string): Promise<SessionSnapshot> {
@@ -488,7 +623,12 @@ export async function endIdleSessions(): Promise<number> {
   });
   let ended = 0;
   for (const s of live) {
-    if (isSessionIdle(s.lastActivityAt)) {
+    if (
+      isLiveSessionIdle({
+        lastActivityAt: s.lastActivityAt,
+        playbackState: s.playbackState,
+      })
+    ) {
       await endSessionInternal(s.id, "idle");
       ended += 1;
     }
@@ -496,15 +636,77 @@ export async function endIdleSessions(): Promise<number> {
   return ended;
 }
 
-export async function findLiveSessionForUser(userId: string) {
+export type LiveSessionSummary = {
+  id: string;
+  joinCode: string;
+  role: "host" | "guest";
+  playbackState: "idle" | "playing" | "paused";
+  positionMs: number;
+  currentTitle: string | null;
+  hostUserId: string;
+  lastActivityAt: string;
+};
+
+export async function listLiveSessionsForUser(userId: string): Promise<LiveSessionSummary[]> {
   await endIdleSessions();
-  const membership = await db.query.sessionMembers.findFirst({
+  const memberships = await db.query.sessionMembers.findMany({
     where: and(eq(schema.sessionMembers.userId, userId), isNull(schema.sessionMembers.leftAt)),
     orderBy: [desc(schema.sessionMembers.joinedAt)],
   });
-  if (!membership) return null;
-  const session = await db.query.sessions.findFirst({
-    where: and(eq(schema.sessions.id, membership.sessionId), eq(schema.sessions.status, "live")),
+  if (memberships.length === 0) return [];
+
+  const sessions = await db.query.sessions.findMany({
+    where: and(
+      eq(schema.sessions.status, "live"),
+      inArray(
+        schema.sessions.id,
+        memberships.map((m) => m.sessionId)
+      )
+    ),
   });
-  return session ?? null;
+  const byId = new Map(sessions.map((s) => [s.id, s]));
+
+  const currentIds = sessions.map((s) => s.currentQueueItemId).filter((id): id is string => Boolean(id));
+  const queueItems =
+    currentIds.length > 0
+      ? await db.query.queueItems.findMany({
+          where: inArray(schema.queueItems.id, currentIds),
+        })
+      : [];
+  const assetIds = [...new Set(queueItems.map((q) => q.mediaAssetId))];
+  const assets =
+    assetIds.length > 0
+      ? await db.query.mediaAssets.findMany({
+          where: inArray(schema.mediaAssets.id, assetIds),
+        })
+      : [];
+  const titleByAsset = new Map(assets.map((a) => [a.id, a.title]));
+  const assetByQueueItem = new Map(queueItems.map((q) => [q.id, q.mediaAssetId]));
+
+  const out: LiveSessionSummary[] = [];
+  for (const m of memberships) {
+    const s = byId.get(m.sessionId);
+    if (!s) continue;
+    const assetId = s.currentQueueItemId ? assetByQueueItem.get(s.currentQueueItemId) : null;
+    out.push({
+      id: s.id,
+      joinCode: s.joinCode,
+      role: m.role,
+      playbackState: s.playbackState,
+      positionMs: s.positionMs,
+      currentTitle: assetId ? (titleByAsset.get(assetId) ?? null) : null,
+      hostUserId: s.hostUserId,
+      lastActivityAt: s.lastActivityAt.toISOString(),
+    });
+  }
+  return out;
+}
+
+export async function findLiveSessionForUser(userId: string) {
+  const list = await listLiveSessionsForUser(userId);
+  if (list.length === 0) return null;
+  const preferred = list.find((s) => s.role === "host") ?? list[0]!;
+  return db.query.sessions.findFirst({
+    where: and(eq(schema.sessions.id, preferred.id), eq(schema.sessions.status, "live")),
+  });
 }

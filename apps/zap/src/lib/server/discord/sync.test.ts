@@ -19,6 +19,7 @@ function baseSnapshot(overrides: Partial<SessionSnapshot["session"]> & { playabl
       playbackGeneration: 1,
       guestsCanAdd: false,
       guestsCanControl: false,
+      autoPlay: true,
       lastActivityAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       endedAt: null,

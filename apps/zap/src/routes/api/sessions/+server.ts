@@ -1,6 +1,6 @@
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { SessionError, createSession, findLiveSessionForUser, joinSessionByCode } from "$lib/server/sessions";
+import { SessionError, createSession, findLiveSessionForUser, joinSessionByCode, listLiveSessionsForUser } from "$lib/server/sessions";
 
 function requireVerifiedUser(locals: App.Locals) {
   if (!locals.user) throw error(401, "Sign in required");
@@ -17,10 +17,19 @@ function mapError(err: unknown): never {
 export const POST: RequestHandler = async ({ locals, request }) => {
   const user = requireVerifiedUser(locals);
   try {
-    const body = (await request.json().catch(() => ({}))) as { action?: string; code?: string };
+    const body = (await request.json().catch(() => ({}))) as { action?: string; code?: string; forceNew?: boolean };
     if (body.action === "join") {
       const snapshot = await joinSessionByCode(user.id, body.code ?? "");
       return json(snapshot);
+    }
+    // Prefer resuming an existing live host session unless forceNew.
+    if (!body.forceNew) {
+      const existing = await findLiveSessionForUser(user.id);
+      if (existing && existing.hostUserId === user.id) {
+        const { getSessionForUser } = await import("$lib/server/sessions");
+        const snapshot = await getSessionForUser(existing.id, user.id);
+        return json(snapshot);
+      }
     }
     const snapshot = await createSession(user.id);
     return json(snapshot, { status: 201 });
@@ -29,9 +38,14 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   }
 };
 
-/** Current live session for this user (if any). */
+/** Live sessions for this user (resume). */
 export const GET: RequestHandler = async ({ locals }) => {
   const user = requireVerifiedUser(locals);
-  const session = await findLiveSessionForUser(user.id);
-  return json({ sessionId: session?.id ?? null, joinCode: session?.joinCode ?? null });
+  const live = await listLiveSessionsForUser(user.id);
+  const primary = live.find((s) => s.role === "host") ?? live[0] ?? null;
+  return json({
+    sessionId: primary?.id ?? null,
+    joinCode: primary?.joinCode ?? null,
+    live,
+  });
 };

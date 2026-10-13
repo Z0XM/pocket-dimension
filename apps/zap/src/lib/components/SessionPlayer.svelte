@@ -98,7 +98,7 @@
     void applyTransport();
   });
 
-  async function transport(action: "play" | "pause" | "skip" | "seek", positionMs?: number) {
+  async function transport(action: "play" | "pause" | "skip" | "seek" | "ended", positionMs?: number) {
     if (!session) return;
     busy = true;
     localError = null;
@@ -119,7 +119,18 @@
     }
   }
 
-  async function togglePerm(key: "guestsCanAdd" | "guestsCanControl", value: boolean) {
+  $effect(() => {
+    const el = audioEl;
+    if (!el) return;
+    const onEnded = () => {
+      if (!canControl || busy) return;
+      void transport("ended");
+    };
+    el.addEventListener("ended", onEnded);
+    return () => el.removeEventListener("ended", onEnded);
+  });
+
+  async function togglePerm(key: "guestsCanAdd" | "guestsCanControl" | "autoPlay", value: boolean) {
     if (!session) return;
     busy = true;
     try {
@@ -262,6 +273,16 @@
           onchange={(e) => void togglePerm("guestsCanControl", (e.currentTarget as HTMLInputElement).checked)}
         />
         Guests can control
+      </label>
+      <label class="flex items-center gap-2" title="When the queue ends, pick another catalogue track">
+        <input
+          class="zap-checkbox"
+          type="checkbox"
+          checked={session.autoPlay}
+          disabled={busy}
+          onchange={(e) => void togglePerm("autoPlay", (e.currentTarget as HTMLInputElement).checked)}
+        />
+        Auto-play
       </label>
       <button type="button" class="text-destructive hover:underline" disabled={busy} onclick={() => (endConfirmOpen = true)}> End session </button>
     </div>

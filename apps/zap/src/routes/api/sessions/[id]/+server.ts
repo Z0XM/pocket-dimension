@@ -29,6 +29,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
     const body = (await request.json()) as {
       guestsCanAdd?: boolean;
       guestsCanControl?: boolean;
+      autoPlay?: boolean;
     };
     const snapshot = await setGuestPermissions(params.id!, user.id, body);
     return json(snapshot);
