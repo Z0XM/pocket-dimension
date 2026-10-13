@@ -154,6 +154,46 @@
   }
 }
 
+@keyframes zap-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes zap-nav-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.zap-skeleton {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--muted) 55%, transparent) 0%,
+    color-mix(in srgb, var(--signal) 12%, var(--muted)) 45%,
+    color-mix(in srgb, var(--muted) 55%, transparent) 90%
+  );
+  background-size: 200% 100%;
+  animation: zap-shimmer 1.35s ease-in-out infinite;
+}
+
+.zap-nav-progress {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--signal) 70%, transparent);
+  transform-origin: left;
+  animation: zap-nav-pulse 1.1s ease-in-out infinite;
+}
+
 .zap-bar {
   animation: zap-wave 1.6s ease-in-out infinite;
   transform-origin: center bottom;

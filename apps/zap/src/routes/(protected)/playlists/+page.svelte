@@ -1,10 +1,12 @@
 <script lang="ts">
+  import BusyStatus from "$lib/components/BusyStatus.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
 
   let playlists = $state(data.playlists ?? []);
   let busy = $state(false);
+  let busyLabel = $state("Working…");
   let error = $state<string | null>(null);
   let newName = $state("");
   let mergeIds = $state<string[]>([]);
@@ -23,6 +25,7 @@
   async function create() {
     if (!newName.trim() || busy) return;
     busy = true;
+    busyLabel = "Creating playlist…";
     error = null;
     try {
       const res = await fetch("/api/playlists", {
@@ -50,6 +53,7 @@
   async function mergeSelected() {
     if (mergeIds.length < 2 || busy) return;
     busy = true;
+    busyLabel = "Merging playlists…";
     error = null;
     try {
       const res = await fetch("/api/playlists", {
@@ -93,10 +97,13 @@
       disabled={busy || !newName.trim()}
       onclick={() => void create()}
     >
-      Create
+      {busy && busyLabel.startsWith("Creating") ? "Creating…" : "Create"}
     </button>
   </div>
 
+  {#if busy}
+    <BusyStatus label={busyLabel} />
+  {/if}
   {#if error}
     <p class="auth-error">{error}</p>
   {/if}
