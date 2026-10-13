@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
   import DiscordSinkPanel from "$lib/components/DiscordSinkPanel.svelte";
   import SessionPlayer from "$lib/components/SessionPlayer.svelte";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
@@ -25,11 +26,14 @@
   let queueScrollRoot = $state<HTMLElement | null>(null);
   let q = $state(data.catalogueQ);
   let scope = $state<"all" | "yours">(data.catalogueScope === "yours" ? "yours" : "all");
-  let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  let selectedTagIds = $state<string[]>([...(data.selectedTagIds ?? [])]);
+  let tagQuery = $state(data.catalogueTagQuery ?? "");
+  let tagQueryError = $state<string | null>(data.catalogueTagQueryError ?? null);
   let queueBusy = $state<string | null>(null);
   let queueError = $state<string | null>(null);
   let discordSinkActive = $state(false);
   let catalogueFetchGen = 0;
+  let playlists = $state(data.playlists ?? []);
 
   /** Stable route id — do not read snapshot.session.id inside the SSE effect (that re-subscribes forever). */
   const sessionRouteId = $derived(page.params.id ?? "");
@@ -46,6 +50,10 @@
     const nextOffset = data.catalogueNextOffset;
     const nextQ = data.catalogueQ;
     const nextScope = data.catalogueScope === "yours" ? "yours" : "all";
+    const nextTags = [...(data.selectedTagIds ?? [])];
+    const nextTq = data.catalogueTagQuery ?? "";
+    const nextTqErr = data.catalogueTagQueryError ?? null;
+    const nextPlaylists = data.playlists ?? [];
     untrack(() => {
       snapshot = next;
       catalogue = nextCatalogue;
@@ -54,6 +62,10 @@
       queueVisible = SONG_PAGE;
       q = nextQ;
       scope = nextScope;
+      selectedTagIds = nextTags;
+      tagQuery = nextTq;
+      tagQueryError = nextTqErr;
+      playlists = nextPlaylists;
     });
   });
 
@@ -104,6 +116,7 @@
     const gen = ++catalogueFetchGen;
     if (opts.reset) {
       catalogueLoading = true;
+      tagQueryError = null;
     } else {
       catalogueLoadingMore = true;
     }
@@ -111,6 +124,9 @@
       const params = new URLSearchParams();
       if (q.trim()) params.set("q", q.trim());
       if (scope === "yours") params.set("scope", "yours");
+      const tq = tagQuery.trim();
+      if (tq) params.set("tq", tq);
+      else for (const id of selectedTagIds) params.append("tag", id);
       params.set("limit", String(data.cataloguePageSize ?? SONG_PAGE));
       params.set("offset", String(opts.reset ? 0 : catalogueNextOffset));
       const res = await fetch(`/api/catalogue?${params.toString()}`, {
@@ -122,11 +138,13 @@
         assets: typeof catalogue;
         hasMore: boolean;
         nextOffset: number;
+        tagQueryError?: string | null;
       };
       if (gen !== catalogueFetchGen) return;
       catalogue = opts.reset ? body.assets : [...catalogue, ...body.assets];
       catalogueHasMore = body.hasMore;
       catalogueNextOffset = body.nextOffset;
+      tagQueryError = body.tagQueryError ?? null;
     } finally {
       if (gen === catalogueFetchGen) {
         catalogueLoading = false;
@@ -135,9 +153,25 @@
     }
   }
 
-  function onSearchInput() {
-    if (searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => void fetchCatalogue({ reset: true }), 280);
+  async function loadPlaylist(playlistId: string) {
+    if (!snapshot.session) return;
+    queueBusy = playlistId;
+    queueError = null;
+    try {
+      const res = await fetch(`/api/playlists/${playlistId}/load`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: snapshot.session.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? `Load failed (${res.status})`);
+      snapshot = body as SessionSnapshot;
+    } catch (err) {
+      queueError = err instanceof Error ? err.message : "Load failed";
+    } finally {
+      queueBusy = null;
+    }
   }
 
   $effect(() => {
@@ -285,7 +319,7 @@
       <h1 class="text-3xl font-semibold tracking-tight">Session</h1>
       <p class="mt-1 text-sm text-muted-foreground">
         Catalogue queue · parallel play on every joined device ·
-        <a class="text-signal hover:underline" href="/library">Library</a>
+        <a class="text-signal hover:underline" href="/catalogue">Catalogue</a>
       </p>
     </div>
     {#if !sessionLive}
@@ -373,8 +407,30 @@
           {/if}
         </ul>
 
+        {#if playlists.length > 0}
+          <h2 class="pt-1 font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Zap playlists</h2>
+          <ul class="space-y-1 rounded-lg border border-border/70 bg-card/20 p-2">
+            {#each playlists as pl (pl.id)}
+              <li class="flex items-center justify-between gap-2 px-2 py-1.5">
+                <div class="min-w-0">
+                  <p class="truncate text-sm">{pl.name}</p>
+                  <p class="font-mono text-[10px] text-muted-foreground">{pl.trackCount} tracks</p>
+                </div>
+                <button
+                  type="button"
+                  class="shrink-0 rounded border border-signal/40 px-2 py-1 font-mono text-[10px] text-signal hover:bg-signal/10 disabled:opacity-40"
+                  disabled={!snapshot.me?.canAdd || queueBusy !== null || pl.trackCount === 0}
+                  onclick={() => void loadPlaylist(pl.id)}
+                >
+                  Load
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+
         {#if savedQueues.length > 0}
-          <h2 class="pt-1 font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Saved queues</h2>
+          <h2 class="pt-1 font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Saved queues (snapshots)</h2>
           <ul class="space-y-1 rounded-lg border border-border/70 bg-card/20 p-2">
             {#each savedQueues as sq (sq.id)}
               <li class="flex items-center justify-between gap-2 px-2 py-1.5">
@@ -406,36 +462,19 @@
       </div>
 
       <div class="space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Add from catalogue</h2>
-          <div class="flex gap-1">
-            <button
-              type="button"
-              class={`rounded px-2 py-1 font-mono text-[10px] ${scope === "all" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
-              onclick={() => {
-                scope = "all";
-                void fetchCatalogue({ reset: true });
-              }}>All</button
-            >
-            <button
-              type="button"
-              class={`rounded px-2 py-1 font-mono text-[10px] ${scope === "yours" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
-              onclick={() => {
-                scope = "yours";
-                void fetchCatalogue({ reset: true });
-              }}>Your library</button
-            >
-          </div>
+        <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Add from catalogue</h2>
+        <div class={!snapshot.me?.canAdd ? "pointer-events-none opacity-50" : ""}>
+          <CatalogueFilters
+            compact
+            bind:scope
+            bind:q
+            bind:tagQuery
+            bind:selectedTagIds
+            availableTags={data.availableTags}
+            {tagQueryError}
+            onchange={() => void fetchCatalogue({ reset: true })}
+          />
         </div>
-        <input
-          class="auth-field"
-          type="search"
-          placeholder="Search catalogue…"
-          bind:value={q}
-          oninput={onSearchInput}
-          autocomplete="off"
-          disabled={!snapshot.me?.canAdd}
-        />
         {#if queueError}
           <p class="auth-error">{queueError}</p>
         {/if}

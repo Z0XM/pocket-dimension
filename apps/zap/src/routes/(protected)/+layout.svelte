@@ -9,9 +9,13 @@
   let { data, children }: { data: LayoutData; children: import("svelte").Snippet } = $props();
 
   const path = $derived(page.url.pathname);
-  const libraryActive = $derived(path === "/library" || path.startsWith("/library/"));
+  const homeActive = $derived(path === "/home");
+  const catalogueActive = $derived(path === "/catalogue" || path.startsWith("/catalogue/"));
+  const playlistsActive = $derived(path === "/playlists" || path.startsWith("/playlists/"));
+  const addActive = $derived(path === "/add" || path.startsWith("/add/"));
+  const historyActive = $derived(path === "/history" || path.startsWith("/history/"));
   const joinActive = $derived(path === "/join" || path.startsWith("/join/"));
-  const sessionActive = $derived(path.startsWith("/session/"));
+  const sessionActive = $derived(path === "/session" || path.startsWith("/session/"));
 
   async function signOut() {
     await authClient.signOut();
@@ -21,16 +25,24 @@
 
 <div class="zap-wave-field zap-grid min-h-screen">
   <header class="border-b border-border/60 bg-background/70 backdrop-blur">
-    <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-4">
-      <a href="/" class="flex items-center gap-3">
+    <div class="mx-auto flex max-w-5xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <a href="/home" class="flex items-center gap-3">
         <span class="text-xl font-semibold tracking-tight text-foreground">Zap</span>
         <WaveBars />
       </a>
-      <div class="flex flex-wrap items-center justify-end gap-2 font-mono text-xs sm:gap-3">
-        <a href="/library" class={`zap-nav-link ${libraryActive ? "zap-nav-link-active" : ""}`} aria-current={libraryActive ? "page" : undefined}>
-          Library
-        </a>
-        <a href="/join" class={`zap-nav-link ${joinActive ? "zap-nav-link-active" : ""}`} aria-current={joinActive ? "page" : undefined}> Join </a>
+      <nav class="flex flex-wrap items-center gap-1 font-mono text-[11px] sm:gap-2" aria-label="Primary">
+        <a href="/home" class={`zap-nav-link ${homeActive ? "zap-nav-link-active" : ""}`} aria-current={homeActive ? "page" : undefined}>Home</a>
+        <a
+          href="/catalogue"
+          class={`zap-nav-link ${catalogueActive ? "zap-nav-link-active" : ""}`}
+          aria-current={catalogueActive ? "page" : undefined}>Catalogue</a
+        >
+        <a
+          href="/playlists"
+          class={`zap-nav-link ${playlistsActive ? "zap-nav-link-active" : ""}`}
+          aria-current={playlistsActive ? "page" : undefined}>Playlists</a
+        >
+        <a href="/add" class={`zap-nav-link ${addActive ? "zap-nav-link-active" : ""}`} aria-current={addActive ? "page" : undefined}>Add</a>
         <StartSessionButton
           label="Session"
           class={`text-[11px] disabled:opacity-40 ${
@@ -39,11 +51,16 @@
               : "rounded border border-signal/40 bg-signal/10 px-2 py-1 text-signal hover:bg-signal/20"
           }`}
         />
+        <span class="mx-1 hidden text-border sm:inline" aria-hidden="true">|</span>
+        <a href="/history" class={`zap-nav-link ${historyActive ? "zap-nav-link-active" : ""}`} aria-current={historyActive ? "page" : undefined}
+          >History</a
+        >
+        <a href="/join" class={`zap-nav-link ${joinActive ? "zap-nav-link-active" : ""}`} aria-current={joinActive ? "page" : undefined}>Join</a>
         <span class="hidden text-muted-foreground sm:inline">{data.user?.username ?? data.user?.email}</span>
         <button type="button" class="rounded border border-border px-2 py-1 text-muted-foreground hover:bg-secondary" onclick={signOut}>
           Sign out
         </button>
-      </div>
+      </nav>
     </div>
   </header>
   <main class="mx-auto max-w-5xl px-6 py-8">

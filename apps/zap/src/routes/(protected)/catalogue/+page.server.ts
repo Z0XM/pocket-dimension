@@ -1,0 +1,85 @@
+import { fail } from "@sveltejs/kit";
+import { db, schema } from "@pocket-dimension/db";
+import { eq } from "drizzle-orm";
+import type { Actions, PageServerLoad } from "./$types";
+import {
+  CATALOGUE_PAGE_SIZE,
+  ensureCustomTag,
+  ensureSystemTags,
+  listAvailableTags,
+  listCatalogue,
+  serializeCatalogueAsset,
+  setUserAssetTags,
+} from "$lib/server/catalogue";
+import { listSuggestionsFromOthers } from "$lib/server/suggestions";
+
+function readTagIds(form: FormData): string[] {
+  return form
+    .getAll("tagIds")
+    .map((v) => String(v).trim())
+    .filter(Boolean);
+}
+
+export const load: PageServerLoad = async ({ locals, url }) => {
+  const userId = locals.user!.id;
+  await ensureSystemTags();
+
+  const scope = url.searchParams.get("scope") === "yours" ? "yours" : "all";
+  const q = url.searchParams.get("q") ?? "";
+  const tagIds = url.searchParams.getAll("tag").filter(Boolean);
+  const tagQuery = url.searchParams.get("tq") ?? "";
+
+  const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, availableTags, suggestions] = await Promise.all([
+    listCatalogue({
+      userId,
+      scope,
+      q,
+      tagIds: tagQuery.trim() ? [] : tagIds,
+      tagQuery,
+      offset: 0,
+      limit: CATALOGUE_PAGE_SIZE,
+    }),
+    listAvailableTags(userId),
+    listSuggestionsFromOthers(userId, 12),
+  ]);
+
+  return {
+    scope,
+    q,
+    selectedTagIds: tagIds,
+    tagQuery,
+    tagQueryError: tagQueryError ?? null,
+    pageSize: CATALOGUE_PAGE_SIZE,
+    hasMore,
+    nextOffset,
+    availableTags: availableTags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
+    assets: assets.map((asset) => serializeCatalogueAsset(asset, tagsByAsset.get(asset.id) ?? [])),
+    suggestions,
+  };
+};
+
+export const actions: Actions = {
+  setTags: async ({ request, locals }) => {
+    const userId = locals.user!.id;
+    const form = await request.formData();
+    const mediaAssetId = String(form.get("mediaAssetId") ?? "").trim();
+    const tagIds = readTagIds(form);
+    const customTagName = String(form.get("customTag") ?? "").trim();
+
+    if (!mediaAssetId) return fail(400, { tagError: "Missing track." });
+
+    const asset = await db.query.mediaAssets.findFirst({
+      where: eq(schema.mediaAssets.id, mediaAssetId),
+    });
+    if (!asset || asset.status !== "ready") return fail(404, { tagError: "Track not found." });
+
+    const nextTagIds = [...tagIds];
+    if (customTagName) {
+      const custom = await ensureCustomTag(userId, customTagName);
+      if (custom) nextTagIds.push(custom.id);
+    }
+
+    await setUserAssetTags(userId, mediaAssetId, nextTagIds);
+    return { tagOk: true, mediaAssetId };
+  },
+};

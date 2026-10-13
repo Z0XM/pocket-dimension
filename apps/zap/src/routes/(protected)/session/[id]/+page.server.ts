@@ -12,17 +12,20 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
     const q = url.searchParams.get("q")?.trim() ?? "";
     const scope = url.searchParams.get("scope") === "yours" ? "yours" : "all";
     const selectedTagIds = url.searchParams.getAll("tag").filter(Boolean);
+    const tagQuery = url.searchParams.get("tq") ?? "";
 
-    const [{ assets, tagsByAsset, hasMore, nextOffset }, availableTags] = await Promise.all([
+    const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, availableTags, playlists] = await Promise.all([
       listCatalogue({
         userId: locals.user.id,
         scope,
         q,
-        tagIds: selectedTagIds,
+        tagIds: tagQuery.trim() ? [] : selectedTagIds,
+        tagQuery,
         limit: CATALOGUE_PAGE_SIZE,
         offset: 0,
       }),
       listAvailableTags(locals.user.id),
+      import("$lib/server/playlists").then((m) => m.listPlaylistsForUser(locals.user!.id)),
     ]);
 
     return {
@@ -35,6 +38,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
       catalogueQ: q,
       catalogueScope: scope,
       selectedTagIds,
+      catalogueTagQuery: tagQuery,
+      catalogueTagQueryError: tagQueryError ?? null,
+      playlists: playlists.map((p) => ({ id: p.id, name: p.name, trackCount: p.trackCount })),
     };
   } catch (err) {
     if (err instanceof SessionError) {

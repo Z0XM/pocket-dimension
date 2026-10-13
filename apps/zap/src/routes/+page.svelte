@@ -1,9 +1,17 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
   import type { LayoutData } from "./$types";
+  import { onMount } from "svelte";
 
   let { data }: { data: LayoutData } = $props();
+
+  onMount(() => {
+    if (data.user?.emailVerified) {
+      void goto("/home", { replaceState: true });
+    }
+  });
 </script>
 
 <main class="zap-wave-field zap-grid relative min-h-screen overflow-hidden">
@@ -16,16 +24,20 @@
     </div>
     <div class="mt-10 flex flex-wrap gap-3">
       {#if data.user}
-        <StartSessionButton class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40" />
+        {#if data.user.emailVerified}
+          <a href="/home" class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90">Home</a>
+        {:else}
+          <a href="/check-email?reason=verify" class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">Verify email</a>
+        {/if}
+        <StartSessionButton class="rounded border border-border px-5 py-2.5 text-sm text-muted-foreground hover:bg-secondary/40" />
         <a href="/join" class="rounded border border-border bg-secondary/60 px-5 py-2.5 text-sm text-secondary-foreground hover:bg-secondary">
           Join
         </a>
-        <a href="/library" class="rounded border border-border px-5 py-2.5 text-sm text-muted-foreground hover:bg-secondary/40"> Library </a>
-        <a href="/library?tab=upload" class="rounded border border-border px-5 py-2.5 text-sm text-muted-foreground hover:bg-secondary/40">
-          Add music
-        </a>
+        <a href="/catalogue" class="rounded border border-border px-5 py-2.5 text-sm text-muted-foreground hover:bg-secondary/40"> Catalogue </a>
       {:else}
-        <a href="/login?redirect=/" class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"> Sign in </a>
+        <a href="/login?redirect=/home" class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90">
+          Sign in
+        </a>
         <a href="/sign-up" class="rounded border border-border bg-secondary/60 px-5 py-2.5 text-sm text-secondary-foreground hover:bg-secondary">
           Create account
         </a>
@@ -33,7 +45,7 @@
     </div>
     {#if data.user}
       <p class="mt-6 max-w-lg font-mono text-[11px] leading-relaxed text-muted-foreground">
-        Session = play with guests · Library → Add = upload / public URL / Connect YouTube · Discord sink = attach inside a live session.
+        Home = resume/start · Catalogue = find & tag · Add = ingest · Playlists = Zap lists · Session = play with guests.
       </p>
     {/if}
   </div>

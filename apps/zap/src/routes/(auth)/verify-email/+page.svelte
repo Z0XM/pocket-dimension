@@ -40,7 +40,7 @@
         <p class="text-balance text-sm text-muted-foreground">You can continue to Zap.</p>
       </div>
       <div class="flex w-full flex-col gap-3">
-        <button type="button" class="auth-btn w-full" onclick={() => goto("/library")}> Open library </button>
+        <button type="button" class="auth-btn w-full" onclick={() => goto("/home")}> Open Zap </button>
         <button type="button" class="auth-btn-secondary border-border bg-background" onclick={() => window.close()}> Close window </button>
       </div>
     {/if}
