@@ -27,12 +27,14 @@ TURBO_FORCE=1 bun run build:shared:db
 TURBO_FORCE=1 bun run build:shared:auth
 TURBO_FORCE=1 bun run build:app:zap
 
-if [[ -n "${DATABASE_URL:-}" ]]; then
-  echo "Running database migrations..."
+# Prefer migrations at container start (scripts/start.sh) so schema stays current across restarts.
+# Optional build-time migrate when DATABASE_URL is present (e.g. CI smoke).
+if [[ -n "${DATABASE_URL:-}" && "${ZAP_MIGRATE_AT_BUILD:-}" == "1" ]]; then
+  echo "Running database migrations at build (ZAP_MIGRATE_AT_BUILD=1)..."
   bun db:migrate
 else
-  echo "Skipping db:migrate — DATABASE_URL is not set at build time."
-  echo "Run migrations manually before serving traffic."
+  echo "Migrations deferred to scripts/start.sh when DATABASE_URL is set at runtime."
 fi
 
 echo "Zap deploy build complete."
+echo "Production tip: use the fat Dockerfile (ffmpeg + yt-dlp + Deno). Railpack alone lacks those tools."
