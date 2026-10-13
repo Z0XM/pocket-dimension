@@ -113,6 +113,7 @@ export async function listCatalogue(input: CatalogueQuery) {
 
   const tagsByAsset = new Map<string, CatalogueTag[]>();
   if (assets.length > 0) {
+    // Custom tags are private: only system tags or tags owned by this user may appear.
     const links = await db
       .select({
         mediaAssetId: schema.mediaAssetTags.mediaAssetId,
@@ -126,7 +127,8 @@ export async function listCatalogue(input: CatalogueQuery) {
           inArray(
             schema.mediaAssetTags.mediaAssetId,
             assets.map((a) => a.id)
-          )
+          ),
+          or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, input.userId))
         )
       );
 

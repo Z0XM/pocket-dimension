@@ -6,6 +6,8 @@
   import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
+  import ZapSelect from "$lib/components/ZapSelect.svelte";
+  import { PLAYLIST_IMPORT_SORT_OPTIONS, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
   import type { ActionData, PageData } from "./$types";
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -38,6 +40,7 @@
   let ytTagPromptOpen = $state(false);
   let ytImportTagIds = $state<string[]>([]);
   let ytImportCustomTag = $state("");
+  let ytImportSort = $state<PlaylistImportSort>("playlist");
   let ytTagDialog = $state<HTMLDialogElement | null>(null);
   const ytBusy = $derived(ytPhase !== "idle");
   const addBusy = $derived(uploadBusy || ingestBusy || ytBusy);
@@ -242,6 +245,7 @@
           playlistIds: ytSelected,
           tagIds: ytImportTagIds,
           customTag: ytImportCustomTag.trim() || undefined,
+          sort: ytImportSort,
         }),
       });
       if (!res.ok) {
@@ -967,11 +971,20 @@
 >
   <div class="space-y-4 p-5">
     <div>
-      <h2 class="text-lg font-semibold tracking-tight">Tags for imported songs</h2>
+      <h2 class="text-lg font-semibold tracking-tight">Import options</h2>
       <p class="mt-2 text-sm text-muted-foreground">
-        These tags are added to every song imported from the selected playlist{ytSelected.length === 1 ? "" : "s"}. Optional — you can skip and import
-        without tags.
+        Choose sort order for songs from the selected playlist{ytSelected.length === 1 ? "" : "s"}, then optional tags applied to every imported
+        track.
       </p>
+    </div>
+    <div>
+      <p class="mb-1 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Sort order</p>
+      <ZapSelect
+        options={PLAYLIST_IMPORT_SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        bind:value={ytImportSort}
+        disabled={ytBusy}
+        placeholder="Sort order"
+      />
     </div>
     <div>
       <p class="mb-1 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Tags</p>
