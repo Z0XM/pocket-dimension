@@ -37,15 +37,25 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const scope = url.searchParams.get("scope") === "yours" ? "yours" : "all";
   const q = url.searchParams.get("q") ?? "";
   const tagIds = url.searchParams.getAll("tag").filter(Boolean);
+  const tagQuery = url.searchParams.get("tq") ?? "";
 
-  const [{ assets, tagsByAsset, hasMore, nextOffset }, availableTags, activity, playHistory, suggestions, savedQueues] = await Promise.all([
-    listCatalogue({ userId, scope, q, tagIds, offset: 0, limit: CATALOGUE_PAGE_SIZE }),
-    listAvailableTags(userId),
-    listUserLibraryActivity(userId, 50),
-    listPlayHistory(userId, 40),
-    listSuggestionsFromOthers(userId, 12),
-    listSavedQueues(userId, 20),
-  ]);
+  const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, availableTags, activity, playHistory, suggestions, savedQueues] =
+    await Promise.all([
+      listCatalogue({
+        userId,
+        scope,
+        q,
+        tagIds: tagQuery.trim() ? [] : tagIds,
+        tagQuery,
+        offset: 0,
+        limit: CATALOGUE_PAGE_SIZE,
+      }),
+      listAvailableTags(userId),
+      listUserLibraryActivity(userId, 50),
+      listPlayHistory(userId, 40),
+      listSuggestionsFromOthers(userId, 12),
+      listSavedQueues(userId, 20),
+    ]);
 
   const ytDlpReady = Boolean(await resolveYtDlpBin());
   const storageReady = isStorageConfigured();
@@ -57,6 +67,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     scope,
     q,
     selectedTagIds: tagIds,
+    tagQuery,
+    tagQueryError: tagQueryError ?? null,
     pageSize: CATALOGUE_PAGE_SIZE,
     hasMore,
     nextOffset,

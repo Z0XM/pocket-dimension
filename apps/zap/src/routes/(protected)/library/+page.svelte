@@ -25,6 +25,10 @@
   let scope = $state<"all" | "yours">("all");
   let q = $state("");
   let selected = $state<string[]>([]);
+  /** Nested boolean tag filter, e.g. `love and (soft not upbeat)`. Wins over chip AND. */
+  let tagQuery = $state("");
+  let tagQueryError = $state<string | null>(null);
+  let tagQueryInput = $state<HTMLInputElement | null>(null);
   let uploadTagIds = $state<string[]>([]);
   let uploadCustomTag = $state("");
   let uploadTitle = $state("");
@@ -152,11 +156,13 @@
   let hydratedKey = $state("");
 
   $effect(() => {
-    const key = `${data.scope}|${data.q}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
+    const key = `${data.scope}|${data.q}|${data.tagQuery}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
     if (key === hydratedKey) return;
     hydratedKey = key;
     scope = data.scope === "yours" ? "yours" : "all";
     q = data.q;
+    tagQuery = data.tagQuery ?? "";
+    tagQueryError = data.tagQueryError ?? null;
     selected = [...data.selectedTagIds];
     assets = data.assets.map((a) => ({ ...a, playable: Boolean(a.playable) }));
     hasMore = data.hasMore;
@@ -426,7 +432,12 @@
     const params = new URLSearchParams();
     if (scope === "yours") params.set("scope", "yours");
     if (q.trim()) params.set("q", q.trim());
-    for (const id of selected) params.append("tag", id);
+    const tq = tagQuery.trim();
+    if (tq) {
+      params.set("tq", tq);
+    } else {
+      for (const id of selected) params.append("tag", id);
+    }
     if (offset > 0) params.set("offset", String(offset));
     params.set("limit", String(data.pageSize));
     return params;
@@ -437,7 +448,12 @@
     if (tab === "upload" || tab === "history") params.set("tab", tab);
     if (scope === "yours") params.set("scope", "yours");
     if (q.trim()) params.set("q", q.trim());
-    for (const id of selected) params.append("tag", id);
+    const tq = tagQuery.trim();
+    if (tq) {
+      params.set("tq", tq);
+    } else {
+      for (const id of selected) params.append("tag", id);
+    }
     const qs = params.toString();
     const href = qs ? `${page.url.pathname}?${qs}` : page.url.pathname;
     replaceState(href, {});
@@ -472,6 +488,7 @@
     if (opts.reset) {
       loading = true;
       listError = null;
+      tagQueryError = null;
     } else {
       loadingMore = true;
     }
@@ -488,11 +505,13 @@
         assets: TrackItem[];
         hasMore: boolean;
         nextOffset: number;
+        tagQueryError?: string | null;
       };
       if (gen !== fetchGen) return;
       assets = opts.reset ? body.assets : [...assets, ...body.assets];
       hasMore = body.hasMore;
       nextOffset = body.nextOffset;
+      tagQueryError = body.tagQueryError ?? null;
       if (opts.reset) updateUrl();
     } catch (err) {
       if (gen !== fetchGen) return;
@@ -512,6 +531,46 @@
     }, 280);
   }
 
+  function onTagQueryInput() {
+    if (tagQuery.trim()) selected = [];
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      void fetchPage({ reset: true });
+    }, 320);
+  }
+
+  function clearTagQuery() {
+    if (!tagQuery && !tagQueryError) return;
+    tagQuery = "";
+    tagQueryError = null;
+    void fetchPage({ reset: true });
+  }
+
+  /** Insert a keyword or tag name into the query at the caret (or append). */
+  function insertIntoTagQuery(piece: string, { asToken = true }: { asToken?: boolean } = {}) {
+    const el = tagQueryInput;
+    const cur = tagQuery;
+    const start = el?.selectionStart ?? cur.length;
+    const end = el?.selectionEnd ?? cur.length;
+    const before = cur.slice(0, start);
+    const after = cur.slice(end);
+    const needsSpaceBefore = asToken && before.length > 0 && !/\s$/.test(before) && !/[(\[]$/.test(before);
+    const needsSpaceAfter = asToken && after.length > 0 && !/^\s/.test(after) && !/^[)\]]/.test(after);
+    const next = `${before}${needsSpaceBefore ? " " : ""}${piece}${needsSpaceAfter ? " " : ""}${after}`;
+    tagQuery = next;
+    selected = [];
+    queueMicrotask(() => {
+      if (!el) return;
+      const pos = before.length + (needsSpaceBefore ? 1 : 0) + piece.length + (needsSpaceAfter ? 1 : 0);
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      void fetchPage({ reset: true });
+    }, 320);
+  }
+
   function onScope(next: "all" | "yours") {
     if (scope === next) return;
     scope = next;
@@ -519,6 +578,12 @@
   }
 
   function toggleTag(id: string) {
+    // Nested query mode: chip inserts the tag name into the expression.
+    if (tagQuery.trim()) {
+      const tag = data.availableTags.find((t) => t.id === id);
+      if (tag) insertIntoTagQuery(tag.name);
+      return;
+    }
     selected = selected.includes(id) ? selected.filter((t) => t !== id) : [...selected, id];
     void fetchPage({ reset: true });
   }
@@ -547,8 +612,10 @@
       <h1 class="text-3xl font-semibold tracking-tight">Library</h1>
       <p class="mt-1 text-sm text-muted-foreground">
         Browse the catalogue, open <span class="font-mono text-signal">Add</span> for upload / URL / YouTube, or
-        <span class="font-mono text-signal">History</span> for past imports. Tag filters use
-        <span class="font-mono text-signal">AND</span>.
+        <span class="font-mono text-signal">History</span> for past imports. Tag chips AND together; use a tag query for
+        <span class="font-mono text-signal">and</span> /
+        <span class="font-mono text-signal">or</span> /
+        <span class="font-mono text-signal">not</span>.
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
@@ -615,7 +682,7 @@
   {#if tab === "browse"}
     <div class="space-y-4" role="tabpanel" id="panel-browse" aria-labelledby="tab-browse">
       <p class="text-sm text-muted-foreground">
-        Search and tag chips apply as you go. Scroll for more. Sessions play from this catalogue — Discord attaches inside a session.
+        Search and filters apply as you go. Scroll for more. Sessions play from this catalogue — Discord attaches inside a session.
       </p>
 
       {#if data.suggestions?.length}
@@ -649,11 +716,61 @@
 
         <input class="auth-field" type="search" placeholder="Search title or artists…" bind:value={q} oninput={onSearchInput} autocomplete="off" />
 
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <label class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase" for="tag-query"> Tag query </label>
+            <div class="flex flex-wrap gap-1">
+              {#each ["and", "or", "not", "(", ")"] as kw}
+                <button
+                  type="button"
+                  class="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-signal hover:text-signal"
+                  onclick={() => insertIntoTagQuery(kw)}
+                >
+                  {kw}
+                </button>
+              {/each}
+              {#if tagQuery.trim()}
+                <button
+                  type="button"
+                  class="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-signal hover:text-signal"
+                  onclick={clearTagQuery}
+                >
+                  clear
+                </button>
+              {/if}
+            </div>
+          </div>
+          <input
+            id="tag-query"
+            class="auth-field font-mono text-sm"
+            type="search"
+            placeholder="love and (soft not upbeat)"
+            bind:this={tagQueryInput}
+            bind:value={tagQuery}
+            oninput={onTagQueryInput}
+            autocomplete="off"
+            spellcheck="false"
+          />
+          {#if tagQueryError}
+            <p class="auth-error text-xs">{tagQueryError}</p>
+          {:else if tagQuery.trim()}
+            <p class="font-mono text-[10px] text-muted-foreground">Nested filter active — chips insert tag names into the query.</p>
+          {:else}
+            <p class="font-mono text-[10px] text-muted-foreground">Optional. Chips below AND together when this is empty.</p>
+          {/if}
+        </div>
+
         <div class="flex flex-wrap gap-2">
           {#each data.availableTags as tag}
             <button
               type="button"
-              class={`rounded-full border px-3 py-1 font-mono text-xs ${selected.includes(tag.id) ? "border-signal bg-signal/15 text-signal" : "border-border text-muted-foreground"}`}
+              class={`rounded-full border px-3 py-1 font-mono text-xs ${
+                tagQuery.trim()
+                  ? "border-border text-muted-foreground hover:border-signal hover:text-signal"
+                  : selected.includes(tag.id)
+                    ? "border-signal bg-signal/15 text-signal"
+                    : "border-border text-muted-foreground"
+              }`}
               onclick={() => toggleTag(tag.id)}
             >
               {tag.name}

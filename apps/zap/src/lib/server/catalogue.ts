@@ -1,5 +1,6 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { evaluateTagQuery, parseTagQuery, type TagQueryNode } from "$lib/tag-query";
 
 const SYSTEM_TAG_SEEDS = [
   { name: "slow", slug: "slow" },
@@ -38,8 +39,13 @@ export type CatalogueQuery = {
   userId: string;
   q?: string;
   scope?: CatalogueScope;
-  /** Tag ids that must ALL be present (AND). */
+  /** Tag ids that must ALL be present (AND). Ignored when `tagQuery` is set. */
   tagIds?: string[];
+  /**
+   * Nested boolean tag filter, e.g. `love and (soft not upbeat)`.
+   * Supports AND / OR / NOT and parentheses. Tag leaves match name or slug.
+   */
+  tagQuery?: string;
   /** `library` uses per-user sort keys (playlist import order). Default title. */
   order?: CatalogueOrder;
   /** 0-based page offset in items (not pages). */
@@ -47,24 +53,38 @@ export type CatalogueQuery = {
   limit?: number;
 };
 
+export type CatalogueListResult = {
+  assets: CatalogueAsset[];
+  tagsByAsset: Map<string, CatalogueTag[]>;
+  hasMore: boolean;
+  nextOffset: number;
+  tagQueryError?: string | null;
+  tagQueryAst?: TagQueryNode | null;
+};
+
 export type CatalogueAsset = typeof schema.mediaAssets.$inferSelect;
 export type CatalogueTag = typeof schema.tags.$inferSelect;
 
-export async function listCatalogue(input: CatalogueQuery) {
+export async function listCatalogue(input: CatalogueQuery): Promise<CatalogueListResult> {
   const scope = input.scope ?? "all";
   const q = input.q?.trim() ?? "";
   const tagIds = input.tagIds?.filter(Boolean) ?? [];
+  const tagQueryRaw = input.tagQuery?.trim() ?? "";
   const limit = Math.min(Math.max(input.limit ?? CATALOGUE_PAGE_SIZE, 1), 100);
   const offset = Math.max(input.offset ?? 0, 0);
 
-  const empty = {
+  const empty: CatalogueListResult = {
     assets: [] as CatalogueAsset[],
     tagsByAsset: new Map<string, CatalogueTag[]>(),
     hasMore: false,
     nextOffset: offset,
+    tagQueryError: null,
+    tagQueryAst: null,
   };
 
   let assetIds: string[] | null = null;
+  let tagQueryError: string | null = null;
+  let tagQueryAst: TagQueryNode | null = null;
 
   if (scope === "yours") {
     const tagged = await db
@@ -75,7 +95,58 @@ export async function listCatalogue(input: CatalogueQuery) {
     if (assetIds.length === 0) return empty;
   }
 
-  if (tagIds.length > 0) {
+  if (tagQueryRaw) {
+    const parsed = parseTagQuery(tagQueryRaw);
+    if (!parsed.ok) {
+      return { ...empty, tagQueryError: parsed.error };
+    }
+    tagQueryAst = parsed.ast;
+
+    // Universe for NOT: ready assets in current scope (or all ready).
+    const universeWhere = assetIds
+      ? and(eq(schema.mediaAssets.status, "ready"), inArray(schema.mediaAssets.id, assetIds))
+      : eq(schema.mediaAssets.status, "ready");
+    const universeRows = await db.select({ id: schema.mediaAssets.id }).from(schema.mediaAssets).where(universeWhere);
+    const universe = new Set(universeRows.map((r) => r.id));
+    if (universe.size === 0) return { ...empty, tagQueryAst };
+
+    const available = await listAvailableTags(input.userId);
+    const tagNameToId = new Map<string, string>();
+    for (const t of available) {
+      tagNameToId.set(t.name.toLowerCase(), t.id);
+      tagNameToId.set(t.slug.toLowerCase(), t.id);
+    }
+
+    const universeIds = [...universe];
+    const links =
+      universeIds.length === 0
+        ? []
+        : await db
+            .select({
+              mediaAssetId: schema.mediaAssetTags.mediaAssetId,
+              tagId: schema.mediaAssetTags.tagId,
+            })
+            .from(schema.mediaAssetTags)
+            .where(and(eq(schema.mediaAssetTags.userId, input.userId), inArray(schema.mediaAssetTags.mediaAssetId, universeIds)));
+
+    const tagsByAssetIds = new Map<string, Set<string>>();
+    for (const link of links) {
+      const set = tagsByAssetIds.get(link.mediaAssetId) ?? new Set<string>();
+      set.add(link.tagId);
+      tagsByAssetIds.set(link.mediaAssetId, set);
+    }
+
+    const evaluated = evaluateTagQuery(parsed.ast, {
+      universe,
+      tagsByAsset: tagsByAssetIds,
+      tagNameToId,
+    });
+    if (!evaluated.ok) {
+      return { ...empty, tagQueryError: evaluated.error, tagQueryAst };
+    }
+    assetIds = [...evaluated.assetIds];
+    if (assetIds.length === 0) return { ...empty, tagQueryAst };
+  } else if (tagIds.length > 0) {
     const rows = await db
       .select({
         mediaAssetId: schema.mediaAssetTags.mediaAssetId,
@@ -172,6 +243,8 @@ export async function listCatalogue(input: CatalogueQuery) {
     tagsByAsset,
     hasMore,
     nextOffset: offset + assets.length,
+    tagQueryError,
+    tagQueryAst,
   };
 }
 
