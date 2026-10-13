@@ -11,6 +11,9 @@ export type YtDlpProbe = {
   id: string;
   title: string;
   uploader: string | null;
+  description: string | null;
+  channelTitle: string | null;
+  channelId: string | null;
   durationMs: number | null;
   webpageUrl: string | null;
   extractor: string | null;
@@ -189,10 +192,28 @@ async function runYtDlpJson(extra: string[], label: string): Promise<Record<stri
 
 function probeFromJson(raw: Record<string, unknown>): YtDlpProbe {
   const durationSec = typeof raw.duration === "number" ? raw.duration : null;
+  const channelTitle =
+    raw.channel != null
+      ? String(raw.channel)
+      : raw.uploader != null
+        ? String(raw.uploader)
+        : raw.uploader_id != null
+          ? String(raw.uploader_id)
+          : null;
+  const channelId =
+    raw.channel_id != null
+      ? String(raw.channel_id)
+      : raw.uploader_id != null && String(raw.uploader_id).startsWith("UC")
+        ? String(raw.uploader_id)
+        : null;
+  const description = raw.description != null ? String(raw.description) : null;
   return {
     id: String(raw.id ?? ""),
     title: String(raw.title ?? "Untitled"),
-    uploader: raw.uploader != null ? String(raw.uploader) : raw.channel != null ? String(raw.channel) : null,
+    uploader: raw.uploader != null ? String(raw.uploader) : channelTitle,
+    description: description && description.length > 0 ? description.slice(0, 16_000) : null,
+    channelTitle,
+    channelId,
     durationMs: durationSec != null && Number.isFinite(durationSec) ? Math.round(durationSec * 1000) : null,
     webpageUrl: raw.webpage_url != null ? String(raw.webpage_url) : null,
     extractor: raw.extractor != null ? String(raw.extractor) : null,

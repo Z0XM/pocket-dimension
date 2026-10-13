@@ -16,7 +16,9 @@ export type ZapYouTubePlaylist = {
 export type ZapYouTubePlaylistItem = {
   videoId: string;
   title: string;
+  description: string | null;
   channelTitle: string | null;
+  channelId: string | null;
   durationMs: number | null;
   url: string;
 };
@@ -230,7 +232,10 @@ export async function listYouTubePlaylistItems(userId: string, playlistId: strin
       items?: Array<{
         snippet?: {
           title?: string;
+          description?: string;
           channelTitle?: string;
+          videoOwnerChannelTitle?: string;
+          videoOwnerChannelId?: string;
           resourceId?: { videoId?: string };
         };
         contentDetails?: { videoId?: string };
@@ -242,11 +247,14 @@ export async function listYouTubePlaylistItems(userId: string, playlistId: strin
     for (const item of body.items ?? []) {
       const videoId = item.contentDetails?.videoId ?? item.snippet?.resourceId?.videoId;
       if (!videoId) continue;
+      const ownerTitle = item.snippet?.videoOwnerChannelTitle ?? item.snippet?.channelTitle;
       pageIds.push(videoId);
       pageRows.push({
         videoId,
         title: youtubeText(item.snippet?.title, "Untitled"),
-        channelTitle: item.snippet?.channelTitle ? youtubeText(item.snippet.channelTitle, "") : null,
+        description: item.snippet?.description != null ? youtubeText(item.snippet.description, "") || null : null,
+        channelTitle: ownerTitle ? youtubeText(ownerTitle, "") || null : null,
+        channelId: item.snippet?.videoOwnerChannelId?.trim() || null,
         durationMs: null,
         url: `https://www.youtube.com/watch?v=${videoId}`,
       });

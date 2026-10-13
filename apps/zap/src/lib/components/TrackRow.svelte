@@ -9,6 +9,9 @@
     id: string;
     title: string;
     artists: string | null;
+    description?: string | null;
+    channelTitle?: string | null;
+    channelId?: string | null;
     durationMs: number | null;
     sourceType: string;
     playable: boolean;

@@ -162,6 +162,11 @@ export async function importConnectedPlaylists(
           url: job.entry.url,
           identityKey,
           titleHint: job.entry.title,
+          metaHints: {
+            description: job.entry.description,
+            channelTitle: job.entry.channelTitle,
+            channelId: job.entry.channelId,
+          },
           onSongProgress: async (song) => {
             activeSongs.set(identityKey, song);
             await publish({ currentTitle: song.title ?? job.entry.title });
