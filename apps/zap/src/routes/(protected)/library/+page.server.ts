@@ -15,7 +15,10 @@ import {
 } from "$lib/server/catalogue";
 import { IngestError, ingestPublicUrl, resolveYtDlpBin } from "$lib/server/ingest";
 import { MAX_TRACK_DURATION_MS } from "$lib/server/ingest/limits";
+import { listPlayHistory } from "$lib/server/play-history";
+import { listSavedQueues } from "$lib/server/saved-queues";
 import { describeStorageConfig, isStorageConfigured, putMediaObject } from "$lib/server/storage";
+import { listSuggestionsFromOthers } from "$lib/server/suggestions";
 import { getYoutubeLinkStatus, isGoogleOAuthConfigured } from "$lib/server/youtube";
 
 const MAX_DURATION_MS = MAX_TRACK_DURATION_MS;
@@ -34,12 +37,25 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const scope = url.searchParams.get("scope") === "yours" ? "yours" : "all";
   const q = url.searchParams.get("q") ?? "";
   const tagIds = url.searchParams.getAll("tag").filter(Boolean);
+  const tagQuery = url.searchParams.get("tq") ?? "";
 
-  const [{ assets, tagsByAsset, hasMore, nextOffset }, availableTags, activity] = await Promise.all([
-    listCatalogue({ userId, scope, q, tagIds, offset: 0, limit: CATALOGUE_PAGE_SIZE }),
-    listAvailableTags(userId),
-    listUserLibraryActivity(userId, 50),
-  ]);
+  const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, availableTags, activity, playHistory, suggestions, savedQueues] =
+    await Promise.all([
+      listCatalogue({
+        userId,
+        scope,
+        q,
+        tagIds: tagQuery.trim() ? [] : tagIds,
+        tagQuery,
+        offset: 0,
+        limit: CATALOGUE_PAGE_SIZE,
+      }),
+      listAvailableTags(userId),
+      listUserLibraryActivity(userId, 50),
+      listPlayHistory(userId, 40),
+      listSuggestionsFromOthers(userId, 12),
+      listSavedQueues(userId, 20),
+    ]);
 
   const ytDlpReady = Boolean(await resolveYtDlpBin());
   const storageReady = isStorageConfigured();
@@ -51,6 +67,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     scope,
     q,
     selectedTagIds: tagIds,
+    tagQuery,
+    tagQueryError: tagQueryError ?? null,
     pageSize: CATALOGUE_PAGE_SIZE,
     hasMore,
     nextOffset,
@@ -64,6 +82,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     availableTags: availableTags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
     assets: assets.map((asset) => serializeCatalogueAsset(asset, tagsByAsset.get(asset.id) ?? [])),
     activity,
+    playHistory,
+    suggestions,
+    savedQueues,
   };
 };
 

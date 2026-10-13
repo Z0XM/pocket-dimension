@@ -9,14 +9,16 @@ export const GET: RequestHandler = async ({ locals, url }) => {
   const scope = url.searchParams.get("scope") === "yours" ? "yours" : "all";
   const q = url.searchParams.get("q") ?? "";
   const tagIds = url.searchParams.getAll("tag").filter(Boolean);
+  const tagQuery = url.searchParams.get("tq") ?? "";
   const offset = Number(url.searchParams.get("offset") ?? "0");
   const limit = Number(url.searchParams.get("limit") ?? String(CATALOGUE_PAGE_SIZE));
 
-  const { assets, tagsByAsset, hasMore, nextOffset } = await listCatalogue({
+  const { assets, tagsByAsset, hasMore, nextOffset, tagQueryError } = await listCatalogue({
     userId: locals.user.id,
     scope,
     q,
-    tagIds,
+    tagIds: tagQuery.trim() ? [] : tagIds,
+    tagQuery,
     offset: Number.isFinite(offset) ? offset : 0,
     limit: Number.isFinite(limit) ? limit : CATALOGUE_PAGE_SIZE,
   });
@@ -25,6 +27,8 @@ export const GET: RequestHandler = async ({ locals, url }) => {
     scope,
     q,
     selectedTagIds: tagIds,
+    tagQuery,
+    tagQueryError: tagQueryError ?? null,
     hasMore,
     nextOffset,
     assets: assets.map((asset) => serializeCatalogueAsset(asset, tagsByAsset.get(asset.id) ?? [])),

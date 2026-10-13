@@ -172,6 +172,10 @@
     return () => io.disconnect();
   });
 
+  let saveBusy = $state(false);
+  let savedQueues = $state<{ id: string; name: string; trackCount: number; titles: string[] }[]>([]);
+  let savedQueuesLoaded = $state(false);
+
   async function enqueue(mediaAssetId: string) {
     if (!snapshot.session) return;
     queueBusy = mediaAssetId;
@@ -192,6 +196,85 @@
       queueBusy = null;
     }
   }
+
+  async function queueAction(payload: Record<string, unknown>) {
+    if (!snapshot.session) return;
+    queueBusy = "queue-action";
+    queueError = null;
+    try {
+      const res = await fetch(`/api/sessions/${snapshot.session.id}/queue`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? `Queue update failed (${res.status})`);
+      snapshot = body as SessionSnapshot;
+    } catch (err) {
+      queueError = err instanceof Error ? err.message : "Queue update failed";
+    } finally {
+      queueBusy = null;
+    }
+  }
+
+  async function loadSavedQueues() {
+    try {
+      const res = await fetch("/api/saved-queues", { credentials: "same-origin" });
+      if (!res.ok) return;
+      const body = (await res.json()) as { queues: typeof savedQueues };
+      savedQueues = body.queues ?? [];
+      savedQueuesLoaded = true;
+    } catch {
+      // soft-fail
+    }
+  }
+
+  async function saveCurrentQueue() {
+    if (!snapshot.session || snapshot.queue.length === 0) return;
+    saveBusy = true;
+    queueError = null;
+    try {
+      const res = await fetch("/api/saved-queues", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: snapshot.session.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? `Save failed (${res.status})`);
+      await loadSavedQueues();
+    } catch (err) {
+      queueError = err instanceof Error ? err.message : "Save failed";
+    } finally {
+      saveBusy = false;
+    }
+  }
+
+  async function loadSavedIntoSession(savedId: string) {
+    if (!snapshot.session) return;
+    queueBusy = savedId;
+    queueError = null;
+    try {
+      const res = await fetch(`/api/saved-queues/${savedId}/load`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: snapshot.session.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? `Load failed (${res.status})`);
+      snapshot = body as SessionSnapshot;
+    } catch (err) {
+      queueError = err instanceof Error ? err.message : "Load failed";
+    } finally {
+      queueBusy = null;
+    }
+  }
+
+  $effect(() => {
+    if (sessionLive && !savedQueuesLoaded) void loadSavedQueues();
+  });
 </script>
 
 <audio bind:this={audioEl} preload="auto" class="hidden"></audio>
@@ -221,17 +304,64 @@
   {#if sessionLive}
     <div class="grid gap-6 lg:grid-cols-2">
       <div class="space-y-3">
-        <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Queue</h2>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Queue</h2>
+          <div class="flex flex-wrap gap-1">
+            <button
+              type="button"
+              class="rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:bg-secondary/60 disabled:opacity-40"
+              disabled={!snapshot.me?.canAdd || snapshot.queue.length === 0 || saveBusy || queueBusy !== null}
+              onclick={() => void saveCurrentQueue()}
+            >
+              {saveBusy ? "Saving…" : "Save for later"}
+            </button>
+            <button
+              type="button"
+              class="rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:bg-secondary/60 disabled:opacity-40"
+              disabled={(!snapshot.me?.canAdd && !snapshot.me?.canControl) || snapshot.queue.length === 0 || queueBusy !== null}
+              onclick={() => void queueAction({ action: "clear" })}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
         <ul bind:this={queueScrollRoot} class="max-h-96 divide-y divide-border/50 overflow-y-auto rounded-lg border border-border/70 bg-card/30">
           {#if snapshot.queue.length === 0}
             <li class="px-4 py-8 text-center text-sm text-muted-foreground">Queue empty — add from catalogue.</li>
           {:else}
             {#each visibleQueue as item (item.id)}
-              <li class={`px-4 py-3 ${item.id === snapshot.currentItem?.id ? "bg-signal/10" : ""}`}>
-                <p class="truncate font-medium">{item.title}</p>
-                <p class="font-mono text-[11px] text-muted-foreground">
-                  {item.artists ?? "Unknown"} · added by {item.addedByDisplayName}
-                </p>
+              <li class={`flex items-start justify-between gap-2 px-3 py-2.5 ${item.id === snapshot.currentItem?.id ? "bg-signal/10" : ""}`}>
+                <div class="min-w-0">
+                  <p class="truncate font-medium">{item.title}</p>
+                  <p class="font-mono text-[11px] text-muted-foreground">
+                    {item.artists ?? "Unknown"} · added by {item.addedByDisplayName}
+                  </p>
+                </div>
+                {#if snapshot.me?.canAdd || snapshot.me?.canControl}
+                  <div class="flex shrink-0 gap-0.5">
+                    <button
+                      type="button"
+                      class="rounded px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-secondary disabled:opacity-30"
+                      disabled={queueBusy !== null}
+                      onclick={() => void queueAction({ action: "move", queueItemId: item.id, direction: "up" })}
+                      aria-label="Move up">↑</button
+                    >
+                    <button
+                      type="button"
+                      class="rounded px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-secondary disabled:opacity-30"
+                      disabled={queueBusy !== null}
+                      onclick={() => void queueAction({ action: "move", queueItemId: item.id, direction: "down" })}
+                      aria-label="Move down">↓</button
+                    >
+                    <button
+                      type="button"
+                      class="rounded px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-secondary disabled:opacity-30"
+                      disabled={queueBusy !== null}
+                      onclick={() => void queueAction({ action: "remove", queueItemId: item.id })}
+                      aria-label="Remove">×</button
+                    >
+                  </div>
+                {/if}
               </li>
             {/each}
             <li bind:this={queueSentinel} class="h-4 list-none" aria-hidden="true"></li>
@@ -242,6 +372,28 @@
             {/if}
           {/if}
         </ul>
+
+        {#if savedQueues.length > 0}
+          <h2 class="pt-1 font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Saved queues</h2>
+          <ul class="space-y-1 rounded-lg border border-border/70 bg-card/20 p-2">
+            {#each savedQueues as sq (sq.id)}
+              <li class="flex items-center justify-between gap-2 px-2 py-1.5">
+                <div class="min-w-0">
+                  <p class="truncate text-sm">{sq.name}</p>
+                  <p class="font-mono text-[10px] text-muted-foreground">{sq.trackCount} tracks</p>
+                </div>
+                <button
+                  type="button"
+                  class="shrink-0 rounded border border-signal/40 px-2 py-1 font-mono text-[10px] text-signal hover:bg-signal/10 disabled:opacity-40"
+                  disabled={!snapshot.me?.canAdd || queueBusy !== null}
+                  onclick={() => void loadSavedIntoSession(sq.id)}
+                >
+                  Load
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
 
         <h2 class="pt-2 font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Members</h2>
         <ul class="flex flex-wrap gap-2">
