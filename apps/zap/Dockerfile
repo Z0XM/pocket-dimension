@@ -34,11 +34,15 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3013
+ENV HOST=0.0.0.0
+ENV BODY_SIZE_LIMIT=50M
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # ffmpeg + yt-dlp + Deno (YouTube EJS challenge solving for yt-dlp)
+# bash is required for scripts/start.sh (migrations + env defaults).
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
+    bash \
     ca-certificates \
     curl \
     ffmpeg \
@@ -70,9 +74,11 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/apps/zap/build ./apps/zap/build
 COPY --from=builder /app/apps/zap/package.json ./apps/zap/package.json
+COPY --from=builder /app/apps/zap/scripts ./apps/zap/scripts
 
 WORKDIR /app/apps/zap
 EXPOSE 3013
 
-# Env: DATABASE_URL, BETTER_AUTH_*, S3_*, optional YTDLP_COOKIES_B64 / YTDLP_COOKIES_FILE
-CMD ["bun", "./build/index.js"]
+# Migrations run when DATABASE_URL is set (scripts/start.sh).
+# Env: DATABASE_URL, BETTER_AUTH_*, ORIGIN, S3_*, optional Google/Discord/YTDLP cookies — see DEPLOY.md
+CMD ["bash", "scripts/start.sh"]

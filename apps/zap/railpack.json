@@ -15,7 +15,7 @@
       ],
       "deployOutputs": [
         {
-          "include": ["node_modules", "shared", "apps/zap/build", "apps/zap/package.json", "package.json", "bun.lock", "scripts"]
+          "include": ["node_modules", "shared", "apps/zap/build", "apps/zap/package.json", "apps/zap/scripts", "package.json", "bun.lock", "scripts"]
         }
       ]
     }
@@ -23,7 +23,10 @@
   "deploy": {
     "startCommand": "bash -c 'if [ -f package.json ] && grep -q \"\\\"workspaces\\\"\" package.json 2>/dev/null; then cd apps/zap && exec bun run start; else exec bun run start; fi'",
     "variables": {
-      "NODE_ENV": "production"
+      "NODE_ENV": "production",
+      "PORT": "3013",
+      "HOST": "0.0.0.0",
+      "BODY_SIZE_LIMIT": "50M"
     }
   }
 }

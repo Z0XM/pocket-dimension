@@ -70,7 +70,7 @@ If root directory is `apps/auth-service`, `railpack.json` is picked up automatic
 | zeo | 3008 | [apps/zeo/DEPLOY.md](./apps/zeo/DEPLOY.md) · [dokploy runbook](./apps/zeo/deploy/dokploy/README.md) |
 | markitdown | 3009 | [apps/markitdown/railpack.json](./apps/markitdown/railpack.json) |
 | heimdall | 3012 | [apps/heimdall/DEPLOY.md](./apps/heimdall/DEPLOY.md) |
-| zap | 3013 | [apps/zap/DEPLOY.md](./apps/zap/DEPLOY.md) |
+| zap | 3013 | [apps/zap/DEPLOY.md](./apps/zap/DEPLOY.md) — **prefer fat Dockerfile** (yt-dlp/ffmpeg/Deno); migrations on start |
 
 ## Database
 
