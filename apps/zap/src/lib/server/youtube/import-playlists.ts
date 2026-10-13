@@ -6,6 +6,7 @@ import { DURATION_CAP_MESSAGE, isOverDurationCap } from "$lib/server/ingest/limi
 import { mapPool, youtubeIngestConcurrency } from "$lib/server/ingest/map-pool";
 import { ingestCatalogueVideo, type IngestItemResult, type SyncRunResult } from "$lib/server/ingest/pipeline";
 import type { SongProgress } from "$lib/server/ingest/progress";
+import { setUserLibraryOrder } from "$lib/server/library-order";
 import { listYouTubePlaylistItems, listYouTubePlaylists, type ZapYouTubePlaylistItem } from "./api";
 import { parsePlaylistImportSort, sortPlaylistItemsForImport, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
 
@@ -219,12 +220,22 @@ export async function importConnectedPlaylists(
     items.length = 0;
     items.push(...orderedResults);
 
+    const orderedAssetIds = items
+      .filter((i): i is Extract<IngestItemResult, { mediaAssetId: string }> => i.status === "imported" || i.status === "reused")
+      .map((i) => i.mediaAssetId);
+    try {
+      await setUserLibraryOrder({ userId, mediaAssetIds: orderedAssetIds, syncRunId: run.id });
+    } catch (err) {
+      console.warn("[zap youtube import library order]", err);
+    }
+
     const summary = summarizeIngestItems(items);
     const summaryPayload = {
       playlists: uniqueIds.map((id, i) => ({ id, title: playlistTitles[i] ?? id })),
       playlistTitles,
       sort,
       orderedIdentityKeys: items.map((i) => i.identityKey),
+      orderedMediaAssetIds: orderedAssetIds,
       tagIds,
       items,
       failures: summary.failures,

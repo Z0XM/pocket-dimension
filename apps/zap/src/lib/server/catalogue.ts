@@ -32,12 +32,16 @@ export type CatalogueScope = "all" | "yours";
 
 export const CATALOGUE_PAGE_SIZE = 25;
 
+export type CatalogueOrder = "title" | "library";
+
 export type CatalogueQuery = {
   userId: string;
   q?: string;
   scope?: CatalogueScope;
   /** Tag ids that must ALL be present (AND). */
   tagIds?: string[];
+  /** `library` uses per-user sort keys (playlist import order). Default title. */
+  order?: CatalogueOrder;
   /** 0-based page offset in items (not pages). */
   offset?: number;
   limit?: number;
@@ -100,16 +104,40 @@ export async function listCatalogue(input: CatalogueQuery) {
     conditions.push(or(ilike(schema.mediaAssets.title, pattern), ilike(schema.mediaAssets.artists, pattern))!);
   }
 
-  const rows = await db
-    .select()
-    .from(schema.mediaAssets)
-    .where(and(...conditions))
-    .orderBy(asc(schema.mediaAssets.title), asc(schema.mediaAssets.id))
-    .limit(limit + 1)
-    .offset(offset);
+  const useLibraryOrder = (input.order ?? "title") === "library" || scope === "yours";
 
-  const hasMore = rows.length > limit;
-  const assets = hasMore ? rows.slice(0, limit) : rows;
+  let assets: CatalogueAsset[];
+  let hasMore: boolean;
+
+  if (useLibraryOrder) {
+    // Prefer durable per-user sort keys; untitled/unkeyed rows fall back after keyed ones.
+    const joined = await db
+      .select({
+        asset: schema.mediaAssets,
+        sortKey: schema.userLibraryEntries.sortKey,
+      })
+      .from(schema.mediaAssets)
+      .leftJoin(
+        schema.userLibraryEntries,
+        and(eq(schema.userLibraryEntries.mediaAssetId, schema.mediaAssets.id), eq(schema.userLibraryEntries.userId, input.userId))
+      )
+      .where(and(...conditions))
+      .orderBy(sql`${schema.userLibraryEntries.sortKey} asc nulls last`, asc(schema.mediaAssets.title), asc(schema.mediaAssets.id))
+      .limit(limit + 1)
+      .offset(offset);
+    hasMore = joined.length > limit;
+    assets = (hasMore ? joined.slice(0, limit) : joined).map((r) => r.asset);
+  } else {
+    const rows = await db
+      .select()
+      .from(schema.mediaAssets)
+      .where(and(...conditions))
+      .orderBy(asc(schema.mediaAssets.title), asc(schema.mediaAssets.id))
+      .limit(limit + 1)
+      .offset(offset);
+    hasMore = rows.length > limit;
+    assets = hasMore ? rows.slice(0, limit) : rows;
+  }
 
   const tagsByAsset = new Map<string, CatalogueTag[]>();
   if (assets.length > 0) {

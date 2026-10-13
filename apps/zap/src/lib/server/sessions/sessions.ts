@@ -1,11 +1,21 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { recordPlayEvent } from "$lib/server/play-history";
 import { sessionEventBus } from "./event-bus";
 import { isSessionIdle } from "./idle";
 import { generateJoinCode, normalizeJoinCode } from "./join-code";
 import { canAddToQueue, canControlTransport, canEndSession, canManageGuestPermissions } from "./permissions";
 import { buildSessionSnapshot } from "./snapshot";
 import type { SessionSnapshot } from "./types";
+
+async function recordCurrentTrackPlay(sessionId: string, userId: string, queueItemId: string | null | undefined) {
+  if (!queueItemId) return;
+  const item = await db.query.queueItems.findFirst({
+    where: eq(schema.queueItems.id, queueItemId),
+  });
+  if (!item) return;
+  await recordPlayEvent({ userId, sessionId, mediaAssetId: item.mediaAssetId });
+}
 
 export class SessionError extends Error {
   constructor(
@@ -246,6 +256,7 @@ export async function enqueueCatalogueTrack(sessionId: string, userId: string, m
       currentQueueItemId: item.id,
       positionMs: 0,
     });
+    await recordPlayEvent({ userId, sessionId, mediaAssetId });
   } else {
     await touchActivity(sessionId);
   }
@@ -272,11 +283,17 @@ export async function play(sessionId: string, userId: string): Promise<SessionSn
     currentId = first.id;
   }
 
+  const startingFresh = session.currentQueueItemId !== currentId || session.playbackState !== "playing";
+
   await bumpGeneration(sessionId, session.playbackGeneration, {
     playbackState: "playing",
     currentQueueItemId: currentId,
     positionMs: session.currentQueueItemId === currentId ? session.positionMs : 0,
   });
+
+  if (startingFresh) {
+    await recordCurrentTrackPlay(sessionId, userId, currentId);
+  }
 
   const snapshot = await publish(sessionId, userId);
   if (!snapshot) throw new SessionError("Session not found", 404);
@@ -348,7 +365,116 @@ export async function skip(sessionId: string, userId: string): Promise<SessionSn
       currentQueueItemId: next.id,
       positionMs: 0,
     });
+    await recordPlayEvent({ userId, sessionId, mediaAssetId: next.mediaAssetId });
   }
+
+  const snapshot = await publish(sessionId, userId);
+  if (!snapshot) throw new SessionError("Session not found", 404);
+  return snapshot;
+}
+
+export async function removeQueueItem(sessionId: string, userId: string, queueItemId: string): Promise<SessionSnapshot> {
+  const session = await requireLiveSession(sessionId);
+  const member = await requireMember(sessionId, userId);
+  const flags = { guestsCanAdd: session.guestsCanAdd, guestsCanControl: session.guestsCanControl };
+  if (!canAddToQueue(member.role, flags) && !canControlTransport(member.role, flags)) {
+    throw new SessionError("You can't change the queue", 403);
+  }
+
+  const item = await db.query.queueItems.findFirst({
+    where: and(eq(schema.queueItems.id, queueItemId), eq(schema.queueItems.sessionId, sessionId)),
+  });
+  if (!item) throw new SessionError("Queue item not found", 404);
+
+  const wasCurrent = session.currentQueueItemId === item.id;
+  await db.delete(schema.queueItems).where(eq(schema.queueItems.id, item.id));
+
+  // Compact positions after removal
+  const remaining = await db.query.queueItems.findMany({
+    where: eq(schema.queueItems.sessionId, sessionId),
+    orderBy: [asc(schema.queueItems.position)],
+  });
+  for (let i = 0; i < remaining.length; i++) {
+    if (remaining[i]!.position !== i) {
+      await db.update(schema.queueItems).set({ position: i }).where(eq(schema.queueItems.id, remaining[i]!.id));
+    }
+  }
+
+  if (wasCurrent) {
+    const next = remaining[0] ?? null;
+    if (!next) {
+      await bumpGeneration(sessionId, session.playbackGeneration, {
+        playbackState: "idle",
+        currentQueueItemId: null,
+        positionMs: 0,
+      });
+    } else {
+      await bumpGeneration(sessionId, session.playbackGeneration, {
+        playbackState: session.playbackState === "idle" ? "paused" : session.playbackState,
+        currentQueueItemId: next.id,
+        positionMs: 0,
+      });
+    }
+  } else {
+    await touchActivity(sessionId);
+  }
+
+  const snapshot = await publish(sessionId, userId);
+  if (!snapshot) throw new SessionError("Session not found", 404);
+  return snapshot;
+}
+
+export async function clearQueue(sessionId: string, userId: string): Promise<SessionSnapshot> {
+  const session = await requireLiveSession(sessionId);
+  const member = await requireMember(sessionId, userId);
+  const flags = { guestsCanAdd: session.guestsCanAdd, guestsCanControl: session.guestsCanControl };
+  if (!canAddToQueue(member.role, flags) && !canControlTransport(member.role, flags)) {
+    throw new SessionError("You can't change the queue", 403);
+  }
+
+  await db.delete(schema.queueItems).where(eq(schema.queueItems.sessionId, sessionId));
+  await bumpGeneration(sessionId, session.playbackGeneration, {
+    playbackState: "idle",
+    currentQueueItemId: null,
+    positionMs: 0,
+  });
+
+  const snapshot = await publish(sessionId, userId);
+  if (!snapshot) throw new SessionError("Session not found", 404);
+  return snapshot;
+}
+
+/** Move a queue item one step up or down. */
+export async function moveQueueItem(sessionId: string, userId: string, queueItemId: string, direction: "up" | "down"): Promise<SessionSnapshot> {
+  const session = await requireLiveSession(sessionId);
+  const member = await requireMember(sessionId, userId);
+  const flags = { guestsCanAdd: session.guestsCanAdd, guestsCanControl: session.guestsCanControl };
+  if (!canAddToQueue(member.role, flags) && !canControlTransport(member.role, flags)) {
+    throw new SessionError("You can't change the queue", 403);
+  }
+
+  const queue = await db.query.queueItems.findMany({
+    where: eq(schema.queueItems.sessionId, sessionId),
+    orderBy: [asc(schema.queueItems.position)],
+  });
+  const idx = queue.findIndex((q) => q.id === queueItemId);
+  if (idx < 0) throw new SessionError("Queue item not found", 404);
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= queue.length) {
+    await touchActivity(sessionId);
+    const snapshot = await publish(sessionId, userId);
+    if (!snapshot) throw new SessionError("Session not found", 404);
+    return snapshot;
+  }
+
+  const a = queue[idx]!;
+  const b = queue[swapIdx]!;
+  // Swap via temporary high position to avoid unique constraint clashes
+  const temp = 1_000_000 + a.position;
+  await db.update(schema.queueItems).set({ position: temp }).where(eq(schema.queueItems.id, a.id));
+  await db.update(schema.queueItems).set({ position: a.position }).where(eq(schema.queueItems.id, b.id));
+  await db.update(schema.queueItems).set({ position: b.position }).where(eq(schema.queueItems.id, a.id));
+  await touchActivity(sessionId);
 
   const snapshot = await publish(sessionId, userId);
   if (!snapshot) throw new SessionError("Session not found", 404);

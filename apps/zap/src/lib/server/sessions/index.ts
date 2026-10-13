@@ -15,6 +15,9 @@ export {
   pause,
   seek,
   skip,
+  removeQueueItem,
+  clearQueue,
+  moveQueueItem,
   endIdleSessions,
   findLiveSessionForUser,
 } from "./sessions";

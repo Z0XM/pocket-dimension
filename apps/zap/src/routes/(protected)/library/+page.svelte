@@ -618,6 +618,17 @@
         Search and tag chips apply as you go. Scroll for more. Sessions play from this catalogue — Discord attaches inside a session.
       </p>
 
+      {#if data.suggestions?.length}
+        <div class="space-y-2">
+          <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Suggested from others</h2>
+          <ul class="divide-y divide-border/50 rounded-lg border border-border/70 bg-card/30">
+            {#each data.suggestions as track (track.id)}
+              <TrackRow {track} availableTags={data.availableTags} bind:activeId bind:audioEl />
+            {/each}
+          </ul>
+        </div>
+      {/if}
+
       <div class="flex flex-col gap-4 rounded-lg border border-border/70 bg-card/50 p-4">
         <div class="flex flex-wrap gap-2">
           <button
@@ -680,7 +691,7 @@
         <p class="text-center font-mono text-[11px] text-muted-foreground">End of catalogue</p>
       {/if}
     </div>
-  {:else}
+  {:else if tab === "upload"}
     <div class="relative z-10 space-y-4 overflow-visible" role="tabpanel" id="panel-upload" aria-labelledby="tab-upload">
       <p class="text-sm text-muted-foreground">
         Add to the shared Zap catalogue (max 10 minutes per track). Connect YouTube for your playlists, paste a public URL, or upload a file.
@@ -912,49 +923,100 @@
   {/if}
 
   {#if tab === "history"}
-    <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" class="space-y-4">
-      <p class="text-sm text-muted-foreground">Your recent uploads and imports — when each song or playlist was added.</p>
-      {#if activity.length === 0}
-        <p class="rounded border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
-          No uploads or imports yet. Add music from the Add tab.
-        </p>
-      {:else}
-        <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
-          {#each activity as entry (entry.id)}
-            <li class="px-4 py-3">
-              <div class="flex flex-wrap items-baseline justify-between gap-2">
-                <span class="font-mono text-[10px] tracking-[0.14em] text-signal uppercase">
-                  {activityKindLabel(entry.kind)}
-                </span>
-                <time class="font-mono text-[11px] text-muted-foreground" datetime={entry.at}>
-                  {formatActivityWhen(entry.at)}
-                </time>
-              </div>
-              {#if entry.kind === "upload"}
-                <p class="mt-1 text-sm font-medium text-foreground">{entry.title}</p>
-              {:else}
-                <p class="mt-1 text-sm font-medium text-foreground">{entry.label}</p>
+    <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" class="space-y-8">
+      <div class="space-y-3">
+        <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Play history</h2>
+        {#if !data.playHistory?.length}
+          <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
+            Nothing played yet — start a session and hit play.
+          </p>
+        {:else}
+          <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
+            {#each data.playHistory as play (play.id)}
+              <li class="px-4 py-3">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                  <p class="text-sm font-medium">{play.title}</p>
+                  <time class="font-mono text-[11px] text-muted-foreground" datetime={play.at}>{formatActivityWhen(play.at)}</time>
+                </div>
                 <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                  {entry.status}
-                  · {entry.imported} imported
-                  {#if entry.skipped > 0}· {entry.skipped} skipped{/if}
-                  {#if entry.failed > 0}· {entry.failed} failed{/if}
+                  {play.artists ?? "Unknown"}
+                  {#if play.sessionId}
+                    · session{/if}
                 </p>
-                {#if entry.songTitles?.length}
-                  <ul class="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
-                    {#each entry.songTitles as title}
-                      <li class="truncate">{title}</li>
-                    {/each}
-                    {#if entry.imported > entry.songTitles.length}
-                      <li class="font-mono text-[10px]">+{entry.imported - entry.songTitles.length} more</li>
-                    {/if}
-                  </ul>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+
+      <div class="space-y-3">
+        <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Saved queues</h2>
+        {#if !data.savedQueues?.length}
+          <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
+            Save a session queue to replay it later.
+          </p>
+        {:else}
+          <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
+            {#each data.savedQueues as sq (sq.id)}
+              <li class="px-4 py-3">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                  <p class="text-sm font-medium">{sq.name}</p>
+                  <time class="font-mono text-[11px] text-muted-foreground" datetime={sq.createdAt}>{formatActivityWhen(sq.createdAt)}</time>
+                </div>
+                <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">{sq.trackCount} tracks</p>
+                {#if sq.titles?.length}
+                  <p class="mt-1 truncate text-xs text-muted-foreground">{sq.titles.join(" · ")}</p>
                 {/if}
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+
+      <div class="space-y-3">
+        <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Uploads & imports</h2>
+        {#if activity.length === 0}
+          <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
+            No uploads or imports yet. Add music from the Add tab.
+          </p>
+        {:else}
+          <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
+            {#each activity as entry (entry.id)}
+              <li class="px-4 py-3">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                  <span class="font-mono text-[10px] tracking-[0.14em] text-signal uppercase">
+                    {activityKindLabel(entry.kind)}
+                  </span>
+                  <time class="font-mono text-[11px] text-muted-foreground" datetime={entry.at}>
+                    {formatActivityWhen(entry.at)}
+                  </time>
+                </div>
+                {#if entry.kind === "upload"}
+                  <p class="mt-1 text-sm font-medium text-foreground">{entry.title}</p>
+                {:else}
+                  <p class="mt-1 text-sm font-medium text-foreground">{entry.label}</p>
+                  <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                    {entry.status}
+                    · {entry.imported} imported
+                    {#if entry.skipped > 0}· {entry.skipped} skipped{/if}
+                    {#if entry.failed > 0}· {entry.failed} failed{/if}
+                  </p>
+                  {#if entry.songTitles?.length}
+                    <ul class="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                      {#each entry.songTitles as title}
+                        <li class="truncate">{title}</li>
+                      {/each}
+                      {#if entry.imported > entry.songTitles.length}
+                        <li class="font-mono text-[10px]">+{entry.imported - entry.songTitles.length} more</li>
+                      {/if}
+                    </ul>
+                  {/if}
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
     </div>
   {/if}
 </section>

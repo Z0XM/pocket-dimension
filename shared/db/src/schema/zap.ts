@@ -271,3 +271,85 @@ export const sessionSinks = zapSchema.table(
       .where(sql`${table.type} = 'discord' AND ${table.detachedAt} IS NULL`),
   ]
 );
+
+/**
+ * Per-user catalogue order (playlist import order, manual placement later).
+ * Lower sortKey = earlier in “Your library” when ordered by library.
+ */
+export const userLibraryEntries = zapSchema.table(
+  "user_library_entries",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    mediaAssetId: uuid("media_asset_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "cascade" }),
+    sortKey: integer("sort_key").notNull().default(0),
+    sourceSyncRunId: uuid("source_sync_run_id").references(() => syncRuns.id, { onDelete: "set null" }),
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamp("updated_at")
+      .$default(() => sql`now()`)
+      .$onUpdate(() => sql`now()`)
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.mediaAssetId] }),
+    index("user_library_entries_user_sort_idx").on(table.userId, table.sortKey),
+  ]
+);
+
+/** Recorded plays for play-history UI. */
+export const playEvents = zapSchema.table(
+  "play_events",
+  {
+    id,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id").references(() => sessions.id, { onDelete: "set null" }),
+    mediaAssetId: uuid("media_asset_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "cascade" }),
+    playedAt: timestamp("played_at")
+      .$default(() => sql`now()`)
+      .notNull(),
+  },
+  (table) => [
+    index("play_events_user_id_played_at_idx").on(table.userId, table.playedAt),
+    index("play_events_media_asset_id_idx").on(table.mediaAssetId),
+  ]
+);
+
+/** Saved session queues for replay in another session. */
+export const savedQueues = zapSchema.table(
+  "saved_queues",
+  {
+    id,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    sourceSessionId: uuid("source_session_id").references(() => sessions.id, { onDelete: "set null" }),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [index("saved_queues_user_id_idx").on(table.userId)]
+);
+
+export const savedQueueItems = zapSchema.table(
+  "saved_queue_items",
+  {
+    id,
+    savedQueueId: uuid("saved_queue_id")
+      .notNull()
+      .references(() => savedQueues.id, { onDelete: "cascade" }),
+    mediaAssetId: uuid("media_asset_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "restrict" }),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    uniqueIndex("saved_queue_items_queue_position_unique").on(table.savedQueueId, table.position),
+    index("saved_queue_items_saved_queue_id_idx").on(table.savedQueueId),
+  ]
+);
