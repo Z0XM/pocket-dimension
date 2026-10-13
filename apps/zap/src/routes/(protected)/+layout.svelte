@@ -1,5 +1,6 @@
 <script lang="ts">
   import { authClient } from "$lib/auth-client";
+  import PageSkeleton from "$lib/components/PageSkeleton.svelte";
   import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
   import type { LayoutData } from "../$types";
@@ -9,7 +10,8 @@
   let { data, children }: { data: LayoutData; children: import("svelte").Snippet } = $props();
 
   const path = $derived(page.url.pathname);
-  const isNavigating = $derived(Boolean(navigating.to));
+  const navTo = $derived(navigating.to?.url.pathname ?? null);
+  const isNavigating = $derived(Boolean(navTo));
   const homeActive = $derived(path === "/home");
   const catalogueActive = $derived(path === "/catalogue" || path.startsWith("/catalogue/"));
   const playlistsActive = $derived(path === "/playlists" || path.startsWith("/playlists/"));
@@ -17,6 +19,33 @@
   const historyActive = $derived(path === "/history" || path.startsWith("/history/"));
   const joinActive = $derived(path === "/join" || path.startsWith("/join/"));
   const sessionActive = $derived(path === "/session" || path.startsWith("/session/"));
+
+  const skeletonPath = $derived(navTo ?? path);
+  const skeletonShowFilters = $derived(skeletonPath.startsWith("/catalogue") || skeletonPath.startsWith("/session/"));
+  const skeletonVariant = $derived<"list" | "form" | "home">(
+    skeletonPath.startsWith("/home") || skeletonPath === "/session"
+      ? "home"
+      : skeletonPath.startsWith("/join") || skeletonPath.startsWith("/add")
+        ? "form"
+        : "list"
+  );
+  const skeletonTitle = $derived(
+    skeletonPath.startsWith("/catalogue")
+      ? "Loading catalogue"
+      : skeletonPath.startsWith("/playlists")
+        ? "Loading playlists"
+        : skeletonPath.startsWith("/session")
+          ? "Loading session"
+          : skeletonPath.startsWith("/add")
+            ? "Loading add"
+            : skeletonPath.startsWith("/history")
+              ? "Loading history"
+              : skeletonPath.startsWith("/home")
+                ? "Loading home"
+                : skeletonPath.startsWith("/join")
+                  ? "Loading join"
+                  : "Loading"
+  );
 
   async function signOut() {
     await authClient.signOut();
@@ -69,6 +98,10 @@
     </div>
   </header>
   <main class="mx-auto max-w-5xl px-6 py-8">
-    {@render children()}
+    {#if isNavigating}
+      <PageSkeleton title={skeletonTitle} showFilters={skeletonShowFilters} variant={skeletonVariant} />
+    {:else}
+      {@render children()}
+    {/if}
   </main>
 </div>
