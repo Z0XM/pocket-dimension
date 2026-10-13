@@ -27,6 +27,12 @@ export const mediaAssets = zapSchema.table(
     storageKey: text("storage_key"),
     title: text("title").notNull(),
     artists: text("artists"),
+    /** YouTube / source description (nullable; not required for uploads). */
+    description: text("description"),
+    /** Channel / uploader display name (YouTube channelTitle). */
+    channelTitle: text("channel_title"),
+    /** YouTube channel id (UC…) when known. */
+    channelId: text("channel_id"),
     durationMs: integer("duration_ms"),
     codec: text("codec"),
     externalUrl: text("external_url"),

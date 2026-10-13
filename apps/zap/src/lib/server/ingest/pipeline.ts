@@ -79,12 +79,49 @@ async function waitForReadyAsset(identityKey: string, attempts = 30): Promise<ty
   return null;
 }
 
+export type IngestMetaHints = {
+  description?: string | null;
+  channelTitle?: string | null;
+  channelId?: string | null;
+};
+
+export function coalesceMeta(
+  probe: { description: string | null; channelTitle: string | null; channelId: string | null; uploader: string | null },
+  hints?: IngestMetaHints
+) {
+  const channelTitle = probe.channelTitle ?? hints?.channelTitle ?? probe.uploader ?? null;
+  return {
+    description: probe.description ?? hints?.description ?? null,
+    channelTitle,
+    channelId: probe.channelId ?? hints?.channelId ?? null,
+    artists: probe.uploader ?? channelTitle,
+  };
+}
+
+async function backfillMissingChannelMeta(
+  asset: typeof schema.mediaAssets.$inferSelect,
+  hints?: IngestMetaHints
+): Promise<typeof schema.mediaAssets.$inferSelect> {
+  if (!hints) return asset;
+  const next = {
+    description: asset.description ?? hints.description ?? null,
+    channelTitle: asset.channelTitle ?? hints.channelTitle ?? null,
+    channelId: asset.channelId ?? hints.channelId ?? null,
+  };
+  if (next.description === asset.description && next.channelTitle === asset.channelTitle && next.channelId === asset.channelId) {
+    return asset;
+  }
+  const [updated] = await db.update(schema.mediaAssets).set(next).where(eq(schema.mediaAssets.id, asset.id)).returning();
+  return updated ?? asset;
+}
+
 /** Single catalogue video ingest (no sync_run row) — used by URL paste + connected playlist import. */
 export async function ingestCatalogueVideo(opts: {
   userId: string;
   url: string;
   identityKey: string;
   titleHint?: string;
+  metaHints?: IngestMetaHints;
   onSongProgress?: (progress: SongProgress) => void | Promise<void>;
 }): Promise<IngestItemResult> {
   const { userId, url, identityKey } = opts;
@@ -99,12 +136,13 @@ export async function ingestCatalogueVideo(opts: {
 
   const existingAsset = await findReadyAsset(identityKey);
   if (existingAsset?.status === "ready" && existingAsset.storageKey) {
-    await emit("done", 100, existingAsset.title);
+    const asset = await backfillMissingChannelMeta(existingAsset, opts.metaHints);
+    await emit("done", 100, asset.title);
     return {
       status: "reused",
-      mediaAssetId: existingAsset.id,
+      mediaAssetId: asset.id,
       identityKey,
-      title: existingAsset.title,
+      title: asset.title,
     };
   }
 
@@ -168,6 +206,7 @@ export async function ingestCatalogueVideo(opts: {
     await emit("uploading", 100, downloaded.probe.title);
     await emit("finalizing", 50, downloaded.probe.title);
 
+    const meta = coalesceMeta(downloaded.probe, opts.metaHints);
     let asset = await findReadyAsset(identityKey);
     if (!asset) {
       const [inserted] = await db
@@ -178,7 +217,10 @@ export async function ingestCatalogueVideo(opts: {
           status: "ready",
           storageKey: put.storageKey,
           title: downloaded.probe.title || opts.titleHint || "Untitled",
-          artists: downloaded.probe.uploader,
+          artists: meta.artists,
+          description: meta.description,
+          channelTitle: meta.channelTitle,
+          channelId: meta.channelId,
           durationMs: downloaded.probe.durationMs,
           codec: downloaded.contentType,
           externalUrl: downloaded.probe.webpageUrl ?? url,
@@ -193,7 +235,10 @@ export async function ingestCatalogueVideo(opts: {
           status: "ready",
           storageKey: put.storageKey,
           title: downloaded.probe.title || asset.title,
-          artists: downloaded.probe.uploader,
+          artists: meta.artists ?? asset.artists,
+          description: asset.description ?? meta.description,
+          channelTitle: asset.channelTitle ?? meta.channelTitle,
+          channelId: asset.channelId ?? meta.channelId,
           durationMs: downloaded.probe.durationMs,
           codec: downloaded.contentType,
           errorMessage: null,
@@ -201,6 +246,12 @@ export async function ingestCatalogueVideo(opts: {
         .where(eq(schema.mediaAssets.id, asset.id))
         .returning();
       asset = updated!;
+    } else {
+      asset = await backfillMissingChannelMeta(asset, {
+        description: meta.description,
+        channelTitle: meta.channelTitle,
+        channelId: meta.channelId,
+      });
     }
 
     await db

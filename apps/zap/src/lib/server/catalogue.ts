@@ -30,7 +30,7 @@ export async function ensureSystemTags() {
 
 export type CatalogueScope = "all" | "yours";
 
-export const CATALOGUE_PAGE_SIZE = 24;
+export const CATALOGUE_PAGE_SIZE = 25;
 
 export type CatalogueQuery = {
   userId: string;
@@ -113,6 +113,7 @@ export async function listCatalogue(input: CatalogueQuery) {
 
   const tagsByAsset = new Map<string, CatalogueTag[]>();
   if (assets.length > 0) {
+    // Custom tags are private: only system tags or tags owned by this user may appear.
     const links = await db
       .select({
         mediaAssetId: schema.mediaAssetTags.mediaAssetId,
@@ -126,7 +127,8 @@ export async function listCatalogue(input: CatalogueQuery) {
           inArray(
             schema.mediaAssetTags.mediaAssetId,
             assets.map((a) => a.id)
-          )
+          ),
+          or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, input.userId))
         )
       );
 
@@ -150,6 +152,9 @@ export function serializeCatalogueAsset(asset: CatalogueAsset, tags: CatalogueTa
     id: asset.id,
     title: asset.title,
     artists: asset.artists,
+    description: asset.description,
+    channelTitle: asset.channelTitle,
+    channelId: asset.channelId,
     durationMs: asset.durationMs,
     sourceType: asset.sourceType,
     playable: Boolean(asset.storageKey),
@@ -239,6 +244,15 @@ export async function setUserAssetTags(userId: string, mediaAssetId: string, tag
     await db.insert(schema.mediaAssetTags).values({ userId, mediaAssetId, tagId: tag.id }).onConflictDoNothing();
   }
 
+  return tags;
+}
+
+/** Add tags without removing existing ones (playlist import). */
+export async function addUserAssetTags(userId: string, mediaAssetId: string, tagIds: string[]) {
+  const tags = await resolveUserTagIds(userId, tagIds);
+  for (const tag of tags) {
+    await db.insert(schema.mediaAssetTags).values({ userId, mediaAssetId, tagId: tag.id }).onConflictDoNothing();
+  }
   return tags;
 }
 

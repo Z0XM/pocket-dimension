@@ -16,7 +16,15 @@ export type ZapYouTubePlaylist = {
 export type ZapYouTubePlaylistItem = {
   videoId: string;
   title: string;
+  description: string | null;
   channelTitle: string | null;
+  channelId: string | null;
+  /** Zero-based playlist position from YouTube when present. */
+  position: number | null;
+  /** When the item was added to the playlist (`snippet.publishedAt`). */
+  addedAt: string | null;
+  /** When the video was published (`contentDetails.videoPublishedAt`). */
+  videoPublishedAt: string | null;
   durationMs: number | null;
   url: string;
 };
@@ -230,10 +238,15 @@ export async function listYouTubePlaylistItems(userId: string, playlistId: strin
       items?: Array<{
         snippet?: {
           title?: string;
+          description?: string;
+          publishedAt?: string;
+          position?: number;
           channelTitle?: string;
+          videoOwnerChannelTitle?: string;
+          videoOwnerChannelId?: string;
           resourceId?: { videoId?: string };
         };
-        contentDetails?: { videoId?: string };
+        contentDetails?: { videoId?: string; videoPublishedAt?: string };
       }>;
     }>("playlistItems", params, { accessToken, requireUserAuth: true });
 
@@ -242,11 +255,18 @@ export async function listYouTubePlaylistItems(userId: string, playlistId: strin
     for (const item of body.items ?? []) {
       const videoId = item.contentDetails?.videoId ?? item.snippet?.resourceId?.videoId;
       if (!videoId) continue;
+      const ownerTitle = item.snippet?.videoOwnerChannelTitle ?? item.snippet?.channelTitle;
+      const position = typeof item.snippet?.position === "number" ? item.snippet.position : null;
       pageIds.push(videoId);
       pageRows.push({
         videoId,
         title: youtubeText(item.snippet?.title, "Untitled"),
-        channelTitle: item.snippet?.channelTitle ? youtubeText(item.snippet.channelTitle, "") : null,
+        description: item.snippet?.description != null ? youtubeText(item.snippet.description, "") || null : null,
+        channelTitle: ownerTitle ? youtubeText(ownerTitle, "") || null : null,
+        channelId: item.snippet?.videoOwnerChannelId?.trim() || null,
+        position,
+        addedAt: item.snippet?.publishedAt ?? null,
+        videoPublishedAt: item.contentDetails?.videoPublishedAt ?? null,
         durationMs: null,
         url: `https://www.youtube.com/watch?v=${videoId}`,
       });

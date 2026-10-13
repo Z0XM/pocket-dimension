@@ -1,19 +1,27 @@
 <script lang="ts">
-  import { replaceState } from "$app/navigation";
+  import { invalidateAll, replaceState } from "$app/navigation";
   import { page } from "$app/state";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
   import SongProgressList, { type SongProgressView } from "$lib/components/SongProgressList.svelte";
   import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
+  import ZapSelect from "$lib/components/ZapSelect.svelte";
+  import { PLAYLIST_IMPORT_SORT_OPTIONS, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
   import type { ActionData, PageData } from "./$types";
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
 
-  type LibraryTab = "browse" | "upload";
+  type LibraryTab = "browse" | "upload" | "history";
   type YtPhase = "idle" | "linking" | "loading" | "importing" | "disconnecting";
 
-  let tab = $state<LibraryTab>(page.url.searchParams.get("tab") === "upload" ? "upload" : "browse");
+  function initialTab(): LibraryTab {
+    const t = page.url.searchParams.get("tab");
+    if (t === "upload" || t === "history") return t;
+    return "browse";
+  }
+
+  let tab = $state<LibraryTab>(initialTab());
   let scope = $state<"all" | "yours">("all");
   let q = $state("");
   let selected = $state<string[]>([]);
@@ -29,8 +37,14 @@
   let ytSelected = $state<string[]>([]);
   let ytPhase = $state<YtPhase>("idle");
   let ytError = $state<string | null>(null);
+  let ytTagPromptOpen = $state(false);
+  let ytImportTagIds = $state<string[]>([]);
+  let ytImportCustomTag = $state("");
+  let ytImportSort = $state<PlaylistImportSort>("playlist");
+  let ytTagDialog = $state<HTMLDialogElement | null>(null);
   const ytBusy = $derived(ytPhase !== "idle");
   const addBusy = $derived(uploadBusy || ingestBusy || ytBusy);
+  const activity = $derived(data.activity ?? []);
   let ytImportSummary = $state<{
     imported: number;
     skipped: number;
@@ -195,8 +209,29 @@
     ytSelected = ytSelected.includes(id) ? ytSelected.filter((x) => x !== id) : [...ytSelected, id];
   }
 
+  function openYtTagPrompt() {
+    if (ytSelected.length === 0 || ytBusy) return;
+    ytTagPromptOpen = true;
+  }
+
+  function closeYtTagPrompt() {
+    if (ytBusy) return;
+    ytTagPromptOpen = false;
+  }
+
+  $effect(() => {
+    const el = ytTagDialog;
+    if (!el) return;
+    if (ytTagPromptOpen) {
+      if (!el.open) el.showModal();
+    } else if (el.open) {
+      el.close();
+    }
+  });
+
   async function importSelectedPlaylists() {
     if (ytSelected.length === 0 || ytBusy) return;
+    ytTagPromptOpen = false;
     ytPhase = "importing";
     ytError = null;
     ytImportSummary = null;
@@ -206,7 +241,12 @@
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
-        body: JSON.stringify({ playlistIds: ytSelected }),
+        body: JSON.stringify({
+          playlistIds: ytSelected,
+          tagIds: ytImportTagIds,
+          customTag: ytImportCustomTag.trim() || undefined,
+          sort: ytImportSort,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -244,6 +284,9 @@
       });
 
       if (!sawDone) throw new Error("Import ended without a result");
+      ytImportTagIds = [];
+      ytImportCustomTag = "";
+      await invalidateAll();
       tab = "browse";
       void fetchPage({ reset: true });
     } catch (err) {
@@ -289,6 +332,7 @@
       });
       if (!sawDone) throw new Error("Import ended without a result");
       ingestUrl = "";
+      await invalidateAll();
       tab = "browse";
       void fetchPage({ reset: true });
     } catch (err) {
@@ -360,6 +404,7 @@
       uploadCustomTag = "";
       uploadTitle = "";
       if (uploadFileInput) uploadFileInput.value = "";
+      await invalidateAll();
       tab = "browse";
       void fetchPage({ reset: true });
     } catch (err) {
@@ -389,13 +434,31 @@
 
   function updateUrl() {
     const params = new URLSearchParams();
-    if (tab === "upload") params.set("tab", "upload");
+    if (tab === "upload" || tab === "history") params.set("tab", tab);
     if (scope === "yours") params.set("scope", "yours");
     if (q.trim()) params.set("q", q.trim());
     for (const id of selected) params.append("tag", id);
     const qs = params.toString();
     const href = qs ? `${page.url.pathname}?${qs}` : page.url.pathname;
     replaceState(href, {});
+  }
+
+  function formatActivityWhen(iso: string) {
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(iso));
+    } catch {
+      return iso;
+    }
+  }
+
+  function activityKindLabel(kind: string) {
+    if (kind === "playlist_import") return "Playlist";
+    if (kind === "url_import") return "URL";
+    if (kind === "upload") return "Upload";
+    return kind;
   }
 
   function setTab(next: LibraryTab) {
@@ -483,7 +546,8 @@
     <div>
       <h1 class="text-3xl font-semibold tracking-tight">Library</h1>
       <p class="mt-1 text-sm text-muted-foreground">
-        Browse the catalogue, or open <span class="font-mono text-signal">Add</span> for upload / URL / YouTube. Tag filters use
+        Browse the catalogue, open <span class="font-mono text-signal">Add</span> for upload / URL / YouTube, or
+        <span class="font-mono text-signal">History</span> for past imports. Tag filters use
         <span class="font-mono text-signal">AND</span>.
       </p>
     </div>
@@ -530,6 +594,21 @@
       onclick={() => setTab("upload")}
     >
       Add
+    </button>
+    <button
+      type="button"
+      role="tab"
+      id="tab-history"
+      aria-controls="panel-history"
+      aria-selected={tab === "history"}
+      class={`flex-1 rounded-md px-4 py-2.5 font-mono text-xs tracking-[0.18em] uppercase transition ${
+        tab === "history"
+          ? "bg-primary text-primary-foreground shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_35%,transparent)]"
+          : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+      }`}
+      onclick={() => setTab("history")}
+    >
+      History
     </button>
   </div>
 
@@ -731,7 +810,7 @@
               type="button"
               class="auth-btn mt-2"
               disabled={ytBusy || uploadBusy || ingestBusy || ytSelected.length === 0 || !data.ingestReady}
-              onclick={() => void importSelectedPlaylists()}
+              onclick={openYtTagPrompt}
             >
               {ytPhase === "importing" ? "Importing…" : `Import selected (${ytSelected.length})`}
             </button>
@@ -831,4 +910,104 @@
       </div>
     </div>
   {/if}
+
+  {#if tab === "history"}
+    <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" class="space-y-4">
+      <p class="text-sm text-muted-foreground">Your recent uploads and imports — when each song or playlist was added.</p>
+      {#if activity.length === 0}
+        <p class="rounded border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
+          No uploads or imports yet. Add music from the Add tab.
+        </p>
+      {:else}
+        <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
+          {#each activity as entry (entry.id)}
+            <li class="px-4 py-3">
+              <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <span class="font-mono text-[10px] tracking-[0.14em] text-signal uppercase">
+                  {activityKindLabel(entry.kind)}
+                </span>
+                <time class="font-mono text-[11px] text-muted-foreground" datetime={entry.at}>
+                  {formatActivityWhen(entry.at)}
+                </time>
+              </div>
+              {#if entry.kind === "upload"}
+                <p class="mt-1 text-sm font-medium text-foreground">{entry.title}</p>
+              {:else}
+                <p class="mt-1 text-sm font-medium text-foreground">{entry.label}</p>
+                <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                  {entry.status}
+                  · {entry.imported} imported
+                  {#if entry.skipped > 0}· {entry.skipped} skipped{/if}
+                  {#if entry.failed > 0}· {entry.failed} failed{/if}
+                </p>
+                {#if entry.songTitles?.length}
+                  <ul class="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                    {#each entry.songTitles as title}
+                      <li class="truncate">{title}</li>
+                    {/each}
+                    {#if entry.imported > entry.songTitles.length}
+                      <li class="font-mono text-[10px]">+{entry.imported - entry.songTitles.length} more</li>
+                    {/if}
+                  </ul>
+                {/if}
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  {/if}
 </section>
+
+<dialog
+  bind:this={ytTagDialog}
+  class="zap-dialog m-auto w-[min(100%,24rem)] rounded-lg border border-border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-background/80"
+  onclose={() => {
+    ytTagPromptOpen = false;
+  }}
+  oncancel={(e) => {
+    if (ytBusy) e.preventDefault();
+  }}
+>
+  <div class="space-y-4 p-5">
+    <div>
+      <h2 class="text-lg font-semibold tracking-tight">Import options</h2>
+      <p class="mt-2 text-sm text-muted-foreground">
+        Choose sort order for songs from the selected playlist{ytSelected.length === 1 ? "" : "s"}, then optional tags applied to every imported
+        track.
+      </p>
+    </div>
+    <div>
+      <p class="mb-1 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Sort order</p>
+      <ZapSelect
+        options={PLAYLIST_IMPORT_SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        bind:value={ytImportSort}
+        disabled={ytBusy}
+        placeholder="Sort order"
+      />
+    </div>
+    <div>
+      <p class="mb-1 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Tags</p>
+      <TagMultiSelect options={data.availableTags} bind:selected={ytImportTagIds} name="ytImportTagIds" placeholder="Select tags…" />
+    </div>
+    <input class="auth-field" type="text" placeholder="New custom tag (optional)" bind:value={ytImportCustomTag} />
+    <div class="flex flex-wrap justify-end gap-2">
+      <button
+        type="button"
+        class="rounded border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary disabled:opacity-40"
+        disabled={ytBusy}
+        onclick={closeYtTagPrompt}
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        class="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+        disabled={ytBusy || ytSelected.length === 0}
+        onclick={() => void importSelectedPlaylists()}
+      >
+        Start import
+      </button>
+    </div>
+  </div>
+</dialog>

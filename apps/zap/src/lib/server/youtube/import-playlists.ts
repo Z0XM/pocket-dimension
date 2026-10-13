@@ -1,11 +1,13 @@
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
+import { addUserAssetTags, ensureCustomTag } from "$lib/server/catalogue";
 import { summarizeIngestItems } from "$lib/server/ingest/errors";
 import { DURATION_CAP_MESSAGE, isOverDurationCap } from "$lib/server/ingest/limits";
 import { mapPool, youtubeIngestConcurrency } from "$lib/server/ingest/map-pool";
 import { ingestCatalogueVideo, type IngestItemResult, type SyncRunResult } from "$lib/server/ingest/pipeline";
 import type { SongProgress } from "$lib/server/ingest/progress";
-import { listYouTubePlaylistItems, type ZapYouTubePlaylistItem } from "./api";
+import { listYouTubePlaylistItems, listYouTubePlaylists, type ZapYouTubePlaylistItem } from "./api";
+import { parsePlaylistImportSort, sortPlaylistItemsForImport, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
 
 export type PlaylistImportProgress = {
   total: number;
@@ -37,12 +39,21 @@ function tally(items: IngestItemResult[]) {
 export async function importConnectedPlaylists(
   userId: string,
   playlistIds: string[],
-  onProgress?: (progress: PlaylistImportProgress) => void | Promise<void>
+  onProgress?: (progress: PlaylistImportProgress) => void | Promise<void>,
+  opts?: { tagIds?: string[]; customTag?: string; sort?: PlaylistImportSort | string }
 ): Promise<SyncRunResult & { playlists: string[] }> {
   const uniqueIds = [...new Set(playlistIds.map((id) => id.trim()).filter(Boolean))];
   if (uniqueIds.length === 0) {
     throw new Error("Select at least one playlist");
   }
+
+  const sort = parsePlaylistImportSort(opts?.sort);
+  const tagIds = [...new Set((opts?.tagIds ?? []).map((id) => id.trim()).filter(Boolean))];
+  if (opts?.customTag?.trim()) {
+    const custom = await ensureCustomTag(userId, opts.customTag);
+    if (custom) tagIds.push(custom.id);
+  }
+  const applyTags = tagIds.length > 0;
 
   const sourceUrl = `youtube:connected:${uniqueIds.join(",")}`;
   const [run] = await db
@@ -61,6 +72,7 @@ export async function importConnectedPlaylists(
   /** Serialize progress/DB writes so concurrent workers don't clobber tallies. */
   let progressGate: Promise<void> = Promise.resolve();
   const activeSongs = new Map<string, SongProgress>();
+  let playlistTitles: string[] = [];
 
   const publish = (extra?: { currentTitle?: string | null }) => {
     const counts = tally(items);
@@ -94,11 +106,19 @@ export async function importConnectedPlaylists(
   let workTotal = 0;
 
   try {
-    const entryLists = await Promise.all(uniqueIds.map((playlistId) => listYouTubePlaylistItems(userId, playlistId)));
+    const [entryLists, knownPlaylists] = await Promise.all([
+      Promise.all(uniqueIds.map((playlistId) => listYouTubePlaylistItems(userId, playlistId))),
+      listYouTubePlaylists(userId).catch(() => []),
+    ]);
+    const titleById = new Map(knownPlaylists.map((p) => [p.id, p.title]));
+    playlistTitles = uniqueIds.map((id) => titleById.get(id) ?? id);
 
+    // Sort each playlist independently, then concatenate in selection order.
+    // Work list order = import order; mapPool preserves result slots despite parallel workers.
     const work: WorkItem[] = [];
     for (const entries of entryLists) {
-      for (const entry of entries) {
+      const sorted = sortPlaylistItemsForImport(entries, sort);
+      for (const entry of sorted) {
         if (isOverDurationCap(entry.durationMs)) {
           work.push({ kind: "skip", entry, reason: DURATION_CAP_MESSAGE });
         } else {
@@ -118,7 +138,7 @@ export async function importConnectedPlaylists(
       songs: [],
     });
 
-    await mapPool(work, concurrency, async (job) => {
+    const orderedResults = await mapPool(work, concurrency, async (job) => {
       const identityKey = `youtube:${job.entry.videoId}`;
       let result: IngestItemResult;
       if (job.kind === "skip") {
@@ -147,6 +167,11 @@ export async function importConnectedPlaylists(
           url: job.entry.url,
           identityKey,
           titleHint: job.entry.title,
+          metaHints: {
+            description: job.entry.description,
+            channelTitle: job.entry.channelTitle,
+            channelId: job.entry.channelId,
+          },
           onSongProgress: async (song) => {
             activeSongs.set(identityKey, song);
             await publish({ currentTitle: song.title ?? job.entry.title });
@@ -154,7 +179,15 @@ export async function importConnectedPlaylists(
         });
       }
 
+      // Live tallies may complete out of order; final `items` use mapPool order below.
       items.push(result);
+      if ((result.status === "imported" || result.status === "reused") && applyTags && result.mediaAssetId) {
+        try {
+          await addUserAssetTags(userId, result.mediaAssetId, tagIds);
+        } catch (err) {
+          console.warn("[zap youtube import tags]", result.mediaAssetId, err);
+        }
+      }
       if (result.status === "failed") {
         activeSongs.set(identityKey, {
           identityKey,
@@ -183,7 +216,20 @@ export async function importConnectedPlaylists(
       return result;
     });
 
+    items.length = 0;
+    items.push(...orderedResults);
+
     const summary = summarizeIngestItems(items);
+    const summaryPayload = {
+      playlists: uniqueIds.map((id, i) => ({ id, title: playlistTitles[i] ?? id })),
+      playlistTitles,
+      sort,
+      orderedIdentityKeys: items.map((i) => i.identityKey),
+      tagIds,
+      items,
+      failures: summary.failures,
+      concurrency,
+    };
 
     await db
       .update(schema.syncRuns)
@@ -193,7 +239,7 @@ export async function importConnectedPlaylists(
         skippedCount: summary.skipped,
         failedCount: summary.failed,
         errorMessage: summary.errorMessage,
-        summaryJson: JSON.stringify({ playlists: uniqueIds, items, failures: summary.failures, concurrency }),
+        summaryJson: JSON.stringify(summaryPayload),
         finishedAt: new Date(),
       })
       .where(eq(schema.syncRuns.id, run.id));
@@ -219,7 +265,16 @@ export async function importConnectedPlaylists(
         importedCount: summary.imported,
         skippedCount: summary.skipped,
         failedCount: summary.failed,
-        summaryJson: JSON.stringify({ playlists: uniqueIds, items, failures: summary.failures, concurrency }),
+        summaryJson: JSON.stringify({
+          playlists: uniqueIds.map((id, i) => ({ id, title: playlistTitles[i] ?? id })),
+          playlistTitles,
+          sort,
+          orderedIdentityKeys: items.map((i) => i.identityKey),
+          tagIds,
+          items,
+          failures: summary.failures,
+          concurrency,
+        }),
         finishedAt: new Date(),
       })
       .where(eq(schema.syncRuns.id, run.id));
