@@ -15,8 +15,10 @@ import {
 } from "$lib/server/catalogue";
 import { IngestError, ingestPublicUrl, resolveYtDlpBin } from "$lib/server/ingest";
 import { MAX_TRACK_DURATION_MS } from "$lib/server/ingest/limits";
+import { listPlaylistsForUser } from "$lib/server/playlists";
 import { listPlayHistory } from "$lib/server/play-history";
 import { listSavedQueues } from "$lib/server/saved-queues";
+import { listLiveSessionsForUser } from "$lib/server/sessions";
 import { describeStorageConfig, isStorageConfigured, putMediaObject } from "$lib/server/storage";
 import { listSuggestionsFromOthers } from "$lib/server/suggestions";
 import { getYoutubeLinkStatus, isGoogleOAuthConfigured } from "$lib/server/youtube";
@@ -39,23 +41,33 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const tagIds = url.searchParams.getAll("tag").filter(Boolean);
   const tagQuery = url.searchParams.get("tq") ?? "";
 
-  const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, availableTags, activity, playHistory, suggestions, savedQueues] =
-    await Promise.all([
-      listCatalogue({
-        userId,
-        scope,
-        q,
-        tagIds: tagQuery.trim() ? [] : tagIds,
-        tagQuery,
-        offset: 0,
-        limit: CATALOGUE_PAGE_SIZE,
-      }),
-      listAvailableTags(userId),
-      listUserLibraryActivity(userId, 50),
-      listPlayHistory(userId, 40),
-      listSuggestionsFromOthers(userId, 12),
-      listSavedQueues(userId, 20),
-    ]);
+  const [
+    { assets, tagsByAsset, hasMore, nextOffset, tagQueryError },
+    availableTags,
+    activity,
+    playHistory,
+    suggestions,
+    savedQueues,
+    playlists,
+    liveSessions,
+  ] = await Promise.all([
+    listCatalogue({
+      userId,
+      scope,
+      q,
+      tagIds: tagQuery.trim() ? [] : tagIds,
+      tagQuery,
+      offset: 0,
+      limit: CATALOGUE_PAGE_SIZE,
+    }),
+    listAvailableTags(userId),
+    listUserLibraryActivity(userId, 50),
+    listPlayHistory(userId, 40),
+    listSuggestionsFromOthers(userId, 12),
+    listSavedQueues(userId, 20),
+    listPlaylistsForUser(userId),
+    listLiveSessionsForUser(userId),
+  ]);
 
   const ytDlpReady = Boolean(await resolveYtDlpBin());
   const storageReady = isStorageConfigured();
@@ -85,6 +97,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     playHistory,
     suggestions,
     savedQueues,
+    playlists,
+    liveSessions,
   };
 };
 

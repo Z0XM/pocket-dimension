@@ -20,6 +20,7 @@ function serializeSession(row: typeof schema.sessions.$inferSelect): SessionSnap
     playbackGeneration: row.playbackGeneration,
     guestsCanAdd: row.guestsCanAdd,
     guestsCanControl: row.guestsCanControl,
+    autoPlay: row.autoPlay,
     lastActivityAt: row.lastActivityAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     endedAt: row.endedAt?.toISOString() ?? null,

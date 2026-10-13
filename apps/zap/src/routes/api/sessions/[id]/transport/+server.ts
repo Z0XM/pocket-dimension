@@ -1,6 +1,6 @@
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { SessionError, pause, play, seek, skip } from "$lib/server/sessions";
+import { SessionError, onTrackEnded, pause, play, seek, skip } from "$lib/server/sessions";
 
 export const POST: RequestHandler = async ({ locals, params, request }) => {
   if (!locals.user) throw error(401, "Sign in required");
@@ -24,8 +24,11 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
       case "seek":
         snapshot = await seek(id, uid, Number(body.positionMs));
         break;
+      case "ended":
+        snapshot = await onTrackEnded(id, uid);
+        break;
       default:
-        throw error(400, "action must be play|pause|skip|seek");
+        throw error(400, "action must be play|pause|skip|seek|ended");
     }
     return json(snapshot);
   } catch (err) {

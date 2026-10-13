@@ -13,6 +13,7 @@ export type SessionSnapshotSession = {
   playbackGeneration: number;
   guestsCanAdd: boolean;
   guestsCanControl: boolean;
+  autoPlay: boolean;
   lastActivityAt: string;
   createdAt: string;
   endedAt: string | null;

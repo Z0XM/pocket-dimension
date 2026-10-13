@@ -15,6 +15,8 @@ export const fetchJobStatus = zapSchema.enum("fetch_job_status", ["pending", "ru
 export const syncRunStatus = zapSchema.enum("sync_run_status", ["pending", "running", "completed", "failed"]);
 export const sessionSinkType = zapSchema.enum("session_sink_type", ["web", "discord"]);
 export const sessionSinkStatus = zapSchema.enum("session_sink_status", ["pending", "active", "error", "detached"]);
+export const playlistVisibility = zapSchema.enum("playlist_visibility", ["private", "public"]);
+export const playlistMemberRole = zapSchema.enum("playlist_member_role", ["owner", "collaborator"]);
 
 /** Global Zap catalogue — never deleted by app logic. */
 export const mediaAssets = zapSchema.table(
@@ -117,6 +119,8 @@ export const sessions = zapSchema.table(
     playbackGeneration: integer("playback_generation").default(0).notNull(),
     guestsCanAdd: boolean("guests_can_add").default(false).notNull(),
     guestsCanControl: boolean("guests_can_control").default(false).notNull(),
+    /** When queue ends, algorithmically enqueue+play another catalogue track. */
+    autoPlay: boolean("auto_play").default(true).notNull(),
     lastActivityAt: timestamp("last_activity_at")
       .$default(() => sql`now()`)
       .notNull(),
@@ -351,5 +355,83 @@ export const savedQueueItems = zapSchema.table(
   (table) => [
     uniqueIndex("saved_queue_items_queue_position_unique").on(table.savedQueueId, table.position),
     index("saved_queue_items_saved_queue_id_idx").on(table.savedQueueId),
+  ]
+);
+
+/** Zap-native playlists (owned, optionally collaborative / public). */
+export const playlists = zapSchema.table(
+  "playlists",
+  {
+    id,
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    visibility: playlistVisibility("visibility").default("private").notNull(),
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamp("updated_at")
+      .$default(() => sql`now()`)
+      .$onUpdate(() => sql`now()`)
+      .notNull(),
+  },
+  (table) => [index("playlists_owner_user_id_idx").on(table.ownerUserId), index("playlists_visibility_idx").on(table.visibility)]
+);
+
+export const playlistItems = zapSchema.table(
+  "playlist_items",
+  {
+    id,
+    playlistId: uuid("playlist_id")
+      .notNull()
+      .references(() => playlists.id, { onDelete: "cascade" }),
+    mediaAssetId: uuid("media_asset_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "restrict" }),
+    position: integer("position").notNull(),
+    addedByUserId: uuid("added_by_user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [
+    uniqueIndex("playlist_items_playlist_position_unique").on(table.playlistId, table.position),
+    uniqueIndex("playlist_items_playlist_asset_unique").on(table.playlistId, table.mediaAssetId),
+    index("playlist_items_playlist_id_idx").on(table.playlistId),
+    index("playlist_items_media_asset_id_idx").on(table.mediaAssetId),
+  ]
+);
+
+/** Tracks excluded when rebuilding a playlist from tags. */
+export const playlistExclusions = zapSchema.table(
+  "playlist_exclusions",
+  {
+    playlistId: uuid("playlist_id")
+      .notNull()
+      .references(() => playlists.id, { onDelete: "cascade" }),
+    mediaAssetId: uuid("media_asset_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "cascade" }),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [primaryKey({ columns: [table.playlistId, table.mediaAssetId] }), index("playlist_exclusions_playlist_id_idx").on(table.playlistId)]
+);
+
+export const playlistMembers = zapSchema.table(
+  "playlist_members",
+  {
+    id,
+    playlistId: uuid("playlist_id")
+      .notNull()
+      .references(() => playlists.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    role: playlistMemberRole("role").notNull(),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [
+    uniqueIndex("playlist_members_playlist_user_unique").on(table.playlistId, table.userId),
+    index("playlist_members_user_id_idx").on(table.userId),
   ]
 );
