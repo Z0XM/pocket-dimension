@@ -3,12 +3,13 @@
   import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
   import type { LayoutData } from "../$types";
-  import { page } from "$app/state";
+  import { navigating, page } from "$app/state";
   import { goto } from "$app/navigation";
 
   let { data, children }: { data: LayoutData; children: import("svelte").Snippet } = $props();
 
   const path = $derived(page.url.pathname);
+  const isNavigating = $derived(Boolean(navigating.to));
   const homeActive = $derived(path === "/home");
   const catalogueActive = $derived(path === "/catalogue" || path.startsWith("/catalogue/"));
   const playlistsActive = $derived(path === "/playlists" || path.startsWith("/playlists/"));
@@ -24,7 +25,11 @@
 </script>
 
 <div class="zap-wave-field zap-grid min-h-screen">
-  <header class="border-b border-border/60 bg-background/70 backdrop-blur">
+  <header class="relative border-b border-border/60 bg-background/70 backdrop-blur">
+    {#if isNavigating}
+      <div class="zap-nav-progress" aria-hidden="true"></div>
+      <span class="sr-only" role="status" aria-live="polite">Loading page…</span>
+    {/if}
     <div class="mx-auto flex max-w-5xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
       <a href="/home" class="flex items-center gap-3">
         <span class="text-xl font-semibold tracking-tight text-foreground">Zap</span>

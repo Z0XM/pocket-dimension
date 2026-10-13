@@ -1,4 +1,6 @@
 <script lang="ts">
+  import BusyStatus from "$lib/components/BusyStatus.svelte";
+
   let {
     label = "Start session",
     class: className = "rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40",
@@ -117,6 +119,9 @@
   </span>
   {#if liveId && liveTitle}
     <span class="max-w-xs font-mono text-[10px] text-muted-foreground">Left at: {liveTitle}</span>
+  {/if}
+  {#if busy}
+    <BusyStatus label="Starting session…" />
   {/if}
   {#if error}
     <span class="max-w-xs font-mono text-[10px] text-destructive">{error}</span>

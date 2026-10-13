@@ -2,6 +2,8 @@
   import { replaceState } from "$app/navigation";
   import { page } from "$app/state";
   import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
+  import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
+  import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -150,6 +152,7 @@
       bind:selectedTagIds={selected}
       availableTags={data.availableTags}
       {tagQueryError}
+      busy={loading}
       onchange={() => void fetchPage({ reset: true })}
     />
   </div>
@@ -164,25 +167,34 @@
     <p class="auth-error">{listError}</p>
   {/if}
 
-  <ul class="divide-y divide-border/50 rounded-lg border border-border/70 bg-card/30">
-    {#if loading && assets.length === 0}
-      <li class="px-4 py-10 text-center font-mono text-xs text-muted-foreground">Scanning catalogue…</li>
-    {:else if assets.length === 0}
-      <li class="px-4 py-10 text-center text-sm text-muted-foreground">
-        No tracks match.
-        <a href="/add" class="text-signal hover:underline">Add music</a>
-        or clear filters.
-      </li>
-    {:else}
-      {#each assets as track (track.id)}
-        <TrackRow {track} availableTags={data.availableTags} bind:activeId bind:audioEl />
-      {/each}
-    {/if}
-  </ul>
+  {#if loading && assets.length === 0}
+    <TrackListSkeleton rows={8} />
+  {:else}
+    <ListBusyOverlay busy={loading && assets.length > 0} label="Updating catalogue…">
+      <ul class="divide-y divide-border/50 rounded-lg border border-border/70 bg-card/30 min-h-[12rem]">
+        {#if assets.length === 0}
+          <li class="px-4 py-10 text-center text-sm text-muted-foreground">
+            No tracks match.
+            <a href="/add" class="text-signal hover:underline">Add music</a>
+            or clear filters.
+          </li>
+        {:else}
+          {#each assets as track (track.id)}
+            <TrackRow {track} availableTags={data.availableTags} bind:activeId bind:audioEl />
+          {/each}
+        {/if}
+      </ul>
+    </ListBusyOverlay>
+  {/if}
 
   <div bind:this={sentinel} class="h-8" aria-hidden="true"></div>
   {#if loadingMore}
-    <p class="text-center font-mono text-[11px] text-muted-foreground">Loading more…</p>
+    <div class="flex justify-center py-1">
+      <span class="inline-flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+        <span class="zap-busy-bars scale-90" aria-hidden="true"><span></span><span></span><span></span></span>
+        Loading more…
+      </span>
+    </div>
   {:else if !hasMore && assets.length > 0}
     <p class="text-center font-mono text-[11px] text-muted-foreground">End of catalogue</p>
   {/if}

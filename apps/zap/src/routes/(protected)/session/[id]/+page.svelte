@@ -1,7 +1,10 @@
 <script lang="ts">
+  import BusyStatus from "$lib/components/BusyStatus.svelte";
   import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
   import DiscordSinkPanel from "$lib/components/DiscordSinkPanel.svelte";
+  import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
   import SessionPlayer from "$lib/components/SessionPlayer.svelte";
+  import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
   import type { PageData } from "./$types";
   import { page } from "$app/state";
@@ -209,6 +212,12 @@
   let saveBusy = $state(false);
   let savedQueues = $state<{ id: string; name: string; trackCount: number; titles: string[] }[]>([]);
   let savedQueuesLoaded = $state(false);
+  let savedQueuesLoading = $state(false);
+  const queueBulkBusy = $derived(
+    saveBusy ||
+      queueBusy === "queue-action" ||
+      (queueBusy !== null && (playlists.some((p) => p.id === queueBusy) || savedQueues.some((s) => s.id === queueBusy)))
+  );
 
   async function enqueue(mediaAssetId: string) {
     if (!snapshot.session) return;
@@ -253,6 +262,7 @@
   }
 
   async function loadSavedQueues() {
+    savedQueuesLoading = true;
     try {
       const res = await fetch("/api/saved-queues", { credentials: "same-origin" });
       if (!res.ok) return;
@@ -261,6 +271,8 @@
       savedQueuesLoaded = true;
     } catch {
       // soft-fail
+    } finally {
+      savedQueuesLoading = false;
     }
   }
 
@@ -407,6 +419,10 @@
           {/if}
         </ul>
 
+        {#if queueBulkBusy}
+          <BusyStatus label={saveBusy ? "Saving queue…" : "Updating queue…"} />
+        {/if}
+
         {#if playlists.length > 0}
           <h2 class="pt-1 font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Zap playlists</h2>
           <ul class="space-y-1 rounded-lg border border-border/70 bg-card/20 p-2">
@@ -422,14 +438,21 @@
                   disabled={!snapshot.me?.canAdd || queueBusy !== null || pl.trackCount === 0}
                   onclick={() => void loadPlaylist(pl.id)}
                 >
-                  Load
+                  {queueBusy === pl.id ? "…" : "Load"}
                 </button>
               </li>
             {/each}
           </ul>
         {/if}
 
-        {#if savedQueues.length > 0}
+        {#if savedQueuesLoading && !savedQueuesLoaded}
+          <p class="font-mono text-[10px] text-muted-foreground">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="zap-busy-bars scale-90" aria-hidden="true"><span></span><span></span><span></span></span>
+              Loading saved queues…
+            </span>
+          </p>
+        {:else if savedQueues.length > 0}
           <h2 class="pt-1 font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Saved queues (snapshots)</h2>
           <ul class="space-y-1 rounded-lg border border-border/70 bg-card/20 p-2">
             {#each savedQueues as sq (sq.id)}
@@ -444,7 +467,7 @@
                   disabled={!snapshot.me?.canAdd || queueBusy !== null}
                   onclick={() => void loadSavedIntoSession(sq.id)}
                 >
-                  Load
+                  {queueBusy === sq.id ? "…" : "Load"}
                 </button>
               </li>
             {/each}
@@ -472,42 +495,55 @@
             bind:selectedTagIds
             availableTags={data.availableTags}
             {tagQueryError}
+            busy={catalogueLoading}
             onchange={() => void fetchCatalogue({ reset: true })}
           />
         </div>
         {#if queueError}
           <p class="auth-error">{queueError}</p>
         {/if}
-        <ul bind:this={catalogueScrollRoot} class="max-h-96 divide-y divide-border/50 overflow-y-auto rounded-lg border border-border/70 bg-card/30">
-          {#if catalogueLoading && catalogue.length === 0}
-            <li class="px-4 py-8 text-center font-mono text-xs text-muted-foreground">Scanning catalogue…</li>
-          {:else if catalogue.length === 0}
-            <li class="px-4 py-8 text-center text-sm text-muted-foreground">No tracks.</li>
-          {:else}
-            {#each catalogue as track (track.id)}
-              <li class="flex items-center justify-between gap-2 px-3 py-2">
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-medium">{track.title}</p>
-                  <p class="truncate font-mono text-[10px] text-muted-foreground">{track.artists ?? "Unknown"}</p>
-                </div>
-                <button
-                  type="button"
-                  class="shrink-0 rounded border border-signal/40 px-2 py-1 font-mono text-[10px] text-signal hover:bg-signal/10 disabled:opacity-40"
-                  disabled={!snapshot.me?.canAdd || !track.playable || queueBusy === track.id}
-                  onclick={() => void enqueue(track.id)}
-                >
-                  {queueBusy === track.id ? "…" : "Add"}
-                </button>
-              </li>
-            {/each}
-            <li bind:this={catalogueSentinel} class="h-4 list-none" aria-hidden="true"></li>
-            {#if catalogueLoadingMore}
-              <li class="px-4 py-2 text-center font-mono text-[10px] text-muted-foreground">Loading more…</li>
-            {:else if !catalogueHasMore}
-              <li class="px-4 py-2 text-center font-mono text-[10px] text-muted-foreground">End of catalogue</li>
-            {/if}
-          {/if}
-        </ul>
+        {#if catalogueLoading && catalogue.length === 0}
+          <TrackListSkeleton rows={5} compact />
+        {:else}
+          <ListBusyOverlay busy={catalogueLoading && catalogue.length > 0} label="Updating…">
+            <ul
+              bind:this={catalogueScrollRoot}
+              class="max-h-96 min-h-[8rem] divide-y divide-border/50 overflow-y-auto rounded-lg border border-border/70 bg-card/30"
+            >
+              {#if catalogue.length === 0}
+                <li class="px-4 py-8 text-center text-sm text-muted-foreground">No tracks.</li>
+              {:else}
+                {#each catalogue as track (track.id)}
+                  <li class="flex items-center justify-between gap-2 px-3 py-2">
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-medium">{track.title}</p>
+                      <p class="truncate font-mono text-[10px] text-muted-foreground">{track.artists ?? "Unknown"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      class="shrink-0 rounded border border-signal/40 px-2 py-1 font-mono text-[10px] text-signal hover:bg-signal/10 disabled:opacity-40"
+                      disabled={!snapshot.me?.canAdd || !track.playable || queueBusy === track.id}
+                      onclick={() => void enqueue(track.id)}
+                    >
+                      {queueBusy === track.id ? "…" : "Add"}
+                    </button>
+                  </li>
+                {/each}
+                <li bind:this={catalogueSentinel} class="h-4 list-none" aria-hidden="true"></li>
+                {#if catalogueLoadingMore}
+                  <li class="px-4 py-2 text-center font-mono text-[10px] text-muted-foreground">
+                    <span class="inline-flex items-center gap-1.5">
+                      <span class="zap-busy-bars scale-90" aria-hidden="true"><span></span><span></span><span></span></span>
+                      Loading more…
+                    </span>
+                  </li>
+                {:else if !catalogueHasMore}
+                  <li class="px-4 py-2 text-center font-mono text-[10px] text-muted-foreground">End of catalogue</li>
+                {/if}
+              {/if}
+            </ul>
+          </ListBusyOverlay>
+        {/if}
       </div>
     </div>
   {:else}

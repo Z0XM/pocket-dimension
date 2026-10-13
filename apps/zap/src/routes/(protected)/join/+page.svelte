@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import BusyStatus from "$lib/components/BusyStatus.svelte";
 
   let code = $state(page.url.searchParams.get("code") ?? "");
   let loading = $state(false);
@@ -55,6 +56,9 @@
     </label>
     {#if error}
       <p class="auth-error">{error}</p>
+    {/if}
+    {#if loading}
+      <BusyStatus label="Joining session…" detail="Looking up room…" />
     {/if}
     <button type="submit" class="auth-btn w-full" disabled={loading || !code.trim()}>
       {loading ? "Joining…" : "Join"}

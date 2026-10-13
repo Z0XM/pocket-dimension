@@ -1,10 +1,14 @@
 <script lang="ts">
+  import BusyStatus from "$lib/components/BusyStatus.svelte";
+  import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
+  import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
 
   let playlist = $state(data.playlist);
   let busy = $state(false);
+  let busyLabel = $state("Working…");
   let error = $state<string | null>(null);
   let buildTagIds = $state<string[]>([]);
   let collabQuery = $state("");
@@ -16,6 +20,7 @@
 
   async function action(act: string, extra: Record<string, unknown> = {}) {
     busy = true;
+    busyLabel = act === "buildFromTags" ? "Rebuilding from tags…" : act === "addCollaborator" ? "Inviting collaborator…" : "Updating playlist…";
     error = null;
     try {
       const res = await fetch(`/api/playlists/${playlist.id}`, {
@@ -36,6 +41,7 @@
 
   async function toggleVisibility() {
     busy = true;
+    busyLabel = "Updating visibility…";
     error = null;
     try {
       const res = await fetch(`/api/playlists/${playlist.id}`, {
@@ -61,6 +67,7 @@
       return;
     }
     busy = true;
+    busyLabel = "Loading into session…";
     error = null;
     loadMsg = null;
     try {
@@ -117,6 +124,9 @@
     </div>
   </div>
 
+  {#if busy}
+    <BusyStatus label={busyLabel} />
+  {/if}
   {#if error}
     <p class="auth-error">{error}</p>
   {/if}
@@ -178,39 +188,43 @@
 
   <div>
     <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Tracks</p>
-    {#if playlist.items.length === 0}
+    {#if busy && playlist.items.length === 0 && busyLabel.startsWith("Rebuild")}
+      <TrackListSkeleton rows={4} compact />
+    {:else if playlist.items.length === 0}
       <p class="text-sm text-muted-foreground">Empty — build from tags above.</p>
     {:else}
-      <ul class="max-h-[28rem] space-y-1 overflow-y-auto rounded-lg border border-border/70 bg-card/30 p-2">
-        {#each playlist.items as item}
-          <li class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-secondary/40">
-            <span class="min-w-0 truncate">
-              {item.title}
-              <span class="font-mono text-[10px] text-muted-foreground"> · {item.artists ?? "—"}</span>
-            </span>
-            {#if playlist.canEdit}
-              <span class="flex shrink-0 gap-1">
-                <button
-                  type="button"
-                  class="font-mono text-[10px] text-muted-foreground hover:text-signal"
-                  disabled={busy}
-                  onclick={() => void action("exclude", { mediaAssetId: item.mediaAssetId, excluded: true })}
-                >
-                  exclude
-                </button>
-                <button
-                  type="button"
-                  class="font-mono text-[10px] text-destructive"
-                  disabled={busy}
-                  onclick={() => void action("removeTrack", { mediaAssetId: item.mediaAssetId })}
-                >
-                  remove
-                </button>
+      <ListBusyOverlay {busy} label={busyLabel}>
+        <ul class="max-h-[28rem] min-h-[6rem] space-y-1 overflow-y-auto rounded-lg border border-border/70 bg-card/30 p-2">
+          {#each playlist.items as item}
+            <li class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-secondary/40">
+              <span class="min-w-0 truncate">
+                {item.title}
+                <span class="font-mono text-[10px] text-muted-foreground"> · {item.artists ?? "—"}</span>
               </span>
-            {/if}
-          </li>
-        {/each}
-      </ul>
+              {#if playlist.canEdit}
+                <span class="flex shrink-0 gap-1">
+                  <button
+                    type="button"
+                    class="font-mono text-[10px] text-muted-foreground hover:text-signal"
+                    disabled={busy}
+                    onclick={() => void action("exclude", { mediaAssetId: item.mediaAssetId, excluded: true })}
+                  >
+                    exclude
+                  </button>
+                  <button
+                    type="button"
+                    class="font-mono text-[10px] text-destructive"
+                    disabled={busy}
+                    onclick={() => void action("removeTrack", { mediaAssetId: item.mediaAssetId })}
+                  >
+                    remove
+                  </button>
+                </span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </ListBusyOverlay>
     {/if}
   </div>
 

@@ -9,6 +9,7 @@
     availableTags = [],
     tagQueryError = null,
     compact = false,
+    busy = false,
     onchange,
   }: {
     scope?: "all" | "yours";
@@ -19,6 +20,8 @@
     tagQueryError?: string | null;
     /** Session “add” column — tighter chrome */
     compact?: boolean;
+    /** Refetch in flight — subtle signal on filters */
+    busy?: boolean;
     onchange?: () => void;
   } = $props();
 
@@ -78,11 +81,12 @@
   }
 </script>
 
-<div class={`flex flex-col ${compact ? "gap-2" : "gap-4"}`}>
-  <div class="flex flex-wrap gap-2">
+<div class={`flex flex-col ${compact ? "gap-2" : "gap-4"}`} aria-busy={busy}>
+  <div class="flex flex-wrap items-center gap-2">
     <button
       type="button"
       class={`rounded px-3 py-1.5 font-mono text-xs ${scope === "all" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
+      disabled={busy}
       onclick={() => onScope("all")}
     >
       All
@@ -90,10 +94,17 @@
     <button
       type="button"
       class={`rounded px-3 py-1.5 font-mono text-xs ${scope === "yours" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
+      disabled={busy}
       onclick={() => onScope("yours")}
     >
       Your library
     </button>
+    {#if busy}
+      <span class="inline-flex items-center gap-1.5 font-mono text-[10px] text-signal" role="status">
+        <span class="zap-busy-bars scale-90" aria-hidden="true"><span></span><span></span><span></span></span>
+        Updating
+      </span>
+    {/if}
   </div>
 
   <input
