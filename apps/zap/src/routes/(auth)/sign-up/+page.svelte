@@ -8,8 +8,8 @@
 
   const id = $props.id();
 
-  const redirectTo = $derived(page.url.searchParams.get("redirect") ?? "/library");
-  const loginHref = $derived(redirectTo === "/library" ? "/login" : `/login?redirect=${encodeURIComponent(redirectTo)}`);
+  const redirectTo = $derived(page.url.searchParams.get("redirect") ?? "/home");
+  const loginHref = $derived(redirectTo === "/home" ? "/login" : `/login?redirect=${encodeURIComponent(redirectTo)}`);
 
   let name = $state("");
   let email = $state("");

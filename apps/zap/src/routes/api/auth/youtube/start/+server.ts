@@ -4,7 +4,7 @@ import type { RequestHandler } from "./$types";
 import { buildYouTubeOAuthUrl, isGoogleOAuthConfigured, OAUTH_STATE_COOKIE } from "$lib/server/youtube";
 
 function safeReturnTo(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/library?tab=upload";
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/add";
   return value;
 }
 

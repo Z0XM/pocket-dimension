@@ -57,5 +57,5 @@ export const GET: RequestHandler = async ({ locals, url, cookies }) => {
       },
     });
 
-  throw redirect(302, storedState.returnTo || "/library?tab=upload");
+  throw redirect(302, storedState.returnTo || "/add");
 };

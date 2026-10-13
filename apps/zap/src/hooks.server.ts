@@ -38,7 +38,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     if (session && !isAllowedAuthRoute) {
       if (session.user.emailVerified) {
-        return redirect(307, "/library");
+        return redirect(307, "/home");
       }
     }
   }

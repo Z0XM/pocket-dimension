@@ -1,5 +1,7 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { SessionError, enqueueCatalogueTrack } from "$lib/server/sessions";
+import type { SessionSnapshot } from "$lib/server/sessions/types";
 
 export class PlaylistError extends Error {
   constructor(
@@ -455,4 +457,26 @@ export async function findUserIdByEmailOrUsername(query: string): Promise<string
     where: or(eq(schema.user.email, q.toLowerCase()), eq(schema.user.username, q)),
   });
   return user?.id ?? null;
+}
+
+/** Enqueue all playlist tracks into a live session (playlist order). */
+export async function loadPlaylistIntoSession(sessionId: string, userId: string, playlistId: string): Promise<SessionSnapshot> {
+  if (!(await userCanView(playlistId, userId))) throw new PlaylistError("Playlist not found", 404);
+  const items = await db.query.playlistItems.findMany({
+    where: eq(schema.playlistItems.playlistId, playlistId),
+    orderBy: [asc(schema.playlistItems.position)],
+  });
+  if (items.length === 0) throw new PlaylistError("Playlist is empty", 400);
+
+  let snapshot: SessionSnapshot | null = null;
+  try {
+    for (const item of items) {
+      snapshot = await enqueueCatalogueTrack(sessionId, userId, item.mediaAssetId);
+    }
+  } catch (err) {
+    if (err instanceof SessionError) throw new PlaylistError(err.message, err.status);
+    throw err;
+  }
+  if (!snapshot) throw new PlaylistError("Failed to load playlist", 500);
+  return snapshot;
 }

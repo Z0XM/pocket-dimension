@@ -1,6 +1,7 @@
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { SessionError, createSession, findLiveSessionForUser, joinSessionByCode, listLiveSessionsForUser } from "$lib/server/sessions";
+import { canStartSession } from "$lib/server/session-start";
 
 function requireVerifiedUser(locals: App.Locals) {
   if (!locals.user) throw error(401, "Sign in required");
@@ -22,6 +23,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       const snapshot = await joinSessionByCode(user.id, body.code ?? "");
       return json(snapshot);
     }
+    const live = await listLiveSessionsForUser(user.id);
     // Prefer resuming an existing live host session unless forceNew.
     if (!body.forceNew) {
       const existing = await findLiveSessionForUser(user.id);
@@ -30,6 +32,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
         const snapshot = await getSessionForUser(existing.id, user.id);
         return json(snapshot);
       }
+    }
+    if (!canStartSession(live)) {
+      throw new SessionError("Guests can’t start a new session — resume or join instead", 403);
     }
     const snapshot = await createSession(user.id);
     return json(snapshot, { status: 201 });
