@@ -27,13 +27,12 @@ TURBO_FORCE=1 bun run build:shared:db
 TURBO_FORCE=1 bun run build:shared:auth
 TURBO_FORCE=1 bun run build:app:zap
 
-# Prefer migrations at container start (scripts/start.sh) so schema stays current across restarts.
-# Optional build-time migrate when DATABASE_URL is present (e.g. CI smoke).
+# Opt-in build-time migrate (e.g. CI smoke). Normally run `bun run db:migrate` as an explicit deploy step.
 if [[ -n "${DATABASE_URL:-}" && "${ZAP_MIGRATE_AT_BUILD:-}" == "1" ]]; then
   echo "Running database migrations at build (ZAP_MIGRATE_AT_BUILD=1)..."
   bun db:migrate
 else
-  echo "Migrations deferred to scripts/start.sh when DATABASE_URL is set at runtime."
+  echo "Skipping db:migrate — run \`DATABASE_URL=... bun run db:migrate\` from the repo root before serving a release with new migrations."
 fi
 
 echo "Zap deploy build complete."

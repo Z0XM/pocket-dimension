@@ -27,7 +27,7 @@ Same monorepo context rules as auth-service — see [DEPLOY.md](../../DEPLOY.md)
 | Dockerfile Path | `Dockerfile` |
 | Port | `3008` |
 
-Start command is `bun run start` (`scripts/start.sh`), which runs migrations when `DATABASE_URL` is set, then serves the build.
+Start command is `bun run start` (`scripts/start.sh`), which serves the build. It does **not** run migrations — apply them as a deploy step with `DATABASE_URL=... bun run db:migrate` from the repo root (shared migrations cover every app's schema).
 
 ## Alternative: Railpack
 

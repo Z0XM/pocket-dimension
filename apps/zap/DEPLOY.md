@@ -29,9 +29,10 @@ Build from the **monorepo root** so `@pocket-dimension/*` workspace deps resolve
 
 Start command is `bun run start` → `scripts/start.sh`, which:
 
-1. Runs **Drizzle migrations** when `DATABASE_URL` is set  
-2. Sets `HOST=0.0.0.0`, `PORT=3013`, `BODY_SIZE_LIMIT=50M` (override as needed)  
-3. Serves `./build/index.js`
+1. Sets `HOST=0.0.0.0`, `PORT=3013`, `BODY_SIZE_LIMIT=50M` (override as needed)  
+2. Serves `./build/index.js`
+
+It does **not** run migrations — see [Migrations](#migrations).
 
 Do **not** put media on the VPS disk — blobs go to **Cloudflare R2**.
 
@@ -123,9 +124,10 @@ Invite needs View Channel + Connect + Speak (`permissions=3147776`). See project
 
 PostgreSQL **18+** required (`uuidv7()`). Zap schema lives in migrations `0046+` under `shared/db`.
 
-- **Runtime (preferred):** container start via `scripts/start.sh` when `DATABASE_URL` is set.  
-- **Manual:** from monorepo root: `DATABASE_URL=... bun run db:migrate`  
-- **Build-time (optional):** `ZAP_MIGRATE_AT_BUILD=1` during `deploy-build.sh`
+Migrations are an explicit deploy step, not part of container start. `shared/db/migrations` is shared by every app, so applying it migrates all schemas — run it deliberately, before rolling out a release that needs new tables.
+
+- **Standard:** from monorepo root: `DATABASE_URL=... bun run db:migrate`  
+- **Build-time (opt-in):** `ZAP_MIGRATE_AT_BUILD=1` during `deploy-build.sh` (Railpack path)
 
 ## Checklist
 
