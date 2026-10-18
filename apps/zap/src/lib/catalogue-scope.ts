@@ -14,3 +14,11 @@ export function parseCatalogueScope(params: URLSearchParams, fallback: "all" | "
   if (raw === "all" || raw === "yours") return { scope: raw, playlistId: null };
   return { scope: fallback, playlistId: null };
 }
+
+/** Path + query with the playlist scope dropped (other filters kept) — for a scope whose playlist is gone. */
+export function withoutPlaylistScope(url: URL): string {
+  const params = new URLSearchParams(url.search);
+  params.delete("playlist");
+  const qs = params.toString();
+  return qs ? `${url.pathname}?${qs}` : url.pathname;
+}

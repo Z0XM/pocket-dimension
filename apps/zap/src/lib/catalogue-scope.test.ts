@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseCatalogueScope } from "./catalogue-scope";
+import { parseCatalogueScope, withoutPlaylistScope } from "./catalogue-scope";
 
 const pl = "0193b0f4-5c6e-7d1a-9b2c-3d4e5f607182";
 
@@ -17,5 +17,15 @@ describe("parseCatalogueScope", () => {
   test("playlist scope needs a uuid", () => {
     expect(parseCatalogueScope(new URLSearchParams(`playlist=${pl}&scope=all`), "yours")).toEqual({ scope: "playlist", playlistId: pl });
     expect(parseCatalogueScope(new URLSearchParams("playlist=not-a-uuid"), "yours")).toEqual({ scope: "yours", playlistId: null });
+  });
+});
+
+describe("withoutPlaylistScope", () => {
+  test("drops only the playlist param", () => {
+    expect(withoutPlaylistScope(new URL(`http://x/catalogue?playlist=${pl}&q=rain&tag=a&tag=b`))).toBe("/catalogue?q=rain&tag=a&tag=b");
+  });
+
+  test("returns the bare path when nothing else is set", () => {
+    expect(withoutPlaylistScope(new URL(`http://x/catalogue?playlist=${pl}`))).toBe("/catalogue");
   });
 });

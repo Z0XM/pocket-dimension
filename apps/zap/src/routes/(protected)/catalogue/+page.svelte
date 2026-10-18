@@ -13,6 +13,7 @@
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
   import { getCatalogQueue, type CatalogueFilterInput } from "$lib/catalog-queue-client.svelte";
+  import { withoutPlaylistScope } from "$lib/catalogue-scope";
   import { effectiveTagQuery, findPlaylistMatchingTagFilter, tagFilterKey } from "$lib/tag-filter";
   import type { ActionData, PageData } from "./$types";
 
@@ -60,19 +61,21 @@
 
   let deletedIds = $state<string[]>([]);
   let deleteMessage = $state<string | null>(null);
+  const MISSING_PLAYLIST_NOTICE = "That playlist is no longer available — showing your library.";
+  /** Playlists that 404'd since the page loaded (deleted elsewhere); hidden from the scope + “Add to playlist” menus. */
+  let missingPlaylistIds = $state<string[]>([]);
+  let scopeNotice = $state<string | null>(null);
   const filtering = $derived(Boolean(q.trim() || tagQuery.trim() || selected.length));
   const scopedPlaylistId = $derived(libraryScope.startsWith("playlist:") ? libraryScope.slice("playlist:".length) : null);
   const suggestions = $derived(filtering || scopedPlaylistId ? [] : (data.suggestions ?? []).filter((t) => !deletedIds.includes(t.id)));
+  const playlistOptions = $derived((data.playlistOptions ?? []).filter((p) => !missingPlaylistIds.includes(p.id)));
   const scopeOptions = $derived.by(() => {
-    const opts = [
-      { value: "all", label: "All tracks" },
-      ...(data.playlistOptions ?? []).map((p) => ({ value: `playlist:${p.id}`, label: `▸ ${p.name}` })),
-    ];
+    const opts = [{ value: "all", label: "All tracks" }, ...playlistOptions.map((p) => ({ value: `playlist:${p.id}`, label: `▸ ${p.name}` }))];
     if (scopedPlaylistId && !opts.some((o) => o.value === libraryScope)) opts.push({ value: libraryScope, label: "▸ Shared playlist" });
     return opts;
   });
   const scopeLabel = $derived(scopeOptions.find((o) => o.value === libraryScope)?.label.replace(/^▸ /, "") ?? "Your library");
-  const editablePlaylists = $derived((data.playlistOptions ?? []).filter((p) => p.canEdit).map((p) => ({ id: p.id, name: p.name })));
+  const editablePlaylists = $derived(playlistOptions.filter((p) => p.canEdit).map((p) => ({ id: p.id, name: p.name })));
   const canAddAll = $derived(Boolean(queue) && (filtering || Boolean(scopedPlaylistId)) && assets.length > 0 && !tagQueryError);
 
   function filterInput(): CatalogueFilterInput {
@@ -111,7 +114,15 @@
   /** Tag filters only — the free-text search is deliberately ignored for playlist matching. */
   const tagFilter = $derived({ tagQuery, tagIds: selected });
   const tagFilterValid = $derived(!tagQueryError && tagFilterKey(tagFilter, availableTags) !== null);
-  const matchingPlaylist = $derived(tagFilterValid ? findPlaylistMatchingTagFilter(tagFilter, tagPlaylists, availableTags) : null);
+  const matchingPlaylist = $derived(
+    tagFilterValid
+      ? findPlaylistMatchingTagFilter(
+          tagFilter,
+          tagPlaylists.filter((p) => !missingPlaylistIds.includes(p.id)),
+          availableTags
+        )
+      : null
+  );
   const saveTagQuery = $derived(effectiveTagQuery(tagFilter, availableTags));
   const savePlaylistDefaultName = $derived(
     tagQuery.trim()
@@ -128,10 +139,11 @@
   }
 
   $effect(() => {
-    const key = `${data.scope}|${data.playlistId}|${data.q}|${data.tagQuery}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
+    const key = `${data.scope}|${data.playlistId}|${data.playlistMissing}|${data.q}|${data.tagQuery}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
     if (key === hydratedKey) return;
     hydratedKey = key;
     libraryScope = scopeFromData();
+    scopeNotice = data.playlistMissing ? MISSING_PLAYLIST_NOTICE : null;
     q = data.q;
     tagQuery = data.tagQuery ?? "";
     tagQueryError = data.tagQueryError ?? null;
@@ -161,15 +173,21 @@
     }
   });
 
-  /** `?add` / `?add=file|youtube` deep-links (legacy /add, YouTube OAuth return) open the add dialog. */
+  /**
+   * `?add` / `?add=file|youtube` deep-links (legacy /add, YouTube OAuth return) open the add dialog.
+   * A `?playlist=` the server could not resolve (deleted) is dropped from the URL.
+   */
   afterNavigate(({ to }) => {
-    const add = to?.url.searchParams.get("add");
-    if (add == null || !to) return;
-    openAdd(parseAddMusicTab(add));
+    if (!to) return;
+    const add = to.url.searchParams.get("add");
+    const dropPlaylist = data.playlistMissing && to.url.searchParams.has("playlist");
+    if (add == null && !dropPlaylist) return;
+    if (add != null) openAdd(parseAddMusicTab(add));
     const cleaned = new URL(to.url);
     cleaned.searchParams.delete("add");
+    const target = dropPlaylist ? withoutPlaylistScope(cleaned) : `${cleaned.pathname}${cleaned.search}`;
     // Runs before the router is marked started on first load; defer so replaceState is allowed.
-    queueMicrotask(() => replaceState(`${cleaned.pathname}${cleaned.search}`, {}));
+    queueMicrotask(() => replaceState(target, {}));
   });
 
   function openAdd(tab: AddMusicTab = addTab) {
@@ -235,10 +253,19 @@
 
     try {
       const offset = opts.reset ? 0 : nextOffset;
+      const requestedPlaylistId = scopedPlaylistId;
       const res = await fetch(`/api/catalogue?${buildParams(offset)}`, {
         credentials: "same-origin",
         headers: { Accept: "application/json" },
       });
+      if (res.status === 404 && requestedPlaylistId) {
+        if (gen !== fetchGen) return;
+        missingPlaylistIds = [...missingPlaylistIds, requestedPlaylistId];
+        libraryScope = "";
+        scopeNotice = MISSING_PLAYLIST_NOTICE;
+        void fetchPage({ reset: true });
+        return;
+      }
       if (!res.ok) throw new Error(`Browse failed (${res.status})`);
       const body = (await res.json()) as {
         assets: TrackItem[];
@@ -321,6 +348,7 @@
       actions={addButton}
       onchange={() => {
         savedPlaylistMessage = null;
+        scopeNotice = null;
         void fetchPage({ reset: true });
       }}
     />
@@ -370,8 +398,11 @@
     {/if}
   </div>
 
-  {#if form?.tagError || form?.tagOk || listError || deleteMessage || addMessage || savedPlaylistMessage}
+  {#if form?.tagError || form?.tagOk || listError || deleteMessage || addMessage || savedPlaylistMessage || scopeNotice}
     <div class="shrink-0 space-y-1">
+      {#if scopeNotice}
+        <p class="text-sm text-muted-foreground">{scopeNotice}</p>
+      {/if}
       {#if form?.tagError}
         <p class="auth-error mb-0 p-2">{form.tagError}</p>
       {/if}

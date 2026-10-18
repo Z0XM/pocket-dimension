@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
   import TagQueryEditor from "$lib/components/TagQueryEditor.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
@@ -17,6 +19,8 @@
   let editTagIds = $state<string[]>([]);
   let collabQuery = $state("");
   let loadMsg = $state<string | null>(null);
+  let deleteOpen = $state(false);
+  let deleting = $state(false);
 
   const queue = getCatalogQueue();
   const hasPlayable = $derived(playlist.items.some((i) => i.playable));
@@ -86,6 +90,23 @@
       error = err instanceof Error ? err.message : "Update failed";
     } finally {
       busy = false;
+    }
+  }
+
+  async function deletePlaylist() {
+    deleting = true;
+    error = null;
+    try {
+      const res = await fetch(`/api/playlists/${playlist.id}`, { method: "DELETE", credentials: "same-origin" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 404) throw new Error(body?.message ?? "Delete failed");
+      deleteOpen = false;
+      await goto("/playlists", { invalidateAll: true });
+    } catch (err) {
+      deleteOpen = false;
+      error = err instanceof Error ? err.message : "Delete failed";
+    } finally {
+      deleting = false;
     }
   }
 
@@ -163,7 +184,7 @@
       {:else if data.canStart}
         <span class="font-mono text-[10px] text-muted-foreground self-center">Start a session to queue this playlist</span>
       {/if}
-      {#if playlist.canEdit && playlist.ownerUserId === data.playlist.ownerUserId}
+      {#if playlist.canDelete}
         <button
           type="button"
           class="rounded border border-border px-2 py-1 font-mono text-[10px]"
@@ -171,6 +192,14 @@
           onclick={() => void toggleVisibility()}
         >
           Make {playlist.visibility === "public" ? "private" : "public"}
+        </button>
+        <button
+          type="button"
+          class="rounded border border-destructive/40 px-2 py-1 font-mono text-[10px] text-destructive hover:bg-destructive/10 disabled:opacity-40"
+          disabled={busy || deleting}
+          onclick={() => (deleteOpen = true)}
+        >
+          Delete
         </button>
       {/if}
     </div>
@@ -318,3 +347,13 @@
     </div>
   {/if}
 </section>
+
+<ConfirmDialog
+  bind:open={deleteOpen}
+  title="Delete playlist?"
+  body={`“${playlist.name}” (${playlist.trackCount} track${playlist.trackCount === 1 ? "" : "s"}) will be deleted for you and any collaborators. The tracks stay in the catalogue and in your queue.`}
+  confirmLabel="Delete playlist"
+  danger
+  busy={deleting}
+  onconfirm={deletePlaylist}
+/>
