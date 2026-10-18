@@ -199,7 +199,7 @@
     </button>
   {:else}
     <div
-      class={`fixed z-40 flex flex-col overflow-hidden border border-signal/30 bg-popover/95 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur ${
+      class={`fixed z-[41] flex flex-col overflow-hidden border border-signal/30 bg-popover/95 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur ${
         mode === "full" ? "inset-2 rounded-lg sm:inset-6" : "rounded-lg"
       }`}
       style={mode === "panel" && panel ? `left:${panel.x}px;top:${panel.y}px;width:${panel.w}px;height:${panel.h}px` : undefined}
