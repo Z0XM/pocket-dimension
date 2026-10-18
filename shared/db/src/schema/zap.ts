@@ -5,7 +5,8 @@ import { id, timestamps } from "./common";
 
 export const zapSchema = pgSchema("zap");
 
-export const mediaAssetStatus = zapSchema.enum("media_asset_status", ["pending", "ready", "failed"]);
+/** `unavailable`: identity known (e.g. deleted/private YouTube item) but no audio source yet; backfill flips it to `ready`. */
+export const mediaAssetStatus = zapSchema.enum("media_asset_status", ["pending", "ready", "failed", "unavailable"]);
 export const mediaSourceType = zapSchema.enum("media_source_type", ["upload", "youtube", "url", "other"]);
 export const tagKind = zapSchema.enum("tag_kind", ["system", "custom"]);
 export const sessionStatus = zapSchema.enum("session_status", ["live", "ended"]);
@@ -216,6 +217,8 @@ export const syncRuns = zapSchema.table(
     importedCount: integer("imported_count").default(0).notNull(),
     skippedCount: integer("skipped_count").default(0).notNull(),
     failedCount: integer("failed_count").default(0).notNull(),
+    /** Saved to the catalogue as `unavailable` (metadata only, no audio). Not included in importedCount. */
+    unavailableCount: integer("unavailable_count").default(0).notNull(),
     summaryJson: text("summary_json"),
     errorMessage: text("error_message"),
     createdAt: timestamps.createdAt,
