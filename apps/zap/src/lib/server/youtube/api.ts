@@ -106,7 +106,8 @@ export async function getYouTubeAccessTokenForUser(userId: string) {
       .where(eq(table.userId, userId));
 
     return refreshed.accessToken;
-  } catch {
+  } catch (err) {
+    console.error("[zap youtube] access token lookup failed", { userId }, err);
     return null;
   }
 }
@@ -140,8 +141,16 @@ async function youtubeFetch<T>(
   }
 
   const response = await fetch(url, { headers });
-  const body = (await response.json().catch(() => ({}))) as T & { error?: { message?: string } };
+  const body = (await response.json().catch(() => ({}))) as T & {
+    error?: { message?: string; errors?: Array<{ reason?: string }> };
+  };
   if (!response.ok) {
+    console.error("[zap youtube] Data API request failed", {
+      path,
+      status: response.status,
+      reason: body.error?.errors?.[0]?.reason,
+      message: body.error?.message,
+    });
     throw error(response.status, body.error?.message ?? "YouTube Data API request failed");
   }
   return body;
@@ -156,8 +165,9 @@ export async function getYoutubeLinkStatus(userId: string) {
       linkedAt: link.linkedAt.toISOString(),
       scopes: link.scopes,
     };
-  } catch {
+  } catch (err) {
     // Library must load without YouTube env / before migration / with stale db.query wiring
+    console.error("[zap youtube] link status lookup failed", { userId }, err);
     return { linked: false as const };
   }
 }

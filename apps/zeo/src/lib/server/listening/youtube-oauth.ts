@@ -73,6 +73,7 @@ async function parseTokenResponse(response: Response) {
   const body = (await response.json().catch(() => ({}))) as GoogleTokenBody;
 
   if (!response.ok || !body.access_token) {
+    console.error("[zeo youtube oauth] token exchange failed", { status: response.status, error: body.error, description: body.error_description });
     throw error(502, body.error_description ?? body.error ?? "Google token exchange failed");
   }
 
@@ -94,7 +95,10 @@ export async function tryRefreshYouTubeAccessToken(refreshToken: string) {
   });
 
   const body = (await response.json().catch(() => ({}))) as GoogleTokenBody;
-  if (!response.ok) return null;
+  if (!response.ok) {
+    console.warn("[zeo youtube oauth] token refresh failed", { status: response.status, error: body.error, description: body.error_description });
+    return null;
+  }
   return tokenFromGoogleBody(body);
 }
 
@@ -105,6 +109,7 @@ async function googleSubForAccessToken(accessToken: string) {
   const body = (await response.json().catch(() => ({}))) as { sub?: string; error_description?: string; error?: string };
 
   if (!response.ok || !body.sub) {
+    console.error("[zeo youtube oauth] user info lookup failed", { status: response.status, error: body.error, description: body.error_description });
     throw error(502, body.error_description ?? body.error ?? "Google user info lookup failed");
   }
 

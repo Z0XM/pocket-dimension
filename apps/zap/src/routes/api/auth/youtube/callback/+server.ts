@@ -24,7 +24,15 @@ export const GET: RequestHandler = async ({ locals, url, cookies }) => {
   cookies.delete(OAUTH_STATE_COOKIE, { path: "/" });
 
   if (!code || !state || !storedState || storedState.state !== state) {
-    throw error(400, "Invalid YouTube OAuth callback");
+    const googleError = url.searchParams.get("error");
+    console.error("[zap youtube oauth] invalid callback", {
+      googleError,
+      hasCode: Boolean(code),
+      hasState: Boolean(state),
+      hasStoredState: Boolean(storedState),
+      stateMatches: Boolean(storedState && storedState.state === state),
+    });
+    throw error(400, googleError ? `YouTube linking failed: ${googleError}` : "Invalid YouTube OAuth callback");
   }
 
   const tokens = await exchangeYouTubeCode({ code, requestUrl: url });
