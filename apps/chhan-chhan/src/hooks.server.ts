@@ -1,10 +1,11 @@
-import { auth, getDevModeSessionRedirect, isDevModeEnabled } from "@pocket-dimension/auth";
+import { auth, getDevModeSessionRedirect, isDevModeEnabled, logServerErrors } from "@pocket-dimension/auth";
 import type { schema } from "@pocket-dimension/db";
 import { redirect, type Handle } from "@sveltejs/kit";
+import { sequence } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
 
-export const handle: Handle = async ({ event, resolve }) => {
+const authHandle: Handle = async ({ event, resolve }) => {
   const { pathname } = event.url;
 
   if (pathname === "/sample" || pathname.startsWith("/sample/")) {
@@ -62,3 +63,5 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   return svelteKitHandler({ event, resolve, auth, building });
 };
+
+export const handle = sequence(logServerErrors, authHandle);

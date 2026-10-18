@@ -1,6 +1,7 @@
-import { auth, getDevModeSessionRedirect, isDevModeEnabled } from "@pocket-dimension/auth";
+import { auth, getDevModeSessionRedirect, isDevModeEnabled, logServerErrors } from "@pocket-dimension/auth";
 import type { schema } from "@pocket-dimension/db";
 import { type Handle, redirect } from "@sveltejs/kit";
+import { sequence } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
 import { startNotificationScheduler } from "$lib/server/notification-scheduler";
@@ -9,7 +10,7 @@ if (!building) {
   startNotificationScheduler();
 }
 
-export const handle: Handle = async ({ event, resolve }) => {
+const authHandle: Handle = async ({ event, resolve }) => {
   // Fetch current session from Better Auth
   const session = await auth.api.getSession({
     headers: event.request.headers,
@@ -70,3 +71,5 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   return svelteKitHandler({ event, resolve, auth, building });
 };
+
+export const handle = sequence(logServerErrors, authHandle);

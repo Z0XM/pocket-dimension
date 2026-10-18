@@ -1,6 +1,7 @@
-import { auth, getDevModeSessionRedirect, isDevModeEnabled } from "@pocket-dimension/auth";
+import { auth, getDevModeSessionRedirect, isDevModeEnabled, logServerErrors } from "@pocket-dimension/auth";
 import type { schema } from "@pocket-dimension/db";
-import { redirect } from "@sveltejs/kit";
+import { redirect, type Handle } from "@sveltejs/kit";
+import { sequence } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
 import { startBunkoScheduler } from "$lib/connectors/jobs/bunko-scheduler";
@@ -9,7 +10,7 @@ if (!building) {
   startBunkoScheduler();
 }
 
-export async function handle({ event, resolve }) {
+const authHandle: Handle = async ({ event, resolve }) => {
   // Fetch current session from Better Auth
   const session = await auth.api.getSession({
     headers: event.request.headers,
@@ -67,4 +68,6 @@ export async function handle({ event, resolve }) {
   }
 
   return svelteKitHandler({ event, resolve, auth, building });
-}
+};
+
+export const handle = sequence(logServerErrors, authHandle);
