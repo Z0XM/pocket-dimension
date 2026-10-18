@@ -75,6 +75,7 @@
               {:else}
                 {entry.label}
                 · {entry.imported} imported
+                {#if entry.unavailable}· {entry.unavailable} not available{/if}
                 {#if entry.skipped}· {entry.skipped} skipped{/if}
                 {#if entry.failed}· {entry.failed} failed{/if}
               {/if}

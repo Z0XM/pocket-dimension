@@ -3,6 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { error } from "@sveltejs/kit";
 import { decryptToken, encryptToken } from "./tokens";
 import { tryRefreshYouTubeAccessToken } from "./oauth";
+import { youtubeItemUnavailableReason, type YouTubeVideoStatusInfo } from "./availability";
 
 const DATA_API_URL = "https://www.googleapis.com/youtube/v3";
 
@@ -27,6 +28,8 @@ export type ZapYouTubePlaylistItem = {
   videoPublishedAt: string | null;
   durationMs: number | null;
   url: string;
+  /** Set when the Data API says the video is deleted / private / removed (row is still imported as `unavailable`). */
+  unavailableReason: string | null;
 };
 
 function durationToMs(duration: string | undefined) {
@@ -214,16 +217,23 @@ export async function listYouTubePlaylists(userId: string): Promise<ZapYouTubePl
   return items;
 }
 
-async function videoDurationMap(videoIds: string[], accessToken: string) {
-  const map = new Map<string, number | null>();
+type VideoInfo = YouTubeVideoStatusInfo & { durationMs: number | null };
+
+/** `videos.list` details by id; ids missing from the map were not returned (deleted / private). */
+async function videoInfoMap(videoIds: string[], accessToken: string) {
+  const map = new Map<string, VideoInfo>();
   for (let i = 0; i < videoIds.length; i += 50) {
     const chunk = videoIds.slice(i, i + 50);
     if (chunk.length === 0) continue;
     const body = await youtubeFetch<{
-      items?: Array<{ id: string; contentDetails?: { duration?: string } }>;
-    }>("videos", { part: "contentDetails", id: chunk.join(",") }, { accessToken, requireUserAuth: true });
+      items?: Array<{ id: string; contentDetails?: { duration?: string }; status?: { uploadStatus?: string; privacyStatus?: string } }>;
+    }>("videos", { part: "contentDetails,status", id: chunk.join(",") }, { accessToken, requireUserAuth: true });
     for (const item of body.items ?? []) {
-      map.set(item.id, durationToMs(item.contentDetails?.duration));
+      map.set(item.id, {
+        durationMs: durationToMs(item.contentDetails?.duration),
+        uploadStatus: item.status?.uploadStatus ?? null,
+        privacyStatus: item.status?.privacyStatus ?? null,
+      });
     }
   }
   return map;
@@ -279,12 +289,20 @@ export async function listYouTubePlaylistItems(userId: string, playlistId: strin
         videoPublishedAt: item.contentDetails?.videoPublishedAt ?? null,
         durationMs: null,
         url: `https://www.youtube.com/watch?v=${videoId}`,
+        unavailableReason: null,
       });
     }
 
-    const durations = await videoDurationMap(pageIds, accessToken);
+    const infos = await videoInfoMap(pageIds, accessToken);
     for (const row of pageRows) {
-      row.durationMs = durations.get(row.videoId) ?? null;
+      const info = infos.get(row.videoId) ?? null;
+      row.durationMs = info?.durationMs ?? null;
+      row.unavailableReason = youtubeItemUnavailableReason({ title: row.title, video: info });
+      if (row.unavailableReason) {
+        // Hidden items carry placeholder text ("This video is private.") and the playlist owner's channel.
+        row.description = null;
+        if (!row.channelId) row.channelTitle = null;
+      }
       results.push(row);
     }
 

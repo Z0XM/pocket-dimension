@@ -23,6 +23,9 @@
   --signal: #3dffe8;
   --graph: #5b8cff;
   --wave: color-mix(in srgb, #3dffe8 18%, transparent);
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: color-mix(in srgb, var(--signal) 18%, var(--border));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--signal) 45%, var(--border));
 }
 
 .dark {

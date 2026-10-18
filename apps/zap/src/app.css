@@ -54,6 +54,40 @@
   button {
     @apply cursor-pointer disabled:cursor-not-allowed;
   }
+
+  /*
+   * Themed scrollbars. Chromium ignores ::-webkit-scrollbar once scrollbar-color/width are set,
+   * so the standard properties are only applied where the WebKit pseudo-elements are unsupported (Firefox).
+   */
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    }
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    background-clip: padding-box;
+    border: 3px solid transparent;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:active {
+    background-color: var(--scrollbar-thumb-hover);
+    border-width: 2px;
+  }
 }
 
 @layer components {

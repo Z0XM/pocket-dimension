@@ -1,6 +1,7 @@
 <script lang="ts">
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import CustomTagInput from "$lib/components/CustomTagInput.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import { nextPlaybackAction } from "$lib/playback-action";
   import { enhance } from "$app/forms";
@@ -15,6 +16,10 @@
     durationMs: number | null;
     sourceType: string;
     playable: boolean;
+    /** False for metadata-only rows (deleted / private / blocked source). */
+    available?: boolean;
+    unavailableReason?: string | null;
+    externalUrl?: string | null;
     tags: { id: string; name: string; kind: string }[];
   };
 
@@ -34,6 +39,9 @@
 
   let editing = $state(false);
   let editTagIds = $state<string[]>([]);
+  let editCustomTags = $state<string[]>([]);
+  let editCustomDraft = $state("");
+  const unavailable = $derived(track.available === false);
   let current = $state(0);
   let duration = $state(0);
   let loading = $state(false);
@@ -142,7 +150,7 @@
   async function togglePlay() {
     error = null;
     if (!track.playable) {
-      error = "No audio file for this track.";
+      error = unavailable ? "Song not available — no audio source yet." : "No audio file for this track.";
       return;
     }
     if (!audioEl) return;
@@ -192,6 +200,8 @@
   function startEdit() {
     editing = true;
     editTagIds = track.tags.map((t) => t.id);
+    editCustomTags = [];
+    editCustomDraft = "";
   }
 </script>
 
@@ -201,7 +211,8 @@
       type="button"
       class="flex size-10 shrink-0 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
       disabled={!track.playable || loading}
-      aria-label={uiPlaying ? "Pause" : "Play"}
+      title={unavailable ? "Song not available" : undefined}
+      aria-label={unavailable ? "Song not available" : uiPlaying ? "Pause" : "Play"}
       onclick={togglePlay}
     >
       {#if loading}
@@ -216,10 +227,26 @@
     <div class="min-w-0 flex-1 space-y-2">
       <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0">
-          <p class="truncate font-medium text-foreground">{track.title}</p>
+          <p class="truncate font-medium {unavailable ? 'text-muted-foreground' : 'text-foreground'}">{track.title}</p>
           <p class="font-mono text-xs text-muted-foreground">
             {track.artists ?? "Unknown"} · {formatDurationMs(track.durationMs)} · {track.sourceType}
           </p>
+          {#if unavailable}
+            <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px]">
+              <span class="rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-destructive">Song not available</span>
+              {#if track.unavailableReason}<span class="text-muted-foreground">{track.unavailableReason}</span>{/if}
+              {#if track.externalUrl}
+                <a
+                  class="text-muted-foreground underline-offset-2 hover:text-signal hover:underline"
+                  href={track.externalUrl}
+                  target="_blank"
+                  rel="noreferrer">Source link</a
+                >
+              {:else}
+                <span class="text-muted-foreground">URL not available</span>
+              {/if}
+            </p>
+          {/if}
         </div>
         <div class="flex flex-wrap items-center gap-1">
           {#each track.tags as tag}
@@ -235,7 +262,7 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2" class:hidden={unavailable}>
         <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatTime(isActive ? current : 0)}</span>
         <input
           class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)] disabled:opacity-40"
@@ -271,7 +298,7 @@
     >
       <input type="hidden" name="mediaAssetId" value={track.id} />
       <TagMultiSelect options={availableTags} bind:selected={editTagIds} name="tagIds" placeholder="Select tags…" />
-      <input class="auth-field" type="text" name="customTag" placeholder="New custom tag (optional)" />
+      <CustomTagInput bind:tags={editCustomTags} bind:draft={editCustomDraft} name="customTags" />
       <button type="submit" class="auth-btn w-fit">Save tags</button>
     </form>
   {/if}

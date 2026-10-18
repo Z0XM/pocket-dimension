@@ -1,5 +1,7 @@
 import { error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
+import { readCustomTagNamesFromJson } from "$lib/custom-tags";
+import { ensureCustomTags } from "$lib/server/catalogue";
 import { IngestError, ingestPublicUrl, resolveYtDlpBin } from "$lib/server/ingest";
 import { isStorageConfigured } from "$lib/server/storage";
 
@@ -9,9 +11,16 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   if (!isStorageConfigured()) throw error(503, "Object storage is not configured");
   if (!(await resolveYtDlpBin())) throw error(503, "yt-dlp is not installed");
 
-  const body = (await request.json().catch(() => ({}))) as { url?: string };
+  const body = (await request.json().catch(() => ({}))) as {
+    url?: string;
+    tagIds?: unknown;
+    customTag?: unknown;
+    customTags?: unknown;
+  };
   const url = String(body.url ?? "").trim();
   if (!url) throw error(400, "Paste a public song or playlist URL.");
+  const selectedTagIds = Array.isArray(body.tagIds) ? body.tagIds.map((id) => String(id).trim()).filter(Boolean) : [];
+  const customTagNames = readCustomTagNamesFromJson(body);
 
   const userId = locals.user.id;
   const stream = new ReadableStream<Uint8Array>({
@@ -21,12 +30,19 @@ export const POST: RequestHandler = async ({ locals, request }) => {
         controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
       };
       try {
-        const result = await ingestPublicUrl(userId, url, (song) => {
-          send({ type: "song", ...song });
-        });
+        const tagIds = [...selectedTagIds, ...(await ensureCustomTags(userId, customTagNames))];
+        const result = await ingestPublicUrl(
+          userId,
+          url,
+          (song) => {
+            send({ type: "song", ...song });
+          },
+          { tagIds }
+        );
         send({
           type: "done",
           imported: result.imported,
+          unavailable: result.unavailable,
           skipped: result.skipped,
           failed: result.failed,
           syncRunId: result.syncRunId,

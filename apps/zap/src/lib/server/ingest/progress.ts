@@ -1,4 +1,4 @@
-export type SongProgressPhase = "probing" | "downloading" | "uploading" | "finalizing" | "done" | "skipped" | "failed";
+export type SongProgressPhase = "probing" | "downloading" | "uploading" | "finalizing" | "done" | "unavailable" | "skipped" | "failed";
 
 export type SongProgress = {
   identityKey?: string;

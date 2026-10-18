@@ -1,10 +1,10 @@
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
-import { addUserAssetTags, ensureCustomTag } from "$lib/server/catalogue";
+import { addUserAssetTags, ensureCustomTags } from "$lib/server/catalogue";
 import { summarizeIngestItems } from "$lib/server/ingest/errors";
 import { DURATION_CAP_MESSAGE, isOverDurationCap } from "$lib/server/ingest/limits";
 import { mapPool, youtubeIngestConcurrency } from "$lib/server/ingest/map-pool";
-import { ingestCatalogueVideo, type IngestItemResult, type SyncRunResult } from "$lib/server/ingest/pipeline";
+import { hasCatalogueAsset, ingestCatalogueVideo, type IngestItemResult, type SyncRunResult } from "$lib/server/ingest/pipeline";
 import type { SongProgress } from "$lib/server/ingest/progress";
 import { setUserLibraryOrder } from "$lib/server/library-order";
 import { listYouTubePlaylistItems, listYouTubePlaylists, type ZapYouTubePlaylistItem } from "./api";
@@ -15,6 +15,8 @@ export type PlaylistImportProgress = {
   done: number;
   remaining: number;
   imported: number;
+  /** Saved as `unavailable` catalogue rows (metadata only). */
+  unavailable: number;
   skipped: number;
   failed: number;
   currentTitle?: string | null;
@@ -28,6 +30,7 @@ function tally(items: IngestItemResult[]) {
   const summary = summarizeIngestItems(items);
   return {
     imported: summary.imported,
+    unavailable: summary.unavailable,
     skipped: summary.skipped,
     failed: summary.failed,
   };
@@ -41,7 +44,7 @@ export async function importConnectedPlaylists(
   userId: string,
   playlistIds: string[],
   onProgress?: (progress: PlaylistImportProgress) => void | Promise<void>,
-  opts?: { tagIds?: string[]; customTag?: string; sort?: PlaylistImportSort | string }
+  opts?: { tagIds?: string[]; customTags?: string[]; sort?: PlaylistImportSort | string }
 ): Promise<SyncRunResult & { playlists: string[] }> {
   const uniqueIds = [...new Set(playlistIds.map((id) => id.trim()).filter(Boolean))];
   if (uniqueIds.length === 0) {
@@ -50,9 +53,8 @@ export async function importConnectedPlaylists(
 
   const sort = parsePlaylistImportSort(opts?.sort);
   const tagIds = [...new Set((opts?.tagIds ?? []).map((id) => id.trim()).filter(Boolean))];
-  if (opts?.customTag?.trim()) {
-    const custom = await ensureCustomTag(userId, opts.customTag);
-    if (custom) tagIds.push(custom.id);
+  for (const id of await ensureCustomTags(userId, opts?.customTags ?? [])) {
+    if (!tagIds.includes(id)) tagIds.push(id);
   }
   const applyTags = tagIds.length > 0;
 
@@ -93,6 +95,7 @@ export async function importConnectedPlaylists(
           .update(schema.syncRuns)
           .set({
             importedCount: snapshot.imported,
+            unavailableCount: snapshot.unavailable,
             skippedCount: snapshot.skipped,
             failedCount: snapshot.failed,
           })
@@ -134,6 +137,7 @@ export async function importConnectedPlaylists(
       done: 0,
       remaining: workTotal,
       imported: 0,
+      unavailable: 0,
       skipped: 0,
       failed: 0,
       songs: [],
@@ -173,6 +177,9 @@ export async function importConnectedPlaylists(
             channelTitle: job.entry.channelTitle,
             channelId: job.entry.channelId,
           },
+          durationHint: job.entry.durationMs,
+          recordUnavailable: true,
+          unavailableReason: job.entry.unavailableReason,
           onSongProgress: async (song) => {
             activeSongs.set(identityKey, song);
             await publish({ currentTitle: song.title ?? job.entry.title });
@@ -182,7 +189,7 @@ export async function importConnectedPlaylists(
 
       // Live tallies may complete out of order; final `items` use mapPool order below.
       items.push(result);
-      if ((result.status === "imported" || result.status === "reused") && applyTags && result.mediaAssetId) {
+      if (applyTags && hasCatalogueAsset(result)) {
         try {
           await addUserAssetTags(userId, result.mediaAssetId, tagIds);
         } catch (err) {
@@ -196,11 +203,11 @@ export async function importConnectedPlaylists(
           phase: "failed",
           percent: 0,
         });
-      } else if (result.status === "skipped") {
+      } else if (result.status === "skipped" || result.status === "unavailable") {
         activeSongs.set(identityKey, {
           identityKey,
           title: job.entry.title,
-          phase: "skipped",
+          phase: result.status,
           percent: 100,
         });
       } else {
@@ -220,9 +227,7 @@ export async function importConnectedPlaylists(
     items.length = 0;
     items.push(...orderedResults);
 
-    const orderedAssetIds = items
-      .filter((i): i is Extract<IngestItemResult, { mediaAssetId: string }> => i.status === "imported" || i.status === "reused")
-      .map((i) => i.mediaAssetId);
+    const orderedAssetIds = items.filter(hasCatalogueAsset).map((i) => i.mediaAssetId);
     try {
       await setUserLibraryOrder({ userId, mediaAssetIds: orderedAssetIds, syncRunId: run.id });
     } catch (err) {
@@ -239,6 +244,7 @@ export async function importConnectedPlaylists(
       tagIds,
       items,
       failures: summary.failures,
+      unavailable: summary.unavailableItems,
       concurrency,
     };
 
@@ -247,6 +253,7 @@ export async function importConnectedPlaylists(
       .set({
         status: "completed",
         importedCount: summary.imported,
+        unavailableCount: summary.unavailable,
         skippedCount: summary.skipped,
         failedCount: summary.failed,
         errorMessage: summary.errorMessage,
@@ -258,6 +265,7 @@ export async function importConnectedPlaylists(
     return {
       syncRunId: run.id,
       imported: summary.imported,
+      unavailable: summary.unavailable,
       skipped: summary.skipped,
       failed: summary.failed,
       items,
@@ -274,6 +282,7 @@ export async function importConnectedPlaylists(
         status: "failed",
         errorMessage: message,
         importedCount: summary.imported,
+        unavailableCount: summary.unavailable,
         skippedCount: summary.skipped,
         failedCount: summary.failed,
         summaryJson: JSON.stringify({
