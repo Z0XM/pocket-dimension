@@ -12,6 +12,7 @@ import {
   isValidDeviceId,
   moveItem,
   neighbourId,
+  runTrackDisplayTitle,
   spliceIds,
 } from "./catalog-queue";
 
@@ -134,5 +135,13 @@ describe("misc", () => {
     expect(formatClock(0)).toBe("0:00");
     expect(formatClock(61_500)).toBe("1:01");
     expect(formatClock(null)).toBe("0:00");
+  });
+
+  test("runTrackDisplayTitle placeholders for missing media", () => {
+    expect(runTrackDisplayTitle({ title: "Song A", available: true })).toBe("Song A");
+    expect(runTrackDisplayTitle({ title: "  ", available: true })).toBe("Title unknown");
+    expect(runTrackDisplayTitle({ title: null, available: true })).toBe("Title unknown");
+    expect(runTrackDisplayTitle({ title: "Song A", available: false })).toBe("Title unavailable");
+    expect(runTrackDisplayTitle({ title: null, available: false })).toBe("Title unavailable");
   });
 });

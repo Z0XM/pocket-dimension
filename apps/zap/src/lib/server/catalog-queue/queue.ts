@@ -13,8 +13,10 @@ import {
   type CatalogPlaybackState,
   type CatalogQueueItem,
   type CatalogQueueRunSummary,
+  type CatalogQueueRunTrack,
   type CatalogQueueSnapshot,
   type EnqueueMode,
+  runTrackDisplayTitle,
 } from "$lib/catalog-queue";
 import { recordPlayEvent } from "$lib/server/play-history";
 import { createPlaylist, type PlaylistSummary } from "$lib/server/playlists";
@@ -472,9 +474,10 @@ export async function listQueueRuns(userId: string, limit = 30): Promise<Catalog
       id: schema.catalogQueueItems.id,
       queueId: schema.catalogQueueItems.queueId,
       title: schema.mediaAssets.title,
+      mediaId: schema.mediaAssets.id,
     })
     .from(schema.catalogQueueItems)
-    .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.catalogQueueItems.mediaAssetId))
+    .leftJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.catalogQueueItems.mediaAssetId))
     .where(
       inArray(
         schema.catalogQueueItems.queueId,
@@ -482,10 +485,10 @@ export async function listQueueRuns(userId: string, limit = 30): Promise<Catalog
       )
     )
     .orderBy(asc(schema.catalogQueueItems.position), asc(schema.catalogQueueItems.createdAt));
-  const byQueue = new Map<string, { id: string; title: string }[]>();
+  const byQueue = new Map<string, { id: string; title: string | null; available: boolean }[]>();
   for (const item of items) {
     const list = byQueue.get(item.queueId) ?? [];
-    list.push(item);
+    list.push({ id: item.id, title: item.title, available: item.mediaId != null });
     byQueue.set(item.queueId, list);
   }
   return runs
@@ -498,13 +501,39 @@ export async function listQueueRuns(userId: string, limit = 30): Promise<Catalog
         trackCount: list.length,
         currentIndex: idx >= 0 ? idx : null,
         positionMs: idx >= 0 ? run.positionMs : 0,
-        titles: list.slice(0, HISTORY_TITLES).map((i) => i.title),
+        titles: list.slice(0, HISTORY_TITLES).map((i) => runTrackDisplayTitle(i)),
         createdAt: run.createdAt.toISOString(),
         updatedAt: run.updatedAt.toISOString(),
         endedAt: run.endedAt?.toISOString() ?? null,
       };
     })
     .filter((run) => run.trackCount > 0);
+}
+
+/** Full ordered track list for a History catalogue-queue run (read-only). */
+export async function getQueueRunTracks(userId: string, runId: string): Promise<CatalogQueueRunTrack[]> {
+  const run = await requireOwnRun(db, userId, runId);
+  const rows = await db
+    .select({
+      id: schema.catalogQueueItems.id,
+      mediaAssetId: schema.catalogQueueItems.mediaAssetId,
+      position: schema.catalogQueueItems.position,
+      title: schema.mediaAssets.title,
+      artists: schema.mediaAssets.artists,
+      mediaId: schema.mediaAssets.id,
+    })
+    .from(schema.catalogQueueItems)
+    .leftJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.catalogQueueItems.mediaAssetId))
+    .where(eq(schema.catalogQueueItems.queueId, run.id))
+    .orderBy(asc(schema.catalogQueueItems.position), asc(schema.catalogQueueItems.createdAt));
+  return rows.map((r) => ({
+    id: r.id,
+    mediaAssetId: r.mediaAssetId,
+    position: r.position,
+    title: r.title,
+    artists: r.artists,
+    available: r.mediaId != null,
+  }));
 }
 
 async function requireOwnRun(conn: Conn, userId: string, runId: string): Promise<QueueRow> {

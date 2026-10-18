@@ -65,6 +65,24 @@ export type CatalogQueueRunSummary = {
   endedAt: string | null;
 };
 
+/** One ordered row of a History catalogue-queue run (read-only track list). */
+export type CatalogQueueRunTrack = {
+  id: string;
+  mediaAssetId: string;
+  position: number;
+  title: string | null;
+  artists: string | null;
+  /** False when the media row is gone (or otherwise unreadable) — show a placeholder title. */
+  available: boolean;
+};
+
+/** Label for a History run track; never throws on missing/deleted media. */
+export function runTrackDisplayTitle(track: { title: string | null; available: boolean }): string {
+  if (!track.available) return "Title unavailable";
+  const title = track.title?.trim();
+  return title || "Title unknown";
+}
+
 export function isEnqueueMode(value: unknown): value is EnqueueMode {
   return typeof value === "string" && (ENQUEUE_MODES as readonly string[]).includes(value);
 }

@@ -6,6 +6,7 @@ export {
   deleteRun,
   enqueueTracks,
   forgetDevice,
+  getQueueRunTracks,
   listQueueRuns,
   publishCatalogQueue,
   removeItem,
