@@ -32,7 +32,7 @@ The Drizzle schema defaults ids to the native `uuidv7()` function (`shared/db/sr
 sudo pg_ctlcluster 18 main start    # or: sudo service postgresql start
 ```
 
-Connection: `postgresql://postgres:postgres@localhost:5432/postgres` (user `postgres`, password `postgres`, db `postgres`). Tables live in named schemas (`auth`, `watchlist`, `howwasyourday`, `chhanchhan`, `meviayou`, `zeo`), not `public`. Apply schema with `bun run db:migrate` (not in the update script — needs the DB running). **zeo production:** `bun run start` in `apps/zeo` auto-runs pending migrations when `DATABASE_URL` is set.
+Connection: `postgresql://postgres:postgres@localhost:5432/postgres` (user `postgres`, password `postgres`, db `postgres`). Tables live in named schemas (`auth`, `watchlist`, `howwasyourday`, `chhanchhan`, `meviayou`, `zeo`), not `public`. Apply schema with `bun run db:migrate` (not in the update script — needs the DB running). **Production:** no app migrates on start (`shared/db/migrations` spans every schema) — run `bun run db:migrate` against prod as an explicit deploy step.
 
 ### `.env` files (gitignored — recreate per session)
 

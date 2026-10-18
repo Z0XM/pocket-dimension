@@ -30,4 +30,4 @@ TURBO_FORCE=1 bun run build:shared:auth
 TURBO_FORCE=1 bun run build:app:zeo
 
 echo "zeo deploy build complete."
-echo "Migrations run at container start when DATABASE_URL is set (scripts/start.sh)."
+echo "Migrations are not run on start — run \`DATABASE_URL=... bun run db:migrate\` from the repo root before serving a release with new migrations."
