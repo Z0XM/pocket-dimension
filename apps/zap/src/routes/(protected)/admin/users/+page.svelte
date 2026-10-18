@@ -160,8 +160,9 @@
                 {/if}
               </p>
               <p class="font-mono text-[11px] text-muted-foreground">
-                {#if u.username}{u.email} ·
-                {/if}last seen {formatWhen(u.lastSeenAt)} · first seen {formatWhen(u.firstSeenAt)}
+                {[u.username ? u.email : null, `last seen ${formatWhen(u.lastSeenAt)}`, `first seen ${formatWhen(u.firstSeenAt)}`]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
             </div>
             <div class="flex flex-wrap items-center gap-1 font-mono text-[11px]">
