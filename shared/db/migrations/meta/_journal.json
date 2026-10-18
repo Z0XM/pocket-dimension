@@ -414,6 +414,13 @@
       "when": 1792900000000,
       "tag": "0058_zap_session_layout",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793000000000,
+      "tag": "0059_zap_session_name",
+      "breakpoints": true
     }
   ]
 }

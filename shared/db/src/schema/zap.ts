@@ -112,6 +112,8 @@ export const sessions = zapSchema.table(
       .notNull()
       .references(() => auth.user.id, { onDelete: "cascade" }),
     joinCode: text("join_code").notNull(),
+    /** Display name for sessions index / chrome. */
+    name: text("name").notNull(),
     status: sessionStatus("status").default("live").notNull(),
     playbackState: sessionPlaybackState("playback_state").default("idle").notNull(),
     currentQueueItemId: uuid("current_queue_item_id"),

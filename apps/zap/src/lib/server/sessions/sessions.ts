@@ -16,6 +16,7 @@ import {
   canSkip,
   type MemberPermissionRow,
 } from "./permissions";
+import { defaultSessionName, normalizeSessionName } from "./session-name";
 import { buildSessionSnapshot } from "./snapshot";
 import type { SessionMemberPermissions, SessionSnapshot } from "./types";
 
@@ -208,13 +209,23 @@ async function ensureActiveMember(sessionId: string, userId: string, role: "host
   return created;
 }
 
-export async function createSession(hostUserId: string, opts?: { perpetual?: boolean }): Promise<SessionSnapshot> {
+export async function createSession(
+  hostUserId: string,
+  opts?: { perpetual?: boolean; name?: string | null }
+): Promise<SessionSnapshot> {
   const joinCode = await allocateJoinCode();
+  let name: string;
+  try {
+    name = normalizeSessionName(opts?.name) ?? defaultSessionName(joinCode);
+  } catch (err) {
+    throw new SessionError(err instanceof Error ? err.message : "Invalid session name");
+  }
   const [session] = await db
     .insert(schema.sessions)
     .values({
       hostUserId,
       joinCode,
+      name,
       status: "live",
       playbackState: "idle",
       perpetual: Boolean(opts?.perpetual),
@@ -342,7 +353,7 @@ export async function endSession(sessionId: string, userId: string): Promise<Ses
 export async function setSessionOptions(
   sessionId: string,
   userId: string,
-  flags: { autoPlay?: boolean; perpetual?: boolean }
+  flags: { autoPlay?: boolean; perpetual?: boolean; name?: string | null }
 ): Promise<SessionSnapshot> {
   const session = await requireLiveSession(sessionId);
   const member = await requireMember(sessionId, userId);
@@ -354,13 +365,65 @@ export async function setSessionOptions(
     throw new SessionError("Only the host can change perpetual", 403);
   }
 
+  let nextName: string | undefined;
+  if (flags.name !== undefined) {
+    try {
+      nextName = normalizeSessionName(flags.name) ?? defaultSessionName(session.joinCode);
+    } catch (err) {
+      throw new SessionError(err instanceof Error ? err.message : "Invalid session name");
+    }
+  }
+
   await db
     .update(schema.sessions)
     .set({
       ...(flags.autoPlay !== undefined ? { autoPlay: flags.autoPlay } : {}),
       ...(flags.perpetual !== undefined ? { perpetual: flags.perpetual } : {}),
+      ...(nextName !== undefined ? { name: nextName } : {}),
       lastActivityAt: sql`now()`,
     })
+    .where(eq(schema.sessions.id, session.id));
+
+  const snapshot = await publish(sessionId, userId);
+  if (!snapshot) throw new SessionError("Session not found", 404);
+  return snapshot;
+}
+
+/**
+ * Rename a live or stale (perpetual) session from the sessions index.
+ * Host or setup-capable members (including after stale leftAt).
+ */
+export async function renameSession(sessionId: string, userId: string, name: string | null | undefined): Promise<SessionSnapshot> {
+  const session = await db.query.sessions.findFirst({ where: eq(schema.sessions.id, sessionId) });
+  if (!session) throw new SessionError("Session not found", 404);
+  if (session.status === "ended" || session.endedAt) throw new SessionError("Session has ended", 410);
+
+  const member =
+    (await db.query.sessionMembers.findFirst({
+      where: and(eq(schema.sessionMembers.sessionId, sessionId), eq(schema.sessionMembers.userId, userId), isNull(schema.sessionMembers.leftAt)),
+    })) ??
+    (await db.query.sessionMembers.findFirst({
+      where: and(eq(schema.sessionMembers.sessionId, sessionId), eq(schema.sessionMembers.userId, userId)),
+      orderBy: [desc(schema.sessionMembers.joinedAt)],
+    }));
+
+  const isHost = session.hostUserId === userId || member?.role === "host";
+  const role = isHost ? ("host" as const) : (member?.role ?? null);
+  const grants = member ? grantsOf(member) : null;
+  if (!canManageSetup(role, grants)) {
+    throw new SessionError("You can't rename this session", 403);
+  }
+
+  let nextName: string;
+  try {
+    nextName = normalizeSessionName(name) ?? defaultSessionName(session.joinCode);
+  } catch (err) {
+    throw new SessionError(err instanceof Error ? err.message : "Invalid session name");
+  }
+
+  await db
+    .update(schema.sessions)
+    .set({ name: nextName, lastActivityAt: sql`now()` })
     .where(eq(schema.sessions.id, session.id));
 
   const snapshot = await publish(sessionId, userId);
@@ -1095,6 +1158,7 @@ export async function publishSessionSnapshots(sessionIds: string[]) {
 export type LiveSessionSummary = {
   id: string;
   joinCode: string;
+  name: string;
   role: "host" | "guest";
   playbackState: "idle" | "playing" | "paused";
   positionMs: number;
@@ -1103,6 +1167,10 @@ export type LiveSessionSummary = {
   lastActivityAt: string;
   perpetual: boolean;
   status: "live" | "stale";
+  /** Host or setup grant — rename from the sessions index. */
+  canRename: boolean;
+  /** Host only — end/close from the sessions index. */
+  canClose: boolean;
 };
 
 function sessionIndexStatus(s: { staleAt: Date | null }): "live" | "stale" {
@@ -1141,10 +1209,14 @@ async function summarizeSessionsForUser(
     if (!s) continue;
     if (s.status !== "live") continue;
     const assetId = s.currentQueueItemId ? assetByQueueItem.get(s.currentQueueItemId) : null;
+    const role = roleBySession.get(s.id) ?? m.role;
+    const isHost = role === "host" || s.hostUserId === userId;
+    const grants = grantsOf(m);
     out.push({
       id: s.id,
       joinCode: s.joinCode,
-      role: roleBySession.get(s.id) ?? m.role,
+      name: s.name?.trim() ? s.name : defaultSessionName(s.joinCode),
+      role: isHost ? "host" : role,
       playbackState: s.playbackState,
       positionMs: s.positionMs,
       currentTitle: assetId ? (titleByAsset.get(assetId) ?? null) : null,
@@ -1152,6 +1224,8 @@ async function summarizeSessionsForUser(
       lastActivityAt: s.lastActivityAt.toISOString(),
       perpetual: s.perpetual,
       status: sessionIndexStatus(s),
+      canRename: canManageSetup(isHost ? "host" : role, grants),
+      canClose: canEndSession(isHost ? "host" : role),
     });
   }
   return out;

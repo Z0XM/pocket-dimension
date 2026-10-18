@@ -15,6 +15,7 @@ export type SessionSnapshotSession = {
   id: string;
   hostUserId: string;
   joinCode: string;
+  name: string;
   status: SessionStatus;
   playbackState: SessionPlaybackState;
   currentQueueItemId: string | null;
