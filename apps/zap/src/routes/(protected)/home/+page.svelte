@@ -50,6 +50,37 @@
     {/if}
     <a href="/join" class="rounded border border-border bg-secondary/60 px-5 py-2.5 text-sm text-secondary-foreground hover:bg-secondary"> Join </a>
     <a href="/catalogue" class="rounded border border-border px-5 py-2.5 text-sm text-muted-foreground hover:bg-secondary/40"> Catalogue </a>
+    {#if data.isAdmin}
+      <a href="/admin" class="rounded border border-signal/40 bg-signal/10 px-5 py-2.5 text-sm text-signal hover:bg-signal/20"> Admin </a>
+    {/if}
+  </div>
+
+  <div class="space-y-2">
+    <div class="flex items-baseline justify-between gap-2">
+      <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Playlists</h2>
+      <a href="/playlists" class="font-mono text-[10px] text-signal hover:underline">
+        {data.playlistCount > data.playlists.length ? `All ${data.playlistCount}` : "Manage"}
+      </a>
+    </div>
+    {#if data.playlists.length === 0}
+      <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
+        No playlists yet. <a href="/playlists" class="text-signal hover:underline">Create one</a>.
+      </p>
+    {:else}
+      <ul class="divide-y divide-border/50 rounded-lg border border-border/70 bg-card/30">
+        {#each data.playlists as pl (pl.id)}
+          <li>
+            <a href={`/playlists/${pl.id}`} class="block px-4 py-2.5 text-sm hover:text-signal">
+              <span class="font-medium">{pl.name}</span>
+              <span class="ml-2 font-mono text-[10px] text-muted-foreground"
+                >{pl.trackCount} · {pl.visibility}{#if pl.ownerUserId !== data.user?.id}
+                  · collab{/if}</span
+              >
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </div>
 
   {#if data.playHistory.length}

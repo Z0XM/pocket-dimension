@@ -76,10 +76,14 @@ export async function loadZapAccess(userId: string, opts: { touch?: boolean } = 
   return { isAdmin, status, mode, access: resolvePortalAccess({ isAdmin, status, mode }) };
 }
 
+export function isZapAdmin(locals: App.Locals): boolean {
+  return Boolean(locals.user?.emailVerified && locals.zapAccess?.isAdmin);
+}
+
 /** Server-side gate for every privileged Zap action. 401 without a session, 403 for non-admins. */
 export function requireZapAdmin(locals: App.Locals) {
   if (!locals.user) throw error(401, "Sign in required");
-  if (!locals.user.emailVerified || !locals.zapAccess?.isAdmin) throw error(403, "Zap admin access required");
+  if (!isZapAdmin(locals)) throw error(403, "Zap admin access required");
   return locals.user;
 }
 

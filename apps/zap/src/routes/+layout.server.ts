@@ -1,4 +1,5 @@
 import { isDevModeEnabled } from "@pocket-dimension/auth";
+import { isZapAdmin } from "$lib/server/admin/access";
 import type { LayoutServerLoad } from "./$types";
 
 export const load: LayoutServerLoad = async ({ locals }) => {
@@ -13,6 +14,6 @@ export const load: LayoutServerLoad = async ({ locals }) => {
           emailVerified: locals.user.emailVerified,
         }
       : null,
-    zapAdmin: Boolean(locals.zapAccess?.isAdmin),
+    zapAdmin: isZapAdmin(locals),
   };
 };
