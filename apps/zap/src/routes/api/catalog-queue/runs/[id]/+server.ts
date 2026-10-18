@@ -1,7 +1,7 @@
 import { error, json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { isUuid } from "$lib/admin-access";
-import { CatalogQueueError, activateRun, deleteRun, saveRunAsPlaylist } from "$lib/server/catalog-queue";
+import { CatalogQueueError, activateRun, deleteRun, getQueueRunTracks, saveRunAsPlaylist } from "$lib/server/catalog-queue";
 import { PlaylistError } from "$lib/server/playlists";
 
 function requireVerifiedUser(locals: App.Locals) {
@@ -14,6 +14,17 @@ function mapError(err: unknown): never {
   if (err instanceof CatalogQueueError || err instanceof PlaylistError) throw error(err.status, err.message);
   throw err;
 }
+
+/** Read-only ordered track list for a History catalogue-queue run. */
+export const GET: RequestHandler = async ({ locals, params }) => {
+  const user = requireVerifiedUser(locals);
+  if (!isUuid(params.id)) throw error(404, "Queue not found");
+  try {
+    return json({ tracks: await getQueueRunTracks(user.id, params.id) });
+  } catch (err) {
+    mapError(err);
+  }
+};
 
 /** `restart` / `resume` make this run the active queue; `savePlaylist` copies it into a freehand playlist. */
 export const POST: RequestHandler = async ({ locals, params, request }) => {

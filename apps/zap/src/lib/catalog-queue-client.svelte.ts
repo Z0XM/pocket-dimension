@@ -1,5 +1,12 @@
 import { getContext, setContext } from "svelte";
-import { estimatePositionMs, type CatalogDevice, type CatalogQueueItem, type CatalogQueueSnapshot, type EnqueueMode } from "$lib/catalog-queue";
+  import {
+    estimatePositionMs,
+    type CatalogDevice,
+    type CatalogQueueItem,
+    type CatalogQueueRunTrack,
+    type CatalogQueueSnapshot,
+    type EnqueueMode,
+  } from "$lib/catalog-queue";
 
 const CONTEXT_KEY = Symbol("zap-catalog-queue");
 const DEVICE_STORAGE_KEY = "zap.deviceId";
@@ -221,6 +228,25 @@ export class CatalogQueueClient {
   }
 
   // --- history runs -------------------------------------------------------
+
+  async fetchRunTracks(runId: string): Promise<CatalogQueueRunTrack[] | null> {
+    this.pending++;
+    this.error = null;
+    try {
+      const res = await fetch(`/api/catalog-queue/runs/${runId}`, {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? "Could not load tracks");
+      return Array.isArray(body?.tracks) ? (body.tracks as CatalogQueueRunTrack[]) : [];
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : "Could not load tracks";
+      return null;
+    } finally {
+      this.pending--;
+    }
+  }
 
   activateRun(runId: string, mode: "restart" | "resume") {
     return this.send(`/api/catalog-queue/runs/${runId}`, { method: "POST", body: JSON.stringify({ action: mode }) });

@@ -1,11 +1,13 @@
 <script lang="ts">
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import ListMusicIcon from "@lucide/svelte/icons/list-music";
   import PlayIcon from "@lucide/svelte/icons/play";
   import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
   import SaveIcon from "@lucide/svelte/icons/save";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import { invalidateAll } from "$app/navigation";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
-  import { formatClock } from "$lib/catalog-queue";
+  import { formatClock, runTrackDisplayTitle, type CatalogQueueRunTrack } from "$lib/catalog-queue";
   import { getCatalogQueue } from "$lib/catalog-queue-client.svelte";
   import type { PageData } from "./$types";
 
@@ -19,6 +21,9 @@
   let saved = $state<{ runId: string; id: string; name: string } | null>(null);
   let deleteRunId = $state<string | null>(null);
   let deleteOpen = $state(false);
+  let viewTracksRunId = $state<string | null>(null);
+  let viewTracks = $state<CatalogQueueRunTrack[] | null>(null);
+  let viewTracksLoading = $state(false);
 
   const activeRunId = $derived(queue?.queue?.id ?? null);
 
@@ -36,6 +41,25 @@
     saved = null;
     saveRunId = saveRunId === runId ? null : runId;
     saveName = titles[0] ? `${titles[0]} & more` : `Queue · ${new Date().toLocaleDateString()}`;
+  }
+
+  async function toggleViewTracks(runId: string) {
+    if (viewTracksRunId === runId) {
+      viewTracksRunId = null;
+      viewTracks = null;
+      viewTracksLoading = false;
+      return;
+    }
+    if (!queue) return;
+    viewTracksRunId = runId;
+    viewTracks = null;
+    viewTracksLoading = true;
+    runError = null;
+    const tracks = await queue.fetchRunTracks(runId);
+    if (viewTracksRunId !== runId) return;
+    viewTracksLoading = false;
+    if (tracks) viewTracks = tracks;
+    else runError = queue.error;
   }
 
   async function saveRun(runId: string) {
@@ -107,6 +131,17 @@
             <div class="flex flex-wrap gap-1.5 font-mono text-[10px]">
               <button
                 type="button"
+                class="inline-flex items-center gap-1 rounded border border-border px-2 py-1 hover:text-signal disabled:opacity-40"
+                disabled={!queue || viewTracksLoading}
+                aria-expanded={viewTracksRunId === run.id}
+                onclick={() => void toggleViewTracks(run.id)}
+              >
+                <ListMusicIcon class="size-3" />
+                {viewTracksRunId === run.id ? "Hide songs" : "View songs"}
+                <ChevronDownIcon class={`size-3 transition ${viewTracksRunId === run.id ? "rotate-180" : ""}`} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
                 class="inline-flex items-center gap-1 rounded border border-signal/40 bg-signal/10 px-2 py-1 text-signal hover:bg-signal/20 disabled:opacity-40"
                 disabled={!queue || busyRunId !== null}
                 onclick={() => void runAction(run.id, () => queue!.activateRun(run.id, "restart"))}
@@ -142,6 +177,35 @@
                 <Trash2Icon class="size-3" /> Remove
               </button>
             </div>
+            {#if viewTracksRunId === run.id}
+              <div class="rounded border border-border/60 bg-background/40 px-3 py-2">
+                {#if viewTracksLoading}
+                  <p class="font-mono text-[11px] text-muted-foreground">Loading tracks…</p>
+                {:else if viewTracks}
+                  <ol class="max-h-64 space-y-1.5 overflow-y-auto font-mono text-[11px]">
+                    {#each viewTracks as track, i (track.id)}
+                      {@const label = runTrackDisplayTitle(track)}
+                      <li class="flex gap-2" class:text-muted-foreground={!track.available}>
+                        <span class="w-6 shrink-0 text-right text-muted-foreground tabular-nums">{i + 1}.</span>
+                        <span class="min-w-0 flex-1">
+                          <span class="block truncate font-sans text-xs font-medium" class:italic={!track.available} title={label}
+                            >{label}</span
+                          >
+                          {#if track.available && track.artists}
+                            <span class="block truncate text-muted-foreground">{track.artists}</span>
+                          {:else if !track.available}
+                            <span class="block text-muted-foreground">Unavailable</span>
+                          {/if}
+                        </span>
+                        {#if run.currentIndex === i}
+                          <span class="shrink-0 text-signal">stopped here</span>
+                        {/if}
+                      </li>
+                    {/each}
+                  </ol>
+                {/if}
+              </div>
+            {/if}
             {#if saveRunId === run.id}
               <form
                 class="flex gap-2"
