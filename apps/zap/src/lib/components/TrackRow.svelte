@@ -1,8 +1,10 @@
 <script lang="ts">
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import CustomTagInput from "$lib/components/CustomTagInput.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
+  import { deleteSongAsAdmin, SONG_DELETE_CONFIRM_BODY } from "$lib/admin-song-delete";
   import { nextPlaybackAction } from "$lib/playback-action";
   import { enhance } from "$app/forms";
 
@@ -30,12 +32,39 @@
     availableTags,
     activeId = $bindable<string | null>(null),
     audioEl = $bindable<HTMLAudioElement | null>(null),
+    canDelete = false,
+    ondeleted,
   }: {
     track: TrackItem;
     availableTags: TagOption[];
     activeId?: string | null;
     audioEl?: HTMLAudioElement | null;
+    /** Zap admins only; the server enforces it regardless. */
+    canDelete?: boolean;
+    ondeleted?: (id: string, message: string) => void;
   } = $props();
+
+  let deleteOpen = $state(false);
+  let deleting = $state(false);
+
+  async function confirmDelete() {
+    deleting = true;
+    error = null;
+    const outcome = await deleteSongAsAdmin(track.id);
+    deleting = false;
+    deleteOpen = false;
+    if (!outcome.ok) {
+      error = outcome.message;
+      return;
+    }
+    if (audioEl && isThisLoaded(audioEl)) {
+      audioEl.pause();
+      audioEl.removeAttribute("src");
+      delete audioEl.dataset.assetId;
+    }
+    if (activeId === track.id) activeId = null;
+    ondeleted?.(track.id, outcome.message);
+  }
 
   let editing = $state(false);
   let editTagIds = $state<string[]>([]);
@@ -259,6 +288,17 @@
           >
             {editing ? "Cancel" : "Edit tags"}
           </button>
+          {#if canDelete}
+            <button
+              type="button"
+              class="rounded border border-destructive/40 px-2 py-0.5 font-mono text-[10px] text-destructive hover:bg-destructive/10 disabled:opacity-40"
+              title="Admin: delete song and its storage object"
+              disabled={deleting}
+              onclick={() => (deleteOpen = true)}
+            >
+              Delete
+            </button>
+          {/if}
         </div>
       </div>
 
@@ -301,5 +341,17 @@
       <CustomTagInput bind:tags={editCustomTags} bind:draft={editCustomDraft} name="customTags" />
       <button type="submit" class="auth-btn w-fit">Save tags</button>
     </form>
+  {/if}
+
+  {#if canDelete}
+    <ConfirmDialog
+      bind:open={deleteOpen}
+      title={`Delete "${track.title}"?`}
+      body={SONG_DELETE_CONFIRM_BODY}
+      confirmLabel="Delete song"
+      danger
+      busy={deleting}
+      onconfirm={confirmDelete}
+    />
   {/if}
 </li>

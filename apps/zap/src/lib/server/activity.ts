@@ -24,7 +24,7 @@ export type LibraryActivityEntry =
       songTitles?: string[];
     };
 
-function parseSyncSummary(raw: string | null | undefined) {
+export function parseSyncSummary(raw: string | null | undefined) {
   if (!raw) return null;
   try {
     return JSON.parse(raw) as {
@@ -38,7 +38,7 @@ function parseSyncSummary(raw: string | null | undefined) {
   }
 }
 
-function playlistLabel(
+export function playlistLabel(
   sourceUrl: string,
   summary: ReturnType<typeof parseSyncSummary>
 ): {

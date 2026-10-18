@@ -13,5 +13,6 @@ export const load: LayoutServerLoad = async ({ locals }) => {
           emailVerified: locals.user.emailVerified,
         }
       : null,
+    zapAdmin: Boolean(locals.zapAccess?.isAdmin),
   };
 };

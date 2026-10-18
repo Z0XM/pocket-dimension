@@ -19,6 +19,7 @@
   const historyActive = $derived(path === "/history" || path.startsWith("/history/"));
   const joinActive = $derived(path === "/join" || path.startsWith("/join/"));
   const sessionActive = $derived(path === "/session" || path.startsWith("/session/"));
+  const adminActive = $derived(path === "/admin" || path.startsWith("/admin/"));
 
   const skeletonPath = $derived(navTo ?? path);
   const skeletonShowFilters = $derived(skeletonPath.startsWith("/catalogue") || skeletonPath.startsWith("/session/"));
@@ -44,7 +45,9 @@
                 ? "Loading home"
                 : skeletonPath.startsWith("/join")
                   ? "Loading join"
-                  : "Loading"
+                  : skeletonPath.startsWith("/admin")
+                    ? "Loading admin"
+                    : "Loading"
   );
 
   async function signOut() {
@@ -90,6 +93,10 @@
           >History</a
         >
         <a href="/join" class={`zap-nav-link ${joinActive ? "zap-nav-link-active" : ""}`} aria-current={joinActive ? "page" : undefined}>Join</a>
+        {#if data.zapAdmin}
+          <a href="/admin" class={`zap-nav-link ${adminActive ? "zap-nav-link-active" : ""}`} aria-current={adminActive ? "page" : undefined}>Admin</a
+          >
+        {/if}
         <span class="hidden text-muted-foreground sm:inline">{data.user?.username ?? data.user?.email}</span>
         <button type="button" class="rounded border border-border px-2 py-1 text-muted-foreground hover:bg-secondary" onclick={signOut}>
           Sign out

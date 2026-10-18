@@ -90,7 +90,7 @@ async function bumpGeneration(
     .where(eq(schema.sessions.id, sessionId));
 }
 
-async function endSessionInternal(sessionId: string, _reason: "host" | "idle") {
+async function endSessionInternal(sessionId: string, _reason: "host" | "idle" | "admin") {
   const now = new Date();
   await db
     .update(schema.sessions)
@@ -634,6 +634,41 @@ export async function endIdleSessions(): Promise<number> {
     }
   }
   return ended;
+}
+
+/** Admin block: end live sessions the user hosts and drop them from sessions they joined. */
+export async function removeUserFromLiveSessions(userId: string): Promise<{ endedSessions: number; leftSessions: number }> {
+  const hosted = await db.query.sessions.findMany({
+    where: and(eq(schema.sessions.hostUserId, userId), eq(schema.sessions.status, "live")),
+  });
+  for (const s of hosted) {
+    await endSessionInternal(s.id, "admin");
+  }
+
+  const left = await db
+    .update(schema.sessionMembers)
+    .set({ leftAt: new Date() })
+    .where(and(eq(schema.sessionMembers.userId, userId), isNull(schema.sessionMembers.leftAt)))
+    .returning({ sessionId: schema.sessionMembers.sessionId });
+  const leftSessionIds = [...new Set(left.map((r) => r.sessionId))];
+  await publishSessionSnapshots(leftSessionIds);
+
+  return { endedSessions: hosted.length, leftSessions: leftSessionIds.length };
+}
+
+/**
+ * Push fresh snapshots after an out-of-band change (e.g. admin deleted a queued song).
+ * Broadcast snapshots carry one viewer's `me`; use the host so the host keeps their controls.
+ */
+export async function publishSessionSnapshots(sessionIds: string[]) {
+  if (sessionIds.length === 0) return;
+  const rows = await db
+    .select({ id: schema.sessions.id, hostUserId: schema.sessions.hostUserId })
+    .from(schema.sessions)
+    .where(inArray(schema.sessions.id, sessionIds));
+  for (const row of rows) {
+    await publish(row.id, row.hostUserId);
+  }
 }
 
 export type LiveSessionSummary = {

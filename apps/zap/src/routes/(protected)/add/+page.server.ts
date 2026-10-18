@@ -4,7 +4,7 @@ import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
 import type { Actions, PageServerLoad } from "./$types";
 import { readCustomTagNamesFromForm } from "$lib/custom-tags";
-import { ensureCustomTags, ensureSystemTags, listAvailableTags, setUserAssetTags } from "$lib/server/catalogue";
+import { ensureCustomTags, listAvailableTags, setUserAssetTags } from "$lib/server/catalogue";
 import { IngestError, ingestPublicUrl, resolveYtDlpBin } from "$lib/server/ingest";
 import { MAX_TRACK_DURATION_MS } from "$lib/server/ingest/limits";
 import { describeStorageConfig, isStorageConfigured, putMediaObject } from "$lib/server/storage";
@@ -21,7 +21,6 @@ function readTagIds(form: FormData): string[] {
 
 export const load: PageServerLoad = async ({ locals }) => {
   const userId = locals.user!.id;
-  await ensureSystemTags();
   const availableTags = await listAvailableTags(userId);
   const ytDlpReady = Boolean(await resolveYtDlpBin());
   const storageReady = isStorageConfigured();

@@ -1,9 +1,11 @@
 import { auth, getDevModeSessionRedirect, isDevModeEnabled, logServerErrors } from "@pocket-dimension/auth";
 import type { schema } from "@pocket-dimension/db";
-import { redirect, type Handle } from "@sveltejs/kit";
+import { json, redirect, type Handle } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from "$app/environment";
+import { canUsePortal, isPortalGatedRoute } from "$lib/admin-access";
+import { loadZapAccess } from "$lib/server/admin/access";
 
 const authHandle: Handle = async ({ event, resolve }) => {
   const session = await auth.api.getSession({
@@ -51,6 +53,19 @@ const authHandle: Handle = async ({ event, resolve }) => {
     }
     if (!session.user.emailVerified) {
       return redirect(307, "/check-email?reason=verify");
+    }
+  }
+
+  if (session?.user.emailVerified && !building) {
+    const gated = isPortalGatedRoute(event.route.id, event.url.pathname);
+    const access = await loadZapAccess(session.user.id, { touch: gated });
+    event.locals.zapAccess = access;
+    if (gated && !canUsePortal(access.access)) {
+      if (event.url.pathname.startsWith("/api/")) {
+        const message = access.access === "blocked" ? "Your Zap access has been blocked by an admin." : "Your Zap access is pending admin approval.";
+        return json({ message, access: access.access }, { status: 403 });
+      }
+      return redirect(307, "/blocked");
     }
   }
 
