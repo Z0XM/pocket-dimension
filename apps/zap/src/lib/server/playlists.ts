@@ -325,15 +325,12 @@ export async function deletePlaylist(playlistId: string, userId: string): Promis
   await db.delete(schema.playlists).where(eq(schema.playlists.id, playlistId));
 }
 
-export async function addPlaylistTrack(playlistId: string, userId: string, mediaAssetId: string): Promise<PlaylistDetail> {
-  if (!(await userCanEdit(playlistId, userId))) throw new PlaylistError("Not allowed", 403);
-  const asset = await db.query.mediaAssets.findFirst({ where: eq(schema.mediaAssets.id, mediaAssetId) });
-  if (!asset || asset.status !== "ready") throw new PlaylistError("Track not playable");
-
+/** Append a track to the end of the playlist unless it is already there. Returns whether a row was inserted. */
+async function appendPlaylistItem(playlistId: string, userId: string, mediaAssetId: string): Promise<boolean> {
   const existing = await db.query.playlistItems.findFirst({
     where: and(eq(schema.playlistItems.playlistId, playlistId), eq(schema.playlistItems.mediaAssetId, mediaAssetId)),
   });
-  if (existing) return getPlaylistDetail(playlistId, userId);
+  if (existing) return false;
 
   const last = await db.query.playlistItems.findFirst({
     where: eq(schema.playlistItems.playlistId, playlistId),
@@ -345,6 +342,15 @@ export async function addPlaylistTrack(playlistId: string, userId: string, media
     position: (last?.position ?? -1) + 1,
     addedByUserId: userId,
   });
+  return true;
+}
+
+export async function addPlaylistTrack(playlistId: string, userId: string, mediaAssetId: string): Promise<PlaylistDetail> {
+  if (!(await userCanEdit(playlistId, userId))) throw new PlaylistError("Not allowed", 403);
+  const asset = await db.query.mediaAssets.findFirst({ where: eq(schema.mediaAssets.id, mediaAssetId) });
+  if (!asset || asset.status !== "ready") throw new PlaylistError("Track not playable");
+
+  if (!(await appendPlaylistItem(playlistId, userId, mediaAssetId))) return getPlaylistDetail(playlistId, userId);
   await db
     .update(schema.playlists)
     .set({ updatedAt: sql`now()` })
@@ -352,8 +358,8 @@ export async function addPlaylistTrack(playlistId: string, userId: string, media
   return getPlaylistDetail(playlistId, userId);
 }
 
-export async function removePlaylistTrack(playlistId: string, userId: string, mediaAssetId: string): Promise<PlaylistDetail> {
-  if (!(await userCanEdit(playlistId, userId))) throw new PlaylistError("Not allowed", 403);
+/** Delete a track from the playlist and renumber the remaining positions 0..n-1. */
+async function deletePlaylistItem(playlistId: string, mediaAssetId: string) {
   await db
     .delete(schema.playlistItems)
     .where(and(eq(schema.playlistItems.playlistId, playlistId), eq(schema.playlistItems.mediaAssetId, mediaAssetId)));
@@ -367,6 +373,11 @@ export async function removePlaylistTrack(playlistId: string, userId: string, me
       await db.update(schema.playlistItems).set({ position: i }).where(eq(schema.playlistItems.id, remaining[i]!.id));
     }
   }
+}
+
+export async function removePlaylistTrack(playlistId: string, userId: string, mediaAssetId: string): Promise<PlaylistDetail> {
+  if (!(await userCanEdit(playlistId, userId))) throw new PlaylistError("Not allowed", 403);
+  await deletePlaylistItem(playlistId, mediaAssetId);
   await db
     .update(schema.playlists)
     .set({ updatedAt: sql`now()` })
@@ -378,13 +389,13 @@ export async function setPlaylistExclusion(playlistId: string, userId: string, m
   if (!(await userCanEdit(playlistId, userId))) throw new PlaylistError("Not allowed", 403);
   if (excluded) {
     await db.insert(schema.playlistExclusions).values({ playlistId, mediaAssetId }).onConflictDoNothing();
-    await db
-      .delete(schema.playlistItems)
-      .where(and(eq(schema.playlistItems.playlistId, playlistId), eq(schema.playlistItems.mediaAssetId, mediaAssetId)));
+    await deletePlaylistItem(playlistId, mediaAssetId);
   } else {
     await db
       .delete(schema.playlistExclusions)
       .where(and(eq(schema.playlistExclusions.playlistId, playlistId), eq(schema.playlistExclusions.mediaAssetId, mediaAssetId)));
+    const asset = await db.query.mediaAssets.findFirst({ where: eq(schema.mediaAssets.id, mediaAssetId) });
+    if (asset?.status === "ready") await appendPlaylistItem(playlistId, userId, mediaAssetId);
   }
   await db
     .update(schema.playlists)
