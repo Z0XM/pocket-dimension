@@ -10,7 +10,12 @@ export const GET: RequestHandler = async ({ locals, url, request }) => {
   const deviceId = url.searchParams.get("deviceId");
   if (!isValidDeviceId(deviceId)) throw error(400, "deviceId required");
 
-  const stream = await createCatalogQueueStream(locals.user.id, deviceId, deviceLabelFromUserAgent(request.headers.get("user-agent")));
+  const stream = await createCatalogQueueStream(
+    locals.user.id,
+    deviceId,
+    deviceLabelFromUserAgent(request.headers.get("user-agent")),
+    request.signal
+  );
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",

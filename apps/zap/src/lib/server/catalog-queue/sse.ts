@@ -15,7 +15,7 @@ function encodeSSE(event: string, data: unknown) {
  * One stream per open Zap tab/device. Sync is SSE (server → client snapshots) + plain POSTs for commands,
  * matching the session stream: no extra adapter/proxy setup, and EventSource reconnects on its own.
  */
-export async function createCatalogQueueStream(userId: string, deviceId: string, label: string) {
+export async function createCatalogQueueStream(userId: string, deviceId: string, label: string, signal?: AbortSignal) {
   const onlineBefore = catalogQueueBus.connect(userId, deviceId);
   const pendingPause = pauseTimers.get(userId);
   if (pendingPause) {
@@ -55,6 +55,9 @@ export async function createCatalogQueueStream(userId: string, deviceId: string,
     void publishCatalogQueue(userId).catch(() => {});
   }
 
+  // Presence must drop as soon as the client goes away; not every server runtime calls `cancel()` for that.
+  signal?.addEventListener("abort", close, { once: true });
+
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (event: string, data: unknown) => {
@@ -65,8 +68,10 @@ export async function createCatalogQueueStream(userId: string, deviceId: string,
           close();
         }
       };
+      if (closed) return;
       unsubscribe = catalogQueueBus.subscribe(userId, (snapshot) => send("snapshot", snapshot));
       send("snapshot", await buildCatalogQueueSnapshot(userId));
+      if (closed) return;
       // Tell the user's other devices this one came online.
       void publishCatalogQueue(userId).catch(() => {});
       pingTimer = setInterval(() => send("ping", {}), PING_INTERVAL_MS);

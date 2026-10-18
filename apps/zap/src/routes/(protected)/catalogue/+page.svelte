@@ -21,8 +21,12 @@
   const FILTERS_OPEN_KEY = "zap.catalogue.filtersOpen";
   const queue = getCatalogQueue();
 
+  function scopeFromData() {
+    return data.scope === "playlist" && data.playlistId ? `playlist:${data.playlistId}` : data.scope === "all" ? "all" : "";
+  }
+
   /** `""` = Your library (default), `all`, or `playlist:<id>`. */
-  let libraryScope = $state("");
+  let libraryScope = $state(scopeFromData());
   let q = $state("");
   let selected = $state<string[]>([]);
   let tagQuery = $state("");
@@ -127,7 +131,7 @@
     const key = `${data.scope}|${data.playlistId}|${data.q}|${data.tagQuery}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
     if (key === hydratedKey) return;
     hydratedKey = key;
-    libraryScope = data.scope === "playlist" && data.playlistId ? `playlist:${data.playlistId}` : data.scope === "all" ? "all" : "";
+    libraryScope = scopeFromData();
     q = data.q;
     tagQuery = data.tagQuery ?? "";
     tagQueryError = data.tagQueryError ?? null;
