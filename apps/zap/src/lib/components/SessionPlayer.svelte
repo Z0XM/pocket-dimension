@@ -167,6 +167,9 @@
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
       <p class="font-mono text-[10px] tracking-[0.2em] text-signal uppercase">Now playing</p>
+      {#if session?.name}
+        <p class="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{session.name}</p>
+      {/if}
       <h2 class="mt-1 truncate text-xl font-semibold tracking-tight">
         {current?.title ?? (session?.status === "ended" ? "Session ended" : "Waiting for a track")}
       </h2>

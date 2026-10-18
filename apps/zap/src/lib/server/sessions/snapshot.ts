@@ -1,6 +1,7 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { effectivePermissions } from "./permissions";
+import { defaultSessionName } from "./session-name";
 import type { SessionSnapshot, SessionSnapshotMember, SessionSnapshotQueueItem, SessionSnapshotSession } from "./types";
 
 function displayName(user: { name: string | null; username: string | null; email: string }): string {
@@ -12,6 +13,7 @@ function serializeSession(row: typeof schema.sessions.$inferSelect): SessionSnap
     id: row.id,
     hostUserId: row.hostUserId,
     joinCode: row.joinCode,
+    name: row.name?.trim() ? row.name : defaultSessionName(row.joinCode),
     status: row.status,
     playbackState: row.playbackState,
     currentQueueItemId: row.currentQueueItemId,

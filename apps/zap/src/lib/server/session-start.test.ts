@@ -5,6 +5,7 @@ import { canStartSession, primaryLiveSession } from "./session-start";
 function live(over: Partial<LiveSessionSummary> & { id: string; role: "host" | "guest" }): LiveSessionSummary {
   return {
     joinCode: "ABC",
+    name: "Session ABC",
     playbackState: "idle",
     positionMs: 0,
     currentTitle: null,
@@ -12,6 +13,8 @@ function live(over: Partial<LiveSessionSummary> & { id: string; role: "host" | "
     lastActivityAt: new Date().toISOString(),
     perpetual: false,
     status: "live",
+    canRename: over.role === "host",
+    canClose: over.role === "host",
     ...over,
   };
 }

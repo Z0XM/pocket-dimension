@@ -4,6 +4,7 @@ import {
   SessionError,
   endSession,
   getSessionForUser,
+  renameSession,
   setGuestPermissions,
   setMemberOutput,
   setMemberPermissions,
@@ -39,6 +40,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
       guestsCanControl?: boolean;
       autoPlay?: boolean;
       perpetual?: boolean;
+      name?: string | null;
       memberUserId?: string;
       permissions?: {
         canAdd?: boolean;
@@ -63,11 +65,17 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
       });
       return json(snapshot);
     }
-    if (body.autoPlay !== undefined || body.perpetual !== undefined) {
+    // Name-only PATCH works on stale perpetual rooms (sessions index rename).
+    if (body.name !== undefined && body.autoPlay === undefined && body.perpetual === undefined && body.guestsCanAdd === undefined && body.guestsCanControl === undefined) {
+      const snapshot = await renameSession(params.id!, user.id, body.name);
+      return json(snapshot);
+    }
+    if (body.autoPlay !== undefined || body.perpetual !== undefined || body.name !== undefined) {
       if (body.guestsCanAdd === undefined && body.guestsCanControl === undefined) {
         const snapshot = await setSessionOptions(params.id!, user.id, {
           autoPlay: body.autoPlay,
           perpetual: body.perpetual,
+          name: body.name,
         });
         return json(snapshot);
       }

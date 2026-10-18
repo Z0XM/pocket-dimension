@@ -8,11 +8,14 @@
     allowStart = true,
     /** Show a perpetual checkbox when starting a new session. */
     showPerpetualOption = false,
+    /** Optional name field when creating a new session. */
+    showNameOption = false,
   }: {
     label?: string;
     class?: string;
     allowStart?: boolean;
     showPerpetualOption?: boolean;
+    showNameOption?: boolean;
   } = $props();
 
   let busy = $state(false);
@@ -23,6 +26,7 @@
   let canStart = $state(allowStart);
   let checked = $state(false);
   let perpetual = $state(false);
+  let sessionName = $state("");
 
   $effect(() => {
     canStart = allowStart;
@@ -83,7 +87,11 @@
         method: "POST",
         credentials: "same-origin",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ forceNew: true, perpetual: showPerpetualOption ? perpetual : false }),
+        body: JSON.stringify({
+          forceNew: true,
+          perpetual: showPerpetualOption ? perpetual : false,
+          ...(showNameOption && sessionName.trim() ? { name: sessionName.trim() } : {}),
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Could not start session (${res.status})`);
@@ -123,6 +131,19 @@
   </span>
   {#if liveId && liveTitle}
     <span class="max-w-xs font-mono text-[10px] text-muted-foreground">Left at: {liveTitle}</span>
+  {/if}
+  {#if showNameOption && canStart}
+    <label class="flex w-full max-w-xs flex-col gap-1 font-mono text-[10px] text-muted-foreground">
+      <span>Name (optional)</span>
+      <input
+        class="rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
+        type="text"
+        maxlength={80}
+        placeholder="Session…"
+        bind:value={sessionName}
+        disabled={busy}
+      />
+    </label>
   {/if}
   {#if showPerpetualOption && canStart}
     <label class="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">

@@ -30,6 +30,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       code?: string;
       forceNew?: boolean;
       perpetual?: boolean;
+      name?: string | null;
     };
     if (body.action === "join") {
       const snapshot = await joinSessionByCode(user.id, body.code ?? "");
@@ -47,7 +48,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     if (!canStartSession(live)) {
       throw new SessionError("Guests can’t start a new session — resume or join instead", 403);
     }
-    const snapshot = await createSession(user.id, { perpetual: Boolean(body.perpetual) });
+    const snapshot = await createSession(user.id, { perpetual: Boolean(body.perpetual), name: body.name });
     return json(snapshot, { status: 201 });
   } catch (err) {
     mapError(err);

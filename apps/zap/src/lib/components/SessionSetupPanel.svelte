@@ -14,11 +14,16 @@
 
   let busy = $state(false);
   let error = $state<string | null>(null);
+  let nameDraft = $state("");
 
   const session = $derived(snapshot.session);
   const canSetup = $derived(Boolean(snapshot.me?.canSetup));
   const isHost = $derived(snapshot.me?.role === "host");
   const sessionId = $derived(session?.id ?? "");
+
+  $effect(() => {
+    nameDraft = session?.name ?? "";
+  });
 
   const permKeys: { key: keyof SessionMemberPermissions; label: string }[] = [
     { key: "canAdd", label: "Add" },
@@ -65,6 +70,30 @@
   <div class="space-y-6">
     <div class="space-y-3 rounded-lg border border-border/70 bg-card/30 p-4">
       <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Session options</h2>
+      <form
+        class="flex flex-wrap items-end gap-2"
+        onsubmit={(e) => {
+          e.preventDefault();
+          void patch({ name: nameDraft });
+        }}
+      >
+        <label class="min-w-0 flex-1 space-y-1 font-mono text-[11px] text-muted-foreground">
+          <span>Name</span>
+          <input
+            class="w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+            bind:value={nameDraft}
+            maxlength={80}
+            disabled={busy}
+          />
+        </label>
+        <button
+          type="submit"
+          class="rounded border border-border px-2 py-1.5 font-mono text-[10px] text-muted-foreground hover:bg-secondary/60 disabled:opacity-40"
+          disabled={busy || nameDraft.trim() === (session.name ?? "").trim()}
+        >
+          Save
+        </button>
+      </form>
       <div class="flex flex-wrap gap-4 font-mono text-[11px]">
         <label class="flex items-center gap-2" title="When the queue ends, pick another catalogue track">
           <input

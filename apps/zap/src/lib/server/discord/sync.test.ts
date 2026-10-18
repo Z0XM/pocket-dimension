@@ -11,6 +11,7 @@ function baseSnapshot(overrides: Partial<SessionSnapshot["session"]> & { playabl
       id: "s1",
       hostUserId: "u1",
       joinCode: "ABC123",
+      name: "Session ABC123",
       status: "live",
       playbackState: "idle",
       currentQueueItemId: "q1",
