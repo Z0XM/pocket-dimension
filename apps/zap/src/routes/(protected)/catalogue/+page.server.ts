@@ -62,6 +62,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   return {
     scope,
     playlistId,
+    /** `?playlist=` named a playlist that is gone (deleted) or not viewable; the page falls back to Your library. */
+    playlistMissing: Boolean(parsed.playlistId) && !playlistOk,
     /** Scope dropdown + “Add to playlist” targets. */
     playlistOptions: playlists.map((p) => ({ id: p.id, name: p.name, canEdit: p.canEdit, trackCount: p.trackCount })),
     q,
