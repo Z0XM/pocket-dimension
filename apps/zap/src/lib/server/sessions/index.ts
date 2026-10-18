@@ -22,6 +22,8 @@ export {
   endIdleSessions,
   findLiveSessionForUser,
   listLiveSessionsForUser,
+  removeUserFromLiveSessions,
+  publishSessionSnapshots,
 } from "./sessions";
 export type { LiveSessionSummary } from "./sessions";
 export type * from "./types";
