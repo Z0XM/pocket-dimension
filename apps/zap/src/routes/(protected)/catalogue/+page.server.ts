@@ -6,7 +6,6 @@ import { readCustomTagNamesFromForm } from "$lib/custom-tags";
 import {
   CATALOGUE_PAGE_SIZE,
   ensureCustomTags,
-  ensureSystemTags,
   isCatalogueVisibleStatus,
   listAvailableTags,
   listCatalogue,
@@ -24,7 +23,6 @@ function readTagIds(form: FormData): string[] {
 
 export const load: PageServerLoad = async ({ locals, url }) => {
   const userId = locals.user!.id;
-  await ensureSystemTags();
 
   const scope = url.searchParams.get("scope") === "yours" ? "yours" : "all";
   const q = url.searchParams.get("q") ?? "";

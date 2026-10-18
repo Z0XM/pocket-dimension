@@ -5,33 +5,6 @@ import { evaluateTagQuery, parseTagQuery, type TagQueryNode } from "$lib/tag-que
 
 export { slugifyTag };
 
-const SYSTEM_TAG_SEEDS = [
-  { name: "slow", slug: "slow" },
-  { name: "ignite", slug: "ignite" },
-  { name: "blast", slug: "blast" },
-  { name: "love", slug: "love" },
-  { name: "sad", slug: "sad" },
-  { name: "happy", slug: "happy" },
-  { name: "upbeat", slug: "upbeat" },
-  { name: "rap", slug: "rap" },
-] as const;
-
-export async function ensureSystemTags() {
-  for (const seed of SYSTEM_TAG_SEEDS) {
-    const existing = await db.query.tags.findFirst({
-      where: and(eq(schema.tags.kind, "system"), eq(schema.tags.slug, seed.slug)),
-    });
-    if (!existing) {
-      await db.insert(schema.tags).values({
-        name: seed.name,
-        slug: seed.slug,
-        kind: "system",
-        ownerUserId: null,
-      });
-    }
-  }
-}
-
 export type CatalogueScope = "all" | "yours";
 
 /** Statuses listed in browse / search. `unavailable` rows show with a "not available" badge and are not playable. */
@@ -276,8 +249,8 @@ export function serializeCatalogueAsset(asset: CatalogueAsset, tags: CatalogueTa
   };
 }
 
+/** System tags (seeded by migration 0055, managed by admins) plus this user's private custom tags. */
 export async function listAvailableTags(userId: string) {
-  await ensureSystemTags();
   return db
     .select()
     .from(schema.tags)
@@ -376,5 +349,3 @@ export async function addUserAssetTags(userId: string, mediaAssetId: string, tag
   }
   return tags;
 }
-
-export { SYSTEM_TAG_SEEDS };

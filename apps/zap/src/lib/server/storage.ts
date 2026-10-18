@@ -210,6 +210,20 @@ export async function putMediaObject(input: {
   return { storageKey };
 }
 
+/** Delete one object. S3/R2 DELETE is idempotent, so a missing key is not an error. */
+export async function deleteMediaObject(storageKey: string): Promise<void> {
+  const config = getStorageConfig();
+  if (!config) {
+    throw new Error("Object storage is not configured.");
+  }
+  const client = createS3Client(config);
+  try {
+    await client.delete(storageKey);
+  } catch (err) {
+    throw formatStorageError(err, config);
+  }
+}
+
 export async function getPresignedGetUrl(storageKey: string, expiresInSeconds = 3600): Promise<string> {
   const config = getStorageConfig();
   if (!config) {

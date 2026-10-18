@@ -29,6 +29,17 @@
   let fetchGen = 0;
   let hydratedKey = $state("");
 
+  let deletedIds = $state<string[]>([]);
+  let deleteMessage = $state<string | null>(null);
+  const suggestions = $derived((data.suggestions ?? []).filter((t) => !deletedIds.includes(t.id)));
+
+  function onDeleted(id: string, message: string) {
+    deletedIds = [...deletedIds, id];
+    assets = assets.filter((a) => a.id !== id);
+    nextOffset = Math.max(nextOffset - 1, 0);
+    deleteMessage = message;
+  }
+
   $effect(() => {
     const key = `${data.scope}|${data.q}|${data.tagQuery}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
     if (key === hydratedKey) return;
@@ -133,12 +144,12 @@
     </div>
   </div>
 
-  {#if data.suggestions?.length}
+  {#if suggestions.length}
     <div class="space-y-2">
       <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Suggested from others</h2>
       <ul class="divide-y divide-border/50 rounded-lg border border-border/70 bg-card/30">
-        {#each data.suggestions as track (track.id)}
-          <TrackRow {track} availableTags={data.availableTags} bind:activeId bind:audioEl />
+        {#each suggestions as track (track.id)}
+          <TrackRow {track} availableTags={data.availableTags} bind:activeId bind:audioEl canDelete={data.zapAdmin} ondeleted={onDeleted} />
         {/each}
       </ul>
     </div>
@@ -166,6 +177,9 @@
   {#if listError}
     <p class="auth-error">{listError}</p>
   {/if}
+  {#if deleteMessage}
+    <p class="text-sm text-signal">{deleteMessage}</p>
+  {/if}
 
   {#if loading && assets.length === 0}
     <TrackListSkeleton rows={8} />
@@ -180,7 +194,7 @@
           </li>
         {:else}
           {#each assets as track (track.id)}
-            <TrackRow {track} availableTags={data.availableTags} bind:activeId bind:audioEl />
+            <TrackRow {track} availableTags={data.availableTags} bind:activeId bind:audioEl canDelete={data.zapAdmin} ondeleted={onDeleted} />
           {/each}
         {/if}
       </ul>
