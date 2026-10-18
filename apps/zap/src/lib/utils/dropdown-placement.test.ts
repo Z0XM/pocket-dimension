@@ -44,4 +44,20 @@ describe("measureDropdownPlacement", () => {
     // below: 200-120-4-8=68, above: 80-4-8=68 → openUp false (not greater), max = max(96, min(224,68))=96
     expect(p.maxHeightPx).toBe(96);
   });
+
+  test("flips up near the bottom of a scroll container even with viewport space below", () => {
+    const scroller = {
+      parentElement: null,
+      getBoundingClientRect: () => ({ top: 200, bottom: 500 }),
+    };
+    const anchor = Object.assign(fakeAnchor(440, 480), { parentElement: scroller }) as HTMLElement;
+    globalThis.window = {
+      innerHeight: 1000,
+      getComputedStyle: (el: unknown) => ({ overflowY: el === scroller ? "auto" : "visible" }),
+    } as unknown as Window & typeof globalThis;
+    const p = measureDropdownPlacement(anchor);
+    // below inside scroller: 500-480-12=8 → flip up; above: 440-200-12=228 → capped at 224
+    expect(p.openUp).toBe(true);
+    expect(p.maxHeightPx).toBe(224);
+  });
 });
