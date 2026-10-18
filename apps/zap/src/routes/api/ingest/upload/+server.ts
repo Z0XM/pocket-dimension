@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { RequestHandler } from "./$types";
 import { db, schema } from "@pocket-dimension/db";
-import { ensureCustomTag, setUserAssetTags } from "$lib/server/catalogue";
+import { readCustomTagNamesFromForm } from "$lib/custom-tags";
+import { ensureCustomTags, setUserAssetTags } from "$lib/server/catalogue";
 import { MAX_TRACK_DURATION_MS } from "$lib/server/ingest/limits";
 import { isStorageConfigured, putMediaObject } from "$lib/server/storage";
 
@@ -19,7 +20,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     .getAll("tagIds")
     .map((v) => String(v).trim())
     .filter(Boolean);
-  const customTagName = String(form.get("customTag") ?? "").trim();
+  const customTagNames = readCustomTagNamesFromForm(form);
   const durationRaw = String(form.get("durationMs") ?? "").trim();
   const durationMs = durationRaw ? Number(durationRaw) : null;
 
@@ -99,11 +100,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
           asset = inserted!;
         }
 
-        const nextTagIds = [...tagIds];
-        if (customTagName) {
-          const custom = await ensureCustomTag(userId, customTagName);
-          if (custom) nextTagIds.push(custom.id);
-        }
+        const nextTagIds = [...tagIds, ...(await ensureCustomTags(userId, customTagNames))];
         if (nextTagIds.length > 0) {
           await setUserAssetTags(userId, asset.id, nextTagIds);
         }

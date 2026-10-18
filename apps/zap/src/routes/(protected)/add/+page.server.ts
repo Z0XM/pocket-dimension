@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
 import type { Actions, PageServerLoad } from "./$types";
-import { ensureCustomTag, ensureSystemTags, listAvailableTags, setUserAssetTags } from "$lib/server/catalogue";
+import { readCustomTagNamesFromForm } from "$lib/custom-tags";
+import { ensureCustomTags, ensureSystemTags, listAvailableTags, setUserAssetTags } from "$lib/server/catalogue";
 import { IngestError, ingestPublicUrl, resolveYtDlpBin } from "$lib/server/ingest";
 import { MAX_TRACK_DURATION_MS } from "$lib/server/ingest/limits";
 import { describeStorageConfig, isStorageConfigured, putMediaObject } from "$lib/server/storage";
@@ -46,7 +47,7 @@ export const actions: Actions = {
     const file = form.get("file");
     const title = String(form.get("title") ?? "").trim();
     const tagIds = readTagIds(form);
-    const customTagName = String(form.get("customTag") ?? "").trim();
+    const customTagNames = readCustomTagNamesFromForm(form);
 
     if (!(file instanceof File) || file.size === 0) {
       return fail(400, { uploadError: "Choose an audio file." });
@@ -99,11 +100,7 @@ export const actions: Actions = {
       asset = inserted;
     }
 
-    const nextTagIds = [...tagIds];
-    if (customTagName) {
-      const custom = await ensureCustomTag(userId, customTagName);
-      if (custom) nextTagIds.push(custom.id);
-    }
+    const nextTagIds = [...tagIds, ...(await ensureCustomTags(userId, customTagNames))];
     if (nextTagIds.length > 0) {
       await setUserAssetTags(userId, asset.id, nextTagIds);
     }
@@ -125,6 +122,7 @@ export const actions: Actions = {
         ingestOk: true,
         ingestSummary: {
           imported: result.imported,
+          unavailable: result.unavailable,
           skipped: result.skipped,
           failed: result.failed,
           syncRunId: result.syncRunId,

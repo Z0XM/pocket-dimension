@@ -1,7 +1,8 @@
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
+import { addUserAssetTags } from "$lib/server/catalogue";
 import { isStorageConfigured, putMediaObject } from "$lib/server/storage";
-import { summarizeIngestItems } from "./errors";
+import { classifyUnavailableReason, isPlaceholderVideoTitle, placeholderUnavailableReason, summarizeIngestItems } from "./errors";
 import { DURATION_CAP_MESSAGE, isOverDurationCap } from "./limits";
 import type { SongProgress } from "./progress";
 import { parseMediaUrl } from "./url-parse";
@@ -10,12 +11,20 @@ import { cleanupWorkDir, downloadBestAudio, listPlaylistEntries, probeUrl, resol
 export type IngestItemResult =
   | { status: "imported"; mediaAssetId: string; identityKey: string; title: string }
   | { status: "reused"; mediaAssetId: string; identityKey: string; title: string }
+  /** Catalogue row saved with metadata only (deleted/private/blocked source). */
+  | { status: "unavailable"; mediaAssetId: string; identityKey: string; title: string; reason: string }
   | { status: "skipped"; reason: string; identityKey?: string; title?: string }
   | { status: "failed"; reason: string; identityKey?: string; title?: string };
+
+/** Results that produced a catalogue row the user can tag / order. */
+export function hasCatalogueAsset(item: IngestItemResult): item is Extract<IngestItemResult, { mediaAssetId: string }> {
+  return item.status === "imported" || item.status === "reused" || item.status === "unavailable";
+}
 
 export type SyncRunResult = {
   syncRunId: string;
   imported: number;
+  unavailable: number;
   skipped: number;
   failed: number;
   items: IngestItemResult[];
@@ -115,6 +124,69 @@ async function backfillMissingChannelMeta(
   return updated ?? asset;
 }
 
+/**
+ * Save (or refresh) a metadata-only catalogue row for a source we cannot download.
+ * Never downgrades a playable row. The row keeps its id + identity key, so a later
+ * successful ingest of the same identity flips it to `ready` in place (see ingestCatalogueVideo).
+ */
+export async function saveUnavailableAsset(input: {
+  userId: string;
+  identityKey: string;
+  url: string;
+  title?: string | null;
+  reason: string;
+  metaHints?: IngestMetaHints;
+  durationMs?: number | null;
+}): Promise<typeof schema.mediaAssets.$inferSelect> {
+  const { identityKey } = input;
+  const hints = input.metaHints;
+  const titleHint = input.title?.trim() || null;
+  const existing = await findReadyAsset(identityKey);
+  if (existing) {
+    if (existing.status === "ready" && existing.storageKey) return existing;
+    const [updated] = await db
+      .update(schema.mediaAssets)
+      .set({
+        status: "unavailable",
+        errorMessage: input.reason,
+        title: titleHint && isPlaceholderVideoTitle(existing.title) && !isPlaceholderVideoTitle(titleHint) ? titleHint : existing.title,
+        description: existing.description ?? hints?.description ?? null,
+        channelTitle: existing.channelTitle ?? hints?.channelTitle ?? null,
+        channelId: existing.channelId ?? hints?.channelId ?? null,
+        artists: existing.artists ?? hints?.channelTitle ?? null,
+        durationMs: existing.durationMs ?? input.durationMs ?? null,
+        externalUrl: existing.externalUrl ?? input.url,
+      })
+      .where(eq(schema.mediaAssets.id, existing.id))
+      .returning();
+    return updated ?? existing;
+  }
+
+  const [inserted] = await db
+    .insert(schema.mediaAssets)
+    .values({
+      identityKey,
+      sourceType: identityKey.startsWith("youtube:") ? "youtube" : "url",
+      status: "unavailable",
+      storageKey: null,
+      title: titleHint || "Untitled",
+      artists: hints?.channelTitle ?? null,
+      description: hints?.description ?? null,
+      channelTitle: hints?.channelTitle ?? null,
+      channelId: hints?.channelId ?? null,
+      durationMs: input.durationMs ?? null,
+      externalUrl: input.url,
+      errorMessage: input.reason,
+      addedByUserId: input.userId,
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (inserted) return inserted;
+  const raced = await findReadyAsset(identityKey);
+  if (!raced) throw new Error("Could not save unavailable catalogue entry");
+  return raced;
+}
+
 /** Single catalogue video ingest (no sync_run row) — used by URL paste + connected playlist import. */
 export async function ingestCatalogueVideo(opts: {
   userId: string;
@@ -122,6 +194,14 @@ export async function ingestCatalogueVideo(opts: {
   identityKey: string;
   titleHint?: string;
   metaHints?: IngestMetaHints;
+  durationHint?: number | null;
+  /**
+   * Playlist paths know the item identity even when the source is gone: save deleted / private /
+   * region-blocked items as `unavailable` catalogue rows instead of reporting them as failed.
+   */
+  recordUnavailable?: boolean;
+  /** Pre-flight reason from playlist metadata (e.g. API says private/deleted) — skips yt-dlp. */
+  unavailableReason?: string | null;
   onSongProgress?: (progress: SongProgress) => void | Promise<void>;
 }): Promise<IngestItemResult> {
   const { userId, url, identityKey } = opts;
@@ -134,6 +214,24 @@ export async function ingestCatalogueVideo(opts: {
     });
   };
 
+  const markUnavailable = async (reason: string): Promise<IngestItemResult> => {
+    const asset = await saveUnavailableAsset({
+      userId,
+      identityKey,
+      url,
+      title: opts.titleHint,
+      reason,
+      metaHints: opts.metaHints,
+      durationMs: opts.durationHint,
+    });
+    if (asset.status === "ready" && asset.storageKey) {
+      await emit("done", 100, asset.title);
+      return { status: "reused", mediaAssetId: asset.id, identityKey, title: asset.title };
+    }
+    await emit("unavailable", 100, asset.title);
+    return { status: "unavailable", mediaAssetId: asset.id, identityKey, title: asset.title, reason };
+  };
+
   const existingAsset = await findReadyAsset(identityKey);
   if (existingAsset?.status === "ready" && existingAsset.storageKey) {
     const asset = await backfillMissingChannelMeta(existingAsset, opts.metaHints);
@@ -144,6 +242,10 @@ export async function ingestCatalogueVideo(opts: {
       identityKey,
       title: asset.title,
     };
+  }
+
+  if (opts.recordUnavailable && opts.unavailableReason) {
+    return markUnavailable(opts.unavailableReason);
   }
 
   if (!(await resolveYtDlpBin())) {
@@ -168,6 +270,12 @@ export async function ingestCatalogueVideo(opts: {
     if (asset?.status === "ready" && asset.storageKey) {
       await emit("done", 100, asset.title);
       return { status: "reused", mediaAssetId: asset.id, identityKey, title: asset.title };
+    }
+    if (opts.recordUnavailable) {
+      const settled = asset ?? (await findReadyAsset(identityKey));
+      if (settled?.status === "unavailable") {
+        return markUnavailable(settled.errorMessage ?? "Video unavailable");
+      }
     }
     await emit("failed", 0);
     return { status: "failed", reason: "Concurrent fetch did not finish", identityKey, title: opts.titleHint };
@@ -261,7 +369,7 @@ export async function ingestCatalogueVideo(opts: {
 
     await emit("done", 100, asset.title);
     return {
-      status: existingAsset ? "reused" : "imported",
+      status: existingAsset?.storageKey ? "reused" : "imported",
       mediaAssetId: asset.id,
       identityKey,
       title: asset.title,
@@ -274,6 +382,14 @@ export async function ingestCatalogueVideo(opts: {
       await emit("skipped", 100);
       return { status: "skipped", reason: message, identityKey, title: opts.titleHint };
     }
+    const unavailableReason = opts.recordUnavailable ? classifyUnavailableReason(message) : null;
+    if (unavailableReason) {
+      try {
+        return await markUnavailable(unavailableReason);
+      } catch (saveErr) {
+        console.warn("[zap ingest] could not save unavailable entry", identityKey, saveErr);
+      }
+    }
     await emit("failed", 0);
     return { status: "failed", reason: message, identityKey, title: opts.titleHint };
   } finally {
@@ -284,10 +400,12 @@ export async function ingestCatalogueVideo(opts: {
 export async function ingestPublicUrl(
   userId: string,
   rawUrl: string,
-  onSongProgress?: (progress: SongProgress) => void | Promise<void>
+  onSongProgress?: (progress: SongProgress) => void | Promise<void>,
+  opts?: { tagIds?: string[] }
 ): Promise<SyncRunResult> {
   const parsed = parseMediaUrl(rawUrl);
   if (!parsed) throw new IngestError("Enter a valid http(s) URL");
+  const tagIds = [...new Set((opts?.tagIds ?? []).filter(Boolean))];
 
   const [run] = await db
     .insert(schema.syncRuns)
@@ -301,6 +419,16 @@ export async function ingestPublicUrl(
   if (!run) throw new IngestError("Failed to start sync run", 500);
 
   const items: IngestItemResult[] = [];
+  const push = async (result: IngestItemResult) => {
+    items.push(result);
+    if (tagIds.length > 0 && hasCatalogueAsset(result)) {
+      try {
+        await addUserAssetTags(userId, result.mediaAssetId, tagIds);
+      } catch (err) {
+        console.warn("[zap ingest url tags]", result.mediaAssetId, err);
+      }
+    }
+  };
 
   try {
     if (parsed.kind === "youtube_playlist") {
@@ -319,26 +447,21 @@ export async function ingestPublicUrl(
           });
           continue;
         }
-        const result = await ingestCatalogueVideo({
-          userId,
-          url: entry.url,
-          identityKey: `youtube:${entry.id}`,
-          titleHint: entry.title,
-          onSongProgress,
-        });
-        items.push(result);
+        await push(
+          await ingestCatalogueVideo({
+            userId,
+            url: entry.url,
+            identityKey: `youtube:${entry.id}`,
+            titleHint: entry.title,
+            durationHint: entry.durationMs,
+            recordUnavailable: true,
+            unavailableReason: placeholderUnavailableReason(entry.title),
+            onSongProgress,
+          })
+        );
       }
-    } else if (parsed.kind === "youtube_video") {
-      items.push(
-        await ingestCatalogueVideo({
-          userId,
-          url: parsed.canonicalUrl,
-          identityKey: parsed.identityKey,
-          onSongProgress,
-        })
-      );
     } else {
-      items.push(
+      await push(
         await ingestCatalogueVideo({
           userId,
           url: parsed.canonicalUrl,
@@ -355,10 +478,11 @@ export async function ingestPublicUrl(
       .set({
         status: "completed",
         importedCount: summary.imported,
+        unavailableCount: summary.unavailable,
         skippedCount: summary.skipped,
         failedCount: summary.failed,
         errorMessage: summary.errorMessage,
-        summaryJson: JSON.stringify({ items, failures: summary.failures }),
+        summaryJson: JSON.stringify({ items, failures: summary.failures, unavailable: summary.unavailableItems, tagIds }),
         finishedAt: new Date(),
       })
       .where(eq(schema.syncRuns.id, run.id));
@@ -366,6 +490,7 @@ export async function ingestPublicUrl(
     return {
       syncRunId: run.id,
       imported: summary.imported,
+      unavailable: summary.unavailable,
       skipped: summary.skipped,
       failed: summary.failed,
       items,
@@ -381,9 +506,10 @@ export async function ingestPublicUrl(
         status: "failed",
         errorMessage: message,
         importedCount: summary.imported,
+        unavailableCount: summary.unavailable,
         skippedCount: summary.skipped,
         failedCount: summary.failed + (items.length === 0 ? 1 : 0),
-        summaryJson: JSON.stringify({ items, failures: summary.failures }),
+        summaryJson: JSON.stringify({ items, failures: summary.failures, unavailable: summary.unavailableItems, tagIds }),
         finishedAt: new Date(),
       })
       .where(eq(schema.syncRuns.id, run.id));

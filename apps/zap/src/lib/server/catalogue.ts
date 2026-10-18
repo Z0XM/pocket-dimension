@@ -1,6 +1,9 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { MAX_CUSTOM_TAG_LENGTH, parseCustomTagNames, slugifyTag } from "$lib/custom-tags";
 import { evaluateTagQuery, parseTagQuery, type TagQueryNode } from "$lib/tag-query";
+
+export { slugifyTag };
 
 const SYSTEM_TAG_SEEDS = [
   { name: "slow", slug: "slow" },
@@ -30,6 +33,15 @@ export async function ensureSystemTags() {
 }
 
 export type CatalogueScope = "all" | "yours";
+
+/** Statuses listed in browse / search. `unavailable` rows show with a "not available" badge and are not playable. */
+export const CATALOGUE_VISIBLE_STATUSES = ["ready", "unavailable"] as const;
+
+export function isCatalogueVisibleStatus(status: string): boolean {
+  return (CATALOGUE_VISIBLE_STATUSES as readonly string[]).includes(status);
+}
+
+const catalogueVisible = () => inArray(schema.mediaAssets.status, [...CATALOGUE_VISIBLE_STATUSES]);
 
 export const CATALOGUE_PAGE_SIZE = 25;
 
@@ -102,10 +114,8 @@ export async function listCatalogue(input: CatalogueQuery): Promise<CatalogueLis
     }
     tagQueryAst = parsed.ast;
 
-    // Universe for NOT: ready assets in current scope (or all ready).
-    const universeWhere = assetIds
-      ? and(eq(schema.mediaAssets.status, "ready"), inArray(schema.mediaAssets.id, assetIds))
-      : eq(schema.mediaAssets.status, "ready");
+    // Universe for NOT: visible assets in current scope (or all visible).
+    const universeWhere = assetIds ? and(catalogueVisible(), inArray(schema.mediaAssets.id, assetIds)) : catalogueVisible();
     const universeRows = await db.select({ id: schema.mediaAssets.id }).from(schema.mediaAssets).where(universeWhere);
     const universe = new Set(universeRows.map((r) => r.id));
     if (universe.size === 0) return { ...empty, tagQueryAst };
@@ -166,7 +176,7 @@ export async function listCatalogue(input: CatalogueQuery): Promise<CatalogueLis
     if (assetIds.length === 0) return empty;
   }
 
-  const conditions = [eq(schema.mediaAssets.status, "ready")];
+  const conditions = [catalogueVisible()];
   if (assetIds) {
     conditions.push(inArray(schema.mediaAssets.id, assetIds));
   }
@@ -258,7 +268,10 @@ export function serializeCatalogueAsset(asset: CatalogueAsset, tags: CatalogueTa
     channelId: asset.channelId,
     durationMs: asset.durationMs,
     sourceType: asset.sourceType,
-    playable: Boolean(asset.storageKey),
+    playable: Boolean(asset.storageKey) && asset.status === "ready",
+    available: asset.status !== "unavailable",
+    unavailableReason: asset.status === "unavailable" ? (asset.errorMessage ?? "Song not available") : null,
+    externalUrl: asset.externalUrl,
     tags: tags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
   };
 }
@@ -270,15 +283,6 @@ export async function listAvailableTags(userId: string) {
     .from(schema.tags)
     .where(or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, userId)))
     .orderBy(asc(schema.tags.kind), asc(schema.tags.name));
-}
-
-export function slugifyTag(name: string) {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
 }
 
 /** Resolve selectable tags for a user (system + their custom). Invalid ids are ignored. */
@@ -306,13 +310,29 @@ export async function ensureCustomTag(userId: string, name: string) {
   const [inserted] = await db
     .insert(schema.tags)
     .values({
-      name: trimmed.slice(0, 64),
+      name: trimmed.slice(0, MAX_CUSTOM_TAG_LENGTH),
       slug,
       kind: "custom",
       ownerUserId: userId,
     })
+    .onConflictDoNothing()
     .returning();
-  return inserted;
+  if (inserted) return inserted;
+  return (
+    (await db.query.tags.findFirst({
+      where: and(eq(schema.tags.kind, "custom"), eq(schema.tags.ownerUserId, userId), eq(schema.tags.slug, slug)),
+    })) ?? null
+  );
+}
+
+/** Ensure each name exists as one of this user's private custom tags; returns tag ids in input order. */
+export async function ensureCustomTags(userId: string, names: string[]): Promise<string[]> {
+  const ids: string[] = [];
+  for (const name of parseCustomTagNames(names)) {
+    const tag = await ensureCustomTag(userId, name);
+    if (tag && !ids.includes(tag.id)) ids.push(tag.id);
+  }
+  return ids;
 }
 
 /**

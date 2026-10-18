@@ -2,10 +2,12 @@ import { fail } from "@sveltejs/kit";
 import { db, schema } from "@pocket-dimension/db";
 import { eq } from "drizzle-orm";
 import type { Actions, PageServerLoad } from "./$types";
+import { readCustomTagNamesFromForm } from "$lib/custom-tags";
 import {
   CATALOGUE_PAGE_SIZE,
-  ensureCustomTag,
+  ensureCustomTags,
   ensureSystemTags,
+  isCatalogueVisibleStatus,
   listAvailableTags,
   listCatalogue,
   serializeCatalogueAsset,
@@ -64,20 +66,16 @@ export const actions: Actions = {
     const form = await request.formData();
     const mediaAssetId = String(form.get("mediaAssetId") ?? "").trim();
     const tagIds = readTagIds(form);
-    const customTagName = String(form.get("customTag") ?? "").trim();
+    const customTagNames = readCustomTagNamesFromForm(form);
 
     if (!mediaAssetId) return fail(400, { tagError: "Missing track." });
 
     const asset = await db.query.mediaAssets.findFirst({
       where: eq(schema.mediaAssets.id, mediaAssetId),
     });
-    if (!asset || asset.status !== "ready") return fail(404, { tagError: "Track not found." });
+    if (!asset || !isCatalogueVisibleStatus(asset.status)) return fail(404, { tagError: "Track not found." });
 
-    const nextTagIds = [...tagIds];
-    if (customTagName) {
-      const custom = await ensureCustomTag(userId, customTagName);
-      if (custom) nextTagIds.push(custom.id);
-    }
+    const nextTagIds = [...tagIds, ...(await ensureCustomTags(userId, customTagNames))];
 
     await setUserAssetTags(userId, mediaAssetId, nextTagIds);
     return { tagOk: true, mediaAssetId };

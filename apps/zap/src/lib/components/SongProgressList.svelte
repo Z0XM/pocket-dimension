@@ -21,6 +21,7 @@
     if (phase === "probing") return "Probing";
     if (phase === "finalizing") return "Finalizing";
     if (phase === "done") return "Done";
+    if (phase === "unavailable") return "Saved · not available";
     if (phase === "skipped") return "Skipped";
     if (phase === "failed") return "Failed";
     return phase;
@@ -29,6 +30,7 @@
   function barClass(phase: string) {
     if (phase === "failed") return "bg-destructive";
     if (phase === "skipped") return "bg-muted-foreground";
+    if (phase === "unavailable") return "bg-accent";
     if (phase === "done") return "bg-signal";
     return "bg-signal";
   }

@@ -1,9 +1,11 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
+  import CustomTagInput from "$lib/components/CustomTagInput.svelte";
   import SongProgressList, { type SongProgressView } from "$lib/components/SongProgressList.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import ZapSelect from "$lib/components/ZapSelect.svelte";
+  import { withDraft } from "$lib/custom-tags";
   import { PLAYLIST_IMPORT_SORT_OPTIONS, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
   import type { ActionData, PageData } from "./$types";
 
@@ -12,10 +14,14 @@
   type YtPhase = "idle" | "linking" | "loading" | "importing" | "disconnecting";
 
   let uploadTagIds = $state<string[]>([]);
-  let uploadCustomTag = $state("");
+  let uploadCustomTags = $state<string[]>([]);
+  let uploadCustomDraft = $state("");
   let uploadTitle = $state("");
   let uploadFileInput = $state<HTMLInputElement | null>(null);
   let ingestUrl = $state("");
+  let ingestTagIds = $state<string[]>([]);
+  let ingestCustomTags = $state<string[]>([]);
+  let ingestCustomDraft = $state("");
   let ingestBusy = $state(false);
   let uploadBusy = $state(false);
   let ytLinked = $state(false);
@@ -25,13 +31,15 @@
   let ytError = $state<string | null>(null);
   let ytTagPromptOpen = $state(false);
   let ytImportTagIds = $state<string[]>([]);
-  let ytImportCustomTag = $state("");
+  let ytImportCustomTags = $state<string[]>([]);
+  let ytImportCustomDraft = $state("");
   let ytImportSort = $state<PlaylistImportSort>("playlist");
   let ytTagDialog = $state<HTMLDialogElement | null>(null);
   const ytBusy = $derived(ytPhase !== "idle");
   const addBusy = $derived(uploadBusy || ingestBusy || ytBusy);
   let ytImportSummary = $state<{
     imported: number;
+    unavailable: number;
     skipped: number;
     failed: number;
     errorMessage?: string | null;
@@ -42,6 +50,7 @@
     done: number;
     remaining: number;
     imported: number;
+    unavailable: number;
     skipped: number;
     failed: number;
     currentTitle?: string | null;
@@ -196,7 +205,7 @@
     ytPhase = "importing";
     ytError = null;
     ytImportSummary = null;
-    ytImportProgress = { total: 0, done: 0, remaining: 0, imported: 0, skipped: 0, failed: 0, songs: [] };
+    ytImportProgress = { total: 0, done: 0, remaining: 0, imported: 0, unavailable: 0, skipped: 0, failed: 0, songs: [] };
     try {
       const res = await fetch("/api/youtube/import", {
         method: "POST",
@@ -205,7 +214,7 @@
         body: JSON.stringify({
           playlistIds: ytSelected,
           tagIds: ytImportTagIds,
-          customTag: ytImportCustomTag.trim() || undefined,
+          customTags: withDraft(ytImportCustomTags, ytImportCustomDraft),
           sort: ytImportSort,
         }),
       });
@@ -222,6 +231,7 @@
             done: Number(ev.done ?? 0),
             remaining: Number(ev.remaining ?? 0),
             imported: Number(ev.imported ?? 0),
+            unavailable: Number(ev.unavailable ?? 0),
             skipped: Number(ev.skipped ?? 0),
             failed: Number(ev.failed ?? 0),
             currentTitle: typeof ev.currentTitle === "string" ? ev.currentTitle : null,
@@ -231,6 +241,7 @@
           sawDone = true;
           ytImportSummary = {
             imported: Number(ev.imported ?? 0),
+            unavailable: Number(ev.unavailable ?? 0),
             skipped: Number(ev.skipped ?? 0),
             failed: Number(ev.failed ?? 0),
             errorMessage: (ev.errorMessage as string | null) ?? null,
@@ -246,7 +257,8 @@
 
       if (!sawDone) throw new Error("Import ended without a result");
       ytImportTagIds = [];
-      ytImportCustomTag = "";
+      ytImportCustomTags = [];
+      ytImportCustomDraft = "";
       await invalidateAll();
       window.location.href = "/catalogue";
     } catch (err) {
@@ -268,7 +280,11 @@
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
-        body: JSON.stringify({ url: ingestUrl.trim() }),
+        body: JSON.stringify({
+          url: ingestUrl.trim(),
+          tagIds: ingestTagIds,
+          customTags: withDraft(ingestCustomTags, ingestCustomDraft),
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -292,6 +308,9 @@
       });
       if (!sawDone) throw new Error("Import ended without a result");
       ingestUrl = "";
+      ingestTagIds = [];
+      ingestCustomTags = [];
+      ingestCustomDraft = "";
       await invalidateAll();
       window.location.href = "/catalogue";
     } catch (err) {
@@ -325,7 +344,7 @@
       formData.set("file", file);
       if (uploadTitle.trim()) formData.set("title", uploadTitle.trim());
       for (const id of uploadTagIds) formData.append("tagIds", id);
-      if (uploadCustomTag.trim()) formData.set("customTag", uploadCustomTag.trim());
+      for (const name of withDraft(uploadCustomTags, uploadCustomDraft)) formData.append("customTags", name);
 
       let sawDone = false;
       await xhrFormNdjson(
@@ -360,7 +379,8 @@
       );
       if (!sawDone) throw new Error("Upload ended without a result");
       uploadTagIds = [];
-      uploadCustomTag = "";
+      uploadCustomTags = [];
+      uploadCustomDraft = "";
       uploadTitle = "";
       if (uploadFileInput) uploadFileInput.value = "";
       await invalidateAll();
@@ -467,7 +487,7 @@
           <BusyStatus
             label="Importing from YouTube…"
             detail={ytImportProgress && ytImportProgress.total > 0
-              ? `${ytImportProgress.done}/${ytImportProgress.total} done · ${ytImportProgress.imported} ok · ${ytImportProgress.skipped} skipped · ${ytImportProgress.failed} failed · ${ytImportProgress.remaining} left`
+              ? `${ytImportProgress.done}/${ytImportProgress.total} done · ${ytImportProgress.imported} ok · ${ytImportProgress.unavailable} not available · ${ytImportProgress.skipped} skipped · ${ytImportProgress.failed} failed · ${ytImportProgress.remaining} left`
               : `${ytSelected.length} playlist${ytSelected.length === 1 ? "" : "s"} · expanding & downloading in parallel…`}
           />
           <SongProgressList songs={ytImportProgress?.songs ?? []} />
@@ -481,6 +501,12 @@
           <p class="mt-2 text-sm text-signal">
             Import done — imported {ytImportSummary.imported}, skipped {ytImportSummary.skipped}, failed {ytImportSummary.failed}.
           </p>
+          {#if ytImportSummary.unavailable > 0}
+            <p class="mt-1 text-sm text-muted-foreground">
+              {ytImportSummary.unavailable} song{ytImportSummary.unavailable === 1 ? "" : "s"} saved to the catalogue as “Song not available” (deleted,
+              private, or blocked on YouTube).
+            </p>
+          {/if}
           {#if ytImportSummary.errorMessage}
             <p class="auth-error mt-2">{ytImportSummary.errorMessage}</p>
           {/if}
@@ -548,6 +574,11 @@
           required
           disabled={!data.ingestReady || ingestBusy || uploadBusy || ytBusy}
         />
+        <div class="space-y-2 {!data.ingestReady || uploadBusy || ingestBusy || ytBusy ? 'pointer-events-none opacity-60' : ''}">
+          <p class="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Tags (many allowed)</p>
+          <TagMultiSelect options={data.availableTags} bind:selected={ingestTagIds} name="ingestTagIds" placeholder="Select tags…" />
+          <CustomTagInput bind:tags={ingestCustomTags} bind:draft={ingestCustomDraft} name="ingestCustomTags" />
+        </div>
         <button type="submit" class="auth-btn" disabled={!data.ingestReady || ingestBusy || uploadBusy || ytBusy}>
           {ingestBusy ? "Importing…" : "Import URL"}
         </button>
@@ -596,18 +627,11 @@
           bind:this={uploadFileInput}
           disabled={!data.storageReady || uploadBusy || ingestBusy || ytBusy}
         />
-        <div class={uploadBusy || ingestBusy || ytBusy ? "pointer-events-none opacity-60" : ""}>
-          <p class="mb-1 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Tags (many allowed)</p>
+        <div class="space-y-2 {uploadBusy || ingestBusy || ytBusy ? 'pointer-events-none opacity-60' : ''}">
+          <p class="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Tags (many allowed)</p>
           <TagMultiSelect options={data.availableTags} bind:selected={uploadTagIds} name="tagIds" placeholder="Select tags…" />
+          <CustomTagInput bind:tags={uploadCustomTags} bind:draft={uploadCustomDraft} />
         </div>
-        <input
-          class="auth-field"
-          type="text"
-          name="customTag"
-          placeholder="New custom tag (optional)"
-          bind:value={uploadCustomTag}
-          disabled={uploadBusy || ingestBusy || ytBusy}
-        />
         <button type="submit" class="auth-btn" disabled={!data.storageReady || uploadBusy || ingestBusy || ytBusy}>
           {uploadBusy ? "Uploading…" : "Upload to Zap"}
         </button>
@@ -651,7 +675,10 @@
       <p class="mb-1 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Tags</p>
       <TagMultiSelect options={data.availableTags} bind:selected={ytImportTagIds} name="ytImportTagIds" placeholder="Select tags…" />
     </div>
-    <input class="auth-field" type="text" placeholder="New custom tag (optional)" bind:value={ytImportCustomTag} />
+    <div>
+      <p class="mb-1 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Custom tags</p>
+      <CustomTagInput bind:tags={ytImportCustomTags} bind:draft={ytImportCustomDraft} name="ytImportCustomTags" disabled={ytBusy} />
+    </div>
     <div class="flex flex-wrap justify-end gap-2">
       <button
         type="button"

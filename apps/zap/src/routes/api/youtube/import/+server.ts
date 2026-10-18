@@ -1,5 +1,6 @@
 import { error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
+import { readCustomTagNamesFromJson } from "$lib/custom-tags";
 import { getYoutubeLinkStatus, importConnectedPlaylists } from "$lib/server/youtube";
 import { isStorageConfigured } from "$lib/server/storage";
 import { resolveYtDlpBin } from "$lib/server/ingest";
@@ -17,6 +18,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     playlistIds?: string[];
     tagIds?: string[];
     customTag?: string;
+    customTags?: string[];
     sort?: string;
   };
   const playlistIds = body.playlistIds ?? [];
@@ -24,7 +26,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     throw error(400, "playlistIds required");
   }
   const tagIds = Array.isArray(body.tagIds) ? body.tagIds.map((id) => String(id)) : [];
-  const customTag = typeof body.customTag === "string" ? body.customTag : "";
+  const customTags = readCustomTagNamesFromJson(body);
   const sort = typeof body.sort === "string" ? body.sort : "playlist";
 
   const userId = locals.user.id;
@@ -42,12 +44,13 @@ export const POST: RequestHandler = async ({ locals, request }) => {
           (progress) => {
             send({ type: "progress", ...progress });
           },
-          { tagIds, customTag, sort }
+          { tagIds, customTags, sort }
         );
         send({
           type: "done",
           syncRunId: result.syncRunId,
           imported: result.imported,
+          unavailable: result.unavailable,
           skipped: result.skipped,
           failed: result.failed,
           errorMessage: result.errorMessage ?? null,

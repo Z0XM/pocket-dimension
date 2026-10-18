@@ -516,8 +516,11 @@
                 {#each catalogue as track (track.id)}
                   <li class="flex items-center justify-between gap-2 px-3 py-2">
                     <div class="min-w-0">
-                      <p class="truncate text-sm font-medium">{track.title}</p>
-                      <p class="truncate font-mono text-[10px] text-muted-foreground">{track.artists ?? "Unknown"}</p>
+                      <p class="truncate text-sm font-medium {track.available === false ? 'text-muted-foreground' : ''}">{track.title}</p>
+                      <p class="truncate font-mono text-[10px] text-muted-foreground">
+                        {track.artists ?? "Unknown"}{#if track.available === false}
+                          · <span class="text-destructive">Song not available</span>{/if}
+                      </p>
                     </div>
                     <button
                       type="button"

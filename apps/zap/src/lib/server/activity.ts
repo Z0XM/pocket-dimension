@@ -17,6 +17,7 @@ export type LibraryActivityEntry =
       sourceUrl: string;
       status: string;
       imported: number;
+      unavailable: number;
       skipped: number;
       failed: number;
       playlistTitles?: string[];
@@ -91,6 +92,7 @@ export async function listUserLibraryActivity(userId: string, limit = 40): Promi
       sourceUrl: run.sourceUrl,
       status: run.status,
       imported: run.importedCount,
+      unavailable: run.unavailableCount,
       skipped: run.skippedCount,
       failed: run.failedCount,
       playlistTitles: meta.playlistTitles,
