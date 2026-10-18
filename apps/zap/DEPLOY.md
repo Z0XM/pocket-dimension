@@ -129,10 +129,30 @@ Migrations are an explicit deploy step, not part of container start. `shared/db/
 - **Standard:** from monorepo root: `DATABASE_URL=... bun run db:migrate`  
 - **Build-time (opt-in):** `ZAP_MIGRATE_AT_BUILD=1` during `deploy-build.sh` (Railpack path)
 
+## Admins
+
+Zap admins live in `zap.user_access.is_admin` (migration `0055`). Admins get `/admin`: song deletes (DB + R2 object), system tags, block/allow users, portal mode (open / allowlist) and cross-user activity. After the first admin exists, promote others from **Admin → Users**.
+
+Bootstrap the first admin (the account must already exist — sign up first):
+
+```bash
+# from a monorepo checkout, with DATABASE_URL pointing at the prod DB
+cd apps/zap && DATABASE_URL=... bun run admin:grant you@example.com   # --revoke to undo, --list to show admins
+```
+
+or directly in SQL:
+
+```sql
+INSERT INTO zap.user_access (user_id, is_admin)
+SELECT id, true FROM auth."user" WHERE lower(email) = lower('you@example.com')
+ON CONFLICT (user_id) DO UPDATE SET is_admin = true, updated_at = now();
+```
+
 ## Checklist
 
 - [ ] Dokploy Build Path `/`, Dockerfile `apps/zap/Dockerfile`, port `3013`  
 - [ ] Same Postgres as other PD apps; migrations applied  
+- [ ] First Zap admin bootstrapped (see [Admins](#admins))  
 - [ ] Auth service up; shared `BETTER_AUTH_SECRET`; trusted origins + cookie domain  
 - [ ] `ORIGIN` = public HTTPS URL  
 - [ ] R2 bucket + API token env  
