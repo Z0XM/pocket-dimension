@@ -16,19 +16,15 @@
   let appliedKey = "";
   let pendingSeekSec: number | null = null;
 
-  /** Session pages play their own audio; keep the personal queue silent here so the two never overlap. */
-  const onSessionPage = $derived(page.url.pathname.startsWith("/session/"));
+  /** Session / join routes own their chrome; hide catalog floating queue + devices there. */
+  const path = $derived(page.url.pathname);
+  const hideCatalogFloats = $derived(path.startsWith("/session") || path.startsWith("/join"));
   const deviceOutput = $derived(queue.thisDevice?.outputEnabled ?? false);
-  const outputHere = $derived(deviceOutput && !onSessionPage);
-  const showDevices = $derived(queue.active || queue.onlineDevices.length > 1);
+  const outputHere = $derived(deviceOutput && !hideCatalogFloats);
+  const showQueue = $derived(queue.active && !hideCatalogFloats);
+  const showDevices = $derived(!hideCatalogFloats && (queue.active || queue.onlineDevices.length > 1));
   const localNote = $derived(
-    !queue.thisDevice
-      ? null
-      : onSessionPage && deviceOutput
-        ? "Muted here while a session page is open."
-        : !deviceOutput
-          ? "This device is remote-only."
-          : null
+    !queue.thisDevice ? null : !deviceOutput ? "This device is remote-only." : null
   );
 
   onMount(() => {
@@ -128,7 +124,7 @@
 
 <audio bind:this={audioEl} preload="auto" class="hidden" onloadedmetadata={onLoadedMetadata} ontimeupdate={onTimeUpdate} onended={onEnded}></audio>
 
-{#if queue.active}
+{#if showQueue}
   <FloatingPanel
     id="queue"
     title="Queue"

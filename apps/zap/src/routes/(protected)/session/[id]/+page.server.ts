@@ -1,5 +1,6 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
+import { parseCatalogueScope } from "$lib/catalogue-scope";
 import { SessionError, getSessionForUser } from "$lib/server/sessions";
 import { listCatalogue, listTagFilterOptions, serializeCatalogueAsset, CATALOGUE_PAGE_SIZE } from "$lib/server/catalogue";
 
@@ -10,14 +11,16 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
   try {
     const snapshot = await getSessionForUser(params.id, locals.user.id);
     const q = url.searchParams.get("q")?.trim() ?? "";
-    const scope = url.searchParams.get("scope") === "yours" ? "yours" : "all";
+    const { scope, playlistId } = parseCatalogueScope(url.searchParams, "yours");
     const selectedTagIds = url.searchParams.getAll("tag").filter(Boolean);
     const tagQuery = url.searchParams.get("tq") ?? "";
+    const catalogueLibraryScope = scope === "playlist" && playlistId ? `playlist:${playlistId}` : scope === "all" ? "all" : "";
 
     const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, tagOptions, playlists] = await Promise.all([
       listCatalogue({
         userId: locals.user.id,
         scope,
+        playlistId,
         q,
         tagIds: tagQuery.trim() ? [] : selectedTagIds,
         tagQuery,
@@ -37,7 +40,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
       availableTags: tagOptions.availableTags,
       topTagIds: tagOptions.topTagIds,
       catalogueQ: q,
-      catalogueScope: scope,
+      catalogueLibraryScope,
       selectedTagIds,
       catalogueTagQuery: tagQuery,
       catalogueTagQueryError: tagQueryError ?? null,

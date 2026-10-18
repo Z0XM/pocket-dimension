@@ -6,10 +6,13 @@
     class: className = "rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40",
     /** When false, hide create/new — guests Join/Resume only. */
     allowStart = true,
+    /** Show a perpetual checkbox when starting a new session. */
+    showPerpetualOption = false,
   }: {
     label?: string;
     class?: string;
     allowStart?: boolean;
+    showPerpetualOption?: boolean;
   } = $props();
 
   let busy = $state(false);
@@ -19,6 +22,7 @@
   let liveRole = $state<"host" | "guest" | null>(null);
   let canStart = $state(allowStart);
   let checked = $state(false);
+  let perpetual = $state(false);
 
   $effect(() => {
     canStart = allowStart;
@@ -79,7 +83,7 @@
         method: "POST",
         credentials: "same-origin",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ forceNew: true }),
+        body: JSON.stringify({ forceNew: true, perpetual: showPerpetualOption ? perpetual : false }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Could not start session (${res.status})`);
@@ -119,6 +123,12 @@
   </span>
   {#if liveId && liveTitle}
     <span class="max-w-xs font-mono text-[10px] text-muted-foreground">Left at: {liveTitle}</span>
+  {/if}
+  {#if showPerpetualOption && canStart}
+    <label class="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+      <input class="zap-checkbox" type="checkbox" bind:checked={perpetual} disabled={busy} />
+      Perpetual (persists when idle)
+    </label>
   {/if}
   {#if busy}
     <BusyStatus label="Starting session…" />

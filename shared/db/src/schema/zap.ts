@@ -103,7 +103,7 @@ export const mediaAssetTags = zapSchema.table(
   ]
 );
 
-/** Listening session — host transport authority; guests listen-only by default. */
+/** Listening session — host has full control; guests get per-member capability grants. */
 export const sessions = zapSchema.table(
   "sessions",
   {
@@ -120,10 +120,12 @@ export const sessions = zapSchema.table(
       .$default(() => sql`now()`)
       .notNull(),
     playbackGeneration: integer("playback_generation").default(0).notNull(),
-    guestsCanAdd: boolean("guests_can_add").default(false).notNull(),
-    guestsCanControl: boolean("guests_can_control").default(false).notNull(),
     /** When queue ends, algorithmically enqueue+play another catalogue track. */
     autoPlay: boolean("auto_play").default(true).notNull(),
+    /** Persist through idle; when idle, `staleAt` is set instead of ending. */
+    perpetual: boolean("perpetual").default(false).notNull(),
+    /** Set when a perpetual session goes idle; cleared on rejoin. */
+    staleAt: timestamp("stale_at"),
     lastActivityAt: timestamp("last_activity_at")
       .$default(() => sql`now()`)
       .notNull(),
@@ -149,6 +151,16 @@ export const sessionMembers = zapSchema.table(
       .notNull()
       .references(() => auth.user.id, { onDelete: "cascade" }),
     role: sessionMemberRole("role").notNull(),
+    /** Guest grants (host ignores these — always full). Defaults listen-only. */
+    canAdd: boolean("can_add").default(false).notNull(),
+    canPlayPause: boolean("can_play_pause").default(false).notNull(),
+    canSkip: boolean("can_skip").default(false).notNull(),
+    canSeek: boolean("can_seek").default(false).notNull(),
+    canReorder: boolean("can_reorder").default(false).notNull(),
+    canSetup: boolean("can_setup").default(false).notNull(),
+    /** Browser/account output for this member in the session. */
+    outputEnabled: boolean("output_enabled").default(true).notNull(),
+    volume: integer("volume").default(100).notNull(),
     joinedAt: timestamp("joined_at")
       .$default(() => sql`now()`)
       .notNull(),

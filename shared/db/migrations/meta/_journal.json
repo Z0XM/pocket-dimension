@@ -407,6 +407,13 @@
       "when": 1792800000000,
       "tag": "0057_zap_catalog_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1792900000000,
+      "tag": "0058_zap_session_layout",
+      "breakpoints": true
     }
   ]
 }
