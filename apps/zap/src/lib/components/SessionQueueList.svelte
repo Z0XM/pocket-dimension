@@ -7,10 +7,13 @@
   let {
     snapshot = $bindable<SessionSnapshot>(),
     busy = false,
+    /** When false, omit the “Queue” heading (e.g. nested under a Queue tab). */
+    showHeading = true,
     onerror,
   }: {
     snapshot: SessionSnapshot;
     busy?: boolean;
+    showHeading?: boolean;
     onerror?: (message: string | null) => void;
   } = $props();
 
@@ -119,21 +122,27 @@
 </script>
 
 <div class="space-y-2">
-  <div class="flex flex-wrap items-center justify-between gap-2">
-    <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Queue</h2>
-    {#if snapshot.queue.length > 0 && canRemove}
-      <button
-        type="button"
-        class="rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:bg-secondary/60 disabled:opacity-40"
-        disabled={locked}
-        onclick={() => void queuePost({ action: "clear" })}
-      >
-        Clear
-      </button>
-    {/if}
-  </div>
+  {#if showHeading || (snapshot.queue.length > 0 && canRemove)}
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      {#if showHeading}
+        <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Queue</h2>
+      {:else}
+        <span class="sr-only">Queue</span>
+      {/if}
+      {#if snapshot.queue.length > 0 && canRemove}
+        <button
+          type="button"
+          class="ml-auto rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:bg-secondary/60 disabled:opacity-40"
+          disabled={locked}
+          onclick={() => void queuePost({ action: "clear" })}
+        >
+          Clear
+        </button>
+      {/if}
+    </div>
+  {/if}
 
-  <ul bind:this={listEl} class="max-h-96 min-h-[6rem] overflow-y-auto rounded-lg border border-border/70 bg-card/30 py-1" aria-label="Session queue">
+  <ul bind:this={listEl} class="max-h-[min(32rem,70vh)] min-h-[8rem] overflow-y-auto rounded-lg border border-border/70 bg-card/30 py-1" aria-label="Session queue">
     {#if snapshot.queue.length === 0}
       <li class="px-4 py-8 text-center text-sm text-muted-foreground">Queue empty — add from the library.</li>
     {:else}
