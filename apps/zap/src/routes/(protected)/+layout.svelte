@@ -20,14 +20,13 @@
   const sessionActive = $derived(path === "/session" || path.startsWith("/session/"));
   const adminActive = $derived(path === "/admin" || path.startsWith("/admin/"));
 
+  /** Catalogue pins the shell to the viewport so only its song list scrolls. */
+  const fillViewport = $derived(catalogueActive && !isNavigating);
+
   const skeletonPath = $derived(navTo ?? path);
   const skeletonShowFilters = $derived(skeletonPath.startsWith("/catalogue") || skeletonPath.startsWith("/session/"));
   const skeletonVariant = $derived<"list" | "form" | "home">(
-    skeletonPath.startsWith("/home") || skeletonPath === "/session"
-      ? "home"
-      : skeletonPath.startsWith("/join") || skeletonPath.startsWith("/add")
-        ? "form"
-        : "list"
+    skeletonPath.startsWith("/home") || skeletonPath === "/session" ? "home" : skeletonPath.startsWith("/join") ? "form" : "list"
   );
   const skeletonTitle = $derived(
     skeletonPath.startsWith("/catalogue")
@@ -36,17 +35,15 @@
         ? "Loading playlists"
         : skeletonPath.startsWith("/session")
           ? "Loading session"
-          : skeletonPath.startsWith("/add")
-            ? "Loading add"
-            : skeletonPath.startsWith("/history")
-              ? "Loading history"
-              : skeletonPath.startsWith("/home")
-                ? "Loading home"
-                : skeletonPath.startsWith("/join")
-                  ? "Loading join"
-                  : skeletonPath.startsWith("/admin")
-                    ? "Loading admin"
-                    : "Loading"
+          : skeletonPath.startsWith("/history")
+            ? "Loading history"
+            : skeletonPath.startsWith("/home")
+              ? "Loading home"
+              : skeletonPath.startsWith("/join")
+                ? "Loading join"
+                : skeletonPath.startsWith("/admin")
+                  ? "Loading admin"
+                  : "Loading"
   );
 
   async function signOut() {
@@ -55,8 +52,8 @@
   }
 </script>
 
-<div class="zap-wave-field zap-grid min-h-screen">
-  <header class="relative border-b border-border/60 bg-background/70 backdrop-blur">
+<div class={`zap-wave-field zap-grid flex flex-col ${fillViewport ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
+  <header class="relative shrink-0 border-b border-border/60 bg-background/70 backdrop-blur">
     {#if isNavigating}
       <div class="zap-nav-progress" aria-hidden="true"></div>
       <span class="sr-only" role="status" aria-live="polite">Loading page…</span>
@@ -101,7 +98,7 @@
       </nav>
     </div>
   </header>
-  <main class="mx-auto max-w-5xl px-6 py-8">
+  <main class={`mx-auto w-full max-w-5xl px-6 ${fillViewport ? "flex min-h-0 flex-1 flex-col overflow-y-auto py-4 sm:py-6" : "py-8"}`}>
     {#if isNavigating}
       <PageSkeleton title={skeletonTitle} showFilters={skeletonShowFilters} variant={skeletonVariant} />
     {:else}

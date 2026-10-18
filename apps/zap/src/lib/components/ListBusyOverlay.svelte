@@ -5,16 +5,19 @@
   let {
     busy = false,
     label = "Updating…",
+    fill = false,
     children,
   }: {
     busy?: boolean;
     label?: string;
+    /** Stretch to the parent's height so a child scroller can own scrolling. */
+    fill?: boolean;
     children: import("svelte").Snippet;
   } = $props();
 </script>
 
-<div class="relative">
-  <div class={busy ? "pointer-events-none opacity-55 transition-opacity duration-150" : "transition-opacity duration-150"}>
+<div class={`relative ${fill ? "h-full" : ""}`}>
+  <div class={`transition-opacity duration-150 ${fill ? "h-full" : ""} ${busy ? "pointer-events-none opacity-55" : ""}`}>
     {@render children()}
   </div>
   {#if busy}

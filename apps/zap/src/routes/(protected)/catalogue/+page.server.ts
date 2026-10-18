@@ -12,7 +12,10 @@ import {
   serializeCatalogueAsset,
   setUserAssetTags,
 } from "$lib/server/catalogue";
+import { resolveYtDlpBin } from "$lib/server/ingest";
+import { isStorageConfigured } from "$lib/server/storage";
 import { listSuggestionsFromOthers } from "$lib/server/suggestions";
+import { getYoutubeLinkStatus, isGoogleOAuthConfigured } from "$lib/server/youtube";
 
 function readTagIds(form: FormData): string[] {
   return form
@@ -29,7 +32,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const tagIds = url.searchParams.getAll("tag").filter(Boolean);
   const tagQuery = url.searchParams.get("tq") ?? "";
 
-  const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, availableTags, suggestions] = await Promise.all([
+  const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, availableTags, suggestions, ytDlpBin, youtubeLink] = await Promise.all([
     listCatalogue({
       userId,
       scope,
@@ -41,7 +44,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     }),
     listAvailableTags(userId),
     listSuggestionsFromOthers(userId, 12),
+    resolveYtDlpBin(),
+    getYoutubeLinkStatus(userId).catch(() => ({ linked: false as const })),
   ]);
+
+  const storageReady = isStorageConfigured();
+  const ytDlpReady = Boolean(ytDlpBin);
 
   return {
     scope,
@@ -55,6 +63,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     availableTags: availableTags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
     assets: assets.map((asset) => serializeCatalogueAsset(asset, tagsByAsset.get(asset.id) ?? [])),
     suggestions,
+    addMusic: {
+      storageReady,
+      ingestReady: storageReady && ytDlpReady,
+      ytDlpReady,
+      youtubeOauthConfigured: isGoogleOAuthConfigured(),
+      youtubeLinked: youtubeLink.linked,
+      youtubeLinkedAt: youtubeLink.linked ? youtubeLink.linkedAt : null,
+    },
   };
 };
 
