@@ -15,7 +15,6 @@
   const homeActive = $derived(path === "/home");
   const catalogueActive = $derived(path === "/catalogue" || path.startsWith("/catalogue/"));
   const playlistsActive = $derived(path === "/playlists" || path.startsWith("/playlists/"));
-  const addActive = $derived(path === "/add" || path.startsWith("/add/"));
   const historyActive = $derived(path === "/history" || path.startsWith("/history/"));
   const joinActive = $derived(path === "/join" || path.startsWith("/join/"));
   const sessionActive = $derived(path === "/session" || path.startsWith("/session/"));
@@ -63,12 +62,11 @@
       <span class="sr-only" role="status" aria-live="polite">Loading page…</span>
     {/if}
     <div class="mx-auto flex max-w-5xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <a href="/home" class="flex items-center gap-3">
+      <a href="/home" class="flex items-center gap-3" aria-label="Zap home" aria-current={homeActive ? "page" : undefined}>
         <span class="text-xl font-semibold tracking-tight text-foreground">Zap</span>
         <WaveBars />
       </a>
       <nav class="flex flex-wrap items-center gap-1 font-mono text-[11px] sm:gap-2" aria-label="Primary">
-        <a href="/home" class={`zap-nav-link ${homeActive ? "zap-nav-link-active" : ""}`} aria-current={homeActive ? "page" : undefined}>Home</a>
         <a
           href="/catalogue"
           class={`zap-nav-link ${catalogueActive ? "zap-nav-link-active" : ""}`}
@@ -79,7 +77,7 @@
           class={`zap-nav-link ${playlistsActive ? "zap-nav-link-active" : ""}`}
           aria-current={playlistsActive ? "page" : undefined}>Playlists</a
         >
-        <a href="/add" class={`zap-nav-link ${addActive ? "zap-nav-link-active" : ""}`} aria-current={addActive ? "page" : undefined}>Add</a>
+        <a href="/join" class={`zap-nav-link ${joinActive ? "zap-nav-link-active" : ""}`} aria-current={joinActive ? "page" : undefined}>Join</a>
         <StartSessionButton
           label="Session"
           class={`text-[11px] disabled:opacity-40 ${
@@ -92,7 +90,6 @@
         <a href="/history" class={`zap-nav-link ${historyActive ? "zap-nav-link-active" : ""}`} aria-current={historyActive ? "page" : undefined}
           >History</a
         >
-        <a href="/join" class={`zap-nav-link ${joinActive ? "zap-nav-link-active" : ""}`} aria-current={joinActive ? "page" : undefined}>Join</a>
         {#if data.zapAdmin}
           <a href="/admin" class={`zap-nav-link ${adminActive ? "zap-nav-link-active" : ""}`} aria-current={adminActive ? "page" : undefined}>Admin</a
           >
