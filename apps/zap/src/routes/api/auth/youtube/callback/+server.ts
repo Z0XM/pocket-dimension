@@ -65,5 +65,5 @@ export const GET: RequestHandler = async ({ locals, url, cookies }) => {
       },
     });
 
-  throw redirect(302, storedState.returnTo || "/add");
+  throw redirect(302, storedState.returnTo || "/catalogue?add=youtube");
 };

@@ -10,7 +10,7 @@
     title?: string;
     showFilters?: boolean;
     rows?: number;
-    /** list = catalogue-style; form = join/add; home = hero + actions */
+    /** list = catalogue-style; form = join; home = hero + actions */
     variant?: "list" | "form" | "home";
   } = $props();
 </script>

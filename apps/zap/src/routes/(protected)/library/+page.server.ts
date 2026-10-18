@@ -9,7 +9,10 @@ export const load: PageServerLoad = async ({ url }) => {
   const rest = qs.toString();
   const suffix = rest ? `?${rest}` : "";
 
-  if (tab === "upload") throw redirect(308, `/add${suffix}`);
+  if (tab === "upload") {
+    qs.set("add", "url");
+    throw redirect(308, `/catalogue?${qs}`);
+  }
   if (tab === "playlists") throw redirect(308, `/playlists${suffix}`);
   if (tab === "history") throw redirect(308, `/history${suffix}`);
   throw redirect(308, `/catalogue${suffix}`);

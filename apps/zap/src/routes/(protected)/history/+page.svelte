@@ -59,7 +59,7 @@
     {#if !data.activity?.length}
       <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
         No imports yet —
-        <a href="/add" class="text-signal hover:underline">Add music</a>.
+        <a href="/catalogue?add" class="text-signal hover:underline">Add music</a>.
       </p>
     {:else}
       <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
