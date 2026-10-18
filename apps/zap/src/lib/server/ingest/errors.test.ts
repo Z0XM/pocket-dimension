@@ -10,6 +10,12 @@ describe("formatYtDlpFailure", () => {
     expect(msg).toContain("bot check");
   });
 
+  test("keeps malformed-cookies error instead of the 'set cookies' hint", () => {
+    const msg = formatYtDlpFailure("ERROR: Cookies file must be Netscape formatted, not JSON. See https://github.com/yt-dlp/yt-dlp/wiki/FAQ");
+    expect(msg).toContain("Netscape formatted");
+    expect(msg).not.toContain("bot check");
+  });
+
   test("keeps generic ERROR line", () => {
     const msg = formatYtDlpFailure("ERROR: [youtube] xyz: Video unavailable");
     expect(msg).toContain("Video unavailable");

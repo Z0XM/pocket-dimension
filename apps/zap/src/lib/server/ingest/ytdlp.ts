@@ -43,6 +43,41 @@ async function resolveBinary(candidates: string[]): Promise<string | null> {
 let cachedYtDlp: string | null | undefined;
 let cachedDeno: string | null | undefined;
 let cookiesPathPromise: Promise<string | null> | null = null;
+let cookiesSource: YtDlpCookiesSource = "none";
+
+export type YtDlpCookiesSource = "YTDLP_COOKIES_FILE" | "YTDLP_COOKIES_B64" | "YTDLP_COOKIES" | "none";
+
+/** yt-dlp failure with the raw ERROR lines kept for server logs (message is the user-facing hint). */
+export class YtDlpError extends Error {
+  constructor(
+    message: string,
+    readonly detail: string
+  ) {
+    super(message);
+    this.name = "YtDlpError";
+  }
+}
+
+function rawYtDlpDetail(stderr: string, stdout = "") {
+  const lines = `${stderr}\n${stdout}`
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const errors = lines.filter((l) => /^ERROR:|Sign in to confirm|HTTP Error \d+/i.test(l));
+  return (errors.length > 0 ? errors : lines.slice(-3)).join(" | ").slice(0, 1000);
+}
+
+/** Netscape cookies.txt rows are 7 tab-separated fields; JSON exports or mangled base64 are not. */
+export function inspectCookiesText(text: string) {
+  const rows = text.split(/\r?\n/).filter((l) => (l.trim() && !l.startsWith("#")) || l.startsWith("#HttpOnly_"));
+  const validRows = rows.filter((l) => l.split("\t").length === 7);
+  const youtubeRows = validRows.filter((l) => /youtube\.com|google\.com/.test(l.split("\t")[0] ?? ""));
+  return { rows: rows.length, validRows: validRows.length, youtubeRows: youtubeRows.length };
+}
+
+export function getYtDlpCookiesSource(): YtDlpCookiesSource {
+  return cookiesSource;
+}
 
 export async function resolveYtDlpBin(): Promise<string | null> {
   if (cachedYtDlp !== undefined) return cachedYtDlp;
@@ -65,7 +100,10 @@ async function resolveCookiesPath(): Promise<string | null> {
     const fromEnv = Bun.env.YTDLP_COOKIES_FILE?.trim();
     if (fromEnv) {
       const file = Bun.file(fromEnv);
-      if (await file.exists()) return fromEnv;
+      if (await file.exists()) {
+        logCookies("YTDLP_COOKIES_FILE", await file.text());
+        return fromEnv;
+      }
       console.warn(`[zap ingest] YTDLP_COOKIES_FILE missing: ${fromEnv}`);
     }
 
@@ -80,13 +118,26 @@ async function resolveCookiesPath(): Promise<string | null> {
     } else if (inline.includes("\\n") && !inline.includes("\n")) {
       inline = inline.replace(/\\n/g, "\n");
     }
-    if (!inline) return null;
+    if (!inline) {
+      console.warn("[zap ingest] no yt-dlp cookies configured; YouTube may bot-check downloads from datacenter IPs");
+      return null;
+    }
+    logCookies(b64 ? "YTDLP_COOKIES_B64" : "YTDLP_COOKIES", inline);
 
     const path = "/tmp/zap-ytdlp-cookies.txt";
     await writeFile(path, inline.endsWith("\n") ? inline : `${inline}\n`);
     return path;
   })();
   return cookiesPathPromise;
+}
+
+function logCookies(source: YtDlpCookiesSource, text: string) {
+  cookiesSource = source;
+  const stats = inspectCookiesText(text);
+  console.info(`[zap ingest] yt-dlp cookies from ${source}`, stats);
+  if (stats.validRows === 0 || stats.youtubeRows === 0) {
+    console.warn(`[zap ingest] ${source} does not look like a Netscape cookies.txt with youtube.com rows — yt-dlp will ignore it`);
+  }
 }
 
 async function baseArgs(): Promise<string[]> {
@@ -158,17 +209,17 @@ function assertYtDlpJson(code: number, stdout: string, stderr: string, label: st
   const trimmed = stdout.trim();
   const looksFailed = code !== 0 || !trimmed || trimmed === "null" || /^ERROR:/im.test(stderr) || /Sign in to confirm you’re not a bot/i.test(stderr);
   if (looksFailed) {
-    throw new Error(formatYtDlpFailure(stderr, stdout) || `${label} failed`);
+    throw new YtDlpError(formatYtDlpFailure(stderr, stdout) || `${label} failed`, rawYtDlpDetail(stderr, stdout));
   }
   try {
     const json = JSON.parse(trimmed) as unknown;
     if (!json || typeof json !== "object") {
-      throw new Error(formatYtDlpFailure(stderr, stdout) || `${label} returned no metadata`);
+      throw new YtDlpError(formatYtDlpFailure(stderr, stdout) || `${label} returned no metadata`, rawYtDlpDetail(stderr, stdout));
     }
     return json as Record<string, unknown>;
   } catch (err) {
-    if (err instanceof Error && /YouTube blocked|yt-dlp|bot check/i.test(err.message)) throw err;
-    throw new Error(formatYtDlpFailure(stderr, stdout) || `${label} returned invalid JSON`);
+    if (err instanceof YtDlpError) throw err;
+    throw new YtDlpError(formatYtDlpFailure(stderr, stdout) || `${label} returned invalid JSON`, rawYtDlpDetail(stderr, stdout));
   }
 }
 
@@ -274,7 +325,7 @@ export async function downloadBestAudio(
 
   if (code !== 0) {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
-    throw new Error(formatYtDlpFailure(lastStderr) || "yt-dlp download failed");
+    throw new YtDlpError(formatYtDlpFailure(lastStderr) || "yt-dlp download failed", rawYtDlpDetail(lastStderr));
   }
 
   const glob = new Bun.Glob("audio.*");
@@ -305,4 +356,5 @@ export function resetYtDlpCache() {
   cachedYtDlp = undefined;
   cachedDeno = undefined;
   cookiesPathPromise = null;
+  cookiesSource = "none";
 }
