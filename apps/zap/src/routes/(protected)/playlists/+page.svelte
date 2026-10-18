@@ -141,7 +141,7 @@
             Fills the playlist with your tracks matching <span class="text-signal">{newEffectiveTagQuery}</span>; rebuild any time from the playlist
             page.
           {:else}
-            Optional — leave empty for a hand-picked playlist.
+            Optional — leave empty for a freehand playlist: add tracks from the catalogue (⋮ → Add to playlist) or save a queue.
           {/if}
         </p>
       </div>
@@ -173,7 +173,8 @@
             <a href={`/playlists/${pl.id}`} class="min-w-0 flex-1 text-sm hover:text-signal">
               <span class="font-medium">{pl.name}</span>
               <span class="ml-2 font-mono text-[10px] text-muted-foreground"
-                >{pl.trackCount} · {pl.visibility}{#if !pl.canEdit}
+                >{pl.trackCount} · {pl.visibility}{#if !pl.tagQuery}
+                  · freehand{/if}{#if !pl.canEdit}
                   · collab{/if}</span
               >
               {#if pl.tagQuery}

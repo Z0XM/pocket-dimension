@@ -9,10 +9,12 @@ import {
   isCatalogueVisibleStatus,
   listCatalogue,
   listTagFilterOptions,
+  parseCatalogueScope,
   serializeCatalogueAsset,
   setUserAssetTags,
 } from "$lib/server/catalogue";
 import { resolveYtDlpBin } from "$lib/server/ingest";
+import { userCanViewPlaylist } from "$lib/server/playlist-access";
 import { listPlaylistsForUser } from "$lib/server/playlists";
 import { isStorageConfigured } from "$lib/server/storage";
 import { listSuggestionsFromOthers } from "$lib/server/suggestions";
@@ -28,7 +30,10 @@ function readTagIds(form: FormData): string[] {
 export const load: PageServerLoad = async ({ locals, url }) => {
   const userId = locals.user!.id;
 
-  const scope = url.searchParams.get("scope") === "yours" ? "yours" : "all";
+  const parsed = parseCatalogueScope(url.searchParams, "yours");
+  const playlistOk = parsed.playlistId ? await userCanViewPlaylist(parsed.playlistId, userId) : false;
+  const scope = parsed.scope === "playlist" && !playlistOk ? "yours" : parsed.scope;
+  const playlistId = scope === "playlist" ? parsed.playlistId : null;
   const q = url.searchParams.get("q") ?? "";
   const tagIds = url.searchParams.getAll("tag").filter(Boolean);
   const tagQuery = url.searchParams.get("tq") ?? "";
@@ -37,6 +42,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     listCatalogue({
       userId,
       scope,
+      playlistId,
       q,
       tagIds: tagQuery.trim() ? [] : tagIds,
       tagQuery,
@@ -55,6 +61,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
   return {
     scope,
+    playlistId,
+    /** Scope dropdown + “Add to playlist” targets. */
+    playlistOptions: playlists.map((p) => ({ id: p.id, name: p.name, canEdit: p.canEdit, trackCount: p.trackCount })),
     q,
     selectedTagIds: tagIds,
     tagQuery,

@@ -1,7 +1,54 @@
 <script lang="ts">
+  import PlayIcon from "@lucide/svelte/icons/play";
+  import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
+  import SaveIcon from "@lucide/svelte/icons/save";
+  import Trash2Icon from "@lucide/svelte/icons/trash-2";
+  import { invalidateAll } from "$app/navigation";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import { formatClock } from "$lib/catalog-queue";
+  import { getCatalogQueue } from "$lib/catalog-queue-client.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
+
+  const queue = getCatalogQueue();
+  let busyRunId = $state<string | null>(null);
+  let runError = $state<string | null>(null);
+  let saveRunId = $state<string | null>(null);
+  let saveName = $state("");
+  let saved = $state<{ runId: string; id: string; name: string } | null>(null);
+  let deleteRunId = $state<string | null>(null);
+  let deleteOpen = $state(false);
+
+  const activeRunId = $derived(queue?.queue?.id ?? null);
+
+  async function runAction(runId: string, fn: () => Promise<unknown>) {
+    if (!queue || busyRunId) return;
+    busyRunId = runId;
+    runError = null;
+    await fn();
+    runError = queue.error;
+    busyRunId = null;
+    await invalidateAll();
+  }
+
+  function openSave(runId: string, titles: string[]) {
+    saved = null;
+    saveRunId = saveRunId === runId ? null : runId;
+    saveName = titles[0] ? `${titles[0]} & more` : `Queue · ${new Date().toLocaleDateString()}`;
+  }
+
+  async function saveRun(runId: string) {
+    if (!queue || !saveName.trim()) return;
+    busyRunId = runId;
+    runError = null;
+    const playlist = await queue.saveRunAsPlaylist(runId, saveName.trim());
+    busyRunId = null;
+    if (playlist) {
+      saved = { runId, id: playlist.id, name: playlist.name };
+      saveRunId = null;
+    } else runError = queue.error;
+  }
 
   function formatWhen(iso: string) {
     try {
@@ -23,17 +70,110 @@
   <div>
     <h1 class="text-3xl font-semibold tracking-tight">History</h1>
     <p class="mt-1 text-sm text-muted-foreground">
-      Plays and imports. Saved queues live under
-      <a href="/playlists" class="text-signal hover:underline">Playlists</a>
-      (separate from Zap playlists).
+      Catalogue queues, plays and imports. Session snapshots (saved queues) live under
+      <a href="/playlists" class="text-signal hover:underline">Playlists</a>.
     </p>
+  </div>
+
+  <div class="space-y-3">
+    <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Catalogue queues</h2>
+    {#if runError}
+      <p class="auth-error mb-0 p-2">{runError}</p>
+    {/if}
+    {#if !data.queueRuns?.length}
+      <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
+        No queues yet — press play on a track in the <a href="/catalogue" class="text-signal hover:underline">Catalogue</a>.
+      </p>
+    {:else}
+      <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
+        {#each data.queueRuns as run (run.id)}
+          {@const isActive = run.id === activeRunId}
+          <li class="space-y-2 px-4 py-3">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <p class="min-w-0 flex-1 truncate text-sm font-medium" title={run.titles.join(" · ")}>
+                {run.titles.slice(0, 3).join(" · ")}{run.trackCount > 3 ? ` +${run.trackCount - 3}` : ""}
+              </p>
+              <time class="font-mono text-[11px] text-muted-foreground" datetime={run.updatedAt}>{formatWhen(run.updatedAt)}</time>
+            </div>
+            <p class="font-mono text-[11px] text-muted-foreground">
+              {run.trackCount} track{run.trackCount === 1 ? "" : "s"}
+              {#if run.currentIndex != null}
+                · stopped at {run.currentIndex + 1}/{run.trackCount} ({formatClock(run.positionMs)})
+              {:else}
+                · finished
+              {/if}
+              {#if isActive}<span class="ml-1 rounded border border-signal/40 px-1 text-signal">playing now</span>{/if}
+            </p>
+            <div class="flex flex-wrap gap-1.5 font-mono text-[10px]">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded border border-signal/40 bg-signal/10 px-2 py-1 text-signal hover:bg-signal/20 disabled:opacity-40"
+                disabled={!queue || busyRunId !== null}
+                onclick={() => void runAction(run.id, () => queue!.activateRun(run.id, "restart"))}
+              >
+                <RotateCcwIcon class="size-3" /> Restart queue
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded border border-border px-2 py-1 hover:text-signal disabled:opacity-40"
+                disabled={!queue || busyRunId !== null || run.currentIndex == null}
+                title={run.currentIndex == null ? "This queue played to the end" : "Continue where it stopped"}
+                onclick={() => void runAction(run.id, () => queue!.activateRun(run.id, "resume"))}
+              >
+                <PlayIcon class="size-3" /> Resume queue
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded border border-border px-2 py-1 hover:text-signal disabled:opacity-40"
+                disabled={!queue || busyRunId !== null}
+                onclick={() => openSave(run.id, run.titles)}
+              >
+                <SaveIcon class="size-3" /> Save as playlist
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                disabled={!queue || busyRunId !== null}
+                onclick={() => {
+                  deleteRunId = run.id;
+                  deleteOpen = true;
+                }}
+              >
+                <Trash2Icon class="size-3" /> Remove
+              </button>
+            </div>
+            {#if saveRunId === run.id}
+              <form
+                class="flex gap-2"
+                onsubmit={(e) => {
+                  e.preventDefault();
+                  void saveRun(run.id);
+                }}
+              >
+                <input class="auth-field h-8 py-0 text-xs" bind:value={saveName} maxlength="80" aria-label="Playlist name" />
+                <button
+                  type="submit"
+                  class="rounded bg-primary px-3 text-xs text-primary-foreground disabled:opacity-40"
+                  disabled={!saveName.trim() || busyRunId !== null}>Save</button
+                >
+              </form>
+            {/if}
+            {#if saved?.runId === run.id}
+              <p class="font-mono text-[11px] text-signal">
+                Saved as <a class="underline" href={`/playlists/${saved.id}`}>{saved.name}</a>.
+              </p>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </div>
 
   <div class="space-y-3">
     <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Play history</h2>
     {#if !data.playHistory?.length}
       <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
-        Nothing played yet — start a session and hit play.
+        Nothing played yet — play a track from the catalogue or a session.
       </p>
     {:else}
       <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
@@ -86,3 +226,18 @@
     {/if}
   </div>
 </section>
+
+<ConfirmDialog
+  bind:open={deleteOpen}
+  title="Remove this queue from History?"
+  body="The tracks stay in the catalogue; only this saved queue run is deleted."
+  confirmLabel="Remove"
+  danger
+  busy={busyRunId !== null}
+  onconfirm={() => {
+    const id = deleteRunId;
+    deleteOpen = false;
+    deleteRunId = null;
+    if (id) void runAction(id, () => queue!.deleteRun(id));
+  }}
+/>

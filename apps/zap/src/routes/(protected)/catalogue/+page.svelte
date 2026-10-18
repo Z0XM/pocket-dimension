@@ -1,5 +1,7 @@
 <script lang="ts">
+  import ListEndIcon from "@lucide/svelte/icons/list-end";
   import ListPlusIcon from "@lucide/svelte/icons/list-plus";
+  import PlayIcon from "@lucide/svelte/icons/play";
   import PlusIcon from "@lucide/svelte/icons/plus";
   import { onMount } from "svelte";
   import { afterNavigate, replaceState } from "$app/navigation";
@@ -10,14 +12,17 @@
   import SaveTagPlaylistDialog from "$lib/components/SaveTagPlaylistDialog.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
+  import { getCatalogQueue, type CatalogueFilterInput } from "$lib/catalog-queue-client.svelte";
   import { effectiveTagQuery, findPlaylistMatchingTagFilter, tagFilterKey } from "$lib/tag-filter";
   import type { ActionData, PageData } from "./$types";
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
 
   const FILTERS_OPEN_KEY = "zap.catalogue.filtersOpen";
+  const queue = getCatalogQueue();
 
-  let scope = $state<"all" | "yours">("all");
+  /** `""` = Your library (default), `all`, or `playlist:<id>`. */
+  let libraryScope = $state("");
   let q = $state("");
   let selected = $state<string[]>([]);
   let tagQuery = $state("");
@@ -35,8 +40,8 @@
   let loadingMore = $state(false);
   let listError = $state<string | null>(null);
 
-  let activeId = $state<string | null>(null);
-  let audioEl = $state<HTMLAudioElement | null>(null);
+  let bulkBusy = $state(false);
+  let bulkError = $state<string | null>(null);
   let sentinel = $state<HTMLDivElement | null>(null);
   let scrollRoot = $state<HTMLDivElement | null>(null);
 
@@ -52,7 +57,39 @@
   let deletedIds = $state<string[]>([]);
   let deleteMessage = $state<string | null>(null);
   const filtering = $derived(Boolean(q.trim() || tagQuery.trim() || selected.length));
-  const suggestions = $derived(filtering ? [] : (data.suggestions ?? []).filter((t) => !deletedIds.includes(t.id)));
+  const scopedPlaylistId = $derived(libraryScope.startsWith("playlist:") ? libraryScope.slice("playlist:".length) : null);
+  const suggestions = $derived(filtering || scopedPlaylistId ? [] : (data.suggestions ?? []).filter((t) => !deletedIds.includes(t.id)));
+  const scopeOptions = $derived.by(() => {
+    const opts = [
+      { value: "all", label: "All tracks" },
+      ...(data.playlistOptions ?? []).map((p) => ({ value: `playlist:${p.id}`, label: `▸ ${p.name}` })),
+    ];
+    if (scopedPlaylistId && !opts.some((o) => o.value === libraryScope)) opts.push({ value: libraryScope, label: "▸ Shared playlist" });
+    return opts;
+  });
+  const scopeLabel = $derived(scopeOptions.find((o) => o.value === libraryScope)?.label.replace(/^▸ /, "") ?? "Your library");
+  const editablePlaylists = $derived((data.playlistOptions ?? []).filter((p) => p.canEdit).map((p) => ({ id: p.id, name: p.name })));
+  const canAddAll = $derived(Boolean(queue) && (filtering || Boolean(scopedPlaylistId)) && assets.length > 0 && !tagQueryError);
+
+  function filterInput(): CatalogueFilterInput {
+    const tq = tagQuery.trim();
+    return {
+      scope: scopedPlaylistId ? "playlist" : libraryScope === "all" ? "all" : "yours",
+      playlistId: scopedPlaylistId,
+      q: q.trim(),
+      tagQuery: tq,
+      tagIds: tq ? [] : selected,
+    };
+  }
+
+  async function addAllFiltered(mode: "replace" | "last") {
+    if (!queue || bulkBusy) return;
+    bulkBusy = true;
+    bulkError = null;
+    await queue.enqueueFiltered(filterInput(), mode);
+    bulkError = queue.error;
+    bulkBusy = false;
+  }
 
   function onDeleted(id: string, message: string) {
     deletedIds = [...deletedIds, id];
@@ -87,10 +124,10 @@
   }
 
   $effect(() => {
-    const key = `${data.scope}|${data.q}|${data.tagQuery}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
+    const key = `${data.scope}|${data.playlistId}|${data.q}|${data.tagQuery}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
     if (key === hydratedKey) return;
     hydratedKey = key;
-    scope = data.scope === "yours" ? "yours" : "all";
+    libraryScope = data.scope === "playlist" && data.playlistId ? `playlist:${data.playlistId}` : data.scope === "all" ? "all" : "";
     q = data.q;
     tagQuery = data.tagQuery ?? "";
     tagQueryError = data.tagQueryError ?? null;
@@ -155,9 +192,15 @@
     void refreshTags();
   }
 
+  function setScopeParams(params: URLSearchParams, forApi: boolean) {
+    if (scopedPlaylistId) params.set("playlist", scopedPlaylistId);
+    else if (libraryScope === "all") params.set("scope", "all");
+    else if (forApi) params.set("scope", "yours");
+  }
+
   function buildParams(offset = 0) {
     const params = new URLSearchParams();
-    if (scope === "yours") params.set("scope", "yours");
+    setScopeParams(params, true);
     if (q.trim()) params.set("q", q.trim());
     const tq = tagQuery.trim();
     if (tq) params.set("tq", tq);
@@ -169,7 +212,7 @@
 
   function updateUrl() {
     const params = new URLSearchParams();
-    if (scope === "yours") params.set("scope", "yours");
+    setScopeParams(params, false);
     if (q.trim()) params.set("q", q.trim());
     const tq = tagQuery.trim();
     if (tq) params.set("tq", tq);
@@ -237,8 +280,6 @@
   });
 </script>
 
-<audio bind:this={audioEl} preload="auto" class="hidden"></audio>
-
 {#snippet addButton()}
   <button
     type="button"
@@ -255,8 +296,8 @@
   <div class="shrink-0">
     <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Catalogue</h1>
     <p class="mt-1 text-sm text-muted-foreground">
-      Search the shared Zap catalogue. <span class="font-mono text-signal">Your library</span> = tracks you’ve tagged. Use
-      <span class="font-mono text-signal">+</span> to add music.
+      Search the shared Zap catalogue. <span class="font-mono text-signal">Your library</span> = tracks you’ve tagged. Play adds to your personal
+      queue; use <span class="font-mono text-signal">+</span> to add music.
     </p>
   </div>
 
@@ -264,7 +305,8 @@
     <CatalogueFilters
       collapsible
       bind:open={filtersOpen}
-      bind:scope
+      bind:libraryScope
+      libraryScopeOptions={scopeOptions}
       bind:q
       bind:tagQuery
       bind:selectedTagIds={selected}
@@ -296,6 +338,30 @@
             Save as playlist
           </button>
         {/if}
+      </div>
+    {/if}
+    {#if canAddAll}
+      <div class="mt-2 flex flex-wrap items-center gap-2 border-t border-border/50 pt-2 font-mono text-[11px] text-muted-foreground">
+        <span>Add all {filtering ? "filtered" : scopeLabel} tracks{hasMore ? "" : ` (${assets.length})`}:</span>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded border border-signal/40 bg-signal/10 px-2 py-0.5 text-[11px] text-signal hover:bg-signal/20 disabled:opacity-40"
+          disabled={bulkBusy}
+          title="Replace your queue with these tracks and play"
+          onclick={() => void addAllFiltered("replace")}
+        >
+          <PlayIcon class="size-3.5" aria-hidden="true" /> Play all
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-[11px] hover:text-signal disabled:opacity-40"
+          disabled={bulkBusy}
+          title="Append these tracks to the end of your queue"
+          onclick={() => void addAllFiltered("last")}
+        >
+          <ListEndIcon class="size-3.5" aria-hidden="true" /> Add all to queue
+        </button>
+        {#if bulkError}<span class="text-destructive">{bulkError}</span>{/if}
       </div>
     {/if}
   </div>
@@ -337,23 +403,35 @@
             </h2>
             <ul class="divide-y divide-border/50 border-b border-border/70">
               {#each suggestions as track (track.id)}
-                <TrackRow {track} {availableTags} bind:activeId bind:audioEl canDelete={data.zapAdmin} ondeleted={onDeleted} />
+                <TrackRow {track} {availableTags} {queue} playlists={editablePlaylists} canDelete={data.zapAdmin} ondeleted={onDeleted} />
               {/each}
             </ul>
             <h2 class="border-b border-border/50 px-4 pt-3 pb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
-              {scope === "yours" ? "Your library" : "All tracks"}
+              {scopeLabel}
             </h2>
           {/if}
           <ul class="divide-y divide-border/50">
             {#if assets.length === 0}
               <li class="px-4 py-10 text-center text-sm text-muted-foreground">
-                No tracks match.
-                <button type="button" class="text-signal hover:underline" onclick={() => openAdd()}>Add music</button>
-                or clear filters.
+                {#if libraryScope === "" && !filtering}
+                  Your library is empty — tag tracks to collect them here, or
+                  <button
+                    type="button"
+                    class="text-signal hover:underline"
+                    onclick={() => {
+                      libraryScope = "all";
+                      void fetchPage({ reset: true });
+                    }}>browse all tracks</button
+                  >.
+                {:else}
+                  No tracks match.
+                  <button type="button" class="text-signal hover:underline" onclick={() => openAdd()}>Add music</button>
+                  or clear filters.
+                {/if}
               </li>
             {:else}
               {#each assets as track (track.id)}
-                <TrackRow {track} {availableTags} bind:activeId bind:audioEl canDelete={data.zapAdmin} ondeleted={onDeleted} />
+                <TrackRow {track} {availableTags} {queue} playlists={editablePlaylists} canDelete={data.zapAdmin} ondeleted={onDeleted} />
               {/each}
             {/if}
           </ul>

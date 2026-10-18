@@ -150,6 +150,10 @@
     @apply border-signal text-signal;
   }
 
+  .zap-menu-item {
+    @apply flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs text-muted-foreground transition hover:bg-signal/10 hover:text-signal;
+  }
+
   .zap-busy {
     @apply mt-3 flex items-center gap-3 rounded border border-signal/30 bg-signal/5 px-3 py-2.5;
   }

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { authClient } from "$lib/auth-client";
+  import { CatalogQueueClient, setCatalogQueue } from "$lib/catalog-queue-client.svelte";
+  import CatalogQueueDock from "$lib/components/CatalogQueueDock.svelte";
   import PageSkeleton from "$lib/components/PageSkeleton.svelte";
   import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
@@ -8,6 +10,9 @@
   import { goto } from "$app/navigation";
 
   let { data, children }: { data: LayoutData; children: import("svelte").Snippet } = $props();
+
+  const catalogQueue = new CatalogQueueClient();
+  setCatalogQueue(catalogQueue);
 
   const path = $derived(page.url.pathname);
   const navTo = $derived(navigating.to?.url.pathname ?? null);
@@ -47,6 +52,7 @@
   );
 
   async function signOut() {
+    catalogQueue.disconnect();
     await authClient.signOut();
     await goto("/");
   }
@@ -106,3 +112,5 @@
     {/if}
   </main>
 </div>
+
+<CatalogQueueDock queue={catalogQueue} />

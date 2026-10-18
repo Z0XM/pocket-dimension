@@ -3,6 +3,7 @@
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
   import TagQueryEditor from "$lib/components/TagQueryEditor.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
+  import { getCatalogQueue } from "$lib/catalog-queue-client.svelte";
   import { effectiveTagQuery, tagFilterKey, tagQueryProblem } from "$lib/tag-filter";
   import type { PageData } from "./$types";
 
@@ -16,6 +17,16 @@
   let editTagIds = $state<string[]>([]);
   let collabQuery = $state("");
   let loadMsg = $state<string | null>(null);
+
+  const queue = getCatalogQueue();
+  const hasPlayable = $derived(playlist.items.some((i) => i.playable));
+
+  async function queuePlaylist(mode: "replace" | "last") {
+    if (!queue) return;
+    error = null;
+    await queue.enqueuePlaylist(playlist.id, mode);
+    if (queue.error) error = queue.error;
+  }
 
   $effect(() => {
     playlist = data.playlist;
@@ -120,6 +131,26 @@
       {/if}
     </div>
     <div class="flex flex-wrap gap-2">
+      {#if queue}
+        <button
+          type="button"
+          class="rounded border border-signal/40 bg-signal/10 px-3 py-1.5 text-xs font-medium text-signal hover:bg-signal/20 disabled:opacity-40"
+          disabled={busy || !hasPlayable || queue.pending > 0}
+          title="Replace your queue with this playlist and play"
+          onclick={() => void queuePlaylist("replace")}
+        >
+          Play
+        </button>
+        <button
+          type="button"
+          class="rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-signal disabled:opacity-40"
+          disabled={busy || !hasPlayable || queue.pending > 0}
+          title="Append this playlist to your queue"
+          onclick={() => void queuePlaylist("last")}
+        >
+          Add to queue
+        </button>
+      {/if}
       {#if data.primaryLive}
         <button
           type="button"
