@@ -75,16 +75,16 @@ console.log("playing", (played.body as { session: { playbackState: string } }).s
 
 const perms = await req(`/api/sessions/${sessionId}`, {
   method: "PATCH",
-  body: JSON.stringify({ guestsCanAdd: true, guestsCanControl: true }),
+  body: JSON.stringify({ autoPlay: true, perpetual: true }),
 });
 if (!perms.res.ok) {
   console.error("perms failed", perms.res.status, perms.body);
   process.exit(1);
 }
 console.log(
-  "perms",
-  (perms.body as { session: { guestsCanAdd: boolean; guestsCanControl: boolean } }).session.guestsCanAdd,
-  (perms.body as { session: { guestsCanControl: boolean } }).session.guestsCanControl
+  "opts",
+  (perms.body as { session: { autoPlay: boolean; perpetual: boolean } }).session.autoPlay,
+  (perms.body as { session: { perpetual: boolean } }).session.perpetual
 );
 
 const ended = await req(`/api/sessions/${sessionId}`, { method: "DELETE" });

@@ -2,7 +2,18 @@ export { createSessionSSEStream } from "./sse";
 export { buildSessionSnapshot } from "./snapshot";
 export { SESSION_IDLE_MS, isSessionIdle, msUntilIdle } from "./idle";
 export { generateJoinCode, normalizeJoinCode } from "./join-code";
-export { canAddToQueue, canControlTransport, canEndSession, canManageGuestPermissions } from "./permissions";
+export {
+  canAddToQueue,
+  canControlTransport,
+  canEndSession,
+  canManageGuestPermissions,
+  canManageSetup,
+  canPlayPause,
+  canReorderQueue,
+  canSeek,
+  canSkip,
+  effectivePermissions,
+} from "./permissions";
 export {
   SessionError,
   createSession,
@@ -10,18 +21,27 @@ export {
   getSessionForUser,
   endSession,
   setGuestPermissions,
+  setSessionOptions,
+  setMemberPermissions,
+  setMemberOutput,
   enqueueCatalogueTrack,
+  enqueueCatalogueTracks,
   play,
   pause,
   seek,
   skip,
+  previous,
+  playQueueItem,
   onTrackEnded,
   removeQueueItem,
   clearQueue,
   moveQueueItem,
+  reorderQueue,
   endIdleSessions,
   findLiveSessionForUser,
   listLiveSessionsForUser,
+  listSessionsIndexForUser,
+  reactivateSession,
   removeUserFromLiveSessions,
   publishSessionSnapshots,
 } from "./sessions";

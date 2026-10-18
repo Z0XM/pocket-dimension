@@ -1,31 +1,52 @@
 import { describe, expect, test } from "bun:test";
-import { canAddToQueue, canControlTransport, canEndSession, canManageGuestPermissions } from "./permissions";
+import {
+  EMPTY_MEMBER_PERMISSIONS,
+  canAddToQueue,
+  canControlTransport,
+  canEndSession,
+  canManageSetup,
+  canPlayPause,
+  canReorderQueue,
+  canSeek,
+  canSkip,
+  effectivePermissions,
+} from "./permissions";
 
 describe("session permissions", () => {
-  test("host always can add/control/manage/end", () => {
-    const flags = { guestsCanAdd: false, guestsCanControl: false };
-    expect(canAddToQueue("host", flags)).toBe(true);
-    expect(canControlTransport("host", flags)).toBe(true);
-    expect(canManageGuestPermissions("host")).toBe(true);
+  test("host always has full access", () => {
+    const eff = effectivePermissions("host", EMPTY_MEMBER_PERMISSIONS);
+    expect(eff.canAdd).toBe(true);
+    expect(eff.canPlayPause).toBe(true);
+    expect(eff.canSkip).toBe(true);
+    expect(eff.canSeek).toBe(true);
+    expect(eff.canReorder).toBe(true);
+    expect(eff.canSetup).toBe(true);
+    expect(eff.canControl).toBe(true);
+    expect(eff.canManageGuests).toBe(true);
+    expect(eff.canEnd).toBe(true);
     expect(canEndSession("host")).toBe(true);
   });
 
   test("guest listen-only by default", () => {
-    const flags = { guestsCanAdd: false, guestsCanControl: false };
-    expect(canAddToQueue("guest", flags)).toBe(false);
-    expect(canControlTransport("guest", flags)).toBe(false);
-    expect(canManageGuestPermissions("guest")).toBe(false);
+    expect(canAddToQueue("guest", EMPTY_MEMBER_PERMISSIONS)).toBe(false);
+    expect(canControlTransport("guest", EMPTY_MEMBER_PERMISSIONS)).toBe(false);
+    expect(canManageSetup("guest", EMPTY_MEMBER_PERMISSIONS)).toBe(false);
     expect(canEndSession("guest")).toBe(false);
   });
 
-  test("guest grants via host flags", () => {
-    expect(canAddToQueue("guest", { guestsCanAdd: true, guestsCanControl: false })).toBe(true);
-    expect(canControlTransport("guest", { guestsCanAdd: false, guestsCanControl: true })).toBe(true);
+  test("guest grants are granular", () => {
+    expect(canAddToQueue("guest", { ...EMPTY_MEMBER_PERMISSIONS, canAdd: true })).toBe(true);
+    expect(canPlayPause("guest", { ...EMPTY_MEMBER_PERMISSIONS, canPlayPause: true })).toBe(true);
+    expect(canSkip("guest", { ...EMPTY_MEMBER_PERMISSIONS, canSkip: true })).toBe(true);
+    expect(canSeek("guest", { ...EMPTY_MEMBER_PERMISSIONS, canSeek: true })).toBe(true);
+    expect(canReorderQueue("guest", { ...EMPTY_MEMBER_PERMISSIONS, canReorder: true })).toBe(true);
+    expect(canManageSetup("guest", { ...EMPTY_MEMBER_PERMISSIONS, canSetup: true })).toBe(true);
+    expect(canControlTransport("guest", { ...EMPTY_MEMBER_PERMISSIONS, canSeek: true })).toBe(true);
+    expect(canControlTransport("guest", { ...EMPTY_MEMBER_PERMISSIONS, canAdd: true })).toBe(false);
   });
 
   test("non-member denied", () => {
-    const flags = { guestsCanAdd: true, guestsCanControl: true };
-    expect(canAddToQueue(null, flags)).toBe(false);
-    expect(canControlTransport(null, flags)).toBe(false);
+    expect(canAddToQueue(null, { ...EMPTY_MEMBER_PERMISSIONS, canAdd: true })).toBe(false);
+    expect(canControlTransport(null, { ...EMPTY_MEMBER_PERMISSIONS, canPlayPause: true })).toBe(false);
   });
 });

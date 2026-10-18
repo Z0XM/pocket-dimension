@@ -10,6 +10,8 @@ function live(over: Partial<LiveSessionSummary> & { id: string; role: "host" | "
     currentTitle: null,
     hostUserId: "h",
     lastActivityAt: new Date().toISOString(),
+    perpetual: false,
+    status: "live",
     ...over,
   };
 }

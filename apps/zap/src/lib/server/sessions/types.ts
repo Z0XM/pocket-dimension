@@ -1,19 +1,30 @@
 export type SessionPlaybackState = "idle" | "playing" | "paused";
 export type SessionMemberRole = "host" | "guest";
+export type SessionStatus = "live" | "ended";
+
+export type SessionMemberPermissions = {
+  canAdd: boolean;
+  canPlayPause: boolean;
+  canSkip: boolean;
+  canSeek: boolean;
+  canReorder: boolean;
+  canSetup: boolean;
+};
 
 export type SessionSnapshotSession = {
   id: string;
   hostUserId: string;
   joinCode: string;
-  status: "live" | "ended";
+  status: SessionStatus;
   playbackState: SessionPlaybackState;
   currentQueueItemId: string | null;
   positionMs: number;
   positionUpdatedAt: string;
   playbackGeneration: number;
-  guestsCanAdd: boolean;
-  guestsCanControl: boolean;
   autoPlay: boolean;
+  perpetual: boolean;
+  /** ISO timestamp when perpetual session went idle; null while active. */
+  staleAt: string | null;
   lastActivityAt: string;
   createdAt: string;
   endedAt: string | null;
@@ -25,6 +36,9 @@ export type SessionSnapshotMember = {
   role: SessionMemberRole;
   displayName: string;
   joinedAt: string;
+  permissions: SessionMemberPermissions;
+  outputEnabled: boolean;
+  volume: number;
 };
 
 export type SessionSnapshotQueueItem = {
@@ -53,6 +67,12 @@ export type SessionSnapshot = {
     userId: string;
     role: SessionMemberRole | null;
     canAdd: boolean;
+    canPlayPause: boolean;
+    canSkip: boolean;
+    canSeek: boolean;
+    canReorder: boolean;
+    canSetup: boolean;
+    /** playPause || skip || seek — for compact UI chrome. */
     canControl: boolean;
     canManageGuests: boolean;
   } | null;

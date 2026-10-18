@@ -1,6 +1,6 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
-import { canAddToQueue, canControlTransport, canManageGuestPermissions } from "./permissions";
+import { effectivePermissions } from "./permissions";
 import type { SessionSnapshot, SessionSnapshotMember, SessionSnapshotQueueItem, SessionSnapshotSession } from "./types";
 
 function displayName(user: { name: string | null; username: string | null; email: string }): string {
@@ -18,12 +18,23 @@ function serializeSession(row: typeof schema.sessions.$inferSelect): SessionSnap
     positionMs: row.positionMs,
     positionUpdatedAt: row.positionUpdatedAt.toISOString(),
     playbackGeneration: row.playbackGeneration,
-    guestsCanAdd: row.guestsCanAdd,
-    guestsCanControl: row.guestsCanControl,
     autoPlay: row.autoPlay,
+    perpetual: row.perpetual,
+    staleAt: row.staleAt?.toISOString() ?? null,
     lastActivityAt: row.lastActivityAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     endedAt: row.endedAt?.toISOString() ?? null,
+  };
+}
+
+function memberGrants(row: typeof schema.sessionMembers.$inferSelect) {
+  return {
+    canAdd: row.canAdd,
+    canPlayPause: row.canPlayPause,
+    canSkip: row.canSkip,
+    canSeek: row.canSeek,
+    canReorder: row.canReorder,
+    canSetup: row.canSetup,
   };
 }
 
@@ -84,6 +95,9 @@ export async function buildSessionSnapshot(sessionId: string, viewerUserId?: str
     role: m.role,
     displayName: names.get(m.userId) ?? "Listener",
     joinedAt: m.joinedAt.toISOString(),
+    permissions: memberGrants(m),
+    outputEnabled: m.outputEnabled,
+    volume: m.volume,
   }));
 
   const currentItem = session.currentQueueItemId ? (queue.find((q) => q.id === session.currentQueueItemId) ?? null) : null;
@@ -92,13 +106,18 @@ export async function buildSessionSnapshot(sessionId: string, viewerUserId?: str
   if (viewerUserId) {
     const mine = memberRows.find((m) => m.userId === viewerUserId);
     const role = mine?.role ?? null;
-    const flags = { guestsCanAdd: session.guestsCanAdd, guestsCanControl: session.guestsCanControl };
+    const eff = effectivePermissions(role, mine ? memberGrants(mine) : null);
     me = {
       userId: viewerUserId,
       role,
-      canAdd: canAddToQueue(role, flags),
-      canControl: canControlTransport(role, flags),
-      canManageGuests: canManageGuestPermissions(role),
+      canAdd: eff.canAdd,
+      canPlayPause: eff.canPlayPause,
+      canSkip: eff.canSkip,
+      canSeek: eff.canSeek,
+      canReorder: eff.canReorder,
+      canSetup: eff.canSetup,
+      canControl: eff.canControl,
+      canManageGuests: eff.canManageGuests,
     };
   }
 
