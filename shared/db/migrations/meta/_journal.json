@@ -400,6 +400,13 @@
       "when": 1792700000000,
       "tag": "0056_zap_playlist_tag_query",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1792800000000,
+      "tag": "0057_zap_catalog_queue",
+      "breakpoints": true
     }
   ]
 }

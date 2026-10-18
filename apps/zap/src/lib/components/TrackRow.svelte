@@ -1,11 +1,16 @@
 <script lang="ts">
+  import EllipsisVerticalIcon from "@lucide/svelte/icons/ellipsis-vertical";
+  import ListEndIcon from "@lucide/svelte/icons/list-end";
+  import ListPlusIcon from "@lucide/svelte/icons/list-plus";
+  import ListStartIcon from "@lucide/svelte/icons/list-start";
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import CustomTagInput from "$lib/components/CustomTagInput.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import { deleteSongAsAdmin, SONG_DELETE_CONFIRM_BODY } from "$lib/admin-song-delete";
-  import { nextPlaybackAction } from "$lib/playback-action";
+  import { formatClock, type EnqueueMode } from "$lib/catalog-queue";
+  import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
   import { enhance } from "$app/forms";
 
   export type TrackItem = {
@@ -26,19 +31,22 @@
   };
 
   type TagOption = { id: string; name: string; kind: string };
+  type PlaylistOption = { id: string; name: string };
 
   let {
     track,
     availableTags,
-    activeId = $bindable<string | null>(null),
-    audioEl = $bindable<HTMLAudioElement | null>(null),
+    queue = null,
+    playlists = [],
     canDelete = false,
     ondeleted,
   }: {
     track: TrackItem;
     availableTags: TagOption[];
-    activeId?: string | null;
-    audioEl?: HTMLAudioElement | null;
+    /** Personal catalogue queue — play / enqueue actions go through it. */
+    queue?: CatalogQueueClient | null;
+    /** Playlists this user can add tracks to. */
+    playlists?: PlaylistOption[];
     /** Zap admins only; the server enforces it regardless. */
     canDelete?: boolean;
     ondeleted?: (id: string, message: string) => void;
@@ -46,6 +54,22 @@
 
   let deleteOpen = $state(false);
   let deleting = $state(false);
+  let editing = $state(false);
+  let editTagIds = $state<string[]>([]);
+  let editCustomTags = $state<string[]>([]);
+  let editCustomDraft = $state("");
+  let error = $state<string | null>(null);
+  let info = $state<string | null>(null);
+
+  let menuOpen = $state(false);
+  let menuBtn = $state<HTMLButtonElement | null>(null);
+  let menuEl = $state<HTMLDivElement | null>(null);
+  let menuStyle = $state("");
+
+  const unavailable = $derived(track.available === false);
+  const isCurrent = $derived(Boolean(queue?.currentItem && queue.currentItem.mediaAssetId === track.id));
+  const isPlaying = $derived(isCurrent && Boolean(queue?.playing));
+  const durationMs = $derived(track.durationMs ?? queue?.currentItem?.durationMs ?? 0);
 
   async function confirmDelete() {
     deleting = true;
@@ -57,123 +81,7 @@
       error = outcome.message;
       return;
     }
-    if (audioEl && isThisLoaded(audioEl)) {
-      audioEl.pause();
-      audioEl.removeAttribute("src");
-      delete audioEl.dataset.assetId;
-    }
-    if (activeId === track.id) activeId = null;
     ondeleted?.(track.id, outcome.message);
-  }
-
-  let editing = $state(false);
-  let editTagIds = $state<string[]>([]);
-  let editCustomTags = $state<string[]>([]);
-  let editCustomDraft = $state("");
-  const unavailable = $derived(track.available === false);
-  let current = $state(0);
-  let duration = $state(0);
-  let loading = $state(false);
-  let error = $state<string | null>(null);
-  /** Event-synced; do not derive from audioEl.paused (not Svelte-reactive). */
-  let uiPlaying = $state(false);
-
-  const isActive = $derived(activeId === track.id);
-  let playGen = 0;
-
-  function formatTime(sec: number) {
-    if (!Number.isFinite(sec) || sec < 0) return "0:00";
-    const s = Math.floor(sec);
-    const m = Math.floor(s / 60);
-    const r = s % 60;
-    return `${m}:${r.toString().padStart(2, "0")}`;
-  }
-
-  function formatDurationMs(ms: number | null) {
-    if (ms == null) return "—";
-    return formatTime(ms / 1000);
-  }
-
-  function isThisLoaded(el: HTMLAudioElement) {
-    return el.dataset.assetId === track.id && Boolean(el.currentSrc || el.src);
-  }
-
-  function syncFromElement() {
-    if (!audioEl) {
-      uiPlaying = false;
-      return;
-    }
-    const mine = isThisLoaded(audioEl);
-    uiPlaying = mine && !audioEl.paused;
-    if (mine) {
-      current = audioEl.currentTime;
-      if (Number.isFinite(audioEl.duration)) duration = audioEl.duration;
-    }
-  }
-
-  function onTimeUpdate() {
-    if (!audioEl || !isThisLoaded(audioEl)) return;
-    current = audioEl.currentTime;
-    if (Number.isFinite(audioEl.duration)) duration = audioEl.duration;
-  }
-
-  function onEnded() {
-    if (!audioEl || !isThisLoaded(audioEl)) return;
-    uiPlaying = false;
-    current = 0;
-    if (activeId === track.id) activeId = null;
-  }
-
-  $effect(() => {
-    if (!isActive) uiPlaying = false;
-  });
-
-  $effect(() => {
-    if (!audioEl) return;
-    const el = audioEl;
-    const onPlay = () => syncFromElement();
-    const onPause = () => syncFromElement();
-    el.addEventListener("play", onPlay);
-    el.addEventListener("playing", onPlay);
-    el.addEventListener("pause", onPause);
-    el.addEventListener("timeupdate", onTimeUpdate);
-    el.addEventListener("ended", onEnded);
-    el.addEventListener("loadedmetadata", onTimeUpdate);
-    syncFromElement();
-    return () => {
-      el.removeEventListener("play", onPlay);
-      el.removeEventListener("playing", onPlay);
-      el.removeEventListener("pause", onPause);
-      el.removeEventListener("timeupdate", onTimeUpdate);
-      el.removeEventListener("ended", onEnded);
-      el.removeEventListener("loadedmetadata", onTimeUpdate);
-    };
-  });
-
-  async function loadAndPlay(el: HTMLAudioElement) {
-    const gen = ++playGen;
-    loading = true;
-    error = null;
-    try {
-      // Only (re)assign src when switching tracks — never on resume after pause
-      if (!isThisLoaded(el)) {
-        el.pause();
-        el.src = `/api/media/${track.id}/audio`;
-        el.dataset.assetId = track.id;
-        el.load();
-      }
-      activeId = track.id;
-      await el.play();
-      if (gen !== playGen) return;
-      uiPlaying = true;
-    } catch (err) {
-      if (gen !== playGen) return;
-      error = err instanceof Error ? err.message : "Playback failed";
-      uiPlaying = false;
-      if (activeId === track.id) activeId = null;
-    } finally {
-      if (gen === playGen) loading = false;
-    }
   }
 
   async function togglePlay() {
@@ -182,49 +90,70 @@
       error = unavailable ? "Song not available — no audio source yet." : "No audio file for this track.";
       return;
     }
-    if (!audioEl) return;
-    const el = audioEl;
-    const action = nextPlaybackAction(isThisLoaded(el), el.paused);
-
-    if (action === "pause") {
-      el.pause();
-      uiPlaying = false;
-      // keep activeId so seek bar stays usable and resume can continue
-      return;
-    }
-
-    if (action === "resume") {
-      const gen = ++playGen;
-      loading = true;
-      try {
-        activeId = track.id;
-        await el.play();
-        if (gen !== playGen) return;
-        uiPlaying = true;
-      } catch {
-        // Media element may be stuck after an aborted range request — hard reload once
-        if (gen !== playGen) return;
-        el.removeAttribute("src");
-        delete el.dataset.assetId;
-        await loadAndPlay(el);
-      } finally {
-        if (gen === playGen) loading = false;
-      }
-      return;
-    }
-
-    await loadAndPlay(el);
+    if (!queue) return;
+    if (isCurrent) await queue.togglePlay();
+    else await queue.playNow(track.id);
+    if (queue.error) error = queue.error;
   }
 
-  function seek(e: Event) {
-    const input = e.currentTarget as HTMLInputElement;
-    if (!audioEl || !isThisLoaded(audioEl)) return;
-    const next = Number(input.value);
-    if (Number.isFinite(next)) {
-      audioEl.currentTime = next;
-      current = next;
+  async function enqueue(mode: EnqueueMode) {
+    menuOpen = false;
+    if (!queue) return;
+    error = null;
+    await queue.enqueue([track.id], mode);
+    if (queue.error) error = queue.error;
+  }
+
+  async function addToPlaylist(pl: PlaylistOption) {
+    menuOpen = false;
+    error = null;
+    info = null;
+    try {
+      const res = await fetch(`/api/playlists/${pl.id}`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "addTrack", mediaAssetId: track.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? "Add failed");
+      info = `Added to “${pl.name}”.`;
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Add failed";
     }
   }
+
+  function toggleMenu() {
+    if (menuOpen) {
+      menuOpen = false;
+      return;
+    }
+    if (!menuBtn) return;
+    const rect = menuBtn.getBoundingClientRect();
+    const right = Math.max(8, window.innerWidth - rect.right);
+    const openUp = window.innerHeight - rect.bottom < 260 && rect.top > window.innerHeight - rect.bottom;
+    menuStyle = openUp ? `right:${right}px;bottom:${window.innerHeight - rect.top + 4}px` : `right:${right}px;top:${rect.bottom + 4}px`;
+    menuOpen = true;
+  }
+
+  $effect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (menuEl?.contains(t) || menuBtn?.contains(t)) return;
+      menuOpen = false;
+    };
+    const close = () => (menuOpen = false);
+    const id = window.setTimeout(() => document.addEventListener("pointerdown", onDown), 0);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  });
 
   function startEdit() {
     editing = true;
@@ -234,19 +163,17 @@
   }
 </script>
 
-<li class="flex flex-col gap-3 px-4 py-3">
-  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+<li class={`flex flex-col gap-3 px-4 py-3 ${isCurrent ? "bg-signal/5" : ""}`}>
+  <div class="flex items-start gap-3 sm:items-center sm:gap-4">
     <button
       type="button"
       class="flex size-10 shrink-0 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
-      disabled={!track.playable || loading}
-      title={unavailable ? "Song not available" : undefined}
-      aria-label={unavailable ? "Song not available" : uiPlaying ? "Pause" : "Play"}
+      disabled={!track.playable || !queue || (queue.pending > 0 && !isCurrent)}
+      title={unavailable ? "Song not available" : isCurrent ? undefined : "Play now (adds to your queue)"}
+      aria-label={unavailable ? "Song not available" : isPlaying ? "Pause" : "Play"}
       onclick={togglePlay}
     >
-      {#if loading}
-        <span class="font-mono text-[10px]">…</span>
-      {:else if uiPlaying}
+      {#if isPlaying}
         <PauseIcon class="size-4" />
       {:else}
         <PlayIcon class="size-4" />
@@ -254,11 +181,13 @@
     </button>
 
     <div class="min-w-0 flex-1 space-y-2">
-      <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-        <div class="min-w-0">
-          <p class="truncate font-medium {unavailable ? 'text-muted-foreground' : 'text-foreground'}">{track.title}</p>
-          <p class="font-mono text-xs text-muted-foreground">
-            {track.artists ?? "Unknown"} · {formatDurationMs(track.durationMs)} · {track.sourceType}
+      <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+        <div class="min-w-0 flex-1">
+          <p class="truncate font-medium {isCurrent ? 'text-signal' : unavailable ? 'text-muted-foreground' : 'text-foreground'}" title={track.title}>
+            {track.title}
+          </p>
+          <p class="truncate font-mono text-xs text-muted-foreground">
+            {track.artists ?? "Unknown"} · {formatClock(track.durationMs)} · {track.sourceType}
           </p>
           {#if unavailable}
             <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px]">
@@ -277,7 +206,7 @@
             </p>
           {/if}
         </div>
-        <div class="flex flex-wrap items-center gap-1">
+        <div class="flex shrink-0 flex-wrap items-center gap-1 sm:max-w-[45%] sm:justify-end">
           {#each track.tags as tag}
             <span class="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground">{tag.name}</span>
           {/each}
@@ -299,30 +228,77 @@
               Delete
             </button>
           {/if}
+          {#if queue && track.playable}
+            <button
+              type="button"
+              bind:this={menuBtn}
+              class="inline-flex size-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-signal/10 hover:text-signal"
+              aria-label={`More actions for ${track.title}`}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onclick={toggleMenu}
+            >
+              <EllipsisVerticalIcon class="size-3.5" />
+            </button>
+          {/if}
         </div>
       </div>
 
-      <div class="flex items-center gap-2" class:hidden={unavailable}>
-        <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatTime(isActive ? current : 0)}</span>
-        <input
-          class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)] disabled:opacity-40"
-          type="range"
-          min="0"
-          max={isActive && duration > 0 ? duration : Math.max((track.durationMs ?? 0) / 1000, 1)}
-          step="0.1"
-          value={isActive ? current : 0}
-          disabled={!isActive}
-          oninput={seek}
-        />
-        <span class="w-10 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums"
-          >{formatTime(isActive && duration > 0 ? duration : (track.durationMs ?? 0) / 1000)}</span
-        >
-      </div>
+      {#if isCurrent && queue}
+        <div class="flex items-center gap-2">
+          <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(queue.positionMs)}</span>
+          <input
+            class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)]"
+            type="range"
+            min="0"
+            max={Math.max(durationMs / 1000, 1)}
+            step="0.5"
+            value={queue.positionMs / 1000}
+            aria-label={`Seek ${track.title}`}
+            onchange={(e) => void queue.seek(Number((e.currentTarget as HTMLInputElement).value) * 1000)}
+          />
+          <span class="w-10 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(durationMs)}</span>
+        </div>
+      {/if}
       {#if error}
         <p class="font-mono text-[11px] text-destructive">{error}</p>
       {/if}
+      {#if info}
+        <p class="font-mono text-[11px] text-signal">{info}</p>
+      {/if}
     </div>
   </div>
+
+  {#if menuOpen}
+    <div
+      bind:this={menuEl}
+      class="fixed z-50 w-52 overflow-hidden rounded border border-border bg-popover py-1 shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_12%,transparent)]"
+      style={menuStyle}
+      role="menu"
+    >
+      <button type="button" role="menuitem" class="zap-menu-item" onclick={() => void enqueue("next")}>
+        <ListStartIcon class="size-3.5" /> Play next
+      </button>
+      <button type="button" role="menuitem" class="zap-menu-item" onclick={() => void enqueue("queue")}>
+        <ListPlusIcon class="size-3.5" /> Add to queue
+      </button>
+      <button type="button" role="menuitem" class="zap-menu-item" onclick={() => void enqueue("last")}>
+        <ListEndIcon class="size-3.5" /> Play last
+      </button>
+      {#if playlists.length}
+        <p class="mt-1 border-t border-border/60 px-3 pt-2 pb-1 font-mono text-[9px] tracking-[0.18em] text-muted-foreground uppercase">
+          Add to playlist
+        </p>
+        <div class="max-h-40 overflow-y-auto">
+          {#each playlists as pl (pl.id)}
+            <button type="button" role="menuitem" class="zap-menu-item" onclick={() => void addToPlaylist(pl)}>
+              <span class="truncate">{pl.name}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   {#if editing}
     <form

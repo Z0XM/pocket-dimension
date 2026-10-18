@@ -1,6 +1,8 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { dedupeIds } from "$lib/catalog-queue";
 import { evaluateUserTagQuery } from "$lib/server/catalogue";
+import { userCanEditPlaylist, userCanViewPlaylist } from "$lib/server/playlist-access";
 import { SessionError, enqueueCatalogueTrack } from "$lib/server/sessions";
 import type { SessionSnapshot } from "$lib/server/sessions/types";
 import { formatTagQuery, parseTagQuery, type TagQueryNode } from "$lib/tag-query";
@@ -45,26 +47,8 @@ export type PlaylistDetail = PlaylistSummary & {
   collaborators: { userId: string; role: "owner" | "collaborator"; displayName: string }[];
 };
 
-async function userCanEdit(playlistId: string, userId: string): Promise<boolean> {
-  const playlist = await db.query.playlists.findFirst({ where: eq(schema.playlists.id, playlistId) });
-  if (!playlist) return false;
-  if (playlist.ownerUserId === userId) return true;
-  const member = await db.query.playlistMembers.findFirst({
-    where: and(eq(schema.playlistMembers.playlistId, playlistId), eq(schema.playlistMembers.userId, userId)),
-  });
-  return Boolean(member);
-}
-
-async function userCanView(playlistId: string, userId: string): Promise<boolean> {
-  const playlist = await db.query.playlists.findFirst({ where: eq(schema.playlists.id, playlistId) });
-  if (!playlist) return false;
-  if (playlist.visibility === "public") return true;
-  if (playlist.ownerUserId === userId) return true;
-  const member = await db.query.playlistMembers.findFirst({
-    where: and(eq(schema.playlistMembers.playlistId, playlistId), eq(schema.playlistMembers.userId, userId)),
-  });
-  return Boolean(member);
-}
+const userCanEdit = userCanEditPlaylist;
+const userCanView = userCanViewPlaylist;
 
 function displayName(user: { name: string | null; username: string | null; email: string }) {
   return user.name?.trim() || user.username?.trim() || user.email;
@@ -117,6 +101,26 @@ async function replaceItemsWithMatches(playlistId: string, userId: string, asset
   }
 }
 
+async function readyAssetIdsInOrder(ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select({ id: schema.mediaAssets.id })
+    .from(schema.mediaAssets)
+    .where(and(eq(schema.mediaAssets.status, "ready"), inArray(schema.mediaAssets.id, ids)));
+  const ready = new Set(rows.map((r) => r.id));
+  return ids.filter((id) => ready.has(id));
+}
+
+/** Track ids of a playlist the user may view, in playlist order. */
+export async function listPlaylistAssetIds(playlistId: string, userId: string): Promise<string[]> {
+  if (!(await userCanView(playlistId, userId))) throw new PlaylistError("Playlist not found", 404);
+  const items = await db.query.playlistItems.findMany({
+    where: eq(schema.playlistItems.playlistId, playlistId),
+    orderBy: [asc(schema.playlistItems.position)],
+  });
+  return items.map((i) => i.mediaAssetId);
+}
+
 export async function createPlaylist(opts: {
   userId: string;
   name: string;
@@ -124,11 +128,14 @@ export async function createPlaylist(opts: {
   visibility?: PlaylistVisibility;
   /** When set, the playlist is stored with this query and filled with its matches (the creator's tags). */
   tagQuery?: string | null;
+  /** Freehand playlist: these tracks in this order (deduped, unplayable dropped). Ignored with `tagQuery`. */
+  mediaAssetIds?: string[];
 }): Promise<PlaylistSummary> {
   const name = opts.name.trim().slice(0, 80);
   if (!name) throw new PlaylistError("Name is required");
   const tagQuery = parsePlaylistTagQuery(opts.tagQuery);
   const matchedIds = tagQuery ? await tagQueryAssetIds(opts.userId, tagQuery.ast) : [];
+  const freehandIds = tagQuery ? [] : await readyAssetIdsInOrder(dedupeIds(opts.mediaAssetIds ?? []).slice(0, 2000));
 
   const [row] = await db
     .insert(schema.playlists)
@@ -149,7 +156,12 @@ export async function createPlaylist(opts: {
   });
 
   if (tagQuery) await replaceItemsWithMatches(row.id, opts.userId, matchedIds);
-  const trackCount = tagQuery ? await db.$count(schema.playlistItems, eq(schema.playlistItems.playlistId, row.id)) : 0;
+  else if (freehandIds.length > 0) {
+    await db
+      .insert(schema.playlistItems)
+      .values(freehandIds.map((mediaAssetId, position) => ({ playlistId: row.id, mediaAssetId, position, addedByUserId: opts.userId })));
+  }
+  const trackCount = tagQuery ? await db.$count(schema.playlistItems, eq(schema.playlistItems.playlistId, row.id)) : freehandIds.length;
 
   return {
     id: row.id,

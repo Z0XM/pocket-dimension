@@ -1,12 +1,14 @@
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { CATALOGUE_PAGE_SIZE, listCatalogue, listTagFilterOptions, serializeCatalogueAsset } from "$lib/server/catalogue";
+import { CATALOGUE_PAGE_SIZE, listCatalogue, listTagFilterOptions, parseCatalogueScope, serializeCatalogueAsset } from "$lib/server/catalogue";
+import { userCanViewPlaylist } from "$lib/server/playlist-access";
 
 export const GET: RequestHandler = async ({ locals, url }) => {
   if (!locals.user) throw error(401, "Sign in required");
   if (!locals.user.emailVerified) throw error(403, "Verify email first");
 
-  const scope = url.searchParams.get("scope") === "yours" ? "yours" : "all";
+  const { scope, playlistId } = parseCatalogueScope(url.searchParams, "all");
+  if (playlistId && !(await userCanViewPlaylist(playlistId, locals.user.id))) throw error(404, "Playlist not found");
   const q = url.searchParams.get("q") ?? "";
   const tagIds = url.searchParams.getAll("tag").filter(Boolean);
   const tagQuery = url.searchParams.get("tq") ?? "";
@@ -16,6 +18,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
   const { assets, tagsByAsset, hasMore, nextOffset, tagQueryError } = await listCatalogue({
     userId: locals.user.id,
     scope,
+    playlistId,
     q,
     tagIds: tagQuery.trim() ? [] : tagIds,
     tagQuery,
@@ -25,6 +28,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
   return json({
     scope,
+    playlistId,
     q,
     selectedTagIds: tagIds,
     tagQuery,

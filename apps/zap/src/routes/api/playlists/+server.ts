@@ -1,5 +1,6 @@
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
+import { isUuid } from "$lib/admin-access";
 import { PlaylistError, createPlaylist, listPlaylistsForUser, mergePlaylists } from "$lib/server/playlists";
 
 function requireVerifiedUser(locals: App.Locals) {
@@ -29,6 +30,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       visibility?: "private" | "public";
       tagQuery?: string | null;
       sourcePlaylistIds?: string[];
+      mediaAssetIds?: unknown;
     };
 
     if (body.action === "merge") {
@@ -47,6 +49,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       description: body.description,
       visibility: body.visibility,
       tagQuery: typeof body.tagQuery === "string" ? body.tagQuery : null,
+      mediaAssetIds: Array.isArray(body.mediaAssetIds) ? body.mediaAssetIds.filter((id): id is string => isUuid(id)) : undefined,
     });
     return json(summary, { status: 201 });
   } catch (err) {

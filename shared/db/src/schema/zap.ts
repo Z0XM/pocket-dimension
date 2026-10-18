@@ -443,6 +443,85 @@ export const playlistMembers = zapSchema.table(
   ]
 );
 
+export const catalogQueueStatus = zapSchema.enum("catalog_queue_status", ["active", "ended"]);
+
+/**
+ * Personal catalogue queue run (one owner, no guests; distinct from session queues). At most one `active`
+ * run per user; `ended` runs are History entries that can be restarted / resumed / saved as playlists.
+ */
+export const catalogQueues = zapSchema.table(
+  "catalog_queues",
+  {
+    id,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    status: catalogQueueStatus("status").default("active").notNull(),
+    playbackState: sessionPlaybackState("playback_state").default("idle").notNull(),
+    currentItemId: uuid("current_item_id"),
+    positionMs: integer("position_ms").default(0).notNull(),
+    positionUpdatedAt: timestamp("position_updated_at")
+      .$default(() => sql`now()`)
+      .notNull(),
+    playbackGeneration: integer("playback_generation").default(0).notNull(),
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamp("updated_at")
+      .$default(() => sql`now()`)
+      .$onUpdate(() => sql`now()`)
+      .notNull(),
+    endedAt: timestamp("ended_at"),
+  },
+  (table) => [
+    uniqueIndex("catalog_queues_one_active_per_user")
+      .on(table.userId)
+      .where(sql`${table.status} = 'active'`),
+    index("catalog_queues_user_updated_idx").on(table.userId, table.updatedAt),
+  ]
+);
+
+/** Ordered tracks of a catalogue queue run. Duplicates allowed; `source` records how the row was added. */
+export const catalogQueueItems = zapSchema.table(
+  "catalog_queue_items",
+  {
+    id,
+    queueId: uuid("queue_id")
+      .notNull()
+      .references(() => catalogQueues.id, { onDelete: "cascade" }),
+    mediaAssetId: uuid("media_asset_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    /** `play` | `next` | `queue` | `last` | `bulk` — `queue` rows group after the playhead (“Add to queue”). */
+    source: text("source").default("last").notNull(),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [
+    index("catalog_queue_items_queue_position_idx").on(table.queueId, table.position),
+    index("catalog_queue_items_media_asset_id_idx").on(table.mediaAssetId),
+  ]
+);
+
+/** Browsers/devices a user has opened Zap on (client-generated id in localStorage). */
+export const catalogDevices = zapSchema.table(
+  "catalog_devices",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    deviceId: text("device_id").notNull(),
+    label: text("label").notNull(),
+    /** False = remote-only: the device controls the queue but plays no audio. */
+    outputEnabled: boolean("output_enabled").default(true).notNull(),
+    /** 0–100 per-device output volume. */
+    volume: integer("volume").default(100).notNull(),
+    lastSeenAt: timestamp("last_seen_at")
+      .$default(() => sql`now()`)
+      .notNull(),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.deviceId] }), index("catalog_devices_user_seen_idx").on(table.userId, table.lastSeenAt)]
+);
+
 /**
  * Zap-scoped admin flag + portal access per account (auth stays in `auth.user`).
  * A row is created on first Zap visit to track first/last seen; admins edit it from /admin/users.

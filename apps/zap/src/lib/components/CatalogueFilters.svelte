@@ -4,10 +4,13 @@
   import SlidersHorizontalIcon from "@lucide/svelte/icons/sliders-horizontal";
   import type { Snippet } from "svelte";
   import TagQueryEditor from "$lib/components/TagQueryEditor.svelte";
+  import ZapSelect from "$lib/components/ZapSelect.svelte";
   import type { TagFilterTag } from "$lib/tag-filter";
 
   let {
     scope = $bindable<"all" | "yours">("all"),
+    libraryScope = $bindable(""),
+    libraryScopeOptions,
     q = $bindable(""),
     tagQuery = $bindable(""),
     selectedTagIds = $bindable<string[]>([]),
@@ -22,6 +25,10 @@
     onchange,
   }: {
     scope?: "all" | "yours";
+    /** Dropdown scope (catalogue toolbar): `""` = Your library, otherwise one of `libraryScopeOptions`. */
+    libraryScope?: string;
+    /** When set (with `collapsible`), a dropdown replaces the All / Your library buttons. */
+    libraryScopeOptions?: { value: string; label: string }[];
     q?: string;
     tagQuery?: string;
     selectedTagIds?: string[];
@@ -83,9 +90,21 @@
 {#if collapsible}
   <div class="flex flex-col gap-2" aria-busy={busy}>
     <div class="flex flex-wrap items-center gap-2">
-      <div class="flex shrink-0 gap-1.5">
-        {@render scopeButtons("h-9 px-3")}
-      </div>
+      {#if libraryScopeOptions}
+        <div class="w-40 shrink-0 sm:w-48" title="Browse scope">
+          <ZapSelect
+            options={libraryScopeOptions}
+            bind:value={libraryScope}
+            placeholder="Your library"
+            disabled={busy}
+            onChange={() => onchange?.()}
+          />
+        </div>
+      {:else}
+        <div class="flex shrink-0 gap-1.5">
+          {@render scopeButtons("h-9 px-3")}
+        </div>
+      {/if}
       <div class="relative min-w-[12rem] flex-1">
         <SearchIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         <input
