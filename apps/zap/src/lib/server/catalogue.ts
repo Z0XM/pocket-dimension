@@ -1,12 +1,13 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import type { CatalogueScope } from "$lib/catalogue-scope";
 import { MAX_CUSTOM_TAG_LENGTH, parseCustomTagNames, slugifyTag } from "$lib/custom-tags";
 import { rankTopTagIds } from "$lib/tag-filter";
 import { evaluateTagQuery, parseTagQuery, type TagQueryNode } from "$lib/tag-query";
 
 export { slugifyTag };
 
-export type CatalogueScope = "all" | "yours";
+export { parseCatalogueScope, type CatalogueScope } from "$lib/catalogue-scope";
 
 /** Statuses listed in browse / search. `unavailable` rows show with a "not available" badge and are not playable. */
 export const CATALOGUE_VISIBLE_STATUSES = ["ready", "unavailable"] as const;
@@ -25,6 +26,8 @@ export type CatalogueQuery = {
   userId: string;
   q?: string;
   scope?: CatalogueScope;
+  /** Required when `scope` is `playlist`; the caller must have checked view access. */
+  playlistId?: string | null;
   /** Tag ids that must ALL be present (AND). Ignored when `tagQuery` is set. */
   tagIds?: string[];
   /**
@@ -39,6 +42,8 @@ export type CatalogueQuery = {
   limit?: number;
 };
 
+type ListOptions = { maxLimit?: number; skipTags?: boolean };
+
 export type CatalogueListResult = {
   assets: CatalogueAsset[];
   tagsByAsset: Map<string, CatalogueTag[]>;
@@ -51,12 +56,12 @@ export type CatalogueListResult = {
 export type CatalogueAsset = typeof schema.mediaAssets.$inferSelect;
 export type CatalogueTag = typeof schema.tags.$inferSelect;
 
-export async function listCatalogue(input: CatalogueQuery): Promise<CatalogueListResult> {
+export async function listCatalogue(input: CatalogueQuery, options: ListOptions = {}): Promise<CatalogueListResult> {
   const scope = input.scope ?? "all";
   const q = input.q?.trim() ?? "";
   const tagIds = input.tagIds?.filter(Boolean) ?? [];
   const tagQueryRaw = input.tagQuery?.trim() ?? "";
-  const limit = Math.min(Math.max(input.limit ?? CATALOGUE_PAGE_SIZE, 1), 100);
+  const limit = Math.min(Math.max(input.limit ?? CATALOGUE_PAGE_SIZE, 1), options.maxLimit ?? 100);
   const offset = Math.max(input.offset ?? 0, 0);
 
   const empty: CatalogueListResult = {
@@ -78,6 +83,14 @@ export async function listCatalogue(input: CatalogueQuery): Promise<CatalogueLis
       .from(schema.mediaAssetTags)
       .where(eq(schema.mediaAssetTags.userId, input.userId));
     assetIds = tagged.map((row) => row.mediaAssetId);
+    if (assetIds.length === 0) return empty;
+  } else if (scope === "playlist") {
+    if (!input.playlistId) return empty;
+    const items = await db
+      .selectDistinct({ mediaAssetId: schema.playlistItems.mediaAssetId })
+      .from(schema.playlistItems)
+      .where(eq(schema.playlistItems.playlistId, input.playlistId));
+    assetIds = items.map((row) => row.mediaAssetId);
     if (assetIds.length === 0) return empty;
   }
 
@@ -128,7 +141,21 @@ export async function listCatalogue(input: CatalogueQuery): Promise<CatalogueLis
   let assets: CatalogueAsset[];
   let hasMore: boolean;
 
-  if (useLibraryOrder) {
+  if (scope === "playlist" && input.playlistId) {
+    const joined = await db
+      .select({ asset: schema.mediaAssets })
+      .from(schema.mediaAssets)
+      .innerJoin(
+        schema.playlistItems,
+        and(eq(schema.playlistItems.mediaAssetId, schema.mediaAssets.id), eq(schema.playlistItems.playlistId, input.playlistId))
+      )
+      .where(and(...conditions))
+      .orderBy(asc(schema.playlistItems.position), asc(schema.mediaAssets.id))
+      .limit(limit + 1)
+      .offset(offset);
+    hasMore = joined.length > limit;
+    assets = (hasMore ? joined.slice(0, limit) : joined).map((r) => r.asset);
+  } else if (useLibraryOrder) {
     // Prefer durable per-user sort keys; untitled/unkeyed rows fall back after keyed ones.
     const joined = await db
       .select({
@@ -159,7 +186,7 @@ export async function listCatalogue(input: CatalogueQuery): Promise<CatalogueLis
   }
 
   const tagsByAsset = new Map<string, CatalogueTag[]>();
-  if (assets.length > 0) {
+  if (assets.length > 0 && !options.skipTags) {
     // Custom tags are private: only system tags or tags owned by this user may appear.
     const links = await db
       .select({
@@ -193,6 +220,19 @@ export async function listCatalogue(input: CatalogueQuery): Promise<CatalogueLis
     nextOffset: offset + assets.length,
     tagQueryError,
     tagQueryAst,
+  };
+}
+
+/** Playable track ids matching a catalogue filter, in list order (for “Add all filtered”). */
+export async function listPlayableCatalogueIds(
+  input: Omit<CatalogueQuery, "offset" | "limit">,
+  cap: number
+): Promise<{ ids: string[]; truncated: boolean; tagQueryError: string | null }> {
+  const result = await listCatalogue({ ...input, offset: 0, limit: cap }, { maxLimit: cap, skipTags: true });
+  return {
+    ids: result.assets.filter((a) => a.status === "ready" && a.storageKey).map((a) => a.id),
+    truncated: result.hasMore,
+    tagQueryError: result.tagQueryError ?? null,
   };
 }
 
