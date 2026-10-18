@@ -11,6 +11,7 @@ import {
   removeCollaborator,
   removePlaylistTrack,
   setPlaylistExclusion,
+  setPlaylistTagQuery,
   updatePlaylist,
 } from "$lib/server/playlists";
 
@@ -57,6 +58,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
       action?: string;
       mediaAssetId?: string;
       tagIds?: string[];
+      tagQuery?: string | null;
       excluded?: boolean;
       collaborator?: string;
       collaboratorUserId?: string;
@@ -78,6 +80,9 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
       }
       case "buildFromTags": {
         return json(await buildPlaylistFromTags(id, user.id, body.tagIds ?? []));
+      }
+      case "setTagQuery": {
+        return json(await setPlaylistTagQuery(id, user.id, typeof body.tagQuery === "string" ? body.tagQuery : null));
       }
       case "addCollaborator": {
         let collabId = body.collaboratorUserId?.trim() || "";

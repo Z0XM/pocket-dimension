@@ -1,5 +1,8 @@
 <script lang="ts">
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
+  import TagQueryEditor from "$lib/components/TagQueryEditor.svelte";
+  import { effectiveTagQuery, tagQueryProblem } from "$lib/tag-filter";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -9,7 +12,13 @@
   let busyLabel = $state("Working…");
   let error = $state<string | null>(null);
   let newName = $state("");
+  let newTagsOpen = $state(false);
+  let newTagQuery = $state("");
+  let newTagIds = $state<string[]>([]);
   let mergeIds = $state<string[]>([]);
+
+  const newTagQueryProblem = $derived(newTagsOpen ? tagQueryProblem(newTagQuery, data.availableTags) : null);
+  const newEffectiveTagQuery = $derived(newTagsOpen ? effectiveTagQuery({ tagQuery: newTagQuery, tagIds: newTagIds }, data.availableTags) : "");
 
   $effect(() => {
     playlists = data.playlists ?? [];
@@ -23,7 +32,7 @@
   }
 
   async function create() {
-    if (!newName.trim() || busy) return;
+    if (!newName.trim() || busy || newTagQueryProblem) return;
     busy = true;
     busyLabel = "Creating playlist…";
     error = null;
@@ -32,7 +41,7 @@
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim() }),
+        body: JSON.stringify({ name: newName.trim(), tagQuery: newEffectiveTagQuery || null }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? "Create failed");
@@ -86,20 +95,58 @@
     </p>
   </div>
 
-  <div class="flex flex-col gap-3 rounded-lg border border-border/70 bg-card/50 p-4 sm:flex-row sm:items-end">
-    <label class="flex-1 space-y-1">
-      <span class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">New playlist</span>
-      <input class="auth-field" bind:value={newName} placeholder="Name…" maxlength="80" />
-    </label>
-    <button
-      type="button"
-      class="rounded bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
-      disabled={busy || !newName.trim()}
-      onclick={() => void create()}
-    >
-      {busy && busyLabel.startsWith("Creating") ? "Creating…" : "Create"}
-    </button>
-  </div>
+  <form
+    class="space-y-3 rounded-lg border border-border/70 bg-card/50 p-4"
+    onsubmit={(e) => {
+      e.preventDefault();
+      void create();
+    }}
+  >
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+      <label class="flex-1 space-y-1">
+        <span class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">New playlist</span>
+        <input class="auth-field" bind:value={newName} placeholder="Name…" maxlength="80" />
+      </label>
+      <button
+        type="button"
+        class={`inline-flex items-center justify-center gap-1 rounded border px-3 py-2 font-mono text-[11px] ${
+          newTagsOpen ? "border-signal/50 text-signal" : "border-border text-muted-foreground hover:text-signal"
+        }`}
+        aria-expanded={newTagsOpen}
+        onclick={() => (newTagsOpen = !newTagsOpen)}
+      >
+        From tags
+        <ChevronDownIcon class={`size-3 transition ${newTagsOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      <button
+        type="submit"
+        class="rounded bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
+        disabled={busy || !newName.trim() || Boolean(newTagQueryProblem)}
+      >
+        {busy && busyLabel.startsWith("Creating") ? "Creating…" : "Create"}
+      </button>
+    </div>
+    {#if newTagsOpen}
+      <div class="border-t border-border/50 pt-3">
+        <TagQueryEditor
+          compact
+          bind:tagQuery={newTagQuery}
+          bind:selectedTagIds={newTagIds}
+          availableTags={data.availableTags}
+          topTagIds={data.topTagIds}
+          tagQueryError={newTagQueryProblem}
+        />
+        <p class="mt-2 font-mono text-[10px] text-muted-foreground">
+          {#if newEffectiveTagQuery}
+            Fills the playlist with your tracks matching <span class="text-signal">{newEffectiveTagQuery}</span>; rebuild any time from the playlist
+            page.
+          {:else}
+            Optional — leave empty for a hand-picked playlist.
+          {/if}
+        </p>
+      </div>
+    {/if}
+  </form>
 
   {#if busy}
     <BusyStatus label={busyLabel} />
@@ -129,6 +176,9 @@
                 >{pl.trackCount} · {pl.visibility}{#if !pl.canEdit}
                   · collab{/if}</span
               >
+              {#if pl.tagQuery}
+                <span class="mt-0.5 block truncate font-mono text-[10px] text-signal/80" title={pl.tagQuery}>tags: {pl.tagQuery}</span>
+              {/if}
             </a>
           </li>
         {/each}

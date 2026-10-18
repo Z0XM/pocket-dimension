@@ -7,12 +7,13 @@ import {
   CATALOGUE_PAGE_SIZE,
   ensureCustomTags,
   isCatalogueVisibleStatus,
-  listAvailableTags,
   listCatalogue,
+  listTagFilterOptions,
   serializeCatalogueAsset,
   setUserAssetTags,
 } from "$lib/server/catalogue";
 import { resolveYtDlpBin } from "$lib/server/ingest";
+import { listPlaylistsForUser } from "$lib/server/playlists";
 import { isStorageConfigured } from "$lib/server/storage";
 import { listSuggestionsFromOthers } from "$lib/server/suggestions";
 import { getYoutubeLinkStatus, isGoogleOAuthConfigured } from "$lib/server/youtube";
@@ -32,7 +33,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const tagIds = url.searchParams.getAll("tag").filter(Boolean);
   const tagQuery = url.searchParams.get("tq") ?? "";
 
-  const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, availableTags, suggestions, ytDlpBin, youtubeLink] = await Promise.all([
+  const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, tagOptions, playlists, suggestions, ytDlpBin, youtubeLink] = await Promise.all([
     listCatalogue({
       userId,
       scope,
@@ -42,7 +43,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
       offset: 0,
       limit: CATALOGUE_PAGE_SIZE,
     }),
-    listAvailableTags(userId),
+    listTagFilterOptions(userId),
+    listPlaylistsForUser(userId),
     listSuggestionsFromOthers(userId, 12),
     resolveYtDlpBin(),
     getYoutubeLinkStatus(userId).catch(() => ({ linked: false as const })),
@@ -60,7 +62,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     pageSize: CATALOGUE_PAGE_SIZE,
     hasMore,
     nextOffset,
-    availableTags: availableTags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
+    availableTags: tagOptions.availableTags,
+    topTagIds: tagOptions.topTagIds,
+    /** Tag-query playlists the catalogue filter can match against. */
+    tagPlaylists: playlists.filter((p) => p.tagQuery).map((p) => ({ id: p.id, name: p.name, tagQuery: p.tagQuery })),
     assets: assets.map((asset) => serializeCatalogueAsset(asset, tagsByAsset.get(asset.id) ?? [])),
     suggestions,
     addMusic: {

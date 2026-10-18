@@ -27,6 +27,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       name?: string;
       description?: string;
       visibility?: "private" | "public";
+      tagQuery?: string | null;
       sourcePlaylistIds?: string[];
     };
 
@@ -45,6 +46,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       name: body.name ?? "",
       description: body.description,
       visibility: body.visibility,
+      tagQuery: typeof body.tagQuery === "string" ? body.tagQuery : null,
     });
     return json(summary, { status: 201 });
   } catch (err) {

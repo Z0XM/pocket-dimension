@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ListPlusIcon from "@lucide/svelte/icons/list-plus";
   import PlusIcon from "@lucide/svelte/icons/plus";
   import { onMount } from "svelte";
   import { afterNavigate, replaceState } from "$app/navigation";
@@ -6,8 +7,10 @@
   import AddMusicDialog, { parseAddMusicTab, type AddMusicTab } from "$lib/components/AddMusicDialog.svelte";
   import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
+  import SaveTagPlaylistDialog from "$lib/components/SaveTagPlaylistDialog.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
+  import { effectiveTagQuery, findPlaylistMatchingTagFilter, tagFilterKey } from "$lib/tag-filter";
   import type { ActionData, PageData } from "./$types";
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -20,6 +23,10 @@
   let tagQuery = $state("");
   let tagQueryError = $state<string | null>(null);
   let availableTags = $state<PageData["availableTags"]>([]);
+  let topTagIds = $state<string[]>([]);
+  let tagPlaylists = $state<PageData["tagPlaylists"]>([]);
+  let savePlaylistOpen = $state(false);
+  let savedPlaylistMessage = $state<string | null>(null);
 
   let assets = $state<TrackItem[]>([]);
   let hasMore = $state(false);
@@ -56,7 +63,28 @@
 
   $effect(() => {
     availableTags = data.availableTags;
+    topTagIds = data.topTagIds;
+    tagPlaylists = data.tagPlaylists;
   });
+
+  /** Tag filters only — the free-text search is deliberately ignored for playlist matching. */
+  const tagFilter = $derived({ tagQuery, tagIds: selected });
+  const tagFilterValid = $derived(!tagQueryError && tagFilterKey(tagFilter, availableTags) !== null);
+  const matchingPlaylist = $derived(tagFilterValid ? findPlaylistMatchingTagFilter(tagFilter, tagPlaylists, availableTags) : null);
+  const saveTagQuery = $derived(effectiveTagQuery(tagFilter, availableTags));
+  const savePlaylistDefaultName = $derived(
+    tagQuery.trim()
+      ? tagQuery.trim()
+      : availableTags
+          .filter((t) => selected.includes(t.id))
+          .map((t) => t.name)
+          .join(" + ")
+  );
+
+  function onPlaylistSaved(playlist: { id: string; name: string; tagQuery: string | null; trackCount: number }) {
+    tagPlaylists = [...tagPlaylists, { id: playlist.id, name: playlist.name, tagQuery: playlist.tagQuery }];
+    savedPlaylistMessage = `Saved playlist “${playlist.name}” (${playlist.trackCount} track${playlist.trackCount === 1 ? "" : "s"}).`;
+  }
 
   $effect(() => {
     const key = `${data.scope}|${data.q}|${data.tagQuery}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
@@ -113,8 +141,9 @@
     try {
       const res = await fetch("/api/catalogue", { method: "POST", credentials: "same-origin", headers: { Accept: "application/json" } });
       if (!res.ok) return;
-      const body = (await res.json()) as { availableTags?: PageData["availableTags"] };
+      const body = (await res.json()) as { availableTags?: PageData["availableTags"]; topTagIds?: string[] };
       if (body.availableTags) availableTags = body.availableTags;
+      if (body.topTagIds) topTagIds = body.topTagIds;
     } catch {
       // keep current tags; next full load refreshes them
     }
@@ -240,14 +269,38 @@
       bind:tagQuery
       bind:selectedTagIds={selected}
       {availableTags}
+      {topTagIds}
       {tagQueryError}
       busy={loading}
       actions={addButton}
-      onchange={() => void fetchPage({ reset: true })}
+      onchange={() => {
+        savedPlaylistMessage = null;
+        void fetchPage({ reset: true });
+      }}
     />
+    {#if tagFilterValid}
+      <div class="mt-2 flex min-h-7 flex-wrap items-center gap-2 border-t border-border/50 pt-2 font-mono text-[11px] text-muted-foreground">
+        {#if matchingPlaylist}
+          <span>
+            Matches playlist:
+            <a href={`/playlists/${matchingPlaylist.id}`} class="text-signal hover:underline">{matchingPlaylist.name}</a>
+          </span>
+        {:else}
+          <span>No playlist uses these tags.</span>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded border border-signal/40 px-2 py-0.5 text-[11px] text-signal hover:bg-signal/10"
+            onclick={() => (savePlaylistOpen = true)}
+          >
+            <ListPlusIcon class="size-3.5" aria-hidden="true" />
+            Save as playlist
+          </button>
+        {/if}
+      </div>
+    {/if}
   </div>
 
-  {#if form?.tagError || form?.tagOk || listError || deleteMessage || addMessage}
+  {#if form?.tagError || form?.tagOk || listError || deleteMessage || addMessage || savedPlaylistMessage}
     <div class="shrink-0 space-y-1">
       {#if form?.tagError}
         <p class="auth-error mb-0 p-2">{form.tagError}</p>
@@ -263,6 +316,9 @@
       {/if}
       {#if addMessage}
         <p class="text-sm text-signal">{addMessage}</p>
+      {/if}
+      {#if savedPlaylistMessage}
+        <p class="text-sm text-signal">{savedPlaylistMessage}</p>
       {/if}
     </div>
   {/if}
@@ -319,4 +375,5 @@
   </div>
 </section>
 
+<SaveTagPlaylistDialog bind:open={savePlaylistOpen} tagQuery={saveTagQuery} defaultName={savePlaylistDefaultName} onsaved={onPlaylistSaved} />
 <AddMusicDialog bind:open={addOpen} bind:tab={addTab} config={data.addMusic} {availableTags} onadded={onAdded} />

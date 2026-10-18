@@ -1,6 +1,7 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { MAX_CUSTOM_TAG_LENGTH, parseCustomTagNames, slugifyTag } from "$lib/custom-tags";
+import { rankTopTagIds } from "$lib/tag-filter";
 import { evaluateTagQuery, parseTagQuery, type TagQueryNode } from "$lib/tag-query";
 
 export { slugifyTag };
@@ -87,43 +88,7 @@ export async function listCatalogue(input: CatalogueQuery): Promise<CatalogueLis
     }
     tagQueryAst = parsed.ast;
 
-    // Universe for NOT: visible assets in current scope (or all visible).
-    const universeWhere = assetIds ? and(catalogueVisible(), inArray(schema.mediaAssets.id, assetIds)) : catalogueVisible();
-    const universeRows = await db.select({ id: schema.mediaAssets.id }).from(schema.mediaAssets).where(universeWhere);
-    const universe = new Set(universeRows.map((r) => r.id));
-    if (universe.size === 0) return { ...empty, tagQueryAst };
-
-    const available = await listAvailableTags(input.userId);
-    const tagNameToId = new Map<string, string>();
-    for (const t of available) {
-      tagNameToId.set(t.name.toLowerCase(), t.id);
-      tagNameToId.set(t.slug.toLowerCase(), t.id);
-    }
-
-    const universeIds = [...universe];
-    const links =
-      universeIds.length === 0
-        ? []
-        : await db
-            .select({
-              mediaAssetId: schema.mediaAssetTags.mediaAssetId,
-              tagId: schema.mediaAssetTags.tagId,
-            })
-            .from(schema.mediaAssetTags)
-            .where(and(eq(schema.mediaAssetTags.userId, input.userId), inArray(schema.mediaAssetTags.mediaAssetId, universeIds)));
-
-    const tagsByAssetIds = new Map<string, Set<string>>();
-    for (const link of links) {
-      const set = tagsByAssetIds.get(link.mediaAssetId) ?? new Set<string>();
-      set.add(link.tagId);
-      tagsByAssetIds.set(link.mediaAssetId, set);
-    }
-
-    const evaluated = evaluateTagQuery(parsed.ast, {
-      universe,
-      tagsByAsset: tagsByAssetIds,
-      tagNameToId,
-    });
+    const evaluated = await evaluateUserTagQuery(input.userId, parsed.ast, assetIds);
     if (!evaluated.ok) {
       return { ...empty, tagQueryError: evaluated.error, tagQueryAst };
     }
@@ -231,6 +196,48 @@ export async function listCatalogue(input: CatalogueQuery): Promise<CatalogueLis
   };
 }
 
+/**
+ * Evaluate a parsed tag query against this user's tags. The NOT universe is every catalogue-visible
+ * asset, narrowed to `scopeAssetIds` when given.
+ */
+export async function evaluateUserTagQuery(
+  userId: string,
+  ast: TagQueryNode,
+  scopeAssetIds: string[] | null = null
+): Promise<{ ok: true; assetIds: Set<string> } | { ok: false; error: string }> {
+  const universeWhere = scopeAssetIds ? and(catalogueVisible(), inArray(schema.mediaAssets.id, scopeAssetIds)) : catalogueVisible();
+  const universeRows = await db.select({ id: schema.mediaAssets.id }).from(schema.mediaAssets).where(universeWhere);
+  const universe = new Set(universeRows.map((r) => r.id));
+
+  const available = await listAvailableTags(userId);
+  const tagNameToId = new Map<string, string>();
+  for (const t of available) {
+    tagNameToId.set(t.name.toLowerCase(), t.id);
+    tagNameToId.set(t.slug.toLowerCase(), t.id);
+  }
+
+  const universeIds = [...universe];
+  const links =
+    universeIds.length === 0
+      ? []
+      : await db
+          .select({
+            mediaAssetId: schema.mediaAssetTags.mediaAssetId,
+            tagId: schema.mediaAssetTags.tagId,
+          })
+          .from(schema.mediaAssetTags)
+          .where(and(eq(schema.mediaAssetTags.userId, userId), inArray(schema.mediaAssetTags.mediaAssetId, universeIds)));
+
+  const tagsByAssetIds = new Map<string, Set<string>>();
+  for (const link of links) {
+    const set = tagsByAssetIds.get(link.mediaAssetId) ?? new Set<string>();
+    set.add(link.tagId);
+    tagsByAssetIds.set(link.mediaAssetId, set);
+  }
+
+  return evaluateTagQuery(ast, { universe, tagsByAsset: tagsByAssetIds, tagNameToId });
+}
+
 export function serializeCatalogueAsset(asset: CatalogueAsset, tags: CatalogueTag[] | { id: string; name: string; kind: string }[]) {
   return {
     id: asset.id,
@@ -256,6 +263,36 @@ export async function listAvailableTags(userId: string) {
     .from(schema.tags)
     .where(or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, userId)))
     .orderBy(asc(schema.tags.kind), asc(schema.tags.name));
+}
+
+export function serializeTagOption(tag: CatalogueTag) {
+  return { id: tag.id, name: tag.name, kind: tag.kind, slug: tag.slug };
+}
+
+/** Per-tag usage: how many tracks this user tagged with it, and how many tag links it has catalogue-wide. */
+export async function listTagUsage(userId: string): Promise<{ userCounts: Map<string, number>; globalCounts: Map<string, number> }> {
+  const rows = await db
+    .select({
+      tagId: schema.mediaAssetTags.tagId,
+      mine: sql<number>`count(*) filter (where ${schema.mediaAssetTags.userId} = ${userId})::int`,
+      total: sql<number>`count(*)::int`,
+    })
+    .from(schema.mediaAssetTags)
+    .groupBy(schema.mediaAssetTags.tagId);
+  const userCounts = new Map<string, number>();
+  const globalCounts = new Map<string, number>();
+  for (const row of rows) {
+    if (row.mine > 0) userCounts.set(row.tagId, row.mine);
+    globalCounts.set(row.tagId, row.total);
+  }
+  return { userCounts, globalCounts };
+}
+
+/** Selectable tags (with slugs) plus the few to show as chips, ranked by this user's usage. */
+export async function listTagFilterOptions(userId: string) {
+  const [tags, usage] = await Promise.all([listAvailableTags(userId), listTagUsage(userId)]);
+  const availableTags = tags.map(serializeTagOption);
+  return { availableTags, topTagIds: rankTopTagIds(availableTags, usage) };
 }
 
 /** Resolve selectable tags for a user (system + their custom). Invalid ids are ignored. */
