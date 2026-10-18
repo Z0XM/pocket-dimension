@@ -136,3 +136,5 @@ export {
   type CreatedApiToken,
   type ValidatedApiToken,
 } from "./lib/api-tokens";
+
+export { logServerErrors } from "./lib/server-error-log";

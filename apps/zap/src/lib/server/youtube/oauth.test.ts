@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, mock } from "bun:test";
+import { afterEach, describe, expect, test, mock, spyOn } from "bun:test";
 import { buildYouTubeOAuthUrl, isGoogleOAuthConfigured, tryRefreshYouTubeAccessToken, youtubeRedirectUri } from "./oauth";
 
 const originalFetch = globalThis.fetch;
@@ -36,7 +36,12 @@ describe("youtube oauth helpers", () => {
     Bun.env.GOOGLE_CLIENT_ID = "cid";
     Bun.env.GOOGLE_CLIENT_SECRET = "csecret";
     globalThis.fetch = mock(async () => new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 })) as unknown as typeof fetch;
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
     const result = await tryRefreshYouTubeAccessToken("stale");
     expect(result).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[1]).toEqual({ status: 400, error: "invalid_grant", description: undefined });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("stale");
+    warn.mockRestore();
   });
 });

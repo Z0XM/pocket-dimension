@@ -52,7 +52,8 @@ export async function getYouTubeAccessTokenForUser(userId: string) {
       .where(eq(schema.youtubeAccountLinks.userId, userId));
 
     return refreshed.accessToken;
-  } catch {
+  } catch (err) {
+    console.error("[zeo youtube] access token lookup failed", { userId }, err);
     return null;
   }
 }
@@ -171,8 +172,16 @@ async function youtubeFetch<T>(path: string, params: Record<string, string>, aut
   }
 
   const response = await fetch(url, { headers });
-  const body = (await response.json().catch(() => ({}))) as T & { error?: { message?: string } };
+  const body = (await response.json().catch(() => ({}))) as T & {
+    error?: { message?: string; errors?: Array<{ reason?: string }> };
+  };
   if (!response.ok) {
+    console.error("[zeo youtube] Data API request failed", {
+      path,
+      status: response.status,
+      reason: body.error?.errors?.[0]?.reason,
+      message: body.error?.message,
+    });
     throw error(response.status, body.error?.message ?? "YouTube Data API request failed");
   }
   return body;
