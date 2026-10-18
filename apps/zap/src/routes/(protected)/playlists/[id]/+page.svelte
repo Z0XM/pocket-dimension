@@ -1,7 +1,9 @@
 <script lang="ts">
   import BusyStatus from "$lib/components/BusyStatus.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
+  import TagQueryEditor from "$lib/components/TagQueryEditor.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
+  import { effectiveTagQuery, tagFilterKey, tagQueryProblem } from "$lib/tag-filter";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -10,7 +12,8 @@
   let busy = $state(false);
   let busyLabel = $state("Working…");
   let error = $state<string | null>(null);
-  let buildTagIds = $state<string[]>([]);
+  let editTagQuery = $state("");
+  let editTagIds = $state<string[]>([]);
   let collabQuery = $state("");
   let loadMsg = $state<string | null>(null);
 
@@ -18,9 +21,24 @@
     playlist = data.playlist;
   });
 
+  const savedTagQuery = $derived(playlist.tagQuery ?? "");
+
+  $effect(() => {
+    editTagQuery = savedTagQuery;
+    editTagIds = [];
+  });
+
+  const editProblem = $derived(tagQueryProblem(editTagQuery, data.availableTags));
+  const editEffective = $derived(effectiveTagQuery({ tagQuery: editTagQuery, tagIds: editTagIds }, data.availableTags));
+  const editUnchanged = $derived(
+    Boolean(playlist.tagQuery) &&
+      tagFilterKey({ tagQuery: editEffective }, data.availableTags) === tagFilterKey({ tagQuery: playlist.tagQuery }, data.availableTags)
+  );
+
   async function action(act: string, extra: Record<string, unknown> = {}) {
     busy = true;
-    busyLabel = act === "buildFromTags" ? "Rebuilding from tags…" : act === "addCollaborator" ? "Inviting collaborator…" : "Updating playlist…";
+    busyLabel =
+      act === "setTagQuery" && extra.tagQuery ? "Rebuilding from tags…" : act === "addCollaborator" ? "Inviting collaborator…" : "Updating playlist…";
     error = null;
     try {
       const res = await fetch(`/api/playlists/${playlist.id}`, {
@@ -97,6 +115,9 @@
       </p>
       <h1 class="mt-1 text-3xl font-semibold tracking-tight">{playlist.name}</h1>
       <p class="font-mono text-[10px] text-muted-foreground uppercase">{playlist.visibility} · {playlist.trackCount} tracks</p>
+      {#if playlist.tagQuery && !playlist.canEdit}
+        <p class="mt-1 font-mono text-[10px] text-muted-foreground">tags: <span class="text-signal">{playlist.tagQuery}</span></p>
+      {/if}
     </div>
     <div class="flex flex-wrap gap-2">
       {#if data.primaryLive}
@@ -136,30 +157,42 @@
 
   {#if playlist.canEdit}
     <div class="space-y-3 rounded-lg border border-border/70 bg-card/40 p-4">
-      <p class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Build from tags (AND)</p>
-      <div class="flex flex-wrap gap-2">
-        {#each data.availableTags as tag}
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <p class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Build from tags</p>
+        {#if playlist.tagQuery}
+          <p class="font-mono text-[10px] text-muted-foreground">saved: <span class="text-signal">{playlist.tagQuery}</span></p>
+        {/if}
+      </div>
+      <TagQueryEditor
+        compact
+        bind:tagQuery={editTagQuery}
+        bind:selectedTagIds={editTagIds}
+        availableTags={data.availableTags}
+        topTagIds={data.topTagIds}
+        tagQueryError={editProblem}
+      />
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-40"
+          disabled={busy || !editEffective || Boolean(editProblem)}
+          onclick={() => void action("setTagQuery", { tagQuery: editEffective })}
+        >
+          {editUnchanged ? "Rebuild from tags" : "Save & rebuild"}
+        </button>
+        {#if playlist.tagQuery}
           <button
             type="button"
-            class={`rounded-full border px-2 py-0.5 font-mono text-[10px] ${
-              buildTagIds.includes(tag.id) ? "border-signal text-signal" : "border-border text-muted-foreground"
-            }`}
-            onclick={() => {
-              buildTagIds = buildTagIds.includes(tag.id) ? buildTagIds.filter((t) => t !== tag.id) : [...buildTagIds, tag.id];
-            }}
+            class="rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:text-signal disabled:opacity-40"
+            disabled={busy}
+            title="Keep current tracks, stop treating this as a tag playlist"
+            onclick={() => void action("setTagQuery", { tagQuery: null })}
           >
-            {tag.name}
+            Clear tag query
           </button>
-        {/each}
+        {/if}
+        <span class="font-mono text-[10px] text-muted-foreground">Uses your tags; excluded tracks stay out.</span>
       </div>
-      <button
-        type="button"
-        class="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-40"
-        disabled={busy || buildTagIds.length === 0}
-        onclick={() => void action("buildFromTags", { tagIds: buildTagIds })}
-      >
-        Rebuild from tags
-      </button>
 
       <div class="border-t border-border/50 pt-3">
         <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Add collaborator</p>
@@ -191,7 +224,10 @@
     {#if busy && playlist.items.length === 0 && busyLabel.startsWith("Rebuild")}
       <TrackListSkeleton rows={4} compact />
     {:else if playlist.items.length === 0}
-      <p class="text-sm text-muted-foreground">Empty — build from tags above.</p>
+      <p class="text-sm text-muted-foreground">
+        Empty{#if playlist.canEdit}
+          — build from tags above{/if}.
+      </p>
     {:else}
       <ListBusyOverlay {busy} label={busyLabel}>
         <ul class="max-h-[28rem] min-h-[6rem] space-y-1 overflow-y-auto rounded-lg border border-border/70 bg-card/30 p-2">

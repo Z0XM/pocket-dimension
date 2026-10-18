@@ -373,6 +373,8 @@ export const playlists = zapSchema.table(
       .references(() => auth.user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description"),
+    /** Tag-query DSL (`lofi and not sad`) the playlist is built from; null for hand-picked playlists. */
+    tagQuery: text("tag_query"),
     visibility: playlistVisibility("visibility").default("private").notNull(),
     createdAt: timestamps.createdAt,
     updatedAt: timestamp("updated_at")

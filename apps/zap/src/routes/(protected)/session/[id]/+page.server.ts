@@ -1,7 +1,7 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { SessionError, getSessionForUser } from "$lib/server/sessions";
-import { listAvailableTags, listCatalogue, serializeCatalogueAsset, CATALOGUE_PAGE_SIZE } from "$lib/server/catalogue";
+import { listCatalogue, listTagFilterOptions, serializeCatalogueAsset, CATALOGUE_PAGE_SIZE } from "$lib/server/catalogue";
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
   if (!locals.user) throw redirect(307, `/login?redirect=${encodeURIComponent(url.pathname)}`);
@@ -14,7 +14,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
     const selectedTagIds = url.searchParams.getAll("tag").filter(Boolean);
     const tagQuery = url.searchParams.get("tq") ?? "";
 
-    const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, availableTags, playlists] = await Promise.all([
+    const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, tagOptions, playlists] = await Promise.all([
       listCatalogue({
         userId: locals.user.id,
         scope,
@@ -24,7 +24,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
         limit: CATALOGUE_PAGE_SIZE,
         offset: 0,
       }),
-      listAvailableTags(locals.user.id),
+      listTagFilterOptions(locals.user.id),
       import("$lib/server/playlists").then((m) => m.listPlaylistsForUser(locals.user!.id)),
     ]);
 
@@ -34,7 +34,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
       catalogueHasMore: hasMore,
       catalogueNextOffset: nextOffset,
       cataloguePageSize: CATALOGUE_PAGE_SIZE,
-      availableTags,
+      availableTags: tagOptions.availableTags,
+      topTagIds: tagOptions.topTagIds,
       catalogueQ: q,
       catalogueScope: scope,
       selectedTagIds,

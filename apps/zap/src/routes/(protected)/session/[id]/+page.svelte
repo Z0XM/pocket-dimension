@@ -494,6 +494,7 @@
             bind:tagQuery
             bind:selectedTagIds
             availableTags={data.availableTags}
+            topTagIds={data.topTagIds}
             {tagQueryError}
             busy={catalogueLoading}
             onchange={() => void fetchCatalogue({ reset: true })}
