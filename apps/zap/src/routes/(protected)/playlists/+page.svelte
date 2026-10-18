@@ -1,6 +1,8 @@
 <script lang="ts">
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import TagQueryEditor from "$lib/components/TagQueryEditor.svelte";
   import { effectiveTagQuery, tagQueryProblem } from "$lib/tag-filter";
   import type { PageData } from "./$types";
@@ -16,6 +18,10 @@
   let newTagQuery = $state("");
   let newTagIds = $state<string[]>([]);
   let mergeIds = $state<string[]>([]);
+  let deleteTarget = $state<{ id: string; name: string; trackCount: number } | null>(null);
+  let deleteOpen = $state(false);
+  let deleting = $state(false);
+  let deletedMessage = $state<string | null>(null);
 
   const newTagQueryProblem = $derived(newTagsOpen ? tagQueryProblem(newTagQuery, data.availableTags) : null);
   const newEffectiveTagQuery = $derived(newTagsOpen ? effectiveTagQuery({ tagQuery: newTagQuery, tagIds: newTagIds }, data.availableTags) : "");
@@ -57,6 +63,33 @@
 
   function toggleMerge(id: string) {
     mergeIds = mergeIds.includes(id) ? mergeIds.filter((x) => x !== id) : [...mergeIds, id];
+  }
+
+  function askDelete(pl: { id: string; name: string; trackCount: number }) {
+    deleteTarget = pl;
+    deletedMessage = null;
+    deleteOpen = true;
+  }
+
+  async function confirmDelete() {
+    const target = deleteTarget;
+    if (!target) return;
+    deleting = true;
+    error = null;
+    try {
+      const res = await fetch(`/api/playlists/${target.id}`, { method: "DELETE", credentials: "same-origin" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 404) throw new Error(body?.message ?? "Delete failed");
+      playlists = playlists.filter((p) => p.id !== target.id);
+      mergeIds = mergeIds.filter((id) => id !== target.id);
+      deletedMessage = `Deleted “${target.name}”.`;
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Delete failed";
+    } finally {
+      deleting = false;
+      deleteOpen = false;
+      deleteTarget = null;
+    }
   }
 
   async function mergeSelected() {
@@ -154,6 +187,9 @@
   {#if error}
     <p class="auth-error">{error}</p>
   {/if}
+  {#if deletedMessage}
+    <p class="text-sm text-signal">{deletedMessage}</p>
+  {/if}
 
   <div class="space-y-2">
     <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Zap playlists</h2>
@@ -181,6 +217,18 @@
                 <span class="mt-0.5 block truncate font-mono text-[10px] text-signal/80" title={pl.tagQuery}>tags: {pl.tagQuery}</span>
               {/if}
             </a>
+            {#if pl.canDelete}
+              <button
+                type="button"
+                class="inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                aria-label={`Delete ${pl.name}`}
+                title="Delete playlist"
+                disabled={busy || deleting}
+                onclick={() => askDelete(pl)}
+              >
+                <Trash2Icon class="size-3.5" aria-hidden="true" />
+              </button>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -228,3 +276,15 @@
     {/if}
   </div>
 </section>
+
+<ConfirmDialog
+  bind:open={deleteOpen}
+  title="Delete playlist?"
+  body={deleteTarget
+    ? `“${deleteTarget.name}” (${deleteTarget.trackCount} track${deleteTarget.trackCount === 1 ? "" : "s"}) will be deleted for you and any collaborators. The tracks stay in the catalogue and in your queue.`
+    : ""}
+  confirmLabel="Delete playlist"
+  danger
+  busy={deleting}
+  onconfirm={confirmDelete}
+/>
