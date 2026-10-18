@@ -18,8 +18,10 @@ export const sessionSinkType = zapSchema.enum("session_sink_type", ["web", "disc
 export const sessionSinkStatus = zapSchema.enum("session_sink_status", ["pending", "active", "error", "detached"]);
 export const playlistVisibility = zapSchema.enum("playlist_visibility", ["private", "public"]);
 export const playlistMemberRole = zapSchema.enum("playlist_member_role", ["owner", "collaborator"]);
+/** `default` follows the portal access mode (`open` → allowed, `allowlist` → pending). */
+export const userAccessStatus = zapSchema.enum("user_access_status", ["default", "allowed", "blocked"]);
 
-/** Global Zap catalogue — never deleted by app logic. */
+/** Global Zap catalogue — only a Zap admin delete removes rows (and their R2 object). */
 export const mediaAssets = zapSchema.table(
   "media_assets",
   {
@@ -438,3 +440,38 @@ export const playlistMembers = zapSchema.table(
     index("playlist_members_user_id_idx").on(table.userId),
   ]
 );
+
+/**
+ * Zap-scoped admin flag + portal access per account (auth stays in `auth.user`).
+ * A row is created on first Zap visit to track first/last seen; admins edit it from /admin/users.
+ */
+export const userAccess = zapSchema.table(
+  "user_access",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    isAdmin: boolean("is_admin").default(false).notNull(),
+    status: userAccessStatus("status").default("default").notNull(),
+    firstSeenAt: timestamp("first_seen_at"),
+    lastSeenAt: timestamp("last_seen_at"),
+    updatedByUserId: uuid("updated_by_user_id").references(() => auth.user.id, { onDelete: "set null" }),
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamp("updated_at")
+      .$default(() => sql`now()`)
+      .$onUpdate(() => sql`now()`)
+      .notNull(),
+  },
+  (table) => [index("user_access_last_seen_at_idx").on(table.lastSeenAt), index("user_access_status_idx").on(table.status)]
+);
+
+/** Runtime Zap settings editable by admins (e.g. `access_mode` = `open` | `allowlist`). Distinct export name from other apps. */
+export const zapSettings = zapSchema.table("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedByUserId: uuid("updated_by_user_id").references(() => auth.user.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at")
+    .$default(() => sql`now()`)
+    .$onUpdate(() => sql`now()`)
+    .notNull(),
+});
