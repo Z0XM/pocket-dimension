@@ -5,7 +5,7 @@ import { summarizeIngestItems } from "./errors";
 import { DURATION_CAP_MESSAGE, isOverDurationCap } from "./limits";
 import type { SongProgress } from "./progress";
 import { parseMediaUrl } from "./url-parse";
-import { cleanupWorkDir, downloadBestAudio, listPlaylistEntries, probeUrl, resolveYtDlpBin } from "./ytdlp";
+import { cleanupWorkDir, downloadBestAudio, getYtDlpCookiesSource, listPlaylistEntries, probeUrl, resolveYtDlpBin, YtDlpError } from "./ytdlp";
 
 export type IngestItemResult =
   | { status: "imported"; mediaAssetId: string; identityKey: string; title: string }
@@ -147,10 +147,12 @@ export async function ingestCatalogueVideo(opts: {
   }
 
   if (!(await resolveYtDlpBin())) {
+    console.error("[zap ingest] failed", { identityKey, reason: "yt-dlp is not installed" });
     await emit("failed", 0);
     return { status: "failed", reason: "yt-dlp is not installed", identityKey, title: opts.titleHint };
   }
   if (!isStorageConfigured()) {
+    console.error("[zap ingest] failed", { identityKey, reason: "Object storage is not configured" });
     await emit("failed", 0);
     return { status: "failed", reason: "Object storage is not configured", identityKey, title: opts.titleHint };
   }
@@ -169,6 +171,7 @@ export async function ingestCatalogueVideo(opts: {
       await emit("done", 100, asset.title);
       return { status: "reused", mediaAssetId: asset.id, identityKey, title: asset.title };
     }
+    console.error("[zap ingest] failed", { identityKey, reason: "Concurrent fetch did not finish" });
     await emit("failed", 0);
     return { status: "failed", reason: "Concurrent fetch did not finish", identityKey, title: opts.titleHint };
   }
@@ -274,6 +277,13 @@ export async function ingestCatalogueVideo(opts: {
       await emit("skipped", 100);
       return { status: "skipped", reason: message, identityKey, title: opts.titleHint };
     }
+    console.error("[zap ingest] failed", {
+      identityKey,
+      url,
+      reason: message,
+      cookies: getYtDlpCookiesSource(),
+      ...(err instanceof YtDlpError ? { ytdlp: err.detail } : { error: err }),
+    });
     await emit("failed", 0);
     return { status: "failed", reason: message, identityKey, title: opts.titleHint };
   } finally {
@@ -374,6 +384,7 @@ export async function ingestPublicUrl(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed";
+    console.error("[zap ingest] sync run failed", { syncRunId: run.id, sourceUrl: parsed.canonicalUrl }, err);
     const summary = summarizeIngestItems(items);
     await db
       .update(schema.syncRuns)
