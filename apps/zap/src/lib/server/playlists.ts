@@ -2,6 +2,7 @@ import { db, schema } from "@pocket-dimension/db";
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { dedupeIds } from "$lib/catalog-queue";
 import { evaluateUserTagQuery } from "$lib/server/catalogue";
+import { playlistDeleteAccess } from "$lib/playlist-permissions";
 import { userCanEditPlaylist, userCanViewPlaylist } from "$lib/server/playlist-access";
 import { SessionError, enqueueCatalogueTrack } from "$lib/server/sessions";
 import type { SessionSnapshot } from "$lib/server/sessions/types";
@@ -29,6 +30,8 @@ export type PlaylistSummary = {
   ownerUserId: string;
   trackCount: number;
   canEdit: boolean;
+  /** Owner-only: delete, visibility, and membership changes. */
+  canDelete: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -172,6 +175,7 @@ export async function createPlaylist(opts: {
     ownerUserId: row.ownerUserId,
     trackCount,
     canEdit: true,
+    canDelete: true,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -215,6 +219,7 @@ export async function listPlaylistsForUser(userId: string): Promise<PlaylistSumm
     ownerUserId: p.ownerUserId,
     trackCount: countBy.get(p.id) ?? 0,
     canEdit: p.ownerUserId === userId || collabIds.includes(p.id),
+    canDelete: p.ownerUserId === userId,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   }));
@@ -267,6 +272,7 @@ export async function getPlaylistDetail(playlistId: string, userId: string): Pro
     ownerUserId: playlist.ownerUserId,
     trackCount: items.length,
     canEdit,
+    canDelete: playlist.ownerUserId === userId,
     createdAt: playlist.createdAt.toISOString(),
     updatedAt: playlist.updatedAt.toISOString(),
     items: items.map((i) => {
@@ -318,11 +324,27 @@ export async function updatePlaylist(
   return getPlaylistDetail(playlistId, userId);
 }
 
+/**
+ * Delete a playlist with its items, exclusions and memberships. Catalogue queues hold media ids, not playlist
+ * ids, so queues filled from (or saved as) this playlist keep playing.
+ */
 export async function deletePlaylist(playlistId: string, userId: string): Promise<void> {
-  const playlist = await db.query.playlists.findFirst({ where: eq(schema.playlists.id, playlistId) });
-  if (!playlist) throw new PlaylistError("Playlist not found", 404);
-  if (playlist.ownerUserId !== userId) throw new PlaylistError("Only the owner can delete", 403);
-  await db.delete(schema.playlists).where(eq(schema.playlists.id, playlistId));
+  await db.transaction(async (tx) => {
+    const [playlist] = await tx.select().from(schema.playlists).where(eq(schema.playlists.id, playlistId)).for("update");
+    const member = playlist
+      ? await tx.query.playlistMembers.findFirst({
+          where: and(eq(schema.playlistMembers.playlistId, playlistId), eq(schema.playlistMembers.userId, userId)),
+        })
+      : undefined;
+    const access = playlistDeleteAccess(playlist, userId, Boolean(member));
+    if (access === "not_found") throw new PlaylistError("Playlist not found", 404);
+    if (access === "forbidden") throw new PlaylistError("Only the owner can delete this playlist", 403);
+
+    await tx.delete(schema.playlistItems).where(eq(schema.playlistItems.playlistId, playlistId));
+    await tx.delete(schema.playlistExclusions).where(eq(schema.playlistExclusions.playlistId, playlistId));
+    await tx.delete(schema.playlistMembers).where(eq(schema.playlistMembers.playlistId, playlistId));
+    await tx.delete(schema.playlists).where(eq(schema.playlists.id, playlistId));
+  });
 }
 
 export async function addPlaylistTrack(playlistId: string, userId: string, mediaAssetId: string): Promise<PlaylistDetail> {
