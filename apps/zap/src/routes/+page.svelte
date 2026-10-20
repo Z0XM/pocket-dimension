@@ -1,6 +1,5 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
   import type { LayoutData } from "./$types";
   import { onMount } from "svelte";
@@ -29,7 +28,12 @@
         {:else}
           <a href="/check-email?reason=verify" class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground">Verify email</a>
         {/if}
-        <StartSessionButton class="rounded border border-border px-5 py-2.5 text-sm text-muted-foreground hover:bg-secondary/40" />
+        <a
+          href="/session?stay=1"
+          class="rounded border border-border px-5 py-2.5 text-sm text-muted-foreground hover:bg-secondary/40"
+        >
+          Go to sessions
+        </a>
         <a href="/join" class="rounded border border-border bg-secondary/60 px-5 py-2.5 text-sm text-secondary-foreground hover:bg-secondary">
           Join
         </a>
@@ -45,7 +49,7 @@
     </div>
     {#if data.user}
       <p class="mt-6 max-w-lg font-mono text-[11px] leading-relaxed text-muted-foreground">
-        Home = resume/start · Catalogue = find & tag · Add = ingest · Playlists = Zap lists · Session = play with guests.
+        Home = hub · Sessions = start/resume/join · Catalogue = find & tag · Playlists = Zap lists.
       </p>
     {/if}
   </div>

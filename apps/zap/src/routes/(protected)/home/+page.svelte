@@ -1,5 +1,4 @@
 <script lang="ts">
-  import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
   import type { PageData } from "./$types";
 
@@ -10,7 +9,7 @@
   <div>
     <p class="font-mono text-xs tracking-[0.35em] text-signal/80 uppercase">Zap</p>
     <h1 class="mt-2 text-4xl font-semibold tracking-tight md:text-5xl">Home</h1>
-    <p class="mt-2 max-w-lg text-sm text-muted-foreground">Resume a live room, start as host, or join with a code.</p>
+    <p class="mt-2 max-w-lg text-sm text-muted-foreground">Open sessions to start or resume a room, or join with a code.</p>
     <div class="mt-4">
       <WaveBars />
     </div>
@@ -37,17 +36,12 @@
   {/if}
 
   <div class="flex flex-wrap gap-3">
-    {#if data.canStart}
-      <StartSessionButton
-        allowStart={true}
-        label={data.primaryLive?.role === "host" ? "Resume session" : "Start session"}
-        class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
-      />
-    {:else}
-      <p class="rounded border border-border/70 bg-card/40 px-4 py-2.5 font-mono text-xs text-muted-foreground">
-        You’re in as guest — resume above or join another code. Hosts start sessions.
-      </p>
-    {/if}
+    <a
+      href="/session?stay=1"
+      class="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+    >
+      Go to sessions
+    </a>
     <a href="/join" class="rounded border border-border bg-secondary/60 px-5 py-2.5 text-sm text-secondary-foreground hover:bg-secondary"> Join </a>
     <a href="/catalogue" class="rounded border border-border px-5 py-2.5 text-sm text-muted-foreground hover:bg-secondary/40"> Catalogue </a>
     {#if data.isAdmin}

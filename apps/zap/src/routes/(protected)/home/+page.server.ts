@@ -3,7 +3,6 @@ import { isZapAdmin } from "$lib/server/admin/access";
 import { listPlayHistory } from "$lib/server/play-history";
 import { listPlaylistsForUser } from "$lib/server/playlists";
 import { listLiveSessionsForUser } from "$lib/server/sessions";
-import { canStartSession, primaryLiveSession } from "$lib/server/session-start";
 
 const HOME_PLAYLIST_LIMIT = 5;
 
@@ -21,8 +20,6 @@ export const load: PageServerLoad = async ({ locals }) => {
     playHistory,
     playlists: recentPlaylists,
     playlistCount: playlists.length,
-    canStart: canStartSession(liveSessions),
-    primaryLive: primaryLiveSession(liveSessions),
     isAdmin: isZapAdmin(locals),
   };
 };
