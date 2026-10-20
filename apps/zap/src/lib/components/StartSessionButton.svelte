@@ -10,12 +10,15 @@
     showPerpetualOption = false,
     /** Optional name field when creating a new session. */
     showNameOption = false,
+    /** Skip Resume — only create (sessions index start panel). */
+    createOnly = false,
   }: {
     label?: string;
     class?: string;
     allowStart?: boolean;
     showPerpetualOption?: boolean;
     showNameOption?: boolean;
+    createOnly?: boolean;
   } = $props();
 
   let busy = $state(false);
@@ -105,51 +108,80 @@
   }
 </script>
 
-<span class="inline-flex flex-col items-start gap-1">
-  <span class="inline-flex flex-wrap items-center gap-2">
-    {#if liveId}
-      <button type="button" class={className} disabled={busy || !checked} onclick={() => void goResume()}>
-        {busy ? "…" : liveRole === "guest" ? "Resume (guest)" : label.includes("Resume") ? label : "Resume session"}
-      </button>
-      {#if canStart}
-        <button
-          type="button"
-          class="rounded border border-border px-2 py-1.5 font-mono text-[10px] text-muted-foreground hover:bg-secondary/60"
-          disabled={busy}
-          onclick={() => void start(true)}
-        >
-          New session
+<span class="inline-flex w-full flex-col items-start gap-2">
+  {#if createOnly}
+    {#if canStart}
+      <span class="flex w-full flex-wrap items-end gap-3">
+        {#if showNameOption}
+          <label class="flex min-w-[10rem] flex-1 flex-col gap-1 font-mono text-[10px] text-muted-foreground">
+            <span>Name (optional)</span>
+            <input
+              class="rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+              type="text"
+              maxlength={80}
+              placeholder="Session…"
+              bind:value={sessionName}
+              disabled={busy}
+            />
+          </label>
+        {/if}
+        <button type="button" class={className} disabled={busy || !checked} onclick={() => void start(true)}>
+          {busy ? "Starting…" : label}
         </button>
+      </span>
+      {#if showPerpetualOption}
+        <label class="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+          <input class="zap-checkbox" type="checkbox" bind:checked={perpetual} disabled={busy} />
+          Perpetual (persists when idle)
+        </label>
       {/if}
-    {:else if canStart}
-      <button type="button" class={className} disabled={busy || !checked} onclick={() => void start(true)}>
-        {busy ? "Starting…" : label}
-      </button>
-    {:else}
-      <a href="/join" class={className}>Join</a>
     {/if}
-  </span>
-  {#if liveId && liveTitle}
-    <span class="max-w-xs font-mono text-[10px] text-muted-foreground">Left at: {liveTitle}</span>
-  {/if}
-  {#if showNameOption && canStart}
-    <label class="flex w-full max-w-xs flex-col gap-1 font-mono text-[10px] text-muted-foreground">
-      <span>Name (optional)</span>
-      <input
-        class="rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
-        type="text"
-        maxlength={80}
-        placeholder="Session…"
-        bind:value={sessionName}
-        disabled={busy}
-      />
-    </label>
-  {/if}
-  {#if showPerpetualOption && canStart}
-    <label class="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
-      <input class="zap-checkbox" type="checkbox" bind:checked={perpetual} disabled={busy} />
-      Perpetual (persists when idle)
-    </label>
+  {:else}
+    <span class="inline-flex flex-wrap items-center gap-2">
+      {#if liveId}
+        <button type="button" class={className} disabled={busy || !checked} onclick={() => void goResume()}>
+          {busy ? "…" : liveRole === "guest" ? "Resume (guest)" : label.includes("Resume") ? label : "Resume session"}
+        </button>
+        {#if canStart}
+          <button
+            type="button"
+            class="rounded border border-border px-2 py-1.5 font-mono text-[10px] text-muted-foreground hover:bg-secondary/60"
+            disabled={busy}
+            onclick={() => void start(true)}
+          >
+            New session
+          </button>
+        {/if}
+      {:else if canStart}
+        <button type="button" class={className} disabled={busy || !checked} onclick={() => void start(true)}>
+          {busy ? "Starting…" : label}
+        </button>
+      {:else}
+        <a href="/join" class={className}>Join</a>
+      {/if}
+    </span>
+    {#if liveId && liveTitle}
+      <span class="max-w-xs font-mono text-[10px] text-muted-foreground">Left at: {liveTitle}</span>
+    {/if}
+    {#if showNameOption && canStart}
+      <label class="flex w-full max-w-xs flex-col gap-1 font-mono text-[10px] text-muted-foreground">
+        <span>Name (optional)</span>
+        <input
+          class="rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
+          type="text"
+          maxlength={80}
+          placeholder="Session…"
+          bind:value={sessionName}
+          disabled={busy}
+        />
+      </label>
+    {/if}
+    {#if showPerpetualOption && canStart}
+      <label class="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+        <input class="zap-checkbox" type="checkbox" bind:checked={perpetual} disabled={busy} />
+        Perpetual (persists when idle)
+      </label>
+    {/if}
   {/if}
   {#if busy}
     <BusyStatus label="Starting session…" />

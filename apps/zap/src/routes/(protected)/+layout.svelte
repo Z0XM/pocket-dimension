@@ -3,7 +3,6 @@
   import { CatalogQueueClient, setCatalogQueue } from "$lib/catalog-queue-client.svelte";
   import CatalogQueueDock from "$lib/components/CatalogQueueDock.svelte";
   import PageSkeleton from "$lib/components/PageSkeleton.svelte";
-  import StartSessionButton from "$lib/components/StartSessionButton.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
   import type { LayoutData } from "../$types";
   import { navigating, page } from "$app/state";
@@ -21,7 +20,6 @@
   const catalogueActive = $derived(path === "/catalogue" || path.startsWith("/catalogue/"));
   const playlistsActive = $derived(path === "/playlists" || path.startsWith("/playlists/"));
   const historyActive = $derived(path === "/history" || path.startsWith("/history/"));
-  const joinActive = $derived(path === "/join" || path.startsWith("/join/"));
   const sessionActive = $derived(path === "/session" || path.startsWith("/session/"));
   const adminActive = $derived(path === "/admin" || path.startsWith("/admin/"));
 
@@ -80,15 +78,11 @@
           class={`zap-nav-link ${playlistsActive ? "zap-nav-link-active" : ""}`}
           aria-current={playlistsActive ? "page" : undefined}>Playlists</a
         >
-        <a href="/join" class={`zap-nav-link ${joinActive ? "zap-nav-link-active" : ""}`} aria-current={joinActive ? "page" : undefined}>Join</a>
-        <StartSessionButton
-          label="Session"
-          class={`text-[11px] disabled:opacity-40 ${
-            sessionActive
-              ? "zap-nav-link zap-nav-link-active"
-              : "rounded border border-signal/40 bg-signal/10 px-2 py-1 text-signal hover:bg-signal/20"
-          }`}
-        />
+        <a
+          href="/session?stay=1"
+          class={`zap-nav-link ${sessionActive ? "zap-nav-link-active" : ""}`}
+          aria-current={sessionActive ? "page" : undefined}>Sessions</a
+        >
         <span class="mx-1 hidden text-border sm:inline" aria-hidden="true">|</span>
         <a href="/history" class={`zap-nav-link ${historyActive ? "zap-nav-link-active" : ""}`} aria-current={historyActive ? "page" : undefined}
           >History</a
