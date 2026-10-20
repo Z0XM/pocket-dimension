@@ -1,6 +1,7 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
-import { dedupeIds } from "$lib/catalog-queue";
+import { dedupeIds, isPermutation } from "$lib/catalog-queue";
+import { parsePlaylistTrackSort, sortPlaylistTracks, type PlaylistTrackSort } from "$lib/playlist-sort";
 import { evaluateUserTagQuery } from "$lib/server/catalogue";
 import { playlistDeleteAccess } from "$lib/playlist-permissions";
 import { userCanEditPlaylist, userCanViewPlaylist } from "$lib/server/playlist-access";
@@ -45,6 +46,8 @@ export type PlaylistDetail = PlaylistSummary & {
     artists: string | null;
     durationMs: number | null;
     playable: boolean;
+    /** When the track was added to this playlist (ISO). */
+    addedAt: string;
   }[];
   exclusions: { mediaAssetId: string; title: string }[];
   collaborators: { userId: string; role: "owner" | "collaborator"; displayName: string }[];
@@ -285,6 +288,7 @@ export async function getPlaylistDetail(playlistId: string, userId: string): Pro
         artists: a?.artists ?? null,
         durationMs: a?.durationMs ?? null,
         playable: Boolean(a?.storageKey && a.status === "ready"),
+        addedAt: i.createdAt.toISOString(),
       };
     }),
     exclusions: exclusions.map((e) => ({
@@ -400,6 +404,71 @@ async function deletePlaylistItem(playlistId: string, mediaAssetId: string) {
 export async function removePlaylistTrack(playlistId: string, userId: string, mediaAssetId: string): Promise<PlaylistDetail> {
   if (!(await userCanEdit(playlistId, userId))) throw new PlaylistError("Not allowed", 403);
   await deletePlaylistItem(playlistId, mediaAssetId);
+  await db
+    .update(schema.playlists)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(schema.playlists.id, playlistId));
+  return getPlaylistDetail(playlistId, userId);
+}
+
+/**
+ * Rewrite playlist item positions to 0..n-1 in `itemIds` order.
+ * Two-phase (high offset, then final) so the (playlist_id, position) unique index never clashes mid-update.
+ */
+async function writePlaylistItemOrder(itemIds: string[]) {
+  if (itemIds.length === 0) return;
+  const offset = 2_000_000;
+  for (let i = 0; i < itemIds.length; i++) {
+    await db.update(schema.playlistItems).set({ position: offset + i }).where(eq(schema.playlistItems.id, itemIds[i]!));
+  }
+  for (let i = 0; i < itemIds.length; i++) {
+    await db.update(schema.playlistItems).set({ position: i }).where(eq(schema.playlistItems.id, itemIds[i]!));
+  }
+}
+
+/**
+ * DnD reorder — `orderedItemIds` must be a permutation of current playlist item row ids.
+ * Allowed for freehand and tag-query playlists; tag rebuild later may overwrite order.
+ */
+export async function reorderPlaylistTracks(playlistId: string, userId: string, orderedItemIds: string[]): Promise<PlaylistDetail> {
+  if (!(await userCanEdit(playlistId, userId))) throw new PlaylistError("Not allowed", 403);
+  const items = await db.query.playlistItems.findMany({
+    where: eq(schema.playlistItems.playlistId, playlistId),
+    orderBy: [asc(schema.playlistItems.position)],
+  });
+  const currentIds = items.map((i) => i.id);
+  if (!isPermutation(currentIds, orderedItemIds)) {
+    throw new PlaylistError("Playlist changed — refresh and try again", 409);
+  }
+  await writePlaylistItemOrder(orderedItemIds);
+  await db
+    .update(schema.playlists)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(schema.playlists.id, playlistId));
+  return getPlaylistDetail(playlistId, userId);
+}
+
+/**
+ * Sort playlist tracks and persist the new positions.
+ * For tag-query playlists the order sticks until the next rebuild (which replaces items in title order).
+ */
+export async function sortPlaylistTracksPersisted(
+  playlistId: string,
+  userId: string,
+  sort: PlaylistTrackSort | string
+): Promise<PlaylistDetail> {
+  if (!(await userCanEdit(playlistId, userId))) throw new PlaylistError("Not allowed", 403);
+  const mode = typeof sort === "string" ? parsePlaylistTrackSort(sort) : sort;
+  if (!mode) throw new PlaylistError("Unknown sort");
+
+  const detail = await getPlaylistDetail(playlistId, userId);
+  if (detail.items.length === 0) return detail;
+
+  const ordered = sortPlaylistTracks(
+    detail.items.map((i) => ({ id: i.id, title: i.title, artists: i.artists, addedAt: i.addedAt })),
+    mode
+  );
+  await writePlaylistItemOrder(ordered.map((i) => i.id));
   await db
     .update(schema.playlists)
     .set({ updatedAt: sql`now()` })

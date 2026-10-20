@@ -1,11 +1,14 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
   import TagQueryEditor from "$lib/components/TagQueryEditor.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
+  import { moveItem } from "$lib/catalog-queue";
   import { getCatalogQueue } from "$lib/catalog-queue-client.svelte";
+  import { PLAYLIST_TRACK_SORT_OPTIONS, type PlaylistTrackSort } from "$lib/playlist-sort";
   import { effectiveTagQuery, tagFilterKey, tagQueryProblem } from "$lib/tag-filter";
   import type { PageData } from "./$types";
 
@@ -21,9 +24,14 @@
   let loadMsg = $state<string | null>(null);
   let deleteOpen = $state(false);
   let deleting = $state(false);
+  let sortBusy = $state(false);
+  let dragFrom = $state<number | null>(null);
+  let dragOver = $state<number | null>(null);
+  let listEl = $state<HTMLUListElement | null>(null);
 
   const queue = getCatalogQueue();
   const hasPlayable = $derived(playlist.items.some((i) => i.playable));
+  const canReorder = $derived(playlist.canEdit);
 
   async function queuePlaylist(mode: "replace" | "last") {
     if (!queue) return;
@@ -53,7 +61,15 @@
   async function action(act: string, extra: Record<string, unknown> = {}) {
     busy = true;
     busyLabel =
-      act === "setTagQuery" && extra.tagQuery ? "Rebuilding from tags…" : act === "addCollaborator" ? "Inviting collaborator…" : "Updating playlist…";
+      act === "setTagQuery" && extra.tagQuery
+        ? "Rebuilding from tags…"
+        : act === "addCollaborator"
+          ? "Inviting collaborator…"
+          : act === "reorder"
+            ? "Reordering…"
+            : act === "sort"
+              ? "Sorting…"
+              : "Updating playlist…";
     error = null;
     try {
       const res = await fetch(`/api/playlists/${playlist.id}`, {
@@ -69,6 +85,66 @@
       error = err instanceof Error ? err.message : "Action failed";
     } finally {
       busy = false;
+    }
+  }
+
+  function startReorder(e: PointerEvent, index: number) {
+    if (!canReorder || busy || e.button !== 0) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragFrom = index;
+    dragOver = index;
+  }
+
+  function moveReorder(e: PointerEvent) {
+    if (dragFrom == null) return;
+    const row = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-pi]");
+    if (row?.dataset.pi) dragOver = Number(row.dataset.pi);
+    if (listEl) {
+      const box = listEl.getBoundingClientRect();
+      if (e.clientY < box.top + 28) listEl.scrollBy({ top: -14 });
+      else if (e.clientY > box.bottom - 28) listEl.scrollBy({ top: 14 });
+    }
+  }
+
+  function endReorder() {
+    const from = dragFrom;
+    const to = dragOver;
+    dragFrom = null;
+    dragOver = null;
+    if (from == null || to == null || from === to || busy) return;
+    void action("reorder", {
+      orderedItemIds: moveItem(
+        playlist.items.map((i) => i.id),
+        from,
+        to
+      ),
+    });
+  }
+
+  function keyReorder(e: KeyboardEvent, index: number) {
+    if (!canReorder || busy) return;
+    const delta = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+    if (!delta) return;
+    e.preventDefault();
+    const to = index + delta;
+    if (to < 0 || to >= playlist.items.length) return;
+    void action("reorder", {
+      orderedItemIds: moveItem(
+        playlist.items.map((i) => i.id),
+        index,
+        to
+      ),
+    });
+  }
+
+  async function applySort(sort: PlaylistTrackSort) {
+    if (!canReorder || busy || sortBusy) return;
+    sortBusy = true;
+    try {
+      await action("sort", { sort });
+    } finally {
+      sortBusy = false;
     }
   }
 
@@ -280,7 +356,34 @@
   {/if}
 
   <div>
-    <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Tracks</p>
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <p class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Tracks</p>
+      {#if playlist.canEdit && playlist.items.length > 1}
+        <label class="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+          <span class="uppercase tracking-[0.12em]">Sort</span>
+          <select
+            class="rounded border border-border bg-background px-1.5 py-1 text-[11px] text-foreground disabled:opacity-40"
+            disabled={busy || sortBusy}
+            value=""
+            onchange={(e) => {
+              const v = (e.currentTarget as HTMLSelectElement).value as PlaylistTrackSort | "";
+              (e.currentTarget as HTMLSelectElement).value = "";
+              if (v) void applySort(v);
+            }}
+          >
+            <option value="" disabled>Choose…</option>
+            {#each PLAYLIST_TRACK_SORT_OPTIONS as opt}
+              <option value={opt.value}>{opt.label}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
+    </div>
+    {#if playlist.canEdit && playlist.tagQuery && playlist.items.length > 1}
+      <p class="mb-2 font-mono text-[10px] text-muted-foreground">
+        Sort & drag save order until the next tag rebuild.
+      </p>
+    {/if}
     {#if busy && playlist.items.length === 0 && busyLabel.startsWith("Rebuild")}
       <TrackListSkeleton rows={4} compact />
     {:else if playlist.items.length === 0}
@@ -290,18 +393,48 @@
       </p>
     {:else}
       <ListBusyOverlay {busy} label={busyLabel}>
-        <ul class="max-h-[28rem] min-h-[6rem] space-y-1 overflow-y-auto rounded-lg border border-border/70 bg-card/30 p-2">
-          {#each playlist.items as item}
-            <li class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-secondary/40">
-              <span class="min-w-0 truncate">
+        <ul
+          bind:this={listEl}
+          class="max-h-[28rem] min-h-[6rem] space-y-0 overflow-y-auto rounded-lg border border-border/70 bg-card/30 py-1"
+          aria-label="Playlist tracks"
+        >
+          {#each playlist.items as item, index (item.id)}
+            <li
+              data-pi={index}
+              class={`group flex items-center gap-1 px-1.5 ${dragFrom === index ? "opacity-40" : ""} ${
+                dragOver === index && dragFrom != null && dragFrom !== index
+                  ? dragFrom < index
+                    ? "border-b-2 border-signal"
+                    : "border-t-2 border-signal"
+                  : ""
+              }`}
+            >
+              {#if canReorder}
+                <button
+                  type="button"
+                  class="inline-flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:text-signal disabled:opacity-40"
+                  disabled={busy}
+                  aria-label={`Reorder ${item.title}`}
+                  title="Drag to reorder"
+                  onpointerdown={(e) => startReorder(e, index)}
+                  onpointermove={moveReorder}
+                  onpointerup={endReorder}
+                  onpointercancel={endReorder}
+                  onkeydown={(e) => keyReorder(e, index)}
+                >
+                  <GripVerticalIcon class="size-3.5" />
+                </button>
+              {/if}
+              <span class="w-6 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground">{index + 1}</span>
+              <span class="min-w-0 flex-1 truncate px-1 py-1.5 text-sm">
                 {item.title}
                 <span class="font-mono text-[10px] text-muted-foreground"> · {item.artists ?? "—"}</span>
               </span>
               {#if playlist.canEdit}
-                <span class="flex shrink-0 gap-1">
+                <span class="flex shrink-0 gap-1 pr-1">
                   <button
                     type="button"
-                    class="font-mono text-[10px] text-muted-foreground hover:text-signal"
+                    class="font-mono text-[10px] text-muted-foreground hover:text-signal disabled:opacity-40"
                     disabled={busy}
                     onclick={() => void action("exclude", { mediaAssetId: item.mediaAssetId, excluded: true })}
                   >
@@ -309,7 +442,7 @@
                   </button>
                   <button
                     type="button"
-                    class="font-mono text-[10px] text-destructive"
+                    class="font-mono text-[10px] text-destructive disabled:opacity-40"
                     disabled={busy}
                     onclick={() => void action("removeTrack", { mediaAssetId: item.mediaAssetId })}
                   >

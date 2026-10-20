@@ -10,8 +10,10 @@ import {
   getPlaylistDetail,
   removeCollaborator,
   removePlaylistTrack,
+  reorderPlaylistTracks,
   setPlaylistExclusion,
   setPlaylistTagQuery,
+  sortPlaylistTracksPersisted,
   updatePlaylist,
 } from "$lib/server/playlists";
 
@@ -62,6 +64,10 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
       excluded?: boolean;
       collaborator?: string;
       collaboratorUserId?: string;
+      /** Playlist item row ids in the desired order (action=reorder). */
+      orderedItemIds?: string[];
+      /** Persistable sort key (action=sort). */
+      sort?: string;
     };
     const id = params.id!;
 
@@ -77,6 +83,14 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
       case "exclude": {
         if (!body.mediaAssetId) throw error(400, "mediaAssetId required");
         return json(await setPlaylistExclusion(id, user.id, body.mediaAssetId, body.excluded !== false));
+      }
+      case "reorder": {
+        if (!Array.isArray(body.orderedItemIds)) throw error(400, "orderedItemIds required");
+        return json(await reorderPlaylistTracks(id, user.id, body.orderedItemIds));
+      }
+      case "sort": {
+        if (!body.sort) throw error(400, "sort required");
+        return json(await sortPlaylistTracksPersisted(id, user.id, body.sort));
       }
       case "buildFromTags": {
         return json(await buildPlaylistFromTags(id, user.id, body.tagIds ?? []));
