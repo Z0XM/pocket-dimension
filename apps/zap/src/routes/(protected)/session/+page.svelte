@@ -19,7 +19,6 @@
 <section class="mx-auto max-w-2xl space-y-8">
   <div>
     <h1 class="text-3xl font-semibold tracking-tight">Sessions</h1>
-    <p class="mt-1 text-sm text-muted-foreground">Resume a live room, start as host, or join with a code.</p>
   </div>
 
   <div class="space-y-4">

@@ -123,9 +123,6 @@
 <section class="space-y-8">
   <div>
     <h1 class="text-3xl font-semibold tracking-tight">Playlists</h1>
-    <p class="mt-1 text-sm text-muted-foreground">
-      Zap-native playlists (owned / collab). Session snapshots live below as <span class="font-mono text-signal">saved queues</span> — a separate concept.
-    </p>
   </div>
 
   <form

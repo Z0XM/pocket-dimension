@@ -208,10 +208,6 @@
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <h1 class="text-3xl font-semibold tracking-tight">Session</h1>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Shared listening ·
-        <a class="text-signal hover:underline" href="/session?stay=1">All sessions</a>
-      </p>
     </div>
     {#if !sessionLive}
       <a href="/session?stay=1" class="auth-btn">Back to sessions</a>

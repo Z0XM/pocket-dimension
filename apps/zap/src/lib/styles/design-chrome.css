@@ -111,13 +111,6 @@ html body {
   text-transform: uppercase;
 }
 
-.zap-catalogue-lede {
-  margin-top: 0.65rem;
-  max-width: 40rem;
-  font-size: 0.95rem;
-  color: var(--muted-foreground);
-}
-
 .zap-filters-panel {
   border: 2px solid var(--border);
   border-radius: 0;

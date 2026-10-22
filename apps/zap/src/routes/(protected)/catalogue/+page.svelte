@@ -326,10 +326,6 @@
 <section class="zap-catalogue flex min-h-0 flex-1 flex-col gap-3">
   <div class="zap-catalogue-header shrink-0">
     <h1 class="zap-catalogue-title text-2xl font-semibold tracking-tight sm:text-3xl">Catalogue</h1>
-    <p class="zap-catalogue-lede mt-1 text-sm text-muted-foreground">
-      Search the shared Zap catalogue. <span class="font-mono text-signal">Your library</span> = tracks you’ve tagged. Play adds to your personal
-      queue; use <span class="font-mono text-signal">+</span> to add music.
-    </p>
   </div>
 
   <div class="zap-filters-panel shrink-0 rounded-lg border border-border/70 bg-card/50 p-3">

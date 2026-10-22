@@ -9,7 +9,6 @@
   <div>
     <p class="font-mono text-xs tracking-[0.35em] text-signal/80 uppercase">Zap</p>
     <h1 class="mt-2 text-4xl font-semibold tracking-tight md:text-5xl">Home</h1>
-    <p class="mt-2 max-w-lg text-sm text-muted-foreground">Open sessions to start or resume a room, or join with a code.</p>
     <div class="mt-4">
       <WaveBars />
     </div>

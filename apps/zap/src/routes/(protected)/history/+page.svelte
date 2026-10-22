@@ -93,10 +93,6 @@
 <section class="space-y-8">
   <div>
     <h1 class="text-3xl font-semibold tracking-tight">History</h1>
-    <p class="mt-1 text-sm text-muted-foreground">
-      Catalogue queues, plays and imports. Session snapshots (saved queues) live under
-      <a href="/playlists" class="text-signal hover:underline">Playlists</a>.
-    </p>
   </div>
 
   <div class="space-y-3">
