@@ -143,16 +143,16 @@
 
 <div class="flex min-h-0 flex-1 flex-col gap-4">
   <form
-    class="grid shrink-0 gap-2 rounded-lg border border-border/70 bg-card/50 p-4 sm:grid-cols-[1fr_12rem_auto]"
+    class="grid shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card/50 p-4 sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
     onsubmit={(e) => {
       e.preventDefault();
       navigate({});
     }}
   >
     <div class="relative min-w-0">
-      <SearchIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+      <SearchIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
       <input
-        class="auth-field w-full py-0 pl-8"
+        class="auth-field w-full pl-9"
         type="search"
         placeholder="Title, artist or source id"
         aria-label="Search songs"
@@ -160,9 +160,12 @@
         autocomplete="off"
       />
     </div>
-    <ZapSelect options={statusOptions} bind:value={status} placeholder="Any status" onChange={(v) => navigate({ status: v })} />
-    <button type="submit" class="auth-btn inline-flex size-10 w-fit items-center justify-center p-0" aria-label="Search" title="Search">
-      <SearchIcon class="size-4" aria-hidden="true" />
+    <div class="min-w-0 sm:w-48">
+      <ZapSelect options={statusOptions} bind:value={status} placeholder="Any status" onChange={(v) => navigate({ status: v })} />
+    </div>
+    <button type="submit" class="auth-btn inline-flex h-auto min-h-10 w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-4 py-2">
+      <SearchIcon class="size-3.5 shrink-0" aria-hidden="true" />
+      Search
     </button>
   </form>
 
@@ -204,7 +207,7 @@
             </button>
             <button
               type="button"
-              class="inline-flex size-8 w-fit shrink-0 items-center justify-center border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-40"
+              class="inline-flex size-8 shrink-0 items-center justify-center border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-40"
               aria-label={`Delete ${song.title}`}
               title="Delete song"
               disabled={busy}
@@ -213,7 +216,7 @@
                 confirmOpen = true;
               }}
             >
-              <Trash2Icon class="size-3.5" aria-hidden="true" />
+              <Trash2Icon class="size-3.5 shrink-0" aria-hidden="true" />
             </button>
           </li>
         {/each}
