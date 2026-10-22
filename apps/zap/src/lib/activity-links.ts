@@ -19,6 +19,32 @@ export function parseSyncSummary(raw: string | null | undefined) {
   }
 }
 
+/** Song titles from an ingest summary, preferring imported/reused then any titled item. */
+export function songTitlesFromSummary(summary: ReturnType<typeof parseSyncSummary>): string[] {
+  const items = summary?.items ?? [];
+  const preferred = items
+    .filter((i) => i.status === "imported" || i.status === "reused")
+    .map((i) => i.title?.trim())
+    .filter((t): t is string => Boolean(t));
+  const pool = preferred.length
+    ? preferred
+    : items.map((i) => i.title?.trim()).filter((t): t is string => Boolean(t));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const title of pool) {
+    if (seen.has(title)) continue;
+    seen.add(title);
+    out.push(title);
+  }
+  return out;
+}
+
+function formatTitleList(titles: string[], max = 3): string {
+  if (titles.length === 0) return "";
+  if (titles.length <= max) return titles.join(", ");
+  return `${titles.slice(0, max).join(", ")} +${titles.length - max}`;
+}
+
 export function playlistLabel(
   sourceUrl: string,
   summary: ReturnType<typeof parseSyncSummary>
@@ -37,7 +63,10 @@ export function playlistLabel(
         : sourceUrl.slice("youtube:connected:".length).split(",").filter(Boolean).join(", ") || "YouTube playlists";
     return { kind: "playlist_import", label, playlistTitles: titlesFromSummary.length ? titlesFromSummary : undefined };
   }
-  return { kind: "url_import", label: sourceUrl };
+  // URL / single-video import: show song title(s) from metadata, not the raw URL.
+  const songTitles = songTitlesFromSummary(summary);
+  const label = formatTitleList(songTitles) || sourceUrl;
+  return { kind: "url_import", label };
 }
 
 /** Clickable playlist / source links for an import sync run. */
@@ -47,7 +76,8 @@ export function importLinks(
   meta: ReturnType<typeof playlistLabel>
 ): ActivityLink[] {
   if (meta.kind === "url_import") {
-    return isHttpUrl(sourceUrl) ? [{ label: sourceUrl, href: sourceUrl }] : [];
+    // Song title (or titles) as link text; href is always the origin/source URL.
+    return isHttpUrl(sourceUrl) ? [{ label: meta.label, href: sourceUrl }] : [];
   }
 
   const ids = sourceUrl.startsWith("youtube:connected:")

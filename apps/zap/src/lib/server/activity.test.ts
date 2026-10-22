@@ -15,7 +15,15 @@ describe("playlist activity labels", () => {
     expect(out.label).toBe("abc, def");
   });
 
-  test("treats other urls as url imports", () => {
+  test("uses song title from summary for url imports", () => {
+    const out = playlistLabel("https://youtu.be/xyz", {
+      items: [{ title: "Midnight City", status: "imported" }],
+    });
+    expect(out.kind).toBe("url_import");
+    expect(out.label).toBe("Midnight City");
+  });
+
+  test("falls back to raw url when no title metadata", () => {
     const out = playlistLabel("https://youtu.be/xyz", null);
     expect(out.kind).toBe("url_import");
     expect(out.label).toBe("https://youtu.be/xyz");
@@ -33,7 +41,14 @@ describe("import links", () => {
     ]);
   });
 
-  test("links http url imports to the source", () => {
+  test("url imports link song titles to the origin URL", () => {
+    const sourceUrl = "https://youtu.be/xyz";
+    const summary = { items: [{ title: "Midnight City", status: "imported" }] };
+    const meta = playlistLabel(sourceUrl, summary);
+    expect(importLinks(sourceUrl, summary, meta)).toEqual([{ label: "Midnight City", href: sourceUrl }]);
+  });
+
+  test("url imports fall back to raw url label without metadata", () => {
     const sourceUrl = "https://youtu.be/xyz";
     const meta = playlistLabel(sourceUrl, null);
     expect(importLinks(sourceUrl, null, meta)).toEqual([{ label: sourceUrl, href: sourceUrl }]);
