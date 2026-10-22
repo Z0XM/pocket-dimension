@@ -8,6 +8,7 @@
   import { page } from "$app/state";
   import AddMusicDialog, { parseAddMusicTab, type AddMusicTab } from "$lib/components/AddMusicDialog.svelte";
   import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
   import PageHeader from "$lib/components/PageHeader.svelte";
   import SaveTagPlaylistDialog from "$lib/components/SaveTagPlaylistDialog.svelte";
@@ -48,6 +49,7 @@
 
   let bulkBusy = $state(false);
   let bulkError = $state<string | null>(null);
+  let replaceOpen = $state(false);
   let sentinel = $state<HTMLDivElement | null>(null);
   let scrollRoot = $state<HTMLDivElement | null>(null);
 
@@ -92,11 +94,25 @@
 
   async function addAllFiltered(mode: "replace" | "last") {
     if (!queue || bulkBusy) return;
+    if (mode === "replace" && queue.needsReplaceConfirm) {
+      replaceOpen = true;
+      return;
+    }
     bulkBusy = true;
     bulkError = null;
     await queue.enqueueFiltered(filterInput(), mode);
     bulkError = queue.error;
     bulkBusy = false;
+  }
+
+  async function confirmReplaceAll() {
+    if (!queue || bulkBusy) return;
+    bulkBusy = true;
+    bulkError = null;
+    await queue.enqueueFiltered(filterInput(), "replace");
+    bulkError = queue.error;
+    bulkBusy = false;
+    replaceOpen = false;
   }
 
   function onDeleted(id: string, message: string) {
@@ -491,3 +507,11 @@
 
 <SaveTagPlaylistDialog bind:open={savePlaylistOpen} tagQuery={saveTagQuery} defaultName={savePlaylistDefaultName} onsaved={onPlaylistSaved} />
 <AddMusicDialog bind:open={addOpen} bind:tab={addTab} config={data.addMusic} {availableTags} onadded={onAdded} />
+<ConfirmDialog
+  bind:open={replaceOpen}
+  title="Replace your queue?"
+  body={`Your current queue of ${queue?.items.length ?? 0} song${(queue?.items.length ?? 0) === 1 ? "" : "s"} will be closed, and this queue will be started.`}
+  confirmLabel="Start this queue"
+  busy={bulkBusy}
+  onconfirm={confirmReplaceAll}
+/>

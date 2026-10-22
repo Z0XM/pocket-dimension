@@ -9,6 +9,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
     user: locals.user
       ? {
           id: locals.user.id,
+          name: locals.user.name,
           email: locals.user.email,
           username: locals.user.username,
           emailVerified: locals.user.emailVerified,

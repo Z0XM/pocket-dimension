@@ -31,6 +31,7 @@ type Body = {
   order?: unknown;
   positionMs?: number;
   generation?: number;
+  play?: boolean;
 };
 
 function requireVerifiedUser(locals: App.Locals) {
@@ -70,6 +71,12 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       if (ids.length === 0) throw error(400, "mediaAssetIds required");
       if (!isEnqueueMode(body.mode)) throw error(400, "mode must be play|next|queue|last");
       return json(await enqueueTracks(user.id, ids, body.mode));
+    }
+
+    if (action === "replace") {
+      const ids = stringIds(body.mediaAssetIds, MAX_BULK_ENQUEUE);
+      if (ids.length === 0) throw error(400, "mediaAssetIds required");
+      return json(await replaceQueue(user.id, ids, { play: body.play !== false }));
     }
 
     if (action === "enqueueFiltered") {

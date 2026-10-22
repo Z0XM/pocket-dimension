@@ -1,11 +1,15 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import EyeIcon from "@lucide/svelte/icons/eye";
+  import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
   import ListEndIcon from "@lucide/svelte/icons/list-end";
   import PlayIcon from "@lucide/svelte/icons/play";
   import RadioIcon from "@lucide/svelte/icons/radio";
+  import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
+  import XIcon from "@lucide/svelte/icons/x";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
@@ -34,14 +38,55 @@
   let dragFrom = $state<number | null>(null);
   let dragOver = $state<number | null>(null);
   let listEl = $state<HTMLUListElement | null>(null);
+  let replaceOpen = $state(false);
+  let replaceBusy = $state(false);
+  let pendingReplaceIds = $state<string[] | null>(null);
 
   const queue = getCatalogQueue();
   const hasPlayable = $derived(playlist.items.some((i) => i.playable));
   const canReorder = $derived(playlist.canEdit);
+  const replaceConfirmBody = $derived(
+    `Your current queue of ${queue?.items.length ?? 0} song${(queue?.items.length ?? 0) === 1 ? "" : "s"} will be closed, and this queue will be started.`
+  );
+
+  async function runReplace(mediaAssetIds: string[]) {
+    if (!queue) return;
+    error = null;
+    replaceBusy = true;
+    try {
+      await queue.replaceTracks(mediaAssetIds, { play: true });
+      if (queue.error) error = queue.error;
+    } finally {
+      replaceBusy = false;
+      replaceOpen = false;
+      pendingReplaceIds = null;
+    }
+  }
+
+  async function playPlaylistFrom(startMediaAssetId?: string) {
+    if (!queue) return;
+    const ids = playlist.items.filter((i) => i.playable).map((i) => i.mediaAssetId);
+    if (ids.length === 0) return;
+    let ordered = ids;
+    if (startMediaAssetId) {
+      const idx = ids.indexOf(startMediaAssetId);
+      if (idx >= 0) ordered = ids.slice(idx);
+    }
+    if (queue.needsReplaceConfirm) {
+      pendingReplaceIds = ordered;
+      replaceOpen = true;
+      return;
+    }
+    await runReplace(ordered);
+  }
 
   async function queuePlaylist(mode: "replace" | "last") {
     if (!queue) return;
     error = null;
+    if (mode === "replace") {
+      await playPlaylistFrom();
+      return;
+    }
     await queue.enqueuePlaylist(playlist.id, mode);
     if (queue.error) error = queue.error;
   }
@@ -274,11 +319,18 @@
       {#if playlist.canDelete}
         <button
           type="button"
-          class="rounded border border-border px-2 py-1 font-mono text-[10px]"
+          class="inline-flex items-center gap-1.5 rounded border border-border px-2.5 py-1.5 font-mono text-[10px] text-muted-foreground transition-colors hover:border-signal/50 hover:bg-signal/10 hover:text-signal disabled:opacity-40"
           disabled={busy}
+          title={playlist.visibility === "public" ? "Make private" : "Make public"}
           onclick={() => void toggleVisibility()}
         >
-          Make {playlist.visibility === "public" ? "private" : "public"}
+          {#if playlist.visibility === "public"}
+            <EyeOffIcon class="size-3.5" aria-hidden="true" />
+            Make private
+          {:else}
+            <EyeIcon class="size-3.5" aria-hidden="true" />
+            Make public
+          {/if}
         </button>
         <button
           type="button"
@@ -342,7 +394,7 @@
             Clear tag query
           </button>
         {/if}
-        <span class="font-mono text-[10px] text-muted-foreground">Uses your tags; excluded tracks stay out.</span>
+        <span class="font-mono text-[10px] text-muted-foreground">Uses your tags; removed tracks stay out of rebuilds.</span>
       </div>
 
       <div class="border-t border-border/50 pt-3">
@@ -441,29 +493,27 @@
                 </button>
               {/if}
               <span class="w-6 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground">{index + 1}</span>
-              <span class="min-w-0 flex-1 truncate px-1 py-1.5 text-sm">
+              <button
+                type="button"
+                class="min-w-0 flex-1 truncate px-1 py-1.5 text-left text-sm hover:text-signal disabled:opacity-40"
+                disabled={busy || !item.playable || !queue || (queue.pending > 0 && !queue.needsReplaceConfirm)}
+                title={item.playable ? `Play from “${item.title}”` : "Not playable"}
+                onclick={() => void playPlaylistFrom(item.mediaAssetId)}
+              >
                 {item.title}
                 <span class="font-mono text-[10px] text-muted-foreground"> · {item.artists ?? "—"}</span>
-              </span>
+              </button>
               {#if playlist.canEdit}
-                <span class="flex shrink-0 gap-1 pr-1">
-                  <button
-                    type="button"
-                    class="font-mono text-[10px] text-muted-foreground hover:text-signal disabled:opacity-40"
-                    disabled={busy}
-                    onclick={() => void action("exclude", { mediaAssetId: item.mediaAssetId, excluded: true })}
-                  >
-                    exclude
-                  </button>
-                  <button
-                    type="button"
-                    class="font-mono text-[10px] text-destructive disabled:opacity-40"
-                    disabled={busy}
-                    onclick={() => void action("removeTrack", { mediaAssetId: item.mediaAssetId })}
-                  >
-                    remove
-                  </button>
-                </span>
+                <button
+                  type="button"
+                  class="inline-flex size-7 shrink-0 items-center justify-center rounded text-destructive opacity-70 hover:bg-destructive/10 hover:opacity-100 disabled:opacity-40"
+                  disabled={busy}
+                  aria-label={`Remove ${item.title}`}
+                  title="Remove"
+                  onclick={() => void action("exclude", { mediaAssetId: item.mediaAssetId, excluded: true })}
+                >
+                  <XIcon class="size-3.5" aria-hidden="true" />
+                </button>
               {/if}
             </li>
           {/each}
@@ -474,19 +524,21 @@
 
   {#if playlist.exclusions.length}
     <div>
-      <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Excluded from tag rebuilds</p>
-      <ul class="space-y-1 font-mono text-[11px]">
+      <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Added in the past</p>
+      <ul class="space-y-1 rounded-lg border border-border/50 bg-card/20 py-1 font-mono text-[11px]">
         {#each playlist.exclusions as ex}
-          <li class="flex justify-between gap-2">
-            <span>{ex.title}</span>
+          <li class="flex items-center justify-between gap-2 px-2 py-1">
+            <span class="min-w-0 truncate text-muted-foreground">{ex.title}</span>
             {#if playlist.canEdit}
               <button
                 type="button"
-                class="text-signal"
+                class="inline-flex items-center gap-1 text-signal hover:underline disabled:opacity-40"
                 disabled={busy}
+                title="Restore to playlist"
                 onclick={() => void action("exclude", { mediaAssetId: ex.mediaAssetId, excluded: false })}
               >
-                restore
+                <RotateCcwIcon class="size-3" aria-hidden="true" />
+                Restore
               </button>
             {/if}
           </li>
@@ -496,6 +548,17 @@
   {/if}
   </div>
 </section>
+
+<ConfirmDialog
+  bind:open={replaceOpen}
+  title="Replace your queue?"
+  body={replaceConfirmBody}
+  confirmLabel="Start this queue"
+  busy={replaceBusy}
+  onconfirm={() => {
+    if (pendingReplaceIds) void runReplace(pendingReplaceIds);
+  }}
+/>
 
 <ConfirmDialog
   bind:open={deleteOpen}

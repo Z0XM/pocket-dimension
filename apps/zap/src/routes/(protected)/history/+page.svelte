@@ -22,6 +22,8 @@
   let saved = $state<{ runId: string; id: string; name: string } | null>(null);
   let deleteRunId = $state<string | null>(null);
   let deleteOpen = $state(false);
+  let replaceOpen = $state(false);
+  let pendingRestartId = $state<string | null>(null);
   let viewTracksRunId = $state<string | null>(null);
   let viewTracks = $state<CatalogQueueRunTrack[] | null>(null);
   let viewTracksLoading = $state(false);
@@ -36,6 +38,24 @@
     runError = queue.error;
     busyRunId = null;
     await invalidateAll();
+  }
+
+  function requestRestart(runId: string) {
+    if (!queue) return;
+    if (queue.needsReplaceConfirm && activeRunId !== runId) {
+      pendingRestartId = runId;
+      replaceOpen = true;
+      return;
+    }
+    void runAction(runId, () => queue.activateRun(runId, "restart"));
+  }
+
+  async function confirmRestart() {
+    const runId = pendingRestartId;
+    if (!runId || !queue) return;
+    replaceOpen = false;
+    pendingRestartId = null;
+    await runAction(runId, () => queue.activateRun(runId, "restart"));
   }
 
   function formatWhen(iso: string) {
@@ -146,7 +166,7 @@
               type="button"
               class="inline-flex items-center gap-1 rounded border border-signal/40 bg-signal/10 px-2 py-1 text-signal hover:bg-signal/20 disabled:opacity-40"
               disabled={!queue || busyRunId !== null}
-              onclick={() => void runAction(run.id, () => queue!.activateRun(run.id, "restart"))}
+              onclick={() => requestRestart(run.id)}
             >
               <RotateCcwIcon class="size-3" /> Restart
             </button>
@@ -247,6 +267,15 @@
     </ul>
   {/if}
 </div>
+
+<ConfirmDialog
+  bind:open={replaceOpen}
+  title="Replace your queue?"
+  body={`Your current queue of ${queue?.items.length ?? 0} song${(queue?.items.length ?? 0) === 1 ? "" : "s"} will be closed, and this queue will be started.`}
+  confirmLabel="Start this queue"
+  busy={busyRunId !== null}
+  onconfirm={confirmRestart}
+/>
 
 <ConfirmDialog
   bind:open={deleteOpen}

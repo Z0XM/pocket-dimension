@@ -2,7 +2,7 @@ export { createSessionSSEStream } from "./sse";
 export { buildSessionSnapshot } from "./snapshot";
 export { SESSION_IDLE_MS, isSessionIdle, msUntilIdle } from "./idle";
 export { generateJoinCode, normalizeJoinCode } from "./join-code";
-export { SESSION_NAME_MAX_LEN, defaultSessionName, normalizeSessionName } from "./session-name";
+export { SESSION_NAME_MAX_LEN, defaultSessionName, hostLabelForSession, normalizeSessionName } from "./session-name";
 export {
   canAddToQueue,
   canControlTransport,

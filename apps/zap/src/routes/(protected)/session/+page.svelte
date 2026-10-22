@@ -66,8 +66,9 @@
             createOnly
             showPerpetualOption
             showNameOption
+            defaultName={data.defaultSessionName}
             label="Start session"
-            class="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+            class="inline-flex items-center gap-1.5 rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
           />
         {:else}
           <p class="font-mono text-xs text-muted-foreground">Guests can’t start — resume above or join a code.</p>

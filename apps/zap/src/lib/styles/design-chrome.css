@@ -181,7 +181,7 @@ html body {
 }
 
 .zap-track.is-current {
-  background: color-mix(in srgb, var(--signal) 12%, transparent);
+  background: transparent;
   box-shadow: none;
 }
 

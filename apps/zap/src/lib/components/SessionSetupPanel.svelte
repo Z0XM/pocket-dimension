@@ -106,14 +106,18 @@
           Auto-play
         </label>
         {#if isHost}
-          <label class="flex items-center gap-2" title="Keep this room when idle; rejoin anytime">
-            <input
-              class="zap-checkbox"
-              type="checkbox"
-              checked={session.perpetual}
+          <label class="flex items-center gap-2 font-mono text-[10px] text-muted-foreground" title="Keep this room when idle; rejoin anytime">
+            <button
+              type="button"
+              class="zap-toggle"
+              role="switch"
+              aria-checked={session.perpetual}
+              aria-label="Perpetual session"
               disabled={busy}
-              onchange={(e) => void patch({ perpetual: (e.currentTarget as HTMLInputElement).checked })}
-            />
+              onclick={() => void patch({ perpetual: !session.perpetual })}
+            >
+              <span class="zap-toggle-thumb"></span>
+            </button>
             Perpetual
           </label>
         {/if}

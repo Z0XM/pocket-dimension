@@ -12,10 +12,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     throw redirect(303, `/session/${primary.id}`);
   }
   const index = stay ? await listSessionsIndexForUser(locals.user!.id) : live;
+  const user = locals.user!;
+  const hostLabel = user.name?.trim() || user.username?.trim() || user.email?.split("@")[0]?.trim() || null;
   return {
     liveSessions: live,
     indexSessions: index,
     canStart: canStartSession(live),
     primaryLive: primary,
+    defaultSessionName: hostLabel ? `${hostLabel}'s session` : "My session",
   };
 };

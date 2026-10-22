@@ -1,15 +1,18 @@
 <script lang="ts">
+  import PlayIcon from "@lucide/svelte/icons/play";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
 
   let {
     label = "Start session",
-    class: className = "rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40",
+    class: className = "inline-flex items-center gap-1.5 rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40",
     /** When false, hide create/new — guests Join/Resume only. */
     allowStart = true,
-    /** Show a perpetual checkbox when starting a new session. */
+    /** Show a perpetual toggle when starting a new session. */
     showPerpetualOption = false,
     /** Optional name field when creating a new session. */
     showNameOption = false,
+    /** Prefill + default submit name (e.g. "{name}'s session"). */
+    defaultName = "",
     /** Skip Resume — only create (sessions index start panel). */
     createOnly = false,
   }: {
@@ -18,6 +21,7 @@
     allowStart?: boolean;
     showPerpetualOption?: boolean;
     showNameOption?: boolean;
+    defaultName?: string;
     createOnly?: boolean;
   } = $props();
 
@@ -29,10 +33,15 @@
   let canStart = $state(allowStart);
   let checked = $state(false);
   let perpetual = $state(false);
-  let sessionName = $state("");
+  let sessionName = $state(defaultName);
 
   $effect(() => {
     canStart = allowStart;
+  });
+
+  // Seed once when the server default arrives (avoid fighting user edits).
+  $effect(() => {
+    if (defaultName && sessionName === "") sessionName = defaultName;
   });
 
   $effect(() => {
@@ -86,6 +95,7 @@
     busy = true;
     error = null;
     try {
+      const name = showNameOption ? sessionName.trim() || defaultName.trim() || undefined : undefined;
       const res = await fetch("/api/sessions", {
         method: "POST",
         credentials: "same-origin",
@@ -93,7 +103,7 @@
         body: JSON.stringify({
           forceNew: true,
           perpetual: showPerpetualOption ? perpetual : false,
-          ...(showNameOption && sessionName.trim() ? { name: sessionName.trim() } : {}),
+          ...(name ? { name } : {}),
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -114,24 +124,37 @@
       <span class="flex w-full flex-wrap items-end gap-3">
         {#if showNameOption}
           <label class="flex min-w-[10rem] flex-1 flex-col gap-1 font-mono text-[10px] text-muted-foreground">
-            <span>Name (optional)</span>
+            <span>Name</span>
             <input
               class="rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground"
               type="text"
               maxlength={80}
-              placeholder="Session…"
+              placeholder={defaultName || "Session…"}
               bind:value={sessionName}
               disabled={busy}
             />
           </label>
         {/if}
         <button type="button" class={className} disabled={busy || !checked} onclick={() => void start(true)}>
+          <PlayIcon class="size-3.5" aria-hidden="true" />
           {busy ? "Starting…" : label}
         </button>
       </span>
       {#if showPerpetualOption}
-        <label class="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
-          <input class="zap-checkbox" type="checkbox" bind:checked={perpetual} disabled={busy} />
+        <label class="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+          <button
+            type="button"
+            class="zap-toggle"
+            role="switch"
+            aria-checked={perpetual}
+            aria-label="Perpetual session"
+            disabled={busy}
+            onclick={() => {
+              perpetual = !perpetual;
+            }}
+          >
+            <span class="zap-toggle-thumb"></span>
+          </button>
           Perpetual (persists when idle)
         </label>
       {/if}
@@ -140,6 +163,7 @@
     <span class="inline-flex flex-wrap items-center gap-2">
       {#if liveId}
         <button type="button" class={className} disabled={busy || !checked} onclick={() => void goResume()}>
+          <PlayIcon class="size-3.5" aria-hidden="true" />
           {busy ? "…" : liveRole === "guest" ? "Resume (guest)" : label.includes("Resume") ? label : "Resume session"}
         </button>
         {#if canStart}
@@ -154,6 +178,7 @@
         {/if}
       {:else if canStart}
         <button type="button" class={className} disabled={busy || !checked} onclick={() => void start(true)}>
+          <PlayIcon class="size-3.5" aria-hidden="true" />
           {busy ? "Starting…" : label}
         </button>
       {:else}
@@ -165,20 +190,32 @@
     {/if}
     {#if showNameOption && canStart}
       <label class="flex w-full max-w-xs flex-col gap-1 font-mono text-[10px] text-muted-foreground">
-        <span>Name (optional)</span>
+        <span>Name</span>
         <input
           class="rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
           type="text"
           maxlength={80}
-          placeholder="Session…"
+          placeholder={defaultName || "Session…"}
           bind:value={sessionName}
           disabled={busy}
         />
       </label>
     {/if}
     {#if showPerpetualOption && canStart}
-      <label class="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
-        <input class="zap-checkbox" type="checkbox" bind:checked={perpetual} disabled={busy} />
+      <label class="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+        <button
+          type="button"
+          class="zap-toggle"
+          role="switch"
+          aria-checked={perpetual}
+          aria-label="Perpetual session"
+          disabled={busy}
+          onclick={() => {
+            perpetual = !perpetual;
+          }}
+        >
+          <span class="zap-toggle-thumb"></span>
+        </button>
         Perpetual (persists when idle)
       </label>
     {/if}

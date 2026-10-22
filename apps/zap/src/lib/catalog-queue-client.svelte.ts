@@ -44,6 +44,12 @@ export class CatalogQueueClient {
   now = $state(Date.now());
   /** Playhead from this device's audio element while it is the one producing sound. */
   localPositionMs = $state<number | null>(null);
+  /**
+   * Catalogue one-shot: pause the personal queue, play this media, then resume.
+   * Not part of the queue snapshot — local to this device.
+   */
+  interruptMediaAssetId = $state<string | null>(null);
+  interruptTitle = $state<string | null>(null);
 
   queue = $derived(this.snapshot?.queue ?? null);
   items = $derived<CatalogQueueItem[]>(this.snapshot?.items ?? []);
@@ -53,8 +59,12 @@ export class CatalogQueueClient {
   currentItem = $derived(this.items.find((i) => i.id === this.queue?.currentItemId) ?? null);
   currentIndex = $derived(this.items.findIndex((i) => i.id === this.queue?.currentItemId));
   active = $derived(Boolean(this.queue) && this.items.length > 0);
-  playing = $derived(this.queue?.playbackState === "playing" && Boolean(this.currentItem));
+  playing = $derived(this.queue?.playbackState === "playing" && Boolean(this.currentItem) && !this.interruptMediaAssetId);
+  interrupting = $derived(Boolean(this.interruptMediaAssetId));
+  /** True when replacing the personal queue would discard an in-progress run. */
+  needsReplaceConfirm = $derived(this.active);
   positionMs = $derived.by(() => {
+    if (this.interruptMediaAssetId) return this.localPositionMs ?? 0;
     if (this.localPositionMs != null) return this.localPositionMs;
     if (!this.queue) return 0;
     return estimatePositionMs(this.queue, this.now + this.clockOffsetMs, this.currentItem?.durationMs);
@@ -65,6 +75,7 @@ export class CatalogQueueClient {
   private es: EventSource | null = null;
   private ticker: ReturnType<typeof setInterval> | null = null;
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  private interruptResumePlaying = false;
 
   connect() {
     if (this.es) return;
@@ -142,11 +153,52 @@ export class CatalogQueueClient {
 
   // --- adding -------------------------------------------------------------
 
-  playNow(mediaAssetId: string) {
+  clearInterrupt() {
+    this.interruptMediaAssetId = null;
+    this.interruptTitle = null;
+    this.interruptResumePlaying = false;
+    this.localPositionMs = null;
+  }
+
+  /**
+   * Catalogue row Play: if a personal queue is active, pause it and play this song as a one-shot;
+   * when it ends, resume the queue. With no active queue, enqueue+play as usual.
+   */
+  async playCatalogueSong(mediaAssetId: string, meta?: { title?: string | null }) {
+    this.error = null;
+    // Same catalogue song while interrupting → stop interrupt and resume queue if it was playing.
+    if (this.interruptMediaAssetId === mediaAssetId) {
+      await this.finishInterrupt();
+      return null;
+    }
+    if (this.active) {
+      const wasPlaying = this.queue?.playbackState === "playing" || Boolean(this.interruptMediaAssetId && this.interruptResumePlaying);
+      if (this.queue?.playbackState === "playing") {
+        await this.command({ action: "pause", positionMs: this.positionMs });
+      }
+      this.interruptResumePlaying = wasPlaying;
+      this.interruptMediaAssetId = mediaAssetId;
+      this.interruptTitle = meta?.title?.trim() || null;
+      this.localPositionMs = 0;
+      return null;
+    }
+    this.clearInterrupt();
     return this.command({ action: "enqueue", mediaAssetIds: [mediaAssetId], mode: "play" });
   }
 
+  async finishInterrupt() {
+    const resume = this.interruptResumePlaying;
+    this.clearInterrupt();
+    if (resume && this.active) await this.play();
+  }
+
+  /** @deprecated Prefer playCatalogueSong for catalogue rows; kept for History one-offs that should interrupt. */
+  playNow(mediaAssetId: string) {
+    return this.playCatalogueSong(mediaAssetId);
+  }
+
   async enqueue(mediaAssetIds: string[], mode: EnqueueMode) {
+    this.clearInterrupt();
     const res = await this.command({ action: "enqueue", mediaAssetIds, mode });
     if (res && mode !== "play") {
       const label = mode === "next" ? "Playing next" : mode === "queue" ? "Added to queue" : "Added to the end";
@@ -156,24 +208,43 @@ export class CatalogQueueClient {
   }
 
   enqueueFiltered(filter: CatalogueFilterInput, mode: EnqueueMode | "replace") {
+    this.clearInterrupt();
     return this.command({ action: "enqueueFiltered", filter, mode });
   }
 
   enqueuePlaylist(playlistId: string, mode: EnqueueMode | "replace") {
+    this.clearInterrupt();
     return this.command({ action: "enqueuePlaylist", playlistId, mode });
+  }
+
+  /** Close the current run (History) and start a fresh queue with these tracks. */
+  replaceTracks(mediaAssetIds: string[], opts: { play?: boolean } = {}) {
+    this.clearInterrupt();
+    return this.command({ action: "replace", mediaAssetIds, play: opts.play !== false });
   }
 
   // --- transport ----------------------------------------------------------
 
   play() {
+    if (this.interruptMediaAssetId) {
+      this.clearInterrupt();
+    }
     return this.command({ action: "play" });
   }
 
   pause() {
+    if (this.interruptMediaAssetId) {
+      this.clearInterrupt();
+      return null;
+    }
     return this.command({ action: "pause", positionMs: this.positionMs });
   }
 
   togglePlay() {
+    if (this.interruptMediaAssetId) {
+      void this.finishInterrupt();
+      return null;
+    }
     return this.playing ? this.pause() : this.play();
   }
 
@@ -249,6 +320,7 @@ export class CatalogQueueClient {
   }
 
   activateRun(runId: string, mode: "restart" | "resume") {
+    this.clearInterrupt();
     return this.send(`/api/catalog-queue/runs/${runId}`, { method: "POST", body: JSON.stringify({ action: mode }) });
   }
 

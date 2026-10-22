@@ -26,6 +26,8 @@
 
   const current = $derived(queue.currentItem);
   const durationMs = $derived(current?.durationMs ?? 0);
+  const pastItems = $derived(queue.currentIndex > 0 ? queue.items.slice(0, queue.currentIndex) : []);
+  const activeItems = $derived(queue.currentIndex >= 0 ? queue.items.slice(queue.currentIndex) : queue.items);
 
   let scrubMs = $state<number | null>(null);
   let saveOpen = $state(false);
@@ -115,10 +117,17 @@
 <div class="flex min-h-0 flex-1 flex-col">
   <div class="shrink-0 space-y-2 border-b border-border/60 px-3 py-2.5">
     <div class="min-w-0">
-      <p class="truncate text-sm font-medium" title={current?.title}>{current?.title ?? "Queue finished — press play to start over"}</p>
-      <p class="truncate font-mono text-[11px] text-muted-foreground">
-        {current?.artists ?? "—"} · {queue.currentIndex >= 0 ? `${queue.currentIndex + 1} / ${queue.items.length}` : `${queue.items.length} tracks`}
-      </p>
+      {#if queue.interrupting}
+        <p class="truncate text-sm font-medium text-signal" title={queue.interruptTitle ?? undefined}>
+          {queue.interruptTitle ?? "Catalogue song"}
+        </p>
+        <p class="truncate font-mono text-[11px] text-muted-foreground">Playing from catalogue · queue paused</p>
+      {:else}
+        <p class="truncate text-sm font-medium" title={current?.title}>{current?.title ?? "Queue finished — press play to start over"}</p>
+        <p class="truncate font-mono text-[11px] text-muted-foreground">
+          {current?.artists ?? "—"} · {queue.currentIndex >= 0 ? `${queue.currentIndex + 1} / ${queue.items.length}` : `${queue.items.length} tracks`}
+        </p>
+      {/if}
     </div>
     <div class="flex items-center gap-1.5">
       <button
@@ -228,9 +237,9 @@
   </div>
 
   <ul bind:this={listEl} class="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1" aria-label="Queue">
-    {#each queue.items as item, index (item.id)}
+    {#each activeItems as item (item.id)}
+      {@const index = queue.items.findIndex((i) => i.id === item.id)}
       {@const isCurrent = item.id === queue.queue?.currentItemId}
-      {@const isPast = queue.currentIndex >= 0 && index < queue.currentIndex}
       <li
         data-qi={index}
         class={`group flex items-center gap-1 px-1.5 ${dragFrom === index ? "opacity-40" : ""} ${
@@ -257,9 +266,12 @@
         <button
           type="button"
           class={`flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1.5 text-left hover:bg-signal/10 disabled:opacity-40 ${isCurrent ? "bg-signal/10" : ""}`}
-          disabled={!item.playable}
+          disabled={!item.playable || queue.interrupting}
           title={item.playable ? `Play from “${item.title}”` : "Not playable"}
-          onclick={() => void queue.jump(item.id)}
+          onclick={() => {
+            queue.clearInterrupt();
+            void queue.jump(item.id);
+          }}
         >
           <span class={`w-6 shrink-0 text-right font-mono text-[10px] tabular-nums ${isCurrent ? "text-signal" : "text-muted-foreground"}`}>
             {#if isCurrent && queue.playing}
@@ -269,16 +281,14 @@
             {/if}
           </span>
           <span class="min-w-0 flex-1">
-            <span class={`block truncate text-[13px] ${isCurrent ? "text-signal" : isPast ? "text-muted-foreground" : "text-foreground"}`}
-              >{item.title}</span
-            >
+            <span class={`block truncate text-[13px] ${isCurrent ? "text-signal" : "text-foreground"}`}>{item.title}</span>
             <span class="block truncate font-mono text-[10px] text-muted-foreground">{item.artists ?? "Unknown"}</span>
           </span>
           <span class="shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(item.durationMs)}</span>
         </button>
         <button
           type="button"
-          class="inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground opacity-60 group-hover:opacity-100 hover:text-destructive"
+          class="inline-flex size-7 shrink-0 items-center justify-center rounded text-destructive opacity-70 group-hover:opacity-100 hover:bg-destructive/10"
           aria-label={`Remove ${item.title}`}
           title="Remove"
           onclick={() => void queue.remove(item.id)}
@@ -288,4 +298,39 @@
       </li>
     {/each}
   </ul>
+
+  {#if pastItems.length}
+    <div class="shrink-0 border-t border-border/60 px-3 py-2">
+      <p class="mb-1 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Added in the past</p>
+      <ul class="max-h-40 space-y-0.5 overflow-y-auto" aria-label="Added in the past">
+        {#each pastItems as item (item.id)}
+          {@const index = queue.items.findIndex((i) => i.id === item.id)}
+          <li class="group flex items-center gap-1">
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left text-muted-foreground hover:bg-signal/10 hover:text-foreground disabled:opacity-40"
+              disabled={!item.playable || queue.interrupting}
+              title={`Play from “${item.title}”`}
+              onclick={() => {
+                queue.clearInterrupt();
+                void queue.jump(item.id);
+              }}
+            >
+              <span class="w-6 shrink-0 text-right font-mono text-[10px] tabular-nums">{index + 1}</span>
+              <span class="min-w-0 flex-1 truncate text-[13px]">{item.title}</span>
+            </button>
+            <button
+              type="button"
+              class="inline-flex size-7 shrink-0 items-center justify-center rounded text-destructive opacity-70 group-hover:opacity-100 hover:bg-destructive/10"
+              aria-label={`Remove ${item.title}`}
+              title="Remove"
+              onclick={() => void queue.remove(item.id)}
+            >
+              <XIcon class="size-3.5" />
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
 </div>

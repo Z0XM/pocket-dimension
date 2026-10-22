@@ -21,10 +21,10 @@
   const hideCatalogFloats = $derived(path.startsWith("/session") || path.startsWith("/join"));
   const deviceOutput = $derived(queue.thisDevice?.outputEnabled ?? false);
   const outputHere = $derived(deviceOutput && !hideCatalogFloats);
-  const showQueue = $derived(queue.active && !hideCatalogFloats);
-  const showDevices = $derived(!hideCatalogFloats && (queue.active || queue.onlineDevices.length > 1));
+  const showQueue = $derived((queue.active || queue.interrupting) && !hideCatalogFloats);
+  const showDevices = $derived(!hideCatalogFloats && (queue.active || queue.onlineDevices.length > 1 || queue.interrupting));
   const localNote = $derived(
-    !queue.thisDevice ? null : !deviceOutput ? "This device is remote-only." : null
+    !queue.thisDevice ? null : !deviceOutput ? "This device is remote-only." : queue.interrupting ? "Playing a catalogue song — queue resumes when it ends." : null
   );
 
   onMount(() => {
@@ -37,10 +37,34 @@
       el.pause();
       el.removeAttribute("src");
       el.load();
-      delete el.dataset.itemId;
     }
+    delete el.dataset.itemId;
+    delete el.dataset.interrupt;
     queue.localPositionMs = null;
     pendingSeekSec = null;
+  }
+
+  async function applyInterrupt(el: HTMLAudioElement, mediaAssetId: string, output: boolean) {
+    if (!output) {
+      silence(el);
+      audioBlocked = false;
+      return;
+    }
+    const key = `interrupt:${mediaAssetId}`;
+    if (el.dataset.itemId !== key) {
+      el.src = `/api/media/${mediaAssetId}/audio`;
+      el.dataset.itemId = key;
+      el.dataset.interrupt = "1";
+      el.load();
+      pendingSeekSec = 0;
+    }
+    queue.localPositionMs = Math.round(el.currentTime * 1000) || 0;
+    try {
+      await el.play();
+      audioBlocked = false;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "NotAllowedError") audioBlocked = true;
+    }
   }
 
   async function apply(el: HTMLAudioElement, state: CatalogQueueState | null, item: CatalogQueueItem | null, output: boolean) {
@@ -52,6 +76,7 @@
     if (el.dataset.itemId !== item.id) {
       el.src = `/api/media/${item.mediaAssetId}/audio`;
       el.dataset.itemId = item.id;
+      delete el.dataset.interrupt;
       el.load();
     }
     // A new generation means the server moved the playhead (seek / track change); follow it, not our element.
@@ -82,10 +107,18 @@
 
   $effect(() => {
     const el = audioEl;
+    const interruptId = queue.interruptMediaAssetId;
     const state = queue.queue;
     const item = queue.currentItem;
     const output = outputHere;
     if (!el) return;
+    if (interruptId) {
+      const key = `interrupt|${interruptId}|${output}`;
+      if (key === appliedKey) return;
+      appliedKey = key;
+      untrack(() => void applyInterrupt(el, interruptId, output));
+      return;
+    }
     const key = `${state?.id}|${state?.playbackGeneration}|${state?.playbackState}|${item?.id}|${output}`;
     if (key === appliedKey) return;
     appliedKey = key;
@@ -99,11 +132,22 @@
   }
 
   function onTimeUpdate() {
-    if (!audioEl || !outputHere || audioEl.dataset.itemId !== queue.currentItem?.id) return;
+    if (!audioEl || !outputHere) return;
+    if (queue.interruptMediaAssetId) {
+      if (audioEl.dataset.interrupt !== "1") return;
+      queue.localPositionMs = Math.round(audioEl.currentTime * 1000);
+      return;
+    }
+    if (audioEl.dataset.itemId !== queue.currentItem?.id) return;
     queue.localPositionMs = Math.round(audioEl.currentTime * 1000);
   }
 
   function onEnded() {
+    if (queue.interruptMediaAssetId && audioEl?.dataset.interrupt === "1") {
+      queue.localPositionMs = null;
+      void queue.finishInterrupt();
+      return;
+    }
     const state = queue.queue;
     const itemId = audioEl?.dataset.itemId;
     if (!state || !itemId || itemId !== state.currentItemId) return;
@@ -114,10 +158,15 @@
   function unlock() {
     if (!audioEl) return;
     appliedKey = "";
+    if (queue.interruptMediaAssetId) {
+      void applyInterrupt(audioEl, queue.interruptMediaAssetId, outputHere);
+      return;
+    }
     void apply(audioEl, queue.queue, queue.currentItem, outputHere);
   }
 
   async function stopFromDrop() {
+    queue.clearInterrupt();
     await queue.stop();
   }
 </script>
@@ -129,7 +178,7 @@
     id="queue"
     title="Queue"
     slot={0}
-    active={queue.playing}
+    active={queue.playing || queue.interrupting}
     badge={queue.items.length}
     dropLabel="Release to stop the queue"
     ondrop={() => void stopFromDrop()}
