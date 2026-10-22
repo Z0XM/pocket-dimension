@@ -3,6 +3,74 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Apply saved theme before paint to avoid FOUC -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("zap.theme.prefs");
+          if (!raw) return;
+          var p = JSON.parse(raw);
+          var accents = {
+            coral: ["#ff6b4a", "#1a0d08"],
+            red: ["#ff4d4d", "#1a0808"],
+            purple: ["#c45cff", "#14081a"],
+            pink: ["#ff5a9e", "#1a0810"],
+            white: ["#f0ebe3", "#12100e"],
+            yellow: ["#ffc24a", "#1a1408"],
+            green: ["#4adf7a", "#08140e"],
+            blue: ["#4a9eff", "#081018"],
+          };
+          var pages = {
+            "dark-black": "#050505",
+            black: "#0a0a0a",
+            "light-black": "#121212",
+            "dark-gray": "#1a1a1a",
+            gray: "#222222",
+            "dark-blue": "#0a0e16",
+            "dark-purple": "#100a16",
+          };
+          var cards = {
+            ink: "#0f0f0f",
+            charcoal: "#111111",
+            slate: "#161616",
+            steel: "#1c1c1c",
+            "blue-ink": "#10141c",
+            "purple-ink": "#14101a",
+          };
+          var r = document.documentElement;
+          var a = accents[p.accent];
+          var page = pages[p.page];
+          var card = cards[p.card];
+          if (page) {
+            r.style.setProperty("--background", page);
+            r.style.setProperty("--atmosphere", "linear-gradient(180deg," + page + " 0%," + page + " 100%)");
+            r.style.setProperty("--scrollbar-track", page);
+          }
+          if (card) {
+            r.style.setProperty("--background-mid", card);
+            r.style.setProperty("--card", card);
+            r.style.setProperty("--secondary", card);
+            r.style.setProperty("--muted", card);
+            r.style.setProperty("--input", card);
+            r.style.setProperty("--popover", card);
+          }
+          if (a) {
+            r.style.setProperty("--primary", a[0]);
+            r.style.setProperty("--primary-foreground", a[1]);
+            r.style.setProperty("--accent", a[0]);
+            r.style.setProperty("--accent-foreground", a[1]);
+            r.style.setProperty("--positive", a[0]);
+            r.style.setProperty("--positive-foreground", a[1]);
+            r.style.setProperty("--signal", a[0]);
+            r.style.setProperty("--ring", a[0]);
+            r.style.setProperty("--glow-a", a[0]);
+            r.style.setProperty("--scrollbar-thumb-hover", a[0]);
+            r.style.setProperty("--frame-player-border", "4px solid " + a[0]);
+            r.style.setProperty("--frame-shadow", "8px 8px 0 color-mix(in oklab," + a[0] + " 35%,transparent)");
+          }
+        } catch (e) {}
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

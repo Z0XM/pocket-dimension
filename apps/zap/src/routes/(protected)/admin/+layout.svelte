@@ -12,21 +12,24 @@
 
   const path = $derived(page.url.pathname);
   const isActive = (href: string) => (href === "/admin" ? path === "/admin" : path === href || path.startsWith(`${href}/`));
+  const activityFill = $derived(path === "/admin");
 </script>
 
-<section class="space-y-6">
-  <div>
+<section class={`flex flex-col gap-6 ${activityFill ? "min-h-0 flex-1" : ""}`}>
+  <div class="shrink-0">
     <p class="font-mono text-[10px] tracking-[0.18em] text-signal uppercase">Zap admin</p>
     <h1 class="mt-1 text-3xl font-semibold tracking-tight">Admin</h1>
+    <nav class="mt-6 flex flex-wrap gap-1 border-b border-border/60 pb-2 font-mono text-[11px]" aria-label="Admin">
+      {#each tabs as tab (tab.href)}
+        <a
+          href={tab.href}
+          class={`zap-nav-link ${isActive(tab.href) ? "zap-nav-link-active" : ""}`}
+          aria-current={isActive(tab.href) ? "page" : undefined}>{tab.label}</a
+        >
+      {/each}
+    </nav>
   </div>
-  <nav class="flex flex-wrap gap-1 border-b border-border/60 pb-2 font-mono text-[11px]" aria-label="Admin">
-    {#each tabs as tab (tab.href)}
-      <a
-        href={tab.href}
-        class={`zap-nav-link ${isActive(tab.href) ? "zap-nav-link-active" : ""}`}
-        aria-current={isActive(tab.href) ? "page" : undefined}>{tab.label}</a
-      >
-    {/each}
-  </nav>
-  {@render children()}
+  <div class={activityFill ? "flex min-h-0 flex-1 flex-col" : ""}>
+    {@render children()}
+  </div>
 </section>

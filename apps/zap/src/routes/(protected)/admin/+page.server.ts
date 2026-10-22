@@ -3,8 +3,10 @@ import { and, count, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { isUuid } from "$lib/admin-access";
 import { listZapUsers, requireZapAdmin } from "$lib/server/admin/access";
 import { listAdminActivity } from "$lib/server/admin/activity";
-import { parseAdminActivityKind, parseBeforeCursor } from "$lib/server/admin/activity-merge";
+import { parseAdminActivityKind } from "$lib/server/admin/activity-merge";
 import type { PageServerLoad } from "./$types";
+
+const ACTIVITY_PAGE_SIZE = 100;
 
 async function loadSummary() {
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -47,16 +49,19 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const userParam = url.searchParams.get("user");
   const userId = isUuid(userParam) ? userParam : null;
   const kind = parseAdminActivityKind(url.searchParams.get("kind"));
-  const before = parseBeforeCursor(url.searchParams.get("before"));
 
   const mode = locals.zapAccess!.mode;
-  const [summary, activity, users] = await Promise.all([loadSummary(), listAdminActivity({ userId, kind, before, limit: 100 }), listZapUsers(mode)]);
+  const [summary, activity, users] = await Promise.all([
+    loadSummary(),
+    listAdminActivity({ userId, kind, before: null, limit: ACTIVITY_PAGE_SIZE }),
+    listZapUsers(mode),
+  ]);
 
   return {
     summary,
     activity: activity.entries,
     nextBefore: activity.nextBefore,
-    filters: { userId: userId ?? "", kind: kind ?? "", before: before?.toISOString() ?? "" },
+    filters: { userId: userId ?? "", kind: kind ?? "" },
     users: users.map((u) => ({ userId: u.userId, label: u.username ?? u.email, lastSeenAt: u.lastSeenAt })),
   };
 };

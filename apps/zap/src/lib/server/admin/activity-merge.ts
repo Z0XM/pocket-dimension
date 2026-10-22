@@ -1,6 +1,11 @@
 export const ADMIN_ACTIVITY_KINDS = ["play", "session_started", "session_joined", "import", "upload"] as const;
 export type AdminActivityKind = (typeof ADMIN_ACTIVITY_KINDS)[number];
 
+export type AdminActivityLink = {
+  label: string;
+  href: string;
+};
+
 export type AdminActivityEntry = {
   id: string;
   kind: AdminActivityKind;
@@ -10,6 +15,10 @@ export type AdminActivityEntry = {
   userLabel: string;
   summary: string;
   detail: string | null;
+  /** Single primary link (e.g. played song). When set without `links`, summary is clickable. */
+  href?: string | null;
+  /** One or more labeled links (e.g. import URL / YouTube playlists). */
+  links?: AdminActivityLink[] | null;
 };
 
 export function parseAdminActivityKind(raw: string | null | undefined): AdminActivityKind | null {

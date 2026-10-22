@@ -3,6 +3,7 @@
   import { CatalogQueueClient, setCatalogQueue } from "$lib/catalog-queue-client.svelte";
   import CatalogQueueDock from "$lib/components/CatalogQueueDock.svelte";
   import PageSkeleton from "$lib/components/PageSkeleton.svelte";
+  import SettingsMenu from "$lib/components/SettingsMenu.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
   import type { LayoutData } from "../$types";
   import { navigating, page } from "$app/state";
@@ -19,12 +20,11 @@
   const homeActive = $derived(path === "/home");
   const catalogueActive = $derived(path === "/catalogue" || path.startsWith("/catalogue/"));
   const playlistsActive = $derived(path === "/playlists" || path.startsWith("/playlists/"));
-  const historyActive = $derived(path === "/history" || path.startsWith("/history/"));
   const sessionActive = $derived(path === "/session" || path.startsWith("/session/"));
-  const adminActive = $derived(path === "/admin" || path.startsWith("/admin/"));
+  const adminActivityActive = $derived(path === "/admin");
 
-  /** Catalogue pins the shell to the viewport so only its song list scrolls. */
-  const fillViewport = $derived(catalogueActive && !isNavigating);
+  /** Catalogue / Admin activity pin the shell so only their list panes scroll. */
+  const fillViewport = $derived((catalogueActive || adminActivityActive) && !isNavigating);
 
   const skeletonPath = $derived(navTo ?? path);
   const skeletonShowFilters = $derived(skeletonPath.startsWith("/catalogue") || skeletonPath.startsWith("/session/"));
@@ -76,27 +76,6 @@
       class={`zap-nav-link ${sessionActive ? "zap-nav-link-active" : ""} ${rail ? "block w-full px-2" : ""}`}
       aria-current={sessionActive ? "page" : undefined}>Sessions</a
     >
-    {#if !rail}
-      <span class="mx-1 hidden text-border sm:inline" aria-hidden="true">|</span>
-    {/if}
-    <a
-      href="/history"
-      class={`zap-nav-link ${historyActive ? "zap-nav-link-active" : ""} ${rail ? "block w-full px-2" : ""}`}
-      aria-current={historyActive ? "page" : undefined}>History</a
-    >
-    {#if data.zapAdmin}
-      <a
-        href="/admin"
-        class={`zap-nav-link ${adminActive ? "zap-nav-link-active" : ""} ${rail ? "block w-full px-2" : ""}`}
-        aria-current={adminActive ? "page" : undefined}>Admin</a
-      >
-    {/if}
-    {#if !rail}
-      <span class="hidden text-muted-foreground sm:inline">{data.user?.username ?? data.user?.email}</span>
-      <button type="button" class="rounded border border-border px-2 py-1 text-muted-foreground hover:bg-secondary" onclick={signOut}>
-        Sign out
-      </button>
-    {/if}
   </nav>
 {/snippet}
 
@@ -107,15 +86,8 @@
       <WaveBars />
     </a>
     {@render primaryNav(true)}
-    <div class="mt-auto space-y-2 px-2">
-      <p class="truncate text-[10px] text-muted-foreground">{data.user?.username ?? data.user?.email}</p>
-      <button
-        type="button"
-        class="w-full rounded border border-border px-2 py-1 text-left text-muted-foreground hover:bg-secondary"
-        onclick={signOut}
-      >
-        Sign out
-      </button>
+    <div class="mt-auto px-2 py-2">
+      <SettingsMenu username={data.user?.username ?? data.user?.email} isAdmin={data.zapAdmin} onSignOut={signOut} />
     </div>
   </aside>
 
@@ -130,8 +102,9 @@
           <span class="text-xl font-semibold tracking-tight text-foreground">Zap</span>
           <WaveBars />
         </a>
-        <div class="zap-shell-nav-links">
+        <div class="zap-shell-nav-links flex flex-wrap items-center gap-2 sm:gap-3">
           {@render primaryNav(false)}
+          <SettingsMenu username={data.user?.username ?? data.user?.email} isAdmin={data.zapAdmin} onSignOut={signOut} />
         </div>
       </div>
     </header>
