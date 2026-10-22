@@ -227,6 +227,23 @@ html body {
   outline-offset: 2px;
 }
 
+/* Form fields: thin 1px border focus — avoid stacked thick outline + ring */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):focus,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible,
+.auth-field:focus,
+.auth-field:focus-visible {
+  outline: none;
+  outline-offset: 0;
+  border-color: var(--signal);
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

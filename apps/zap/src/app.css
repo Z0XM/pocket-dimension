@@ -96,7 +96,7 @@
   }
 
   .auth-field {
-    @apply w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50;
+    @apply w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-signal focus:outline-none focus:ring-0 disabled:opacity-50;
   }
 
   .auth-btn {
