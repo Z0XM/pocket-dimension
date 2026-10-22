@@ -6,25 +6,26 @@
   --zap-font-sans: "Archivo Variable", sans-serif;
   --zap-font-display: "Archivo Variable", sans-serif;
   --zap-font-mono: "Archivo Variable", sans-serif;
-  --background: #0a0a0a;
-  --background-mid: #111111;
+  /* Defaults match DEFAULT_THEME_PREFS: coral + dark-purple + ink */
+  --background: #100a16;
+  --background-mid: #0f0f0f;
   --foreground: #f3efe9;
-  --card: #111111;
+  --card: #0f0f0f;
   --card-foreground: #f3efe9;
   --primary: #ff6b4a;
   --primary-foreground: #1a0d08;
-  --secondary: #111111;
+  --secondary: #0f0f0f;
   --secondary-foreground: #f3efe9;
-  --muted: #111111;
+  --muted: #0f0f0f;
   --muted-foreground: #9c9389;
   --accent: #ff6b4a;
   --accent-foreground: #1a0d08;
   --positive: #ff6b4a;
   --positive-foreground: #1a0d08;
   --border: #2a2a2a;
-  --input: #111111;
+  --input: #0f0f0f;
   --ring: #ff6b4a;
-  --popover: #111111;
+  --popover: #0f0f0f;
   --popover-foreground: #f3efe9;
   --destructive: #ffb09d;
   --destructive-foreground: #ffb09d;
@@ -40,8 +41,8 @@
   --frame-shadow: 8px 8px 0 color-mix(in oklab, #ff6b4a 35%, transparent);
   --frame-player-border: 4px solid #ff6b4a;
   --frame-stage-rule: 3px solid #f3efe9;
-  --atmosphere: linear-gradient(180deg, #0a0a0a 0%, #0a0a0a 100%);
-  --scrollbar-track: #0a0a0a;
+  --atmosphere: linear-gradient(180deg, #100a16 0%, #100a16 100%);
+  --scrollbar-track: #100a16;
   --scrollbar-thumb: #2a2a2a;
   --scrollbar-thumb-hover: #ff6b4a;
 }

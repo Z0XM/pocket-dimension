@@ -47,8 +47,8 @@ export type ZapThemePrefs = {
 
 export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
   accent: "coral",
-  page: "black",
-  card: "charcoal",
+  page: "dark-purple",
+  card: "ink",
 };
 
 export function isAccentId(v: unknown): v is AccentId {
@@ -92,11 +92,19 @@ function accentById(id: AccentId) {
 }
 
 function pageById(id: PageId) {
-  return PAGE_PRESETS.find((p) => p.id === id) ?? PAGE_PRESETS[1];
+  return (
+    PAGE_PRESETS.find((p) => p.id === id) ??
+    PAGE_PRESETS.find((p) => p.id === DEFAULT_THEME_PREFS.page) ??
+    PAGE_PRESETS[0]
+  );
 }
 
 function cardById(id: CardId) {
-  return CARD_PRESETS.find((p) => p.id === id) ?? CARD_PRESETS[1];
+  return (
+    CARD_PRESETS.find((p) => p.id === id) ??
+    CARD_PRESETS.find((p) => p.id === DEFAULT_THEME_PREFS.card) ??
+    CARD_PRESETS[0]
+  );
 }
 
 /** Apply prefs to `:root` CSS custom properties. */
