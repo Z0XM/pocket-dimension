@@ -1,0 +1,233 @@
+/*
+ * Frame chrome — app-wide topology + component language.
+ */
+
+html,
+html body {
+  font-family: var(--zap-font-sans);
+}
+
+.zap-shell {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+}
+
+.zap-shell-rail {
+  display: none;
+}
+
+.zap-shell-body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.zap-shell-top {
+  position: relative;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--background-mid);
+}
+
+.zap-shell-brand span {
+  font-family: var(--zap-font-display);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+  font-size: 1.15rem;
+  line-height: 0.95;
+}
+
+.zap-nav-link {
+  font-family: var(--zap-font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-bottom-width: 2px;
+  color: var(--muted-foreground);
+}
+
+.zap-nav-link:hover {
+  color: var(--foreground);
+}
+
+.zap-nav-link-active {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+
+.zap-shell-main {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 72rem;
+  padding-inline: 1.5rem;
+}
+
+.zap-shell-main.is-fill {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-block: 1rem;
+}
+
+@media (min-width: 640px) {
+  .zap-shell-main.is-fill {
+    padding-block: 1.5rem;
+  }
+}
+
+.zap-shell-main:not(.is-fill) {
+  padding-block: 2rem;
+}
+
+.zap-wave-field {
+  background: var(--atmosphere);
+  background-attachment: fixed;
+}
+
+.zap-grid {
+  background-image: none;
+}
+
+.zap-catalogue-header {
+  border-bottom: var(--frame-stage-rule);
+  padding-bottom: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.zap-catalogue-title {
+  font-family: var(--zap-font-display);
+  font-size: clamp(2.25rem, 5.5vw, 4rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+  text-transform: uppercase;
+}
+
+.zap-catalogue-lede {
+  margin-top: 0.65rem;
+  max-width: 40rem;
+  font-size: 0.95rem;
+  color: var(--muted-foreground);
+}
+
+.zap-filters-panel {
+  border: 2px solid var(--border);
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: none;
+}
+
+.zap-track-host {
+  border: 2px solid var(--border);
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: none;
+}
+
+.zap-track-host > ul {
+  margin: 0;
+  list-style: none;
+  padding: 0;
+}
+
+.zap-track {
+  border-bottom: 2px solid var(--border);
+  padding-block: 0.85rem;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.zap-track:last-child {
+  border-bottom: none;
+}
+
+.zap-track.is-current {
+  background: color-mix(in srgb, var(--signal) 12%, transparent);
+  box-shadow: none;
+}
+
+.zap-track.is-current .zap-track-title {
+  color: var(--signal);
+  font-weight: 700;
+}
+
+.zap-track-title {
+  letter-spacing: -0.02em;
+}
+
+.zap-track-play {
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  border-radius: 0;
+}
+
+.zap-track.is-current .zap-track-play,
+.zap-track-play:hover:not(:disabled) {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--primary-foreground);
+  transform: none;
+}
+
+.zap-section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--signal);
+  border-color: var(--border);
+}
+
+.auth-error,
+.auth-notice {
+  border-radius: 0;
+}
+
+.auth-error {
+  border-color: color-mix(in srgb, var(--destructive) 45%, var(--border));
+  background: #3a1c18;
+  color: var(--destructive);
+}
+
+.zap-float-icon {
+  border-radius: 0 !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.zap-float-panel {
+  border-radius: 0 !important;
+  border-color: var(--border) !important;
+  border-top: var(--frame-player-border) !important;
+  background: var(--background-mid) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+::selection {
+  background: #ff6b4a;
+  color: #1a0d08;
+}
+
+:focus-visible {
+  outline: 2px solid #ff6b4a;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

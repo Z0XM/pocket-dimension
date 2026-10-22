@@ -1,0 +1,188 @@
+{
+  "title": "Zap Catalogue — visual world",
+  "question": "Pick the world for Zap’s Catalogue redesign. Layout can change; features stay.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Lacquer Spine Wall",
+      "kicker": "THE ROLL",
+      "lineage": "Hi-fi remote + vinyl spine wall",
+      "thesis": "Catalogue as a lit spine wall: dark lacquer ground, tracks as tight spines, play actions sized like a remote.",
+      "palette": ["#0a0c10", "#e8ecf2", "#2ee6ff", "#1a1e26"],
+      "materials": ["matte lacquer", "LED edge glow", "spine-row density"],
+      "viewport": "Top chrome: Zap + nav. Filters as a slim tuner strip. Main stage: dense track rows like album spines; playing row glows as one lit LED. Add music is a remote-sized primary.",
+      "risk": "Can feel too quiet/hi-fi if the signal glow is timid — hangouts need punch.",
+      "raised": [
+        {
+          "from": "Emigre specimen",
+          "raise": "One grotesque family only — hierarchy is size and weight, never a second display costume."
+        },
+        {
+          "from": "Botanical folio",
+          "raise": "Every track row shares one fixed scale and baseline rhythm so the list registers like plates."
+        },
+        {
+          "from": "Emission-line rail",
+          "raise": "Content hangs off one off-centre rail; selection state speaks in weight and edge, not rainbow chrome."
+        }
+      ],
+      "comp": ".impeccable/mocks/decision/assigned.png",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "top nav", "x": 0, "y": 0, "w": 12, "h": 1, "accent": true },
+          { "label": "filter tuner", "x": 1, "y": 1, "w": 10, "h": 2 },
+          { "label": "spine track list", "x": 1, "y": 3, "w": 10, "h": 6, "accent": true },
+          { "label": "queue dock", "x": 9, "y": 9, "w": 3, "h": 1 }
+        ]
+      }
+    },
+    {
+      "id": "model-pick",
+      "label": "Karaoke Songbook",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "bar karaoke binders",
+      "thesis": "Find-and-fire: numbered dense titles, artist under, one huge Play gesture.",
+      "palette": ["#050508", "#f5f5f7", "#ff3d9a", "#2ee6ff"],
+      "materials": ["laminated page", "neon ink", "tabular index"],
+      "viewport": "Full-width search + scope tabs. Numbered track table dominates. Play/enqueue sit on every row like songbook picks.",
+      "risk": "Most familiar music-UI landing — strong, but the category’s safe harbour.",
+      "comp": ".impeccable/mocks/decision/model-pick.png",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "top nav", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "search + scope", "x": 0, "y": 1, "w": 12, "h": 2, "accent": true },
+          { "label": "numbered track table", "x": 0, "y": 3, "w": 12, "h": 7, "accent": true }
+        ]
+      }
+    },
+    {
+      "id": "challenger-doujin",
+      "label": "Event Catalog Grid",
+      "verdict": "wins",
+      "lineage": "convention circle catalog / doujin hall grid",
+      "thesis": "Hundreds of tracks as whole cells in a packed grid — mark, route, enqueue like circling tables on a hall map.",
+      "palette": ["#07070c", "#f0f0f4", "#a3e635", "#e879f9"],
+      "materials": ["packed cells", "spot-mark selection", "single ink intensity"],
+      "viewport": "Slim side rail for Zap nav. Filters collapse to a sticky strip. Main: responsive track cards in a dense grid; active/queued cells ringed in spot color.",
+      "case": "Wins audience ID (browsing a packed catalogue) and product clarity (Catalogue is literally a catalog).",
+      "risk": "Grid density can crush metadata if cells are too small — titles must stay readable.",
+      "comp": ".impeccable/mocks/decision/challenger-doujin.png",
+      "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-doujin-event-catalog-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/pop-culture-shelf-doujin-event-catalog.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "side rail", "x": 0, "y": 0, "w": 2, "h": 10, "accent": true },
+          { "label": "sticky filters", "x": 2, "y": 0, "w": 10, "h": 2 },
+          { "label": "track cell grid", "x": 2, "y": 2, "w": 10, "h": 8, "accent": true }
+        ]
+      }
+    },
+    {
+      "id": "challenger-gate",
+      "label": "Gate Board",
+      "verdict": "competitive",
+      "lineage": "boarding pass + live gate board",
+      "thesis": "Tracks as ranked board rows; playing/queued changes stay lit until you notice.",
+      "palette": ["#0b0d12", "#eef2f7", "#fb923c", "#22d3ee"],
+      "materials": ["segment panels", "tabular figures", "hold-lit change"],
+      "viewport": "Top nav. Filter segments like a pass. Track board columns: title, tags, duration, action — playing row holds amber until acknowledged.",
+      "case": "Holds product clarity (live state, identity-preserving updates); loses slightly on hangout identification.",
+      "risk": "Can read airport-cold without a warm signal accent.",
+      "comp": ".impeccable/mocks/decision/challenger-gate.png",
+      "hero": "https://impeccable.style/worlds/cards/vernacular-ephemera-boarding-pass-and-gate-board-hero.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "top nav", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "pass filters", "x": 0, "y": 1, "w": 12, "h": 2 },
+          { "label": "ranked board", "x": 0, "y": 3, "w": 12, "h": 7, "accent": true }
+        ]
+      }
+    },
+    {
+      "id": "challenger-fac",
+      "label": "FAC Pulse Sleeve",
+      "verdict": "competitive",
+      "lineage": "Factory Records catalog sleeve",
+      "thesis": "Matte black field, sparse type, tags as color code strips; the active track alone blooms full color.",
+      "palette": ["#050505", "#ffffff", "#ff4d8d", "#5ef0c8", "#fbbf24"],
+      "materials": ["matte black", "hairline pulse", "coded hue strips"],
+      "viewport": "Minimal top mark. Filters as coded chips. List of tracks with tiny FAC-like ids; selected spine expands color; play is a single white control.",
+      "case": "Strong music-culture identification; clarity costs if titles hide behind codes.",
+      "risk": "Too cryptic for fast hangout enqueue if decoding is mandatory.",
+      "comp": ".impeccable/mocks/decision/challenger-fac.png",
+      "hero": "https://impeccable.style/worlds/cards/brand-identity-canon-saville-catalog-sleeve-hero.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "minimal chrome", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "code chips", "x": 0, "y": 1, "w": 12, "h": 1 },
+          { "label": "sparse track field", "x": 0, "y": 2, "w": 12, "h": 8, "accent": true }
+        ]
+      }
+    },
+    {
+      "id": "challenger-emigre",
+      "label": "Bitmap Specimen",
+      "verdict": "declined",
+      "lineage": "Emigre bitmap type specimen",
+      "palette": ["#111111", "#f4f0e6", "#ff5c7a"],
+      "materials": ["pixel display", "newsprint", "specimen steps"],
+      "case": "Loses both axes for Operate — pixel display hurts scannable catalogue text.",
+      "kept": "Specimen hierarchy: one face, many sizes.",
+      "hero": "https://impeccable.style/worlds/cards/emigre-bitmap-specimen-hero.webp"
+    },
+    {
+      "id": "challenger-botanical",
+      "label": "Botanical Folio",
+      "verdict": "declined",
+      "lineage": "botanical plate sequence",
+      "palette": ["#f3ead8", "#2f4a3a", "#a33327"],
+      "materials": ["cream plate", "sepia rules"],
+      "case": "Loses both — cream/editorial fights the dark vibrant brief.",
+      "kept": "Fixed-scale registered rows.",
+      "hero": "https://impeccable.style/worlds/cards/editorial-sequence-montage-botanical-folio-season-hero.webp"
+    },
+    {
+      "id": "challenger-emission",
+      "label": "Emission Rail",
+      "verdict": "declined",
+      "lineage": "spectrogram emission-line rail",
+      "palette": ["#1a1a1a", "#d8d0c4", "#67e8f9"],
+      "materials": ["charcoal continuum", "hairline emission"],
+      "case": "Loses both — instrument costume risk on a working Operate screen.",
+      "kept": "Off-centre rail + state in line weight.",
+      "hero": "https://impeccable.style/worlds/cards/operate-c-emission-line-rail-hero.webp"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code", "toggle": true },
+  "canon": true,
+  "canonCard": {
+    "label": "Category standard music app",
+    "thesis": "Dark Spotify-like shell: top nav, search bar, list rows with play — executed at full craft.",
+    "palette": ["#121212", "#ffffff", "#1db954"],
+    "materials": ["flat dark UI", "rounded controls", "cover thumbs"],
+    "viewport": "Familiar music-app catalogue: search, filters, scrollable track list with play buttons.",
+    "risk": "Indistinguishable from every other music tool by design.",
+    "comp": ".impeccable/mocks/decision/canon.png",
+    "wireframe": {
+      "cols": 12,
+      "rows": 10,
+      "regions": [
+        { "label": "top nav", "x": 0, "y": 0, "w": 12, "h": 1 },
+        { "label": "search", "x": 0, "y": 1, "w": 12, "h": 1 },
+        { "label": "track list", "x": 0, "y": 2, "w": 12, "h": 8, "accent": true }
+      ]
+    }
+  },
+  "steer": true
+}

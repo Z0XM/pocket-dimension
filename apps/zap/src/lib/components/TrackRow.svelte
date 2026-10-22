@@ -163,11 +163,11 @@
   }
 </script>
 
-<li class={`flex flex-col gap-3 px-4 py-3 ${isCurrent ? "bg-signal/5" : ""}`}>
+<li class={`zap-track flex flex-col gap-3 px-4 py-3 ${isCurrent ? "is-current bg-signal/5" : ""}`}>
   <div class="flex items-start gap-3 sm:items-center sm:gap-4">
     <button
       type="button"
-      class="flex size-10 shrink-0 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
+      class="zap-track-play flex size-10 shrink-0 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
       disabled={!track.playable || !queue || (queue.pending > 0 && !isCurrent)}
       title={unavailable ? "Song not available" : isCurrent ? undefined : "Play now (adds to your queue)"}
       aria-label={unavailable ? "Song not available" : isPlaying ? "Pause" : "Play"}
@@ -183,7 +183,10 @@
     <div class="min-w-0 flex-1 space-y-2">
       <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div class="min-w-0 flex-1">
-          <p class="truncate font-medium {isCurrent ? 'text-signal' : unavailable ? 'text-muted-foreground' : 'text-foreground'}" title={track.title}>
+          <p
+            class="zap-track-title truncate font-medium {isCurrent ? 'text-signal' : unavailable ? 'text-muted-foreground' : 'text-foreground'}"
+            title={track.title}
+          >
             {track.title}
           </p>
           <p class="truncate font-mono text-xs text-muted-foreground">

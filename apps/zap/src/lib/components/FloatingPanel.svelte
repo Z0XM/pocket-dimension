@@ -177,7 +177,7 @@
   {#if mode === "icon"}
     <button
       type="button"
-      class={`fixed z-40 flex touch-none items-center justify-center rounded-full border bg-popover/95 text-signal shadow-lg backdrop-blur transition-shadow select-none ${
+      class={`zap-float-icon fixed z-40 flex touch-none items-center justify-center rounded-full border bg-popover/95 text-signal shadow-lg backdrop-blur transition-shadow select-none ${
         active ? "border-signal/70 shadow-[0_0_18px_color-mix(in_srgb,var(--signal)_35%,transparent)]" : "border-border hover:border-signal/50"
       } ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
       style={`left:${iconPos.x}px;top:${iconPos.y}px;width:${ICON_SIZE}px;height:${ICON_SIZE}px`}
@@ -199,7 +199,7 @@
     </button>
   {:else}
     <div
-      class={`fixed z-[41] flex flex-col overflow-hidden border border-signal/30 bg-popover/95 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur ${
+      class={`zap-float-panel fixed z-[41] flex flex-col overflow-hidden border border-signal/30 bg-popover/95 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur ${
         mode === "full" ? "inset-2 rounded-lg sm:inset-6" : "rounded-lg"
       }`}
       style={mode === "panel" && panel ? `left:${panel.x}px;top:${panel.y}px;width:${panel.w}px;height:${panel.h}px` : undefined}

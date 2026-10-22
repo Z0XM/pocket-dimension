@@ -2,15 +2,15 @@
 @plugin "@tailwindcss/forms";
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
-@import "@fontsource-variable/space-grotesk";
-@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/archivo";
 @import "./lib/styles/theme.css";
+@import "./lib/styles/design-chrome.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Space Grotesk Variable", sans-serif;
-  --font-mono: "JetBrains Mono Variable", monospace;
+  --font-sans: "Archivo Variable", sans-serif;
+  --font-mono: "Archivo Variable", sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -91,20 +91,6 @@
 }
 
 @layer components {
-  .zap-wave-field {
-    background:
-      radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--signal) 22%, transparent), transparent 55%),
-      radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in srgb, var(--graph) 16%, transparent), transparent 50%),
-      linear-gradient(180deg, #071018 0%, #0a1520 45%, #071018 100%);
-  }
-
-  .zap-grid {
-    background-image:
-      linear-gradient(color-mix(in srgb, var(--signal) 6%, transparent) 1px, transparent 1px),
-      linear-gradient(90deg, color-mix(in srgb, var(--signal) 6%, transparent) 1px, transparent 1px);
-    background-size: 48px 48px;
-  }
-
   .auth-form {
     @apply p-6 md:p-8;
   }

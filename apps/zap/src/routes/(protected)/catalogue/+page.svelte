@@ -323,16 +323,16 @@
   </button>
 {/snippet}
 
-<section class="flex min-h-0 flex-1 flex-col gap-3">
-  <div class="shrink-0">
-    <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Catalogue</h1>
-    <p class="mt-1 text-sm text-muted-foreground">
+<section class="zap-catalogue flex min-h-0 flex-1 flex-col gap-3">
+  <div class="zap-catalogue-header shrink-0">
+    <h1 class="zap-catalogue-title text-2xl font-semibold tracking-tight sm:text-3xl">Catalogue</h1>
+    <p class="zap-catalogue-lede mt-1 text-sm text-muted-foreground">
       Search the shared Zap catalogue. <span class="font-mono text-signal">Your library</span> = tracks you’ve tagged. Play adds to your personal
       queue; use <span class="font-mono text-signal">+</span> to add music.
     </p>
   </div>
 
-  <div class="shrink-0 rounded-lg border border-border/70 bg-card/50 p-3">
+  <div class="zap-filters-panel shrink-0 rounded-lg border border-border/70 bg-card/50 p-3">
     <CatalogueFilters
       collapsible
       bind:open={filtersOpen}
@@ -398,93 +398,99 @@
     {/if}
   </div>
 
-  {#if form?.tagError || form?.tagOk || listError || deleteMessage || addMessage || savedPlaylistMessage || scopeNotice}
-    <div class="shrink-0 space-y-1">
-      {#if scopeNotice}
-        <p class="text-sm text-muted-foreground">{scopeNotice}</p>
-      {/if}
-      {#if form?.tagError}
-        <p class="auth-error mb-0 p-2">{form.tagError}</p>
-      {/if}
-      {#if form?.tagOk}
-        <p class="text-sm text-signal">Tags updated.</p>
-      {/if}
-      {#if listError}
-        <p class="auth-error mb-0 p-2">{listError}</p>
-      {/if}
-      {#if deleteMessage}
-        <p class="text-sm text-signal">{deleteMessage}</p>
-      {/if}
-      {#if addMessage}
-        <p class="text-sm text-signal">{addMessage}</p>
-      {/if}
-      {#if savedPlaylistMessage}
-        <p class="text-sm text-signal">{savedPlaylistMessage}</p>
+  <div class="zap-catalogue-list-col flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+    {#if form?.tagError || form?.tagOk || listError || deleteMessage || addMessage || savedPlaylistMessage || scopeNotice}
+      <div class="shrink-0 space-y-1">
+        {#if scopeNotice}
+          <p class="text-sm text-muted-foreground">{scopeNotice}</p>
+        {/if}
+        {#if form?.tagError}
+          <p class="auth-error mb-0 p-2">{form.tagError}</p>
+        {/if}
+        {#if form?.tagOk}
+          <p class="text-sm text-signal">Tags updated.</p>
+        {/if}
+        {#if listError}
+          <p class="auth-error mb-0 p-2">{listError}</p>
+        {/if}
+        {#if deleteMessage}
+          <p class="text-sm text-signal">{deleteMessage}</p>
+        {/if}
+        {#if addMessage}
+          <p class="text-sm text-signal">{addMessage}</p>
+        {/if}
+        {#if savedPlaylistMessage}
+          <p class="text-sm text-signal">{savedPlaylistMessage}</p>
+        {/if}
+      </div>
+    {/if}
+
+    <div class="min-h-[12rem] flex-1">
+      {#if loading && assets.length === 0}
+        <div class="h-full overflow-hidden">
+          <TrackListSkeleton rows={8} />
+        </div>
+      {:else}
+        <ListBusyOverlay fill busy={loading && assets.length > 0} label="Updating catalogue…">
+          <div bind:this={scrollRoot} class="zap-track-host h-full overflow-y-auto overscroll-contain">
+            {#if suggestions.length}
+              <h2
+                class="zap-section-label border-b border-border/50 px-4 pt-3 pb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase"
+              >
+                Suggested from others
+              </h2>
+              <ul class="zap-track-list zap-suggestions divide-y divide-border/50 border-b border-border/70">
+                {#each suggestions as track (track.id)}
+                  <TrackRow {track} {availableTags} {queue} playlists={editablePlaylists} canDelete={data.zapAdmin} ondeleted={onDeleted} />
+                {/each}
+              </ul>
+              <h2
+                class="zap-section-label border-b border-border/50 px-4 pt-3 pb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase"
+              >
+                {scopeLabel}
+              </h2>
+            {/if}
+            <ul class="zap-track-list divide-y divide-border/50">
+              {#if assets.length === 0}
+                <li class="px-4 py-10 text-center text-sm text-muted-foreground">
+                  {#if libraryScope === "" && !filtering}
+                    Your library is empty — tag tracks to collect them here, or
+                    <button
+                      type="button"
+                      class="text-signal hover:underline"
+                      onclick={() => {
+                        libraryScope = "all";
+                        void fetchPage({ reset: true });
+                      }}>browse all tracks</button
+                    >.
+                  {:else}
+                    No tracks match.
+                    <button type="button" class="text-signal hover:underline" onclick={() => openAdd()}>Add music</button>
+                    or clear filters.
+                  {/if}
+                </li>
+              {:else}
+                {#each assets as track (track.id)}
+                  <TrackRow {track} {availableTags} {queue} playlists={editablePlaylists} canDelete={data.zapAdmin} ondeleted={onDeleted} />
+                {/each}
+              {/if}
+            </ul>
+
+            <div bind:this={sentinel} class="h-px" aria-hidden="true"></div>
+            {#if loadingMore}
+              <div class="flex justify-center py-3">
+                <span class="inline-flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                  <span class="zap-busy-bars scale-90" aria-hidden="true"><span></span><span></span><span></span></span>
+                  Loading more…
+                </span>
+              </div>
+            {:else if !hasMore && assets.length > 0}
+              <p class="border-t border-border/50 py-3 text-center font-mono text-[11px] text-muted-foreground">End of catalogue</p>
+            {/if}
+          </div>
+        </ListBusyOverlay>
       {/if}
     </div>
-  {/if}
-
-  <div class="min-h-[12rem] flex-1">
-    {#if loading && assets.length === 0}
-      <div class="h-full overflow-hidden">
-        <TrackListSkeleton rows={8} />
-      </div>
-    {:else}
-      <ListBusyOverlay fill busy={loading && assets.length > 0} label="Updating catalogue…">
-        <div bind:this={scrollRoot} class="h-full overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-card/30">
-          {#if suggestions.length}
-            <h2 class="border-b border-border/50 px-4 pt-3 pb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
-              Suggested from others
-            </h2>
-            <ul class="divide-y divide-border/50 border-b border-border/70">
-              {#each suggestions as track (track.id)}
-                <TrackRow {track} {availableTags} {queue} playlists={editablePlaylists} canDelete={data.zapAdmin} ondeleted={onDeleted} />
-              {/each}
-            </ul>
-            <h2 class="border-b border-border/50 px-4 pt-3 pb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
-              {scopeLabel}
-            </h2>
-          {/if}
-          <ul class="divide-y divide-border/50">
-            {#if assets.length === 0}
-              <li class="px-4 py-10 text-center text-sm text-muted-foreground">
-                {#if libraryScope === "" && !filtering}
-                  Your library is empty — tag tracks to collect them here, or
-                  <button
-                    type="button"
-                    class="text-signal hover:underline"
-                    onclick={() => {
-                      libraryScope = "all";
-                      void fetchPage({ reset: true });
-                    }}>browse all tracks</button
-                  >.
-                {:else}
-                  No tracks match.
-                  <button type="button" class="text-signal hover:underline" onclick={() => openAdd()}>Add music</button>
-                  or clear filters.
-                {/if}
-              </li>
-            {:else}
-              {#each assets as track (track.id)}
-                <TrackRow {track} {availableTags} {queue} playlists={editablePlaylists} canDelete={data.zapAdmin} ondeleted={onDeleted} />
-              {/each}
-            {/if}
-          </ul>
-
-          <div bind:this={sentinel} class="h-px" aria-hidden="true"></div>
-          {#if loadingMore}
-            <div class="flex justify-center py-3">
-              <span class="inline-flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                <span class="zap-busy-bars scale-90" aria-hidden="true"><span></span><span></span><span></span></span>
-                Loading more…
-              </span>
-            </div>
-          {:else if !hasMore && assets.length > 0}
-            <p class="border-t border-border/50 py-3 text-center font-mono text-[11px] text-muted-foreground">End of catalogue</p>
-          {/if}
-        </div>
-      </ListBusyOverlay>
-    {/if}
   </div>
 </section>
 

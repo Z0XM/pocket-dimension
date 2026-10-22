@@ -1,0 +1,20 @@
+{
+  "id": "e7276d111acc47e7",
+  "digest": "2a964a1a866d134b",
+  "comps": [
+    ".impeccable/mocks/decision/assigned.png",
+    ".impeccable/mocks/decision/model-pick.png",
+    ".impeccable/mocks/decision/challenger-doujin.png",
+    ".impeccable/mocks/decision/challenger-gate.png",
+    ".impeccable/mocks/decision/challenger-fac.png",
+    ".impeccable/mocks/decision/canon.png"
+  ],
+  "pre": {
+    ".impeccable/mocks/decision/assigned.png": "2d6ce28ae516c370b2a69924bcec07295a5cbdf4823ce150b0e745dbd0f364fa",
+    ".impeccable/mocks/decision/model-pick.png": "609f30031edbf9db61c47e2ee7e81a19a9d3f1ee11bbf655ebbc13927bf5d770",
+    ".impeccable/mocks/decision/challenger-doujin.png": "b9f497f3f35a93f357bc644a04477499267985645112eaa01da3d104d87c70ca",
+    ".impeccable/mocks/decision/challenger-gate.png": "0498b640e301590c40cd9d3c65c977fe3e2f55fe30346d089130bd791408b1f7",
+    ".impeccable/mocks/decision/challenger-fac.png": "d250d9376896d958268900835bdf21d0cf60bdcbc838f736586788a79f4cfb1e",
+    ".impeccable/mocks/decision/canon.png": "4f9dcd9f53a091194864b85a426322fb0f4a90151351c34b3a275a44f19e173b"
+  }
+}

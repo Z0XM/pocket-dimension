@@ -34,8 +34,7 @@
   "dependencies": {
     "@better-auth/core": "1.6.33",
     "@discordjs/voice": "^0.19.2",
-    "@fontsource-variable/jetbrains-mono": "^5.2.8",
-    "@fontsource-variable/space-grotesk": "^5.2.10",
+    "@fontsource-variable/archivo": "^5.3.0",
     "@lucide/svelte": "^1.17.0",
     "@pocket-dimension/auth": "workspace:*",
     "@pocket-dimension/db": "workspace:*",

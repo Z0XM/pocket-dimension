@@ -1,0 +1,14 @@
+{
+  "pid": 21054,
+  "port": 40123,
+  "url": "http://127.0.0.1:40123/",
+  "comps": [
+    ".impeccable/mocks/decision/assigned.png",
+    ".impeccable/mocks/decision/model-pick.png",
+    ".impeccable/mocks/decision/challenger-doujin.png",
+    ".impeccable/mocks/decision/challenger-gate.png",
+    ".impeccable/mocks/decision/challenger-fac.png",
+    ".impeccable/mocks/decision/canon.png"
+  ],
+  "lastBeat": 1792534610655
+}

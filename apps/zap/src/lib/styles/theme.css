@@ -1,34 +1,50 @@
+/*
+ * Frame — poster/studio cut (locked visual system).
+ */
+
 :root {
-  --background: #071018;
-  --foreground: #e6f4f8;
-  --card: #0c1822;
-  --card-foreground: #e6f4f8;
-  --primary: #3dffe8;
-  --primary-foreground: #041016;
-  --secondary: #122433;
-  --secondary-foreground: #b7d4df;
-  --muted: #101c28;
-  --muted-foreground: #7fa0ae;
-  --accent: #5b8cff;
-  --accent-foreground: #eef4ff;
-  --positive: #3dffe8;
-  --positive-foreground: #041016;
-  --border: #1c3344;
-  --input: #1c3344;
-  --ring: #3dffe8;
-  --popover: #0c1822;
-  --popover-foreground: #e6f4f8;
-  --destructive: #ff5c7a;
-  --destructive-foreground: #fff0f3;
-  --signal: #3dffe8;
-  --graph: #5b8cff;
-  --wave: color-mix(in srgb, #3dffe8 18%, transparent);
-  --scrollbar-track: transparent;
-  --scrollbar-thumb: color-mix(in srgb, var(--signal) 18%, var(--border));
-  --scrollbar-thumb-hover: color-mix(in srgb, var(--signal) 45%, var(--border));
+  --zap-font-sans: "Archivo Variable", sans-serif;
+  --zap-font-display: "Archivo Variable", sans-serif;
+  --zap-font-mono: "Archivo Variable", sans-serif;
+  --background: #0a0a0a;
+  --background-mid: #111111;
+  --foreground: #f3efe9;
+  --card: #111111;
+  --card-foreground: #f3efe9;
+  --primary: #ff6b4a;
+  --primary-foreground: #1a0d08;
+  --secondary: #111111;
+  --secondary-foreground: #f3efe9;
+  --muted: #111111;
+  --muted-foreground: #9c9389;
+  --accent: #ff6b4a;
+  --accent-foreground: #1a0d08;
+  --positive: #ff6b4a;
+  --positive-foreground: #1a0d08;
+  --border: #2a2a2a;
+  --input: #111111;
+  --ring: #ff6b4a;
+  --popover: #111111;
+  --popover-foreground: #f3efe9;
+  --destructive: #ffb09d;
+  --destructive-foreground: #ffb09d;
+  --signal: #ff6b4a;
+  --graph: #f3efe9;
+  --glow-a: #ff6b4a;
+  --glow-b: #f3efe9;
+  --glow-c: #2a2a2a;
+  --radius-panel: 0;
+  --radius-control: 0;
+  --track-pad-y: 0.85rem;
+  --shadow-panel: none;
+  --frame-shadow: 8px 8px 0 color-mix(in oklab, #ff6b4a 35%, transparent);
+  --frame-player-border: 4px solid #ff6b4a;
+  --frame-stage-rule: 3px solid #f3efe9;
+  --atmosphere: linear-gradient(180deg, #0a0a0a 0%, #0a0a0a 100%);
+  --scrollbar-track: #0a0a0a;
+  --scrollbar-thumb: #2a2a2a;
+  --scrollbar-thumb-hover: #ff6b4a;
 }
 
 .dark {
-  --background: #071018;
-  --foreground: #e6f4f8;
 }
