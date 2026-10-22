@@ -9,6 +9,7 @@
   import AddMusicDialog, { parseAddMusicTab, type AddMusicTab } from "$lib/components/AddMusicDialog.svelte";
   import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
+  import PageHeader from "$lib/components/PageHeader.svelte";
   import SaveTagPlaylistDialog from "$lib/components/SaveTagPlaylistDialog.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
@@ -323,10 +324,8 @@
   </button>
 {/snippet}
 
-<section class="zap-catalogue flex min-h-0 flex-1 flex-col gap-3">
-  <div class="zap-catalogue-header shrink-0">
-    <h1 class="zap-catalogue-title text-2xl font-semibold tracking-tight sm:text-3xl">Catalogue</h1>
-  </div>
+<section class="zap-catalogue zap-page">
+  <PageHeader title="Catalogue" />
 
   <div class="zap-filters-panel shrink-0 rounded-lg border border-border/70 bg-card/50 p-3">
     <CatalogueFilters

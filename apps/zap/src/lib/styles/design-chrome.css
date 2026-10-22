@@ -96,19 +96,53 @@ html body {
   background-image: none;
 }
 
-.zap-catalogue-header {
+/* Page chrome — Catalogue-inspired header shared across protected routes */
+.zap-page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.zap-page-header {
+  flex-shrink: 0;
   border-bottom: var(--frame-stage-rule);
   padding-bottom: 1rem;
   margin-bottom: 0.35rem;
 }
 
-.zap-catalogue-title {
+.zap-page-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.zap-page-title {
   font-family: var(--zap-font-display);
   font-size: clamp(2.25rem, 5.5vw, 4rem);
   font-weight: 800;
   letter-spacing: -0.045em;
   line-height: 0.92;
   text-transform: uppercase;
+}
+
+.zap-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zap-page-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  font-family: var(--zap-font-sans);
+  font-size: 0.72rem;
 }
 
 .zap-filters-panel {

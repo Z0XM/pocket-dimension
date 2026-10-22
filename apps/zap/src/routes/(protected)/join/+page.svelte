@@ -1,11 +1,11 @@
 <script lang="ts">
   import JoinSessionForm from "$lib/components/JoinSessionForm.svelte";
+  import PageHeader from "$lib/components/PageHeader.svelte";
 </script>
 
-<section class="mx-auto max-w-md space-y-6">
-  <div>
-    <h1 class="text-3xl font-semibold tracking-tight">Join session</h1>
+<section class="zap-page">
+  <PageHeader title="Join" />
+  <div class="mx-auto w-full max-w-md">
+    <JoinSessionForm />
   </div>
-
-  <JoinSessionForm />
 </section>

@@ -24,8 +24,21 @@
   const adminActive = $derived(path === "/admin" || path.startsWith("/admin/"));
   const historyActive = $derived(path === "/history" || path.startsWith("/history/"));
 
-  /** Catalogue / Admin / History pin the shell so only their list panes scroll (keeps headers stable across tabs). */
-  const fillViewport = $derived((catalogueActive || adminActive || historyActive) && !isNavigating);
+  const themeActive = $derived(path === "/theme" || path.startsWith("/theme/"));
+  const joinActive = $derived(path === "/join" || path.startsWith("/join/"));
+
+  /** Pin the shell so page headers stay put and list panes scroll (Catalogue-style). */
+  const fillViewport = $derived(
+    (catalogueActive ||
+      adminActive ||
+      historyActive ||
+      playlistsActive ||
+      sessionActive ||
+      themeActive ||
+      homeActive ||
+      joinActive) &&
+      !isNavigating
+  );
 
   const skeletonPath = $derived(navTo ?? path);
   const skeletonShowFilters = $derived(skeletonPath.startsWith("/catalogue") || skeletonPath.startsWith("/session/"));
@@ -47,7 +60,9 @@
                 ? "Loading join"
                 : skeletonPath.startsWith("/admin")
                   ? "Loading admin"
-                  : "Loading"
+                  : skeletonPath.startsWith("/theme")
+                    ? "Loading theme"
+                    : "Loading"
   );
 
   async function signOut() {

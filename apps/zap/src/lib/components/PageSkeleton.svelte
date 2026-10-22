@@ -15,11 +15,10 @@
   } = $props();
 </script>
 
-<section class="space-y-6" role="status" aria-live="polite" aria-busy="true" aria-label={title}>
-  <div class="space-y-2">
-    <div class="zap-skeleton h-8 w-40 rounded-sm"></div>
-    <div class="zap-skeleton h-3 w-full max-w-md rounded-sm opacity-70"></div>
-  </div>
+<section class="zap-page" role="status" aria-live="polite" aria-busy="true" aria-label={title}>
+  <header class="zap-page-header">
+    <div class="zap-skeleton h-10 w-48 rounded-sm sm:h-14 sm:w-64"></div>
+  </header>
 
   {#if variant === "home"}
     <div class="flex flex-wrap gap-3">
@@ -29,7 +28,7 @@
     </div>
     <TrackListSkeleton rows={4} />
   {:else if variant === "form"}
-    <div class="mx-auto max-w-md space-y-3">
+    <div class="mx-auto w-full max-w-md space-y-3">
       <div class="zap-skeleton h-3 w-20 rounded-sm opacity-70"></div>
       <div class="zap-skeleton h-11 w-full rounded-sm"></div>
       <div class="zap-skeleton h-10 w-full rounded-sm"></div>
@@ -45,12 +44,14 @@
         <div class="zap-skeleton h-10 w-full rounded-sm opacity-80"></div>
         <div class="flex flex-wrap gap-2">
           {#each [1, 2, 3, 4, 5] as n}
-            <div class="zap-skeleton h-6 w-14 rounded-full opacity-70"></div>
+            <div class="zap-skeleton h-6 w-14 rounded-sm opacity-70"></div>
           {/each}
         </div>
       </div>
     {/if}
 
-    <TrackListSkeleton {rows} />
+    <div class="min-h-0 flex-1">
+      <TrackListSkeleton {rows} />
+    </div>
   {/if}
 </section>

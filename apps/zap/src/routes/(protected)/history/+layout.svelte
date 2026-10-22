@@ -3,6 +3,7 @@
   import ClapperboardIcon from "@lucide/svelte/icons/clapperboard";
   import HistoryIcon from "@lucide/svelte/icons/history";
   import UploadIcon from "@lucide/svelte/icons/upload";
+  import PageHeader from "$lib/components/PageHeader.svelte";
 
   let { children }: { children: import("svelte").Snippet } = $props();
 
@@ -16,10 +17,9 @@
   const isActive = (href: string) => (href === "/history" ? path === "/history" : path === href || path.startsWith(`${href}/`));
 </script>
 
-<section class="flex min-h-0 flex-1 flex-col gap-6">
-  <div class="shrink-0">
-    <h1 class="text-3xl font-semibold tracking-tight">History</h1>
-    <nav class="mt-6 flex flex-wrap gap-1 border-b border-border/60 pb-2 font-mono text-[11px]" aria-label="History">
+<section class="zap-page">
+  <PageHeader title="History">
+    <nav class="flex flex-wrap gap-1 font-mono text-[11px]" aria-label="History">
       {#each tabs as tab (tab.href)}
         <a
           href={tab.href}
@@ -31,7 +31,7 @@
         </a>
       {/each}
     </nav>
-  </div>
+  </PageHeader>
   <div class="flex min-h-0 flex-1 flex-col">
     {@render children()}
   </div>

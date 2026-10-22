@@ -142,10 +142,7 @@
 
   <div class="flex min-h-0 flex-1 flex-col gap-3">
     <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Activity</h2>
-        <p class="mt-1 text-sm text-muted-foreground">Who used Zap and when — plays, sessions, joins, imports and uploads across all users.</p>
-      </div>
+      <h2 class="zap-section-label font-mono text-[10px] tracking-[0.18em] uppercase">Activity</h2>
       <div class="grid w-full gap-2 sm:w-auto sm:grid-cols-2">
         <div class="sm:w-48">
           <ZapSelect options={userOptions} bind:value={userFilter} placeholder="All users" onChange={(v) => applyFilters({ user: v })} />

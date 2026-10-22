@@ -1,9 +1,15 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
+  import ListEndIcon from "@lucide/svelte/icons/list-end";
+  import PlayIcon from "@lucide/svelte/icons/play";
+  import RadioIcon from "@lucide/svelte/icons/radio";
+  import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
+  import PageHeader from "$lib/components/PageHeader.svelte";
   import TagQueryEditor from "$lib/components/TagQueryEditor.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import { moveItem } from "$lib/catalog-queue";
@@ -215,50 +221,55 @@
   }
 </script>
 
-<section class="space-y-6">
-  <div class="flex flex-wrap items-start justify-between gap-3">
-    <div>
-      <p class="font-mono text-[10px] text-muted-foreground">
-        <a href="/playlists" class="text-signal hover:underline">Playlists</a>
-      </p>
-      <h1 class="mt-1 text-3xl font-semibold tracking-tight">{playlist.name}</h1>
-      <p class="font-mono text-[10px] text-muted-foreground uppercase">{playlist.visibility} · {playlist.trackCount} tracks</p>
+<section class="zap-page">
+  <PageHeader title={playlist.name}>
+    {#snippet crumb()}
+      <a href="/playlists" class="inline-flex items-center gap-1 text-signal hover:underline">
+        <ArrowLeftIcon class="size-3" aria-hidden="true" />
+        Playlists
+      </a>
+    {/snippet}
+    {#snippet meta()}
+      {playlist.visibility} · {playlist.trackCount} tracks
       {#if playlist.tagQuery && !playlist.canEdit}
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">tags: <span class="text-signal">{playlist.tagQuery}</span></p>
+        · tags: <span class="text-signal normal-case tracking-normal">{playlist.tagQuery}</span>
       {/if}
-    </div>
-    <div class="flex flex-wrap gap-2">
+    {/snippet}
+    {#snippet actions()}
       {#if queue}
         <button
           type="button"
-          class="rounded border border-signal/40 bg-signal/10 px-3 py-1.5 text-xs font-medium text-signal hover:bg-signal/20 disabled:opacity-40"
+          class="inline-flex items-center gap-1.5 rounded border border-signal/40 bg-signal/10 px-3 py-1.5 text-xs font-medium text-signal hover:bg-signal/20 disabled:opacity-40"
           disabled={busy || !hasPlayable || queue.pending > 0}
           title="Replace your queue with this playlist and play"
           onclick={() => void queuePlaylist("replace")}
         >
+          <PlayIcon class="size-3.5" aria-hidden="true" />
           Play
         </button>
         <button
           type="button"
-          class="rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-signal disabled:opacity-40"
+          class="inline-flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-signal disabled:opacity-40"
           disabled={busy || !hasPlayable || queue.pending > 0}
           title="Append this playlist to your queue"
           onclick={() => void queuePlaylist("last")}
         >
-          Add to queue
+          <ListEndIcon class="size-3.5" aria-hidden="true" />
+          Queue
         </button>
       {/if}
       {#if data.primaryLive}
         <button
           type="button"
-          class="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
+          class="inline-flex items-center gap-1.5 rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
           disabled={busy || playlist.items.length === 0}
           onclick={() => void loadIntoSession()}
         >
-          Add to live session
+          <RadioIcon class="size-3.5" aria-hidden="true" />
+          Live session
         </button>
       {:else if data.canStart}
-        <span class="font-mono text-[10px] text-muted-foreground self-center">Start a session to queue this playlist</span>
+        <span class="font-mono text-[10px] text-muted-foreground self-center">Start a session to queue</span>
       {/if}
       {#if playlist.canDelete}
         <button
@@ -271,15 +282,19 @@
         </button>
         <button
           type="button"
-          class="rounded border border-destructive/40 px-2 py-1 font-mono text-[10px] text-destructive hover:bg-destructive/10 disabled:opacity-40"
+          class="inline-flex items-center gap-1 rounded border border-destructive/40 px-2 py-1 font-mono text-[10px] text-destructive hover:bg-destructive/10 disabled:opacity-40"
           disabled={busy || deleting}
+          aria-label="Delete playlist"
+          title="Delete playlist"
           onclick={() => (deleteOpen = true)}
         >
-          Delete
+          <Trash2Icon class="size-3.5" aria-hidden="true" />
         </button>
       {/if}
-    </div>
-  </div>
+    {/snippet}
+  </PageHeader>
+
+  <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
 
   {#if busy}
     <BusyStatus label={busyLabel} />
@@ -479,6 +494,7 @@
       </ul>
     </div>
   {/if}
+  </div>
 </section>
 
 <ConfirmDialog
