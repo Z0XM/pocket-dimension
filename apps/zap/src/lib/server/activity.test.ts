@@ -1,25 +1,5 @@
 import { describe, expect, test } from "bun:test";
-
-/** Mirror of playlistLabel parsing used in activity.ts for unit coverage. */
-function playlistLabel(
-  sourceUrl: string,
-  summary: {
-    playlists?: string[] | { id: string; title: string }[];
-    playlistTitles?: string[];
-  } | null
-) {
-  if (sourceUrl.startsWith("youtube:connected:")) {
-    const titlesFromSummary =
-      summary?.playlistTitles ??
-      (Array.isArray(summary?.playlists) ? summary.playlists.map((p) => (typeof p === "string" ? p : p.title)).filter(Boolean) : []);
-    const label =
-      titlesFromSummary.length > 0
-        ? titlesFromSummary.join(", ")
-        : sourceUrl.slice("youtube:connected:".length).split(",").filter(Boolean).join(", ") || "YouTube playlists";
-    return { kind: "playlist_import" as const, label, playlistTitles: titlesFromSummary.length ? titlesFromSummary : undefined };
-  }
-  return { kind: "url_import" as const, label: sourceUrl };
-}
+import { importLinks, playlistLabel } from "$lib/activity-links";
 
 describe("playlist activity labels", () => {
   test("uses playlist titles from summary", () => {
@@ -39,5 +19,23 @@ describe("playlist activity labels", () => {
     const out = playlistLabel("https://youtu.be/xyz", null);
     expect(out.kind).toBe("url_import");
     expect(out.label).toBe("https://youtu.be/xyz");
+  });
+});
+
+describe("import links", () => {
+  test("makes connected playlists clickable with titles", () => {
+    const sourceUrl = "youtube:connected:PLabc,PLdef";
+    const summary = { playlistTitles: ["Liked videos", "Chill"] };
+    const meta = playlistLabel(sourceUrl, summary);
+    expect(importLinks(sourceUrl, summary, meta)).toEqual([
+      { label: "Liked videos", href: "https://www.youtube.com/playlist?list=PLabc" },
+      { label: "Chill", href: "https://www.youtube.com/playlist?list=PLdef" },
+    ]);
+  });
+
+  test("links http url imports to the source", () => {
+    const sourceUrl = "https://youtu.be/xyz";
+    const meta = playlistLabel(sourceUrl, null);
+    expect(importLinks(sourceUrl, null, meta)).toEqual([{ label: sourceUrl, href: sourceUrl }]);
   });
 });

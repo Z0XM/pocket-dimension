@@ -72,6 +72,8 @@ export type CatalogQueueRunTrack = {
   position: number;
   title: string | null;
   artists: string | null;
+  /** Origin/source URL when known (YouTube etc.). */
+  externalUrl: string | null;
   /** False when the media row is gone (or otherwise unreadable) — show a placeholder title. */
   available: boolean;
 };

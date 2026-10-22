@@ -22,9 +22,10 @@
   const playlistsActive = $derived(path === "/playlists" || path.startsWith("/playlists/"));
   const sessionActive = $derived(path === "/session" || path.startsWith("/session/"));
   const adminActive = $derived(path === "/admin" || path.startsWith("/admin/"));
+  const historyActive = $derived(path === "/history" || path.startsWith("/history/"));
 
-  /** Catalogue / Admin pin the shell so only their list panes scroll (keeps admin header stable across tabs). */
-  const fillViewport = $derived((catalogueActive || adminActive) && !isNavigating);
+  /** Catalogue / Admin / History pin the shell so only their list panes scroll (keeps headers stable across tabs). */
+  const fillViewport = $derived((catalogueActive || adminActive || historyActive) && !isNavigating);
 
   const skeletonPath = $derived(navTo ?? path);
   const skeletonShowFilters = $derived(skeletonPath.startsWith("/catalogue") || skeletonPath.startsWith("/session/"));

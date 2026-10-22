@@ -520,6 +520,7 @@ export async function getQueueRunTracks(userId: string, runId: string): Promise<
       position: schema.catalogQueueItems.position,
       title: schema.mediaAssets.title,
       artists: schema.mediaAssets.artists,
+      externalUrl: schema.mediaAssets.externalUrl,
       mediaId: schema.mediaAssets.id,
     })
     .from(schema.catalogQueueItems)
@@ -532,6 +533,7 @@ export async function getQueueRunTracks(userId: string, runId: string): Promise<
     position: r.position,
     title: r.title,
     artists: r.artists,
+    externalUrl: r.externalUrl ?? null,
     available: r.mediaId != null,
   }));
 }
