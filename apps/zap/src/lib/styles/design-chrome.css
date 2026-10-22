@@ -1,5 +1,7 @@
 /*
  * Frame chrome — app-wide topology + component language.
+ * Prefer icons or icon+text over text-only controls where it makes sense
+ * (search, delete/remove, add, transport, dismiss); text-only when an icon would be ambiguous.
  */
 
 html,

@@ -12,10 +12,9 @@
 
   const path = $derived(page.url.pathname);
   const isActive = (href: string) => (href === "/admin" ? path === "/admin" : path === href || path.startsWith(`${href}/`));
-  const activityFill = $derived(path === "/admin");
 </script>
 
-<section class={`flex flex-col gap-6 ${activityFill ? "min-h-0 flex-1" : ""}`}>
+<section class="flex min-h-0 flex-1 flex-col gap-6">
   <div class="shrink-0">
     <p class="font-mono text-[10px] tracking-[0.18em] text-signal uppercase">Zap admin</p>
     <h1 class="mt-1 text-3xl font-semibold tracking-tight">Admin</h1>
@@ -29,7 +28,7 @@
       {/each}
     </nav>
   </div>
-  <div class={activityFill ? "flex min-h-0 flex-1 flex-col" : ""}>
+  <div class="flex min-h-0 flex-1 flex-col">
     {@render children()}
   </div>
 </section>

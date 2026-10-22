@@ -21,10 +21,10 @@
   const catalogueActive = $derived(path === "/catalogue" || path.startsWith("/catalogue/"));
   const playlistsActive = $derived(path === "/playlists" || path.startsWith("/playlists/"));
   const sessionActive = $derived(path === "/session" || path.startsWith("/session/"));
-  const adminActivityActive = $derived(path === "/admin");
+  const adminActive = $derived(path === "/admin" || path.startsWith("/admin/"));
 
-  /** Catalogue / Admin activity pin the shell so only their list panes scroll. */
-  const fillViewport = $derived((catalogueActive || adminActivityActive) && !isNavigating);
+  /** Catalogue / Admin pin the shell so only their list panes scroll (keeps admin header stable across tabs). */
+  const fillViewport = $derived((catalogueActive || adminActive) && !isNavigating);
 
   const skeletonPath = $derived(navTo ?? path);
   const skeletonShowFilters = $derived(skeletonPath.startsWith("/catalogue") || skeletonPath.startsWith("/session/"));
