@@ -241,6 +241,8 @@ export async function leaveVoice(sessionId: string) {
   const runtime = runtimes.get(sessionId);
   if (!runtime) return;
   killFfmpeg(runtime);
+  // Remove before destroy so the Disconnected handler does not treat this as an unexpected drop.
+  runtimes.delete(sessionId);
   try {
     runtime.player.stop(true);
   } catch {
@@ -253,7 +255,6 @@ export async function leaveVoice(sessionId: string) {
   } catch {
     // ignore
   }
-  runtimes.delete(sessionId);
 }
 
 export function hasVoiceRuntime(sessionId: string) {
