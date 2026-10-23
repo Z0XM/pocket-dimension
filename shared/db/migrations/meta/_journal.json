@@ -421,6 +421,13 @@
       "when": 1793000000000,
       "tag": "0059_zap_session_name",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793100000000,
+      "tag": "0060_zap_connections",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ import { mapPool, youtubeIngestConcurrency } from "$lib/server/ingest/map-pool";
 import { hasCatalogueAsset, ingestCatalogueVideo, type IngestItemResult, type SyncRunResult } from "$lib/server/ingest/pipeline";
 import type { SongProgress } from "$lib/server/ingest/progress";
 import { setUserLibraryOrder } from "$lib/server/library-order";
+import { libraryYoutubeIdentityKeys } from "$lib/server/connections/youtube-status";
 import { listYouTubePlaylistItems, listYouTubePlaylists, type ZapYouTubePlaylistItem } from "./api";
 import { parsePlaylistImportSort, sortPlaylistItemsForImport, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
 
@@ -44,7 +45,13 @@ export async function importConnectedPlaylists(
   userId: string,
   playlistIds: string[],
   onProgress?: (progress: PlaylistImportProgress) => void | Promise<void>,
-  opts?: { tagIds?: string[]; customTags?: string[]; sort?: PlaylistImportSort | string }
+  opts?: {
+    tagIds?: string[];
+    customTags?: string[];
+    sort?: PlaylistImportSort | string;
+    /** Skip videos already in the user's library (additive sync / re-import). */
+    skipExisting?: boolean;
+  }
 ): Promise<SyncRunResult & { playlists: string[] }> {
   const uniqueIds = [...new Set(playlistIds.map((id) => id.trim()).filter(Boolean))];
   if (uniqueIds.length === 0) {
@@ -119,11 +126,16 @@ export async function importConnectedPlaylists(
 
     // Sort each playlist independently, then concatenate in selection order.
     // Work list order = import order; mapPool preserves result slots despite parallel workers.
+    const allVideoIds = entryLists.flatMap((entries) => entries.map((e) => e.videoId));
+    const alreadyInLibrary = opts?.skipExisting ? await libraryYoutubeIdentityKeys(userId, allVideoIds) : new Set<string>();
+
     const work: WorkItem[] = [];
     for (const entries of entryLists) {
       const sorted = sortPlaylistItemsForImport(entries, sort);
       for (const entry of sorted) {
-        if (isOverDurationCap(entry.durationMs)) {
+        if (opts?.skipExisting && alreadyInLibrary.has(`youtube:${entry.videoId}`)) {
+          work.push({ kind: "skip", entry, reason: "Already in library" });
+        } else if (isOverDurationCap(entry.durationMs)) {
           work.push({ kind: "skip", entry, reason: DURATION_CAP_MESSAGE });
         } else {
           work.push({ kind: "ingest", entry });

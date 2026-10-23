@@ -11,6 +11,7 @@ export {
 } from "./oauth";
 export { getYoutubeLinkStatus, revokeYoutubeLink, listYouTubePlaylists, listYouTubePlaylistItems, getYouTubeAccessTokenForUser } from "./api";
 export { importConnectedPlaylists, type PlaylistImportProgress } from "./import-playlists";
+// Connections / auto-sync helpers live under `$lib/server/connections`.
 export {
   parsePlaylistImportSort,
   sortPlaylistItemsForImport,

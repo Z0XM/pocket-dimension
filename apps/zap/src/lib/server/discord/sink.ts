@@ -6,6 +6,7 @@ import { sessionEventBus } from "$lib/server/sessions/event-bus";
 import type { SessionSnapshot } from "$lib/server/sessions/types";
 import { getDiscordClient, listBotGuilds, listGuildVoiceChannels, resolveVoiceChannel } from "./bot";
 import { buildDiscordInviteUrl, isDiscordConfigured, parseDiscordSinkConfig, type DiscordSinkConfig } from "./config";
+import { logConnectionActivity } from "$lib/server/connections/activity";
 import { playbackCommandFromSnapshot } from "./sync";
 import {
   applyPlaybackCommand,
@@ -165,6 +166,14 @@ export async function attachDiscordSink(opts: { sessionId: string; userId: strin
     const snapshot = await buildSessionSnapshot(opts.sessionId);
     if (snapshot) await syncSnapshotToVoice(opts.sessionId, snapshot);
 
+    await logConnectionActivity({
+      userId: opts.userId,
+      provider: "discord",
+      kind: "attach",
+      summary: `Joined ${config.channelName ?? config.channelId} in ${config.guildName ?? config.guildId}`,
+      meta: { sessionId: opts.sessionId, guildId: config.guildId, channelId: config.channelId },
+    });
+
     return { ...(await getActiveDiscordSink(opts.sessionId))!, config };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to join voice";
@@ -229,6 +238,16 @@ export async function reconnectDiscordSink(sessionId: string) {
     const { buildSessionSnapshot } = await import("$lib/server/sessions/snapshot");
     const snapshot = await buildSessionSnapshot(sessionId);
     if (snapshot) await syncSnapshotToVoice(sessionId, snapshot);
+
+    if (sink.attachedByUserId) {
+      await logConnectionActivity({
+        userId: sink.attachedByUserId,
+        provider: "discord",
+        kind: "reconnect",
+        summary: `Reconnected to ${nextConfig.channelName ?? nextConfig.channelId} in ${nextConfig.guildName ?? nextConfig.guildId}`,
+        meta: { sessionId, guildId: nextConfig.guildId, channelId: nextConfig.channelId },
+      });
+    }
 
     return (await getActiveDiscordSink(sessionId))!;
   } catch (err) {

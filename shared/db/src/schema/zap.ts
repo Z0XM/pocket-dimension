@@ -570,3 +570,51 @@ export const zapSettings = zapSchema.table("settings", {
     .$onUpdate(() => sql`now()`)
     .notNull(),
 });
+
+export const connectionProvider = zapSchema.enum("connection_provider", ["discord", "spotify", "youtube"]);
+
+/**
+ * Per-user YouTube playlist prefs (auto-sync) + cached titles for Connections UI.
+ * Additive sync only — never removes catalogue rows when YT drops a video.
+ */
+export const youtubePlaylistPrefs = zapSchema.table(
+  "youtube_playlist_prefs",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    youtubePlaylistId: text("youtube_playlist_id").notNull(),
+    title: text("title"),
+    autoSync: boolean("auto_sync").default(false).notNull(),
+    lastSyncedAt: timestamp("last_synced_at"),
+    lastSyncError: text("last_sync_error"),
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamp("updated_at")
+      .$default(() => sql`now()`)
+      .$onUpdate(() => sql`now()`)
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.youtubePlaylistId] }),
+    index("youtube_playlist_prefs_user_autosync_idx").on(table.userId, table.autoSync),
+  ]
+);
+
+/** Connection-scoped activity (Discord voice attach/reconnect, future Spotify, etc.). */
+export const connectionActivity = zapSchema.table(
+  "connection_activity",
+  {
+    id,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    provider: connectionProvider("provider").notNull(),
+    kind: text("kind").notNull(),
+    summary: text("summary").notNull(),
+    metaJson: text("meta_json"),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [
+    index("connection_activity_user_provider_idx").on(table.userId, table.provider, table.createdAt),
+  ]
+);

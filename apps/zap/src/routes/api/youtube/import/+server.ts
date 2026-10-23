@@ -20,6 +20,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     customTag?: string;
     customTags?: string[];
     sort?: string;
+    skipExisting?: boolean;
   };
   const playlistIds = body.playlistIds ?? [];
   if (!Array.isArray(playlistIds) || playlistIds.length === 0) {
@@ -28,6 +29,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   const tagIds = Array.isArray(body.tagIds) ? body.tagIds.map((id) => String(id)) : [];
   const customTags = readCustomTagNamesFromJson(body);
   const sort = typeof body.sort === "string" ? body.sort : "playlist";
+  const skipExisting = Boolean(body.skipExisting);
 
   const userId = locals.user.id;
   const stream = new ReadableStream<Uint8Array>({
@@ -44,7 +46,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
           (progress) => {
             send({ type: "progress", ...progress });
           },
-          { tagIds, customTags, sort }
+          { tagIds, customTags, sort, skipExisting }
         );
         send({
           type: "done",

@@ -25,6 +25,7 @@
   const historyActive = $derived(path === "/history" || path.startsWith("/history/"));
 
   const themeActive = $derived(path === "/theme" || path.startsWith("/theme/"));
+  const connectionsActive = $derived(path === "/connections" || path.startsWith("/connections/"));
   const joinActive = $derived(path === "/join" || path.startsWith("/join/"));
 
   /** Pin the shell so page headers stay put and list panes scroll (Catalogue-style). */
@@ -35,6 +36,7 @@
       playlistsActive ||
       sessionActive ||
       themeActive ||
+      connectionsActive ||
       homeActive ||
       joinActive) &&
       !isNavigating
@@ -62,7 +64,9 @@
                   ? "Loading admin"
                   : skeletonPath.startsWith("/theme")
                     ? "Loading theme"
-                    : "Loading"
+                    : skeletonPath.startsWith("/connections")
+                      ? "Loading connections"
+                      : "Loading"
   );
 
   async function signOut() {
@@ -70,6 +74,20 @@
     await authClient.signOut();
     await goto("/");
   }
+
+  // Additive YouTube playlist auto-sync once per shell mount (cooldown enforced server-side).
+  $effect(() => {
+    if (!data.user?.id) return;
+    const ac = new AbortController();
+    void fetch("/api/connections/youtube/auto-sync", {
+      method: "POST",
+      credentials: "same-origin",
+      signal: ac.signal,
+    }).catch(() => {
+      // not linked / not configured — ignore
+    });
+    return () => ac.abort();
+  });
 </script>
 
 {#snippet primaryNav(rail = false)}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CableIcon from "@lucide/svelte/icons/cable";
   import HistoryIcon from "@lucide/svelte/icons/history";
   import LogOutIcon from "@lucide/svelte/icons/log-out";
   import SettingsIcon from "@lucide/svelte/icons/settings";
@@ -65,6 +66,17 @@
         </p>
       </div>
       <ul class="py-1 font-mono text-[11px]">
+        <li>
+          <a
+            href="/connections"
+            role="menuitem"
+            class="flex items-center gap-2 px-3 py-2.5 text-foreground hover:bg-signal/10 hover:text-signal"
+            onclick={close}
+          >
+            <CableIcon class="size-3.5 shrink-0" aria-hidden="true" />
+            Connections
+          </a>
+        </li>
         <li>
           <a
             href="/history"
