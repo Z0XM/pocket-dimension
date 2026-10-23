@@ -1,11 +1,10 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, eq } from "drizzle-orm";
 import { importConnectedPlaylists } from "$lib/server/youtube/import-playlists";
-import { listYouTubePlaylistItems } from "$lib/server/youtube/api";
 import { isStorageConfigured } from "$lib/server/storage";
 import { resolveYtDlpBin } from "$lib/server/ingest";
 import { logConnectionActivity } from "./activity";
-import { previewPlaylistImport, upsertPlaylistPref } from "./youtube-status";
+import { upsertPlaylistPref } from "./youtube-status";
 
 /** Min gap between auto-sync runs for the same playlist (avoid hammering on every navigation). */
 export const YOUTUBE_AUTOSYNC_COOLDOWN_MS = 15 * 60 * 1000;
@@ -43,20 +42,7 @@ export async function runYouTubeAutoSyncForUser(userId: string): Promise<{
       }
 
       try {
-        const items = await listYouTubePlaylistItems(userId, pref.youtubePlaylistId);
-        const preview = await previewPlaylistImport(userId, pref.youtubePlaylistId, items);
-        if (preview.willImport === 0) {
-          await upsertPlaylistPref({
-            userId,
-            youtubePlaylistId: pref.youtubePlaylistId,
-            lastSyncedAt: new Date(),
-            lastSyncError: null,
-          });
-          skipped += 1;
-          results.push({ playlistId: pref.youtubePlaylistId, imported: 0, unavailable: 0, skipped: preview.alreadyImported });
-          continue;
-        }
-
+        // Single crawl inside import (skipExisting) — do not list+preview then list again.
         const result = await importConnectedPlaylists(userId, [pref.youtubePlaylistId], undefined, {
           skipExisting: true,
           sort: "playlist",
@@ -68,6 +54,16 @@ export async function runYouTubeAutoSyncForUser(userId: string): Promise<{
           lastSyncedAt: new Date(),
           lastSyncError: null,
         });
+        if (result.imported === 0 && result.failed === 0) {
+          skipped += 1;
+          results.push({
+            playlistId: pref.youtubePlaylistId,
+            imported: 0,
+            unavailable: result.unavailable,
+            skipped: result.skipped,
+          });
+          continue;
+        }
         await logConnectionActivity({
           userId,
           provider: "youtube",

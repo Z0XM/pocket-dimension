@@ -17,12 +17,16 @@ export async function listEnrichedYouTubePlaylists(userId: string): Promise<Enri
   return enrichPlaylistsWithStatus(userId, playlists);
 }
 
-export async function previewYouTubePlaylist(userId: string, playlistId: string): Promise<PlaylistPreview & { title?: string }> {
-  const [items, playlists] = await Promise.all([
-    listYouTubePlaylistItems(userId, playlistId),
-    listYouTubePlaylists(userId).catch(() => []),
-  ]);
+/**
+ * Full playlist crawl for Import preview (~700 tracks ≈ 14 Data API pages, pipelined).
+ * Pass `title` from the UI to avoid a second playlists.list round-trip.
+ */
+export async function previewYouTubePlaylist(
+  userId: string,
+  playlistId: string,
+  opts?: { title?: string }
+): Promise<PlaylistPreview & { title?: string }> {
+  const items = await listYouTubePlaylistItems(userId, playlistId);
   const preview = await previewPlaylistImport(userId, playlistId, items);
-  const title = playlists.find((p) => p.id === playlistId)?.title;
-  return { ...preview, title };
+  return { ...preview, title: opts?.title };
 }

@@ -109,7 +109,8 @@
     listError = null;
     importMessage = null;
     try {
-      const res = await fetch(`/api/connections/youtube/playlists/${encodeURIComponent(row.id)}`, {
+      const qs = row.title ? `?title=${encodeURIComponent(row.title)}` : "";
+      const res = await fetch(`/api/connections/youtube/playlists/${encodeURIComponent(row.id)}${qs}`, {
         credentials: "same-origin",
       });
       const body = await res.json().catch(() => ({}));

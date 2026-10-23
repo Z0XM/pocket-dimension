@@ -5,7 +5,7 @@ import { upsertPlaylistPref } from "$lib/server/connections";
 import { previewYouTubePlaylist } from "$lib/server/connections/youtube-playlists";
 import { logConnectionActivity } from "$lib/server/connections/activity";
 
-export const GET: RequestHandler = async ({ locals, params }) => {
+export const GET: RequestHandler = async ({ locals, params, url }) => {
   if (!locals.user) throw error(401, "Sign in required");
   if (!locals.user.emailVerified) throw error(403, "Verify email first");
 
@@ -15,7 +15,8 @@ export const GET: RequestHandler = async ({ locals, params }) => {
   const playlistId = params.playlistId?.trim();
   if (!playlistId) throw error(400, "playlistId required");
 
-  const preview = await previewYouTubePlaylist(locals.user.id, playlistId);
+  const title = url.searchParams.get("title")?.trim() || undefined;
+  const preview = await previewYouTubePlaylist(locals.user.id, playlistId, { title });
   return json({ preview });
 };
 
