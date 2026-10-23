@@ -5,6 +5,7 @@
   import ListStartIcon from "@lucide/svelte/icons/list-start";
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import CustomTagInput from "$lib/components/CustomTagInput.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
@@ -224,12 +225,13 @@
           {#if canDelete}
             <button
               type="button"
-              class="rounded border border-destructive/40 px-2 py-0.5 font-mono text-[10px] text-destructive hover:bg-destructive/10 disabled:opacity-40"
-              title="Admin: delete song and its storage object"
+              class="inline-flex size-6 shrink-0 items-center justify-center rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-40"
+              aria-label={`Delete ${track.title}`}
+              title="Delete song"
               disabled={deleting}
               onclick={() => (deleteOpen = true)}
             >
-              Delete
+              <Trash2Icon class="size-3.5 shrink-0" aria-hidden="true" />
             </button>
           {/if}
           {#if queue && track.playable}
