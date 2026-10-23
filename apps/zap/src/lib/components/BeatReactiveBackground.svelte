@@ -185,9 +185,10 @@
       const band = 0.45 * energy.bass + 0.3 * energy.rms + 0.15 * energy.mid + 0.1 * energy.high;
       waves.push({
         r: 0,
-        speed: 48 + band * 55 + strength * 28,
+        // Faster travel + thinner crest (Radial only — spawnWave unused by other styles).
+        speed: 110 + band * 95 + strength * 50,
         strength: Math.min(1.35, 0.4 + strength * 0.85 + band * 0.35),
-        width: 36 + energy.bass * 48 + energy.mid * 18,
+        width: 16 + energy.bass * 22 + energy.mid * 8,
         life: 1,
       });
       while (waves.length > maxWaves) waves.shift();
@@ -228,8 +229,8 @@
           spawnWave(0.35 + e.rms * 0.55 + e.mid * 0.25, e);
           energyCooldown = 0.28;
         }
-        // Ambient carrier drifts slowly from center → edge, then restarts.
-        ambientR += (42 + sBass * 28 + sRms * 18) * dt;
+        // Ambient carrier from center → edge (kept snappier with beat waves).
+        ambientR += (90 + sBass * 50 + sRms * 30) * dt;
         if (ambientR > maxRadius + 80) ambientR = 0;
       }
 
@@ -243,7 +244,7 @@
       const n = xs.length;
       const restGlow = 0.2 * settle;
       const ambientStrength = reduced ? 0 : (0.18 + sBass * 0.22 + sRms * 0.12) * settle;
-      const ambientWidth = 52 + sBass * 36;
+      const ambientWidth = 22 + sBass * 16;
       const displaceScale = spacing * (0.22 + sRms * 0.28);
 
       for (let k = 0; k < n; k++) {
