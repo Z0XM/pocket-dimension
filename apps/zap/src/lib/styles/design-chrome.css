@@ -244,6 +244,14 @@ html body {
   backdrop-filter: none !important;
 }
 
+.zap-queue-dock {
+  border-radius: 0;
+  border-color: var(--border);
+  border-top: var(--frame-player-border);
+  background: var(--background-mid);
+  backdrop-filter: none;
+}
+
 ::selection {
   background: var(--signal);
   color: var(--primary-foreground);

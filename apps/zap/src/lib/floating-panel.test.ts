@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  DOCK_BAR_H,
   DROP_ZONE_PX,
   ICON_SIZE,
   PANEL_MIN,
@@ -64,6 +65,10 @@ describe("drop zone", () => {
     expect(inDropZone(desktop.h - 1, desktop)).toBe(true);
     expect(inDropZone(desktop.h - DROP_ZONE_PX, desktop)).toBe(true);
     expect(inDropZone(desktop.h - DROP_ZONE_PX - 1, desktop)).toBe(false);
+  });
+
+  test("dock bar height matches the drop band", () => {
+    expect(DOCK_BAR_H).toBe(DROP_ZONE_PX);
   });
 });
 

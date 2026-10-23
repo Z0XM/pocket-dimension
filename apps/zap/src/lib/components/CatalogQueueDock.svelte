@@ -4,17 +4,25 @@
   import { onMount, untrack } from "svelte";
   import { page } from "$app/state";
   import CatalogDevicesPanel from "$lib/components/CatalogDevicesPanel.svelte";
+  import CatalogQueueDockBar from "$lib/components/CatalogQueueDockBar.svelte";
   import CatalogQueuePanel from "$lib/components/CatalogQueuePanel.svelte";
   import FloatingPanel from "$lib/components/FloatingPanel.svelte";
   import type { CatalogQueueItem, CatalogQueueState } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
+  import type { FloatingMode } from "$lib/floating-panel";
 
   let { queue }: { queue: CatalogQueueClient } = $props();
+
+  const DOCK_KEY = "zap.queue.docked";
+  const FLOAT_KEY = "zap.float.queue";
 
   let audioEl = $state<HTMLAudioElement | null>(null);
   let audioBlocked = $state(false);
   let appliedKey = "";
   let pendingSeekSec: number | null = null;
+  let docked = $state(false);
+  let floatOpenAs = $state<FloatingMode | null>(null);
+  let floatEpoch = $state(0);
 
   /** Session / join routes own their chrome; hide catalog floating queue + devices there. */
   const path = $derived(page.url.pathname);
@@ -25,7 +33,54 @@
   const showDevices = $derived(!hideCatalogFloats && (queue.active || queue.onlineDevices.length > 1));
   const localNote = $derived(!queue.thisDevice ? null : !deviceOutput ? "This device is remote-only." : null);
 
+  function readDocked(): boolean {
+    try {
+      return localStorage.getItem(DOCK_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function setDocked(next: boolean) {
+    docked = next;
+    try {
+      localStorage.setItem(DOCK_KEY, next ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Prefer icon/panel/full when remounting the float after undock / maximize. */
+  function writeFloatMode(mode: FloatingMode) {
+    try {
+      const raw = localStorage.getItem(FLOAT_KEY);
+      const base = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      localStorage.setItem(FLOAT_KEY, JSON.stringify({ ...base, mode }));
+    } catch {
+      // ignore
+    }
+  }
+
+  function dockQueue() {
+    setDocked(true);
+  }
+
+  function undockToMini() {
+    writeFloatMode("icon");
+    floatOpenAs = "icon";
+    floatEpoch++;
+    setDocked(false);
+  }
+
+  function maximizeFromDock() {
+    writeFloatMode("full");
+    floatOpenAs = "full";
+    floatEpoch++;
+    setDocked(false);
+  }
+
   onMount(() => {
+    docked = readDocked();
     queue.connect();
     return () => queue.disconnect();
   });
@@ -114,31 +169,40 @@
     appliedKey = "";
     void apply(audioEl, queue.queue, queue.currentItem, outputHere);
   }
-
-  async function stopFromDrop() {
-    await queue.stop();
-  }
 </script>
 
 <audio bind:this={audioEl} preload="auto" class="hidden" onloadedmetadata={onLoadedMetadata} ontimeupdate={onTimeUpdate} onended={onEnded}></audio>
 
-{#if showQueue}
-  <FloatingPanel
-    id="queue"
-    title="Queue"
-    slot={0}
-    active={queue.playing}
-    badge={queue.items.length}
-    dropLabel="Release to stop the queue"
-    ondrop={() => void stopFromDrop()}
-  >
-    {#snippet icon()}
-      <ListMusicIcon class="size-5" />
-    {/snippet}
-    {#snippet children()}
-      <CatalogQueuePanel {queue} {audioBlocked} {localNote} onunlock={unlock} />
-    {/snippet}
-  </FloatingPanel>
+{#if showQueue && docked}
+  <CatalogQueueDockBar
+    {queue}
+    {audioBlocked}
+    {localNote}
+    onunlock={unlock}
+    onmaximize={maximizeFromDock}
+    onundock={undockToMini}
+  />
+{:else if showQueue}
+  {#key floatEpoch}
+    <FloatingPanel
+      id="queue"
+      title="Queue"
+      slot={0}
+      active={queue.playing}
+      badge={queue.items.length}
+      dropLabel="Release to dock"
+      dropTone="dock"
+      openAs={floatOpenAs}
+      ondrop={dockQueue}
+    >
+      {#snippet icon()}
+        <ListMusicIcon class="size-5" />
+      {/snippet}
+      {#snippet children()}
+        <CatalogQueuePanel {queue} {audioBlocked} {localNote} onunlock={unlock} />
+      {/snippet}
+    </FloatingPanel>
+  {/key}
 {/if}
 
 {#if showDevices}
@@ -154,7 +218,9 @@
 
 {#if queue.notice}
   <div
-    class="pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded border border-signal/40 bg-popover/95 px-3 py-1.5 font-mono text-[11px] text-signal shadow-lg"
+    class={`pointer-events-none fixed left-1/2 z-50 -translate-x-1/2 rounded border border-signal/40 bg-popover/95 px-3 py-1.5 font-mono text-[11px] text-signal shadow-lg ${
+      showQueue && docked ? "bottom-[5.25rem]" : "bottom-4"
+    }`}
     role="status"
   >
     {queue.notice}

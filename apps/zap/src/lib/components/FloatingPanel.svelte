@@ -13,6 +13,7 @@
     inDropZone,
     panelRectNearIcon,
     parseStoredFloating,
+    type DropTone,
     type FloatingMode,
     type Point,
     type Rect,
@@ -26,6 +27,9 @@
     active = false,
     badge = null,
     dropLabel = null,
+    dropTone = "dock",
+    /** Force the panel into this mode once after mount (e.g. maximize from dock). */
+    openAs = null,
     ondrop,
     icon,
     header,
@@ -41,6 +45,8 @@
     badge?: string | number | null;
     /** When set, dragging into the bottom edge shows this label and calls `ondrop` on release. */
     dropLabel?: string | null;
+    dropTone?: DropTone;
+    openAs?: FloatingMode | null;
     ondrop?: () => void;
     icon: Snippet;
     header?: Snippet;
@@ -88,8 +94,12 @@
     }
     iconPos = stored.icon ? clampPoint(stored.icon, { w: ICON_SIZE, h: ICON_SIZE }, vp) : defaultIconPos(vp, slot);
     panel = stored.panel ? clampRect(stored.panel, vp) : null;
-    mode = stored.mode;
+    mode = openAs === "panel" || openAs === "full" || openAs === "icon" ? openAs : stored.mode;
+    if ((mode === "panel" || mode === "full") && !panel) {
+      panel = panelRectNearIcon(iconPos, defaultPanelSize(vp), vp);
+    }
     ready = true;
+    persist();
     const onResize = () => reclamp();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -142,6 +152,7 @@
     if (d.moved) suppressClick = d.kind === "icon";
     if (d.moved && overDrop) {
       overDrop = false;
+      // Snap back visually; the parent typically unmounts us (e.g. docks to the footer).
       if (d.kind === "icon") iconPos = { x: d.origin.x, y: d.origin.y };
       else panel = { ...d.origin };
       mode = "icon";
@@ -160,14 +171,22 @@
     }
     setMode("panel");
   }
+
+  const dropBandClass = $derived(
+    dropTone === "danger"
+      ? overDrop
+        ? "border-destructive bg-destructive/25 text-destructive"
+        : "border-destructive/40 bg-destructive/10 text-destructive/80"
+      : overDrop
+        ? "border-signal bg-signal/20 text-signal"
+        : "border-signal/40 bg-signal/10 text-signal/80"
+  );
 </script>
 
 {#if ready}
   {#if dragging && dropLabel}
     <div
-      class={`pointer-events-none fixed inset-x-0 bottom-0 z-[45] flex h-[72px] items-center justify-center border-t font-mono text-[11px] tracking-[0.14em] uppercase transition-colors ${
-        overDrop ? "border-destructive bg-destructive/25 text-destructive" : "border-destructive/40 bg-destructive/10 text-destructive/80"
-      }`}
+      class={`pointer-events-none fixed inset-x-0 bottom-0 z-[45] flex h-[72px] items-center justify-center border-t font-mono text-[11px] tracking-[0.14em] uppercase transition-colors ${dropBandClass}`}
       aria-hidden="true"
     >
       {dropLabel}
@@ -182,7 +201,7 @@
       } ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
       style={`left:${iconPos.x}px;top:${iconPos.y}px;width:${ICON_SIZE}px;height:${ICON_SIZE}px`}
       aria-label={`Open ${title}`}
-      title={dropLabel ? `${title} — drag to the bottom edge to stop` : title}
+      title={dropLabel ? `${title} — drag to the footer to dock` : title}
       onpointerdown={(e) => startDrag(e, "icon")}
       onpointermove={moveDrag}
       onpointerup={endDrag}

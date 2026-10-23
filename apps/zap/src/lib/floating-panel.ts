@@ -4,10 +4,14 @@ export type Point = { x: number; y: number };
 export type Rect = Point & { w: number; h: number };
 export type Viewport = { w: number; h: number };
 export type FloatingMode = "icon" | "panel" | "full";
+/** Visual tone for the bottom-edge drop band (queue docks; legacy stop was danger). */
+export type DropTone = "dock" | "danger";
 
 export const ICON_SIZE = 52;
 /** Releasing a drag with the pointer this close to the bottom edge triggers the drop action. */
 export const DROP_ZONE_PX = 72;
+/** Height of the docked catalog queue footer bar. */
+export const DOCK_BAR_H = 72;
 export const PANEL_MIN = { w: 280, h: 240 } as const;
 const EDGE = 8;
 
