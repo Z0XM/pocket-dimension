@@ -301,12 +301,16 @@
           field = ringField(d, ambientR, 52 + sBass * 36, ambientStrength, 1);
           for (let wi = 0; wi < waves.length; wi++) {
             const wv = waves[wi]!;
-            field += ringField(d, wv.r, wv.width, wv.strength, wv.life);
+            // Bias the envelope slightly ahead of the crest so the leading edge
+            // reads as the splash pressing into the surface first.
+            const lead = ringField(d, wv.r + wv.width * 0.35, wv.width * 0.85, wv.strength * 0.7, wv.life);
+            field += ringField(d, wv.r, wv.width, wv.strength, wv.life) + lead;
           }
           field += field * sHigh * 0.12;
-          const push = field * spacing * (0.22 + sRms * 0.28);
-          ox = ux[k]! * push;
-          oy = uy[k]! * push;
+          // Water-hit: crest dips down (+Y) into the surface, not toward the viewer.
+          const dip = field * spacing * (0.55 + sRms * 0.4);
+          ox = ux[k]! * field * spacing * 0.06;
+          oy = dip;
         } else if (style === "wave") {
           // Soft horizontal + gentle radial blend — flowing, not beat-spiky.
           const horiz = Math.sin(u * Math.PI * 2.2 - wavePhase) * (0.35 + sMid * 0.45);
@@ -353,7 +357,10 @@
         const excite = Math.max(0, Math.min(1.4, 0.28 + field));
         const x = xs[k]! + ox;
         const y = ys[k]! + oy;
-        const r = baseRadius * (0.72 + excite * 0.85);
+        // Radial splash: impact shrinks dots (into the surface); other styles still bloom up.
+        const sizeMul =
+          style === "radial" ? Math.max(0.35, 1.05 - excite * 0.55) : 0.72 + excite * 0.85;
+        const r = baseRadius * sizeMul;
         const alpha = Math.min(0.9, (restGlow + excite * 0.58) * settle);
 
         const t = Math.max(0, Math.min(1, excite * 0.9));
