@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
   import ListVideoIcon from "@lucide/svelte/icons/list-video";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
@@ -140,38 +141,15 @@
       const res = await fetch("/api/youtube/import", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playlistIds: [preview.playlistId], skipExisting: true, sort: "playlist" }),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.message ?? `Import failed (${res.status})`);
-      }
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("No response stream");
-      const decoder = new TextDecoder();
-      let buf = "";
-      let doneMsg: string | null = null;
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const ev = JSON.parse(line) as Record<string, unknown>;
-          if (ev.type === "done") {
-            doneMsg = `Imported ${ev.imported ?? 0} · unavailable ${ev.unavailable ?? 0} · skipped ${ev.skipped ?? 0}`;
-          } else if (ev.type === "error") {
-            throw new Error(typeof ev.message === "string" ? ev.message : "Import failed");
-          }
-        }
-      }
-      importMessage = doneMsg ?? "Import finished";
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 202) throw new Error(body?.message ?? `Import failed (${res.status})`);
+      importMessage = "Import started — open Running Jobs for progress.";
       previewOpen = false;
       preview = null;
-      await loadPlaylists();
+      await goto("/jobs");
     } catch (err) {
       listError = err instanceof Error ? err.message : "Import failed";
       previewOpen = false;

@@ -5,6 +5,7 @@ import type { RequestHandler } from "./$types";
 import { db, schema } from "@pocket-dimension/db";
 import { readCustomTagNamesFromForm } from "$lib/custom-tags";
 import { ensureCustomTags, setUserAssetTags } from "$lib/server/catalogue";
+import { completeJob, createImportJob, markJobRunning, recordIngestResult, updateJobProgress } from "$lib/server/import-jobs";
 import { MAX_TRACK_DURATION_MS } from "$lib/server/ingest/limits";
 import { createNdjsonSender } from "$lib/server/ingest/ndjson-stream";
 import { isStorageConfigured, putMediaObject } from "$lib/server/storage";
@@ -35,18 +36,27 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   const userId = locals.user.id;
   const displayTitle = title || file.name.replace(/\.[^.]+$/, "") || "Untitled";
 
+  const job = await createImportJob({
+    userId,
+    kind: "upload",
+    label: `Upload · ${displayTitle}`,
+    source: { title: displayTitle, tagIds, customTags: customTagNames },
+  });
+  await markJobRunning(job.id);
+  await updateJobProgress(job.id, { total: 1, done: 0, currentTitle: displayTitle });
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const { send, close } = createNdjsonSender(controller);
 
       try {
-        // Client already transferred the file in this request body; treat that as download=100.
         send({
           type: "song",
           identityKey: "upload:pending",
           title: displayTitle,
           phase: "downloading",
           percent: 100,
+          jobId: job.id,
         });
 
         const bytes = new Uint8Array(await file.arrayBuffer());
@@ -64,6 +74,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
             title: displayTitle,
             phase: "uploading",
             percent: 0,
+            jobId: job.id,
           });
           const put = await putMediaObject({
             identityKey,
@@ -77,6 +88,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
                 title: displayTitle,
                 phase: "uploading",
                 percent,
+                jobId: job.id,
               });
             },
           });
@@ -103,19 +115,36 @@ export const POST: RequestHandler = async ({ locals, request }) => {
           await setUserAssetTags(userId, asset.id, nextTagIds);
         }
 
+        await recordIngestResult(job.id, {
+          status: "imported",
+          mediaAssetId: asset.id,
+          identityKey,
+          title: asset.title,
+        });
+        await completeJob(job.id, {
+          status: "completed",
+          importedCount: 1,
+          total: 1,
+          done: 1,
+        });
+
         send({
           type: "song",
           identityKey,
           title: asset.title,
           phase: "done",
           percent: 100,
+          jobId: job.id,
         });
-        send({ type: "done", mediaAssetId: asset.id, title: asset.title });
+        send({ type: "done", mediaAssetId: asset.id, title: asset.title, jobId: job.id });
       } catch (err) {
         console.error("[zap ingest upload]", err);
+        const message = err instanceof Error ? err.message : "Upload failed";
+        await completeJob(job.id, { status: "failed", errorMessage: message, total: 1, done: 1, failedCount: 1 }).catch(() => {});
         send({
           type: "error",
-          message: err instanceof Error ? err.message : "Upload failed",
+          message,
+          jobId: job.id,
         });
       } finally {
         close();

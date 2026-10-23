@@ -1,8 +1,8 @@
-import { error } from "@sveltejs/kit";
+import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { readCustomTagNamesFromJson } from "$lib/custom-tags";
-import { createNdjsonSender } from "$lib/server/ingest/ndjson-stream";
-import { getYoutubeLinkStatus, importConnectedPlaylists } from "$lib/server/youtube";
+import { createImportJob, scheduleImportJob } from "$lib/server/import-jobs";
+import { getYoutubeLinkStatus } from "$lib/server/youtube";
 import { isStorageConfigured } from "$lib/server/storage";
 import { resolveYtDlpBin } from "$lib/server/ingest";
 
@@ -23,56 +23,24 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     sort?: string;
     skipExisting?: boolean;
   };
-  const playlistIds = body.playlistIds ?? [];
-  if (!Array.isArray(playlistIds) || playlistIds.length === 0) {
-    throw error(400, "playlistIds required");
-  }
+  const playlistIds = [...new Set((body.playlistIds ?? []).map((id) => String(id).trim()).filter(Boolean))];
+  if (playlistIds.length === 0) throw error(400, "playlistIds required");
+
   const tagIds = Array.isArray(body.tagIds) ? body.tagIds.map((id) => String(id)) : [];
   const customTags = readCustomTagNamesFromJson(body);
   const sort = typeof body.sort === "string" ? body.sort : "playlist";
   const skipExisting = Boolean(body.skipExisting);
 
-  const userId = locals.user.id;
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const { send, close } = createNdjsonSender(controller);
+  const label =
+    playlistIds.length === 1 ? `YouTube playlist · ${playlistIds[0]}` : `YouTube · ${playlistIds.length} playlists`;
 
-      try {
-        const result = await importConnectedPlaylists(
-          userId,
-          playlistIds,
-          (progress) => {
-            send({ type: "progress", ...progress });
-          },
-          { tagIds, customTags, sort, skipExisting }
-        );
-        send({
-          type: "done",
-          syncRunId: result.syncRunId,
-          imported: result.imported,
-          unavailable: result.unavailable,
-          skipped: result.skipped,
-          failed: result.failed,
-          errorMessage: result.errorMessage ?? null,
-          failures: result.failures ?? [],
-          playlists: result.playlists,
-        });
-      } catch (err) {
-        console.error("[zap youtube import]", err);
-        send({
-          type: "error",
-          message: err instanceof Error ? err.message : "Import failed",
-        });
-      } finally {
-        close();
-      }
-    },
+  const job = await createImportJob({
+    userId: locals.user.id,
+    kind: "youtube_playlist",
+    label,
+    source: { playlistIds, tagIds, customTags, sort, skipExisting },
   });
+  scheduleImportJob(job.id);
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "application/x-ndjson; charset=utf-8",
-      "Cache-Control": "no-store",
-    },
-  });
+  return json({ jobId: job.id, status: job.status, label: job.label }, { status: 202 });
 };

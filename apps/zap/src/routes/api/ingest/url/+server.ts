@@ -1,9 +1,8 @@
-import { error } from "@sveltejs/kit";
+import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { readCustomTagNamesFromJson } from "$lib/custom-tags";
-import { ensureCustomTags } from "$lib/server/catalogue";
-import { IngestError, ingestPublicUrl, resolveYtDlpBin } from "$lib/server/ingest";
-import { createNdjsonSender } from "$lib/server/ingest/ndjson-stream";
+import { createImportJob, scheduleImportJob } from "$lib/server/import-jobs";
+import { resolveYtDlpBin } from "$lib/server/ingest";
 import { isStorageConfigured } from "$lib/server/storage";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
@@ -23,46 +22,14 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   const selectedTagIds = Array.isArray(body.tagIds) ? body.tagIds.map((id) => String(id).trim()).filter(Boolean) : [];
   const customTagNames = readCustomTagNamesFromJson(body);
 
-  const userId = locals.user.id;
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const { send, close } = createNdjsonSender(controller);
-      try {
-        const tagIds = [...selectedTagIds, ...(await ensureCustomTags(userId, customTagNames))];
-        const result = await ingestPublicUrl(
-          userId,
-          url,
-          (song) => {
-            send({ type: "song", ...song });
-          },
-          { tagIds }
-        );
-        send({
-          type: "done",
-          imported: result.imported,
-          unavailable: result.unavailable,
-          skipped: result.skipped,
-          failed: result.failed,
-          syncRunId: result.syncRunId,
-          errorMessage: result.errorMessage ?? null,
-          failures: result.failures ?? [],
-        });
-      } catch (err) {
-        console.error("[zap ingest url]", err);
-        send({
-          type: "error",
-          message: err instanceof IngestError || err instanceof Error ? err.message : "Ingest failed",
-        });
-      } finally {
-        close();
-      }
-    },
+  const label = url.length > 80 ? `${url.slice(0, 77)}…` : url;
+  const job = await createImportJob({
+    userId: locals.user.id,
+    kind: "url",
+    label: `URL · ${label}`,
+    source: { url, tagIds: selectedTagIds, customTags: customTagNames },
   });
+  scheduleImportJob(job.id);
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "application/x-ndjson; charset=utf-8",
-      "Cache-Control": "no-store",
-    },
-  });
+  return json({ jobId: job.id, status: job.status, label: job.label }, { status: 202 });
 };

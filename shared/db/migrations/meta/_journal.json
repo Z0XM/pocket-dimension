@@ -435,6 +435,13 @@
       "when": 1793200000000,
       "tag": "0061_zap_playlist_follow_link",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793300000000,
+      "tag": "0062_zap_import_jobs",
+      "breakpoints": true
     }
   ]
 }

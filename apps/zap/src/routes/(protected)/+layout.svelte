@@ -15,6 +15,29 @@
   const catalogQueue = new CatalogQueueClient();
   setCatalogQueue(catalogQueue);
 
+  let runningImportJobs = $state(data.runningImportJobs ?? 0);
+
+  $effect(() => {
+    runningImportJobs = data.runningImportJobs ?? 0;
+  });
+
+  $effect(() => {
+    if (!data.user?.id) return;
+    const tick = async () => {
+      try {
+        const res = await fetch("/api/jobs/summary", { credentials: "same-origin" });
+        if (!res.ok) return;
+        const body = await res.json();
+        runningImportJobs = Number(body.runningCount ?? 0);
+      } catch {
+        // ignore
+      }
+    };
+    void tick();
+    const id = setInterval(() => void tick(), 4000);
+    return () => clearInterval(id);
+  });
+
   const path = $derived(page.url.pathname);
   const navTo = $derived(navigating.to?.url.pathname ?? null);
   const isNavigating = $derived(Boolean(navTo));
@@ -27,7 +50,9 @@
 
   const themeActive = $derived(path === "/theme" || path.startsWith("/theme/"));
   const connectionsActive = $derived(path === "/connections" || path.startsWith("/connections/"));
+  const jobsActive = $derived(path === "/jobs" || path.startsWith("/jobs/"));
   const joinActive = $derived(path === "/join" || path.startsWith("/join/"));
+  const showRunningJobsNav = $derived(runningImportJobs > 0 || jobsActive);
 
   /** Pin the shell so page headers stay put and list panes scroll (Catalogue-style). */
   const fillViewport = $derived(
@@ -38,6 +63,7 @@
       sessionActive ||
       themeActive ||
       connectionsActive ||
+      jobsActive ||
       homeActive ||
       joinActive) &&
       !isNavigating
@@ -67,7 +93,9 @@
                     ? "Loading theme"
                     : skeletonPath.startsWith("/connections")
                       ? "Loading connections"
-                      : "Loading"
+                      : skeletonPath.startsWith("/jobs")
+                        ? "Loading jobs"
+                        : "Loading"
   );
 
   async function signOut() {
@@ -111,6 +139,15 @@
       class={`zap-nav-link ${sessionActive ? "zap-nav-link-active" : ""} ${rail ? "block w-full px-2" : ""}`}
       aria-current={sessionActive ? "page" : undefined}>Sessions</a
     >
+    {#if showRunningJobsNav}
+      <a
+        href="/jobs"
+        class={`zap-nav-link ${jobsActive ? "zap-nav-link-active" : ""} ${rail ? "block w-full px-2" : ""}`}
+        aria-current={jobsActive ? "page" : undefined}
+        >Running Jobs{#if runningImportJobs > 0}
+          <span class="ml-1 tabular-nums text-signal">({runningImportJobs})</span>{/if}</a
+      >
+    {/if}
   </nav>
 {/snippet}
 
