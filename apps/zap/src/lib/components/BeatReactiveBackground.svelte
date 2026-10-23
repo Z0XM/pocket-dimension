@@ -15,6 +15,8 @@
   import {
     animationsEnabled,
     readAnimationStyle,
+    readResponseWindowMs,
+    readWaveHistoryMs,
     type AnimationStyleId,
   } from "$lib/theme-prefs";
 
@@ -78,6 +80,20 @@
     const waves: RadialWave[] = [];
     const waveBuf = new Float32Array(WAVE_N);
     const freqBuf = new Float32Array(FREQ_N);
+    const drawWave = new Float32Array(WAVE_N);
+    const drawFreq = new Float32Array(FREQ_N);
+
+    /** Response-window energy samples (peak-biased aggregate). */
+    const energyHist: { t: number; e: PlaybackEnergy }[] = [];
+    const FREQ_HIST_MAX = 16;
+    const freqHist: { t: number; bins: Float32Array }[] = [];
+
+    /** Scrolling waveform history for scope / mirror (newest on the right). */
+    const HISTORY_RATE = 2400;
+    const HIST_CAP = Math.ceil((1000 / 1000) * HISTORY_RATE);
+    const histBuf = new Float32Array(HIST_CAP);
+    let histWrite = 0;
+    let histCount = 0;
 
     let sBass = 0;
     let sMid = 0;
@@ -180,6 +196,130 @@
       fakePlaybackFrequency(now, freqBuf);
     }
 
+    function pushEnergyHistory(now: number, e: PlaybackEnergy) {
+      energyHist.push({
+        t: now,
+        e: { live: e.live, bass: e.bass, mid: e.mid, high: e.high, beat: e.beat, rms: e.rms },
+      });
+      const win = readResponseWindowMs();
+      const cutoff = now - Math.max(win, 16);
+      while (energyHist.length > 1 && energyHist[0]!.t < cutoff) energyHist.shift();
+      while (energyHist.length > 48) energyHist.shift();
+    }
+
+    /** 55% peak / 45% average over the response window (0 → instant). */
+    function aggregateEnergy(now: number, instant: PlaybackEnergy): PlaybackEnergy {
+      const win = readResponseWindowMs();
+      pushEnergyHistory(now, instant);
+      if (win <= 0 || energyHist.length <= 1) return instant;
+      const cutoff = now - win;
+      let n = 0;
+      let bass = 0;
+      let mid = 0;
+      let high = 0;
+      let rms = 0;
+      let beat = 0;
+      let peakBass = 0;
+      let peakMid = 0;
+      let peakHigh = 0;
+      let peakRms = 0;
+      let peakBeat = 0;
+      for (const s of energyHist) {
+        if (s.t < cutoff) continue;
+        n++;
+        bass += s.e.bass;
+        mid += s.e.mid;
+        high += s.e.high;
+        rms += s.e.rms;
+        beat += s.e.beat;
+        peakBass = Math.max(peakBass, s.e.bass);
+        peakMid = Math.max(peakMid, s.e.mid);
+        peakHigh = Math.max(peakHigh, s.e.high);
+        peakRms = Math.max(peakRms, s.e.rms);
+        peakBeat = Math.max(peakBeat, s.e.beat);
+      }
+      if (n === 0) return instant;
+      const inv = 1 / n;
+      const mix = (avg: number, peak: number) => peak * 0.55 + avg * 0.45;
+      return {
+        live: instant.live,
+        bass: mix(bass * inv, peakBass),
+        mid: mix(mid * inv, peakMid),
+        high: mix(high * inv, peakHigh),
+        rms: mix(rms * inv, peakRms),
+        beat: mix(beat * inv, peakBeat),
+      };
+    }
+
+    function pushFreqHistory(now: number) {
+      const bins = Float32Array.from(freqBuf);
+      freqHist.push({ t: now, bins });
+      while (freqHist.length > FREQ_HIST_MAX) freqHist.shift();
+      const win = readResponseWindowMs();
+      const cutoff = now - Math.max(win, 16);
+      while (freqHist.length > 1 && freqHist[0]!.t < cutoff) freqHist.shift();
+    }
+
+    function aggregateFrequency(now: number) {
+      pushFreqHistory(now);
+      const win = readResponseWindowMs();
+      if (win <= 0 || freqHist.length <= 1) {
+        drawFreq.set(freqBuf);
+        return;
+      }
+      const cutoff = now - win;
+      drawFreq.fill(0);
+      let n = 0;
+      const peaks = new Float32Array(drawFreq.length);
+      for (const s of freqHist) {
+        if (s.t < cutoff) continue;
+        n++;
+        for (let i = 0; i < drawFreq.length; i++) {
+          const v = s.bins[i] ?? 0;
+          drawFreq[i]! += v;
+          peaks[i] = Math.max(peaks[i]!, v);
+        }
+      }
+      if (n === 0) {
+        drawFreq.set(freqBuf);
+        return;
+      }
+      const inv = 1 / n;
+      for (let i = 0; i < drawFreq.length; i++) {
+        drawFreq[i] = peaks[i]! * 0.55 + drawFreq[i]! * inv * 0.45;
+      }
+    }
+
+    function appendWaveHistory(dt: number, now: number) {
+      fillWaveform(now);
+      const nPush = Math.max(1, Math.round(dt * HISTORY_RATE));
+      for (let i = 0; i < nPush; i++) {
+        const src = Math.min(waveBuf.length - 1, Math.floor((i / nPush) * waveBuf.length));
+        histBuf[histWrite] = waveBuf[src]!;
+        histWrite = (histWrite + 1) % HIST_CAP;
+        histCount = Math.min(HIST_CAP, histCount + 1);
+      }
+    }
+
+    /** Fill `drawWave` oldest→left, newest→right for the selected history window. */
+    function buildDrawWave(now: number, dt: number) {
+      const histMs = readWaveHistoryMs();
+      if (histMs <= 0) {
+        fillWaveform(now);
+        drawWave.set(waveBuf);
+        return;
+      }
+      appendWaveHistory(dt, now);
+      const want = Math.min(histCount, Math.max(8, Math.ceil((histMs / 1000) * HISTORY_RATE)));
+      const outN = drawWave.length;
+      for (let i = 0; i < outN; i++) {
+        const srcOffset = want - 1 - Math.floor((i / Math.max(1, outN - 1)) * (want - 1));
+        // histWrite points at next write (= one past newest)
+        const idx = (histWrite - 1 - srcOffset + HIST_CAP * 4) % HIST_CAP;
+        drawWave[i] = histBuf[idx]!;
+      }
+    }
+
     function spawnWave(strength: number, energy: PlaybackEnergy) {
       if (reduced) return;
       const band = 0.45 * energy.bass + 0.3 * energy.rms + 0.15 * energy.mid + 0.1 * energy.high;
@@ -208,6 +348,10 @@
         styleAttr = next;
         waves.length = 0;
         ambientR = 0;
+        histCount = 0;
+        histWrite = 0;
+        energyHist.length = 0;
+        freqHist.length = 0;
       }
     }
 
@@ -273,14 +417,12 @@
       }
     }
 
-    /** ECG / oscilloscope — time-domain trace across mid-screen. */
-    function drawScope(now: number) {
-      fillWaveform(now);
+    /** ECG / oscilloscope — time-domain trace (live or scrolling history). */
+    function drawScope() {
       const midY = h * 0.52;
       const amp = h * (0.16 + sRms * 0.12);
       const pad = Math.min(48, w * 0.06);
 
-      // Baseline
       ctx!.strokeStyle = rgba(inkRgb, 0.12 * settle);
       ctx!.lineWidth = 1;
       ctx!.beginPath();
@@ -292,26 +434,24 @@
       ctx!.lineWidth = mobile ? 1.5 : 2;
       ctx!.lineJoin = "round";
       ctx!.beginPath();
-      const n = waveBuf.length;
+      const n = drawWave.length;
       for (let i = 0; i < n; i++) {
         const x = pad + (i / (n - 1)) * (w - pad * 2);
-        const y = midY - waveBuf[i]! * amp * (reduced ? 0.35 : 1);
+        const y = midY - drawWave[i]! * amp * (reduced ? 0.35 : 1);
         if (i === 0) ctx!.moveTo(x, y);
         else ctx!.lineTo(x, y);
       }
       ctx!.stroke();
 
-      // Soft afterglow under the stroke
       ctx!.strokeStyle = rgba(signalRgb, 0.18 * settle);
       ctx!.lineWidth = mobile ? 4 : 6;
       ctx!.stroke();
     }
 
     /** Classic frequency bars — bottom-aligned, signal tint. */
-    function drawSpectrum(now: number) {
-      fillFrequency(now);
+    function drawSpectrum() {
       const barCount = mobile ? 40 : 64;
-      const usable = Math.min(barCount, freqBuf.length);
+      const usable = Math.min(barCount, drawFreq.length);
       const gap = 2;
       const padX = Math.min(40, w * 0.05);
       const padY = Math.min(56, h * 0.1);
@@ -320,9 +460,8 @@
       const maxH = h * (0.38 + sBass * 0.08);
 
       for (let i = 0; i < usable; i++) {
-        // Log-ish emphasis: sample across bins
-        const src = Math.min(freqBuf.length - 1, Math.floor((i / usable) * freqBuf.length * 0.9));
-        const v = freqBuf[src]! * (reduced ? 0.4 : 1);
+        const src = Math.min(drawFreq.length - 1, Math.floor((i / usable) * drawFreq.length * 0.9));
+        const v = drawFreq[src]! * (reduced ? 0.4 : 1);
         const bh = Math.max(2, v * maxH * settle);
         const x = padX + i * (barW + gap);
         const y = h - padY - bh;
@@ -336,10 +475,9 @@
     }
 
     /** Circular frequency spectrum around center. */
-    function drawRing(now: number) {
-      fillFrequency(now);
+    function drawRing() {
       const bins = mobile ? 48 : 72;
-      const usable = Math.min(bins, freqBuf.length);
+      const usable = Math.min(bins, drawFreq.length);
       const inner = Math.min(w, h) * 0.14;
       const span = Math.min(w, h) * (0.22 + sRms * 0.06);
 
@@ -350,8 +488,8 @@
       ctx!.stroke();
 
       for (let i = 0; i < usable; i++) {
-        const src = Math.min(freqBuf.length - 1, Math.floor((i / usable) * freqBuf.length * 0.85));
-        const v = freqBuf[src]! * (reduced ? 0.4 : 1);
+        const src = Math.min(drawFreq.length - 1, Math.floor((i / usable) * drawFreq.length * 0.85));
+        const v = drawFreq[src]! * (reduced ? 0.4 : 1);
         const a0 = (i / usable) * Math.PI * 2 - Math.PI / 2;
         const a1 = ((i + 0.72) / usable) * Math.PI * 2 - Math.PI / 2;
         const r1 = inner + v * span * settle;
@@ -378,20 +516,18 @@
       }
     }
 
-    /** Mirrored time-domain waveform (classic visualizer). */
-    function drawMirror(now: number) {
-      fillWaveform(now);
+    /** Mirrored time-domain waveform (live or scrolling history). */
+    function drawMirror() {
       const midY = h * 0.5;
       const amp = h * (0.2 + sRms * 0.14);
       const pad = Math.min(36, w * 0.05);
-      const n = waveBuf.length;
+      const n = drawWave.length;
       const motion = reduced ? 0.35 : 1;
 
-      // Upper half
       ctx!.beginPath();
       for (let i = 0; i < n; i++) {
         const x = pad + (i / (n - 1)) * (w - pad * 2);
-        const y = midY - Math.abs(waveBuf[i]!) * amp * motion * settle;
+        const y = midY - Math.abs(drawWave[i]!) * amp * motion * settle;
         if (i === 0) ctx!.moveTo(x, midY);
         ctx!.lineTo(x, y);
       }
@@ -403,11 +539,10 @@
       ctx!.fillStyle = rgba(signalRgb, (0.28 + sRms * 0.25) * settle);
       ctx!.fill();
 
-      // Lower mirror
       ctx!.beginPath();
       for (let i = 0; i < n; i++) {
         const x = pad + (i / (n - 1)) * (w - pad * 2);
-        const y = midY + Math.abs(waveBuf[i]!) * amp * motion * settle;
+        const y = midY + Math.abs(drawWave[i]!) * amp * motion * settle;
         if (i === 0) ctx!.moveTo(x, midY);
         ctx!.lineTo(x, y);
       }
@@ -419,13 +554,12 @@
       ctx!.fillStyle = rgba(signalRgb, (0.22 + sRms * 0.2) * settle);
       ctx!.fill();
 
-      // Outline
       ctx!.strokeStyle = rgba(signalRgb, (0.55 + sBeat * 0.25) * settle);
       ctx!.lineWidth = 1.25;
       ctx!.beginPath();
       for (let i = 0; i < n; i++) {
         const x = pad + (i / (n - 1)) * (w - pad * 2);
-        const y = midY - Math.abs(waveBuf[i]!) * amp * motion * settle;
+        const y = midY - Math.abs(drawWave[i]!) * amp * motion * settle;
         if (i === 0) ctx!.moveTo(x, y);
         else ctx!.lineTo(x, y);
       }
@@ -433,7 +567,7 @@
       ctx!.beginPath();
       for (let i = 0; i < n; i++) {
         const x = pad + (i / (n - 1)) * (w - pad * 2);
-        const y = midY + Math.abs(waveBuf[i]!) * amp * motion * settle;
+        const y = midY + Math.abs(drawWave[i]!) * amp * motion * settle;
         if (i === 0) ctx!.moveTo(x, y);
         else ctx!.lineTo(x, y);
       }
@@ -450,11 +584,16 @@
       settle += ((playing ? 1 : 0) - settle) * Math.min(1, dt * (playing ? 2.4 : 1.6));
       if (settle < 0.01 && !playing) {
         waves.length = 0;
+        histCount = 0;
+        histWrite = 0;
+        energyHist.length = 0;
+        freqHist.length = 0;
         ctx!.clearRect(0, 0, w, h);
         return;
       }
 
-      const e = energyFrame(ts);
+      const instant = energyFrame(ts);
+      const e = aggregateEnergy(ts, instant);
       const smoothRate = Math.min(1, dt * 3.2);
       sBass += (e.bass - sBass) * smoothRate;
       sMid += (e.mid - sMid) * smoothRate;
@@ -464,11 +603,23 @@
 
       ctx!.clearRect(0, 0, w, h);
 
-      if (style === "radial") drawRadial(e, dt, playing);
-      else if (style === "scope") drawScope(ts);
-      else if (style === "spectrum") drawSpectrum(ts);
-      else if (style === "ring") drawRing(ts);
-      else drawMirror(ts);
+      if (style === "radial") {
+        drawRadial(e, dt, playing);
+      } else if (style === "scope") {
+        buildDrawWave(ts, dt);
+        drawScope();
+      } else if (style === "spectrum") {
+        fillFrequency(ts);
+        aggregateFrequency(ts);
+        drawSpectrum();
+      } else if (style === "ring") {
+        fillFrequency(ts);
+        aggregateFrequency(ts);
+        drawRing();
+      } else {
+        buildDrawWave(ts, dt);
+        drawMirror();
+      }
     }
 
     function frame(ts: number) {
@@ -519,7 +670,7 @@
 -->
 <canvas
   bind:this={canvasEl}
-  class="zap-beat-bg pointer-events-none fixed inset-0 z-[1] h-[100dvh] w-screen"
+  class="zap-beat-bg pointer-events-none fixed inset-0 h-[100dvh] w-screen"
   aria-hidden="true"
   data-analyser={usingAnalyser ? "live" : "fallback"}
   data-style={styleAttr}

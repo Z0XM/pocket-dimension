@@ -52,6 +52,15 @@ export type AccentId = (typeof ACCENT_PRESETS)[number]["id"];
 export type PageId = (typeof PAGE_PRESETS)[number]["id"];
 export type CardId = (typeof CARD_PRESETS)[number]["id"];
 export type AnimationStyleId = (typeof ANIMATION_STYLES)[number]["id"];
+export type AnimationLayer = "behind" | "top";
+
+/** Slider ranges — defaults match pre-control look. */
+export const MOTION_CARD_OPACITY = { min: 0.15, max: 1, step: 0.05, default: 0.4 } as const;
+export const MOTION_ANIM_OPACITY = { min: 0.1, max: 1, step: 0.05, default: 1 } as const;
+/** 0 = instant per-frame; max aggregates peak-biased energy over this many ms. */
+export const MOTION_RESPONSE_MS = { min: 0, max: 200, step: 10, default: 0 } as const;
+/** 0 = live analyser buffer only; max ≈ 1s scrolling history (scope / mirror). */
+export const MOTION_WAVE_HISTORY_MS = { min: 0, max: 1000, step: 50, default: 0 } as const;
 
 export type ZapThemePrefs = {
   accent: AccentId;
@@ -61,6 +70,19 @@ export type ZapThemePrefs = {
   animations: boolean;
   /** Visualizer style when animations are on. */
   animationStyle: AnimationStyleId;
+  /** Card surface alpha when animations on (0.15–1). Ignored when animations off. */
+  cardOpacity: number;
+  /** Visualizer canvas opacity (0.1–1). */
+  animationOpacity: number;
+  /** Canvas under UI vs over UI. */
+  animationLayer: AnimationLayer;
+  /**
+   * Analyser aggregation window in ms. 0 = instant.
+   * >0 → peak-biased blend (55% peak / 45% avg) over the window.
+   */
+  responseWindowMs: number;
+  /** Oscilloscope / mirrored-wave history window in ms. 0 = live buffer only. */
+  waveHistoryMs: number;
 };
 
 export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
@@ -69,11 +91,12 @@ export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
   card: "ink",
   animations: true,
   animationStyle: "radial",
+  cardOpacity: MOTION_CARD_OPACITY.default,
+  animationOpacity: MOTION_ANIM_OPACITY.default,
+  animationLayer: "behind",
+  responseWindowMs: MOTION_RESPONSE_MS.default,
+  waveHistoryMs: MOTION_WAVE_HISTORY_MS.default,
 };
-
-/** Card fill alpha when animations are on (cymatics show through). */
-export const ANIMATIONS_CARD_ALPHA = 0.4;
-export const ANIMATIONS_CHROME_ALPHA = 0.72;
 
 export function isAccentId(v: unknown): v is AccentId {
   return ACCENT_PRESETS.some((p) => p.id === v);
@@ -91,6 +114,35 @@ export function isAnimationStyleId(v: unknown): v is AnimationStyleId {
   return ANIMATION_STYLES.some((p) => p.id === v);
 }
 
+export function isAnimationLayer(v: unknown): v is AnimationLayer {
+  return v === "behind" || v === "top";
+}
+
+function clamp(n: number, min: number, max: number) {
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
+function clampCardOpacity(v: unknown): number {
+  return clamp(typeof v === "number" ? v : MOTION_CARD_OPACITY.default, MOTION_CARD_OPACITY.min, MOTION_CARD_OPACITY.max);
+}
+
+function clampAnimOpacity(v: unknown): number {
+  return clamp(typeof v === "number" ? v : MOTION_ANIM_OPACITY.default, MOTION_ANIM_OPACITY.min, MOTION_ANIM_OPACITY.max);
+}
+
+function clampResponseMs(v: unknown): number {
+  return clamp(typeof v === "number" ? v : MOTION_RESPONSE_MS.default, MOTION_RESPONSE_MS.min, MOTION_RESPONSE_MS.max);
+}
+
+function clampWaveHistoryMs(v: unknown): number {
+  return clamp(
+    typeof v === "number" ? v : MOTION_WAVE_HISTORY_MS.default,
+    MOTION_WAVE_HISTORY_MS.min,
+    MOTION_WAVE_HISTORY_MS.max
+  );
+}
+
 export function readThemePrefs(): ZapThemePrefs {
   if (typeof localStorage === "undefined") return { ...DEFAULT_THEME_PREFS };
   try {
@@ -105,6 +157,13 @@ export function readThemePrefs(): ZapThemePrefs {
       animationStyle: isAnimationStyleId(parsed.animationStyle)
         ? parsed.animationStyle
         : DEFAULT_THEME_PREFS.animationStyle,
+      cardOpacity: clampCardOpacity(parsed.cardOpacity),
+      animationOpacity: clampAnimOpacity(parsed.animationOpacity),
+      animationLayer: isAnimationLayer(parsed.animationLayer)
+        ? parsed.animationLayer
+        : DEFAULT_THEME_PREFS.animationLayer,
+      responseWindowMs: clampResponseMs(parsed.responseWindowMs),
+      waveHistoryMs: clampWaveHistoryMs(parsed.waveHistoryMs),
     };
     // Migrate removed styles (wave/noise/bars/bloom/vortex/…) back to radial.
     if (parsed.animationStyle !== prefs.animationStyle) {
@@ -148,6 +207,11 @@ function mixCard(solid: string, alpha: number) {
   return `color-mix(in srgb, ${solid} ${Math.round(alpha * 100)}%, transparent)`;
 }
 
+/** Chrome slightly more opaque than cards so headers stay readable. */
+function chromeAlphaFromCard(cardOpacity: number) {
+  return clamp(cardOpacity + (1 - cardOpacity) * 0.533, 0.2, 1);
+}
+
 /** Apply prefs to `:root` CSS custom properties + `data-animations`. */
 export function applyThemePrefs(prefs: ZapThemePrefs) {
   if (typeof document === "undefined") return;
@@ -156,20 +220,29 @@ export function applyThemePrefs(prefs: ZapThemePrefs) {
   const page = pageById(prefs.page);
   const card = cardById(prefs.card);
   const animationsOn = prefs.animations !== false;
+  const cardOpacity = clampCardOpacity(prefs.cardOpacity);
+  const animOpacity = clampAnimOpacity(prefs.animationOpacity);
+  const layer = isAnimationLayer(prefs.animationLayer) ? prefs.animationLayer : "behind";
+  const responseMs = clampResponseMs(prefs.responseWindowMs);
+  const waveMs = clampWaveHistoryMs(prefs.waveHistoryMs);
 
   root.setAttribute("data-animations", animationsOn ? "on" : "off");
   root.setAttribute(
     "data-animation-style",
     isAnimationStyleId(prefs.animationStyle) ? prefs.animationStyle : DEFAULT_THEME_PREFS.animationStyle
   );
+  root.setAttribute("data-animation-layer", layer);
+  root.style.setProperty("--zap-anim-opacity", String(animOpacity));
+  root.style.setProperty("--zap-response-ms", String(responseMs));
+  root.style.setProperty("--zap-wave-history-ms", String(waveMs));
 
   root.style.setProperty("--background", page.value);
   root.style.setProperty("--atmosphere", `linear-gradient(180deg, ${page.value} 0%, ${page.value} 100%)`);
   root.style.setProperty("--scrollbar-track", page.value);
 
   root.style.setProperty("--card-solid", card.value);
-  const cardFill = animationsOn ? mixCard(card.value, ANIMATIONS_CARD_ALPHA) : card.value;
-  const chromeFill = animationsOn ? mixCard(card.value, ANIMATIONS_CHROME_ALPHA) : card.value;
+  const cardFill = animationsOn ? mixCard(card.value, cardOpacity) : card.value;
+  const chromeFill = animationsOn ? mixCard(card.value, chromeAlphaFromCard(cardOpacity)) : card.value;
 
   root.style.setProperty("--background-mid", chromeFill);
   root.style.setProperty("--card", cardFill);
@@ -206,9 +279,21 @@ export function animationsEnabled(): boolean {
   return document.documentElement.getAttribute("data-animations") !== "off";
 }
 
-/** Active lattice style from `data-animation-style` (falls back to radial). */
+/** Active visualizer style from `data-animation-style` (falls back to radial). */
 export function readAnimationStyle(): AnimationStyleId {
   if (typeof document === "undefined") return DEFAULT_THEME_PREFS.animationStyle;
   const v = document.documentElement.getAttribute("data-animation-style");
   return isAnimationStyleId(v) ? v : DEFAULT_THEME_PREFS.animationStyle;
+}
+
+export function readResponseWindowMs(): number {
+  if (typeof document === "undefined") return DEFAULT_THEME_PREFS.responseWindowMs;
+  return clampResponseMs(Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zap-response-ms")));
+}
+
+export function readWaveHistoryMs(): number {
+  if (typeof document === "undefined") return DEFAULT_THEME_PREFS.waveHistoryMs;
+  return clampWaveHistoryMs(
+    Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zap-wave-history-ms"))
+  );
 }

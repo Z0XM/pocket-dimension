@@ -43,10 +43,22 @@
           var card = cards[p.card] || cards.ink;
           var animationsOn = p.animations !== false;
           var styles = { radial: 1, scope: 1, spectrum: 1, ring: 1, mirror: 1 };
+          var cardOp = typeof p.cardOpacity === "number" ? Math.min(1, Math.max(0.15, p.cardOpacity)) : 0.4;
+          var animOp = typeof p.animationOpacity === "number" ? Math.min(1, Math.max(0.1, p.animationOpacity)) : 1;
+          var layer = p.animationLayer === "top" ? "top" : "behind";
+          var respMs = typeof p.responseWindowMs === "number" ? Math.min(200, Math.max(0, p.responseWindowMs)) : 0;
+          var waveMs = typeof p.waveHistoryMs === "number" ? Math.min(1000, Math.max(0, p.waveHistoryMs)) : 0;
+          var chromeOp = Math.min(1, cardOp + (1 - cardOp) * 0.533);
           r.setAttribute("data-animations", animationsOn ? "on" : "off");
           r.setAttribute("data-animation-style", styles[p.animationStyle] ? p.animationStyle : "radial");
-          var cardFill = animationsOn ? "color-mix(in srgb," + card + " 40%, transparent)" : card;
-          var chromeFill = animationsOn ? "color-mix(in srgb," + card + " 72%, transparent)" : card;
+          r.setAttribute("data-animation-layer", layer);
+          r.style.setProperty("--zap-anim-opacity", String(animOp));
+          r.style.setProperty("--zap-response-ms", String(respMs));
+          r.style.setProperty("--zap-wave-history-ms", String(waveMs));
+          var cardFill = animationsOn ? "color-mix(in srgb," + card + " " + Math.round(cardOp * 100) + "%, transparent)" : card;
+          var chromeFill = animationsOn
+            ? "color-mix(in srgb," + card + " " + Math.round(chromeOp * 100) + "%, transparent)"
+            : card;
           r.style.setProperty("--background", page);
           r.style.setProperty("--atmosphere", "linear-gradient(180deg," + page + " 0%," + page + " 100%)");
           r.style.setProperty("--scrollbar-track", page);
