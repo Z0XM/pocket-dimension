@@ -10,9 +10,15 @@ html body {
 }
 
 .zap-shell {
+  position: relative;
   display: flex;
   min-height: 100dvh;
   flex-direction: column;
+}
+
+/* Beat-reactive canvas sits behind chrome; keep panels readable. */
+.zap-beat-bg {
+  z-index: 0;
 }
 
 .zap-shell-rail {

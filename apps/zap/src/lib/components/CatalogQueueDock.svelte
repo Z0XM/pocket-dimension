@@ -11,6 +11,7 @@
   import type { CatalogQueueItem, CatalogQueueState } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
   import { DOCK_BAR_H, type FloatingMode } from "$lib/floating-panel";
+  import { setPlaybackAudioElement } from "$lib/playback-audio";
 
   let { queue }: { queue: CatalogQueueClient } = $props();
 
@@ -143,7 +144,14 @@
     docked = readFlag(DOCK_KEY);
     devicesDocked = readFlag(DEVICES_DOCK_KEY);
     queue.connect();
-    return () => queue.disconnect();
+    return () => {
+      setPlaybackAudioElement(null);
+      queue.disconnect();
+    };
+  });
+
+  $effect(() => {
+    setPlaybackAudioElement(audioEl);
   });
 
   function silence(el: HTMLAudioElement) {

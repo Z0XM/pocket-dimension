@@ -1,6 +1,7 @@
 <script lang="ts">
   import { authClient } from "$lib/auth-client";
   import { CatalogQueueClient, setCatalogQueue } from "$lib/catalog-queue-client.svelte";
+  import BeatReactiveBackground from "$lib/components/BeatReactiveBackground.svelte";
   import CatalogQueueDock from "$lib/components/CatalogQueueDock.svelte";
   import PageSkeleton from "$lib/components/PageSkeleton.svelte";
   import SettingsMenu from "$lib/components/SettingsMenu.svelte";
@@ -113,8 +114,9 @@
   </nav>
 {/snippet}
 
-<div class={`zap-shell zap-wave-field zap-grid ${fillViewport ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
-  <aside class="zap-shell-rail" aria-label="App rail">
+<div class={`zap-shell zap-wave-field zap-grid relative ${fillViewport ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
+  <BeatReactiveBackground />
+  <aside class="zap-shell-rail relative z-[1]" aria-label="App rail">
     <a href="/home" class="flex items-center gap-2 px-2" aria-label="Zap home" aria-current={homeActive ? "page" : undefined}>
       <span class="text-lg font-semibold tracking-tight text-foreground">Zap</span>
       <WaveBars />
@@ -125,7 +127,7 @@
     </div>
   </aside>
 
-  <div class="zap-shell-body min-h-0">
+  <div class="zap-shell-body relative z-[1] min-h-0">
     <header class="zap-shell-top">
       {#if isNavigating}
         <div class="zap-nav-progress" aria-hidden="true"></div>
