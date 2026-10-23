@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
+
   let {
     open = $bindable(false),
     title = "Confirm",
@@ -8,6 +10,7 @@
     danger = false,
     busy = false,
     onconfirm,
+    children,
   }: {
     open?: boolean;
     title?: string;
@@ -17,6 +20,7 @@
     danger?: boolean;
     busy?: boolean;
     onconfirm: () => void | Promise<void>;
+    children?: Snippet;
   } = $props();
 
   let dialog = $state<HTMLDialogElement | null>(null);
@@ -55,7 +59,9 @@
   <div class="space-y-4 p-5">
     <div>
       <h2 class="text-lg font-semibold tracking-tight">{title}</h2>
-      {#if body}
+      {#if children}
+        <div class="mt-2">{@render children()}</div>
+      {:else if body}
         <p class="mt-2 text-sm text-muted-foreground">{body}</p>
       {/if}
     </div>

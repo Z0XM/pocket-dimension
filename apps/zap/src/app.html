@@ -8,8 +8,7 @@
       (function () {
         try {
           var raw = localStorage.getItem("zap.theme.prefs");
-          if (!raw) return;
-          var p = JSON.parse(raw);
+          var p = raw ? JSON.parse(raw) : {};
           var accents = {
             coral: ["#ff6b4a", "#1a0d08"],
             red: ["#ff4d4d", "#1a0808"],
@@ -37,37 +36,51 @@
             "blue-ink": "#10141c",
             "purple-ink": "#14101a",
           };
+          /* Defaults: coral + dark-purple + ink + animations on (match theme-prefs DEFAULT_THEME_PREFS) */
           var r = document.documentElement;
-          var a = accents[p.accent];
-          var page = pages[p.page];
-          var card = cards[p.card];
-          if (page) {
-            r.style.setProperty("--background", page);
-            r.style.setProperty("--atmosphere", "linear-gradient(180deg," + page + " 0%," + page + " 100%)");
-            r.style.setProperty("--scrollbar-track", page);
-          }
-          if (card) {
-            r.style.setProperty("--background-mid", card);
-            r.style.setProperty("--card", card);
-            r.style.setProperty("--secondary", card);
-            r.style.setProperty("--muted", card);
-            r.style.setProperty("--input", card);
-            r.style.setProperty("--popover", card);
-          }
-          if (a) {
-            r.style.setProperty("--primary", a[0]);
-            r.style.setProperty("--primary-foreground", a[1]);
-            r.style.setProperty("--accent", a[0]);
-            r.style.setProperty("--accent-foreground", a[1]);
-            r.style.setProperty("--positive", a[0]);
-            r.style.setProperty("--positive-foreground", a[1]);
-            r.style.setProperty("--signal", a[0]);
-            r.style.setProperty("--ring", a[0]);
-            r.style.setProperty("--glow-a", a[0]);
-            r.style.setProperty("--scrollbar-thumb-hover", a[0]);
-            r.style.setProperty("--frame-player-border", "4px solid " + a[0]);
-            r.style.setProperty("--frame-shadow", "8px 8px 0 color-mix(in oklab," + a[0] + " 35%,transparent)");
-          }
+          var a = accents[p.accent] || accents.coral;
+          var page = pages[p.page] || pages["dark-purple"];
+          var card = cards[p.card] || cards.ink;
+          var animationsOn = p.animations !== false;
+          var styles = { radial: 1, scope: 1, spectrum: 1, ring: 1, mirror: 1 };
+          var cardOp = typeof p.cardOpacity === "number" ? Math.min(1, Math.max(0.15, p.cardOpacity)) : 0.4;
+          var animOp = typeof p.animationOpacity === "number" ? Math.min(1, Math.max(0.1, p.animationOpacity)) : 0.8;
+          var layer = p.animationLayer === "top" ? "top" : "behind";
+          var respMs = typeof p.responseWindowMs === "number" ? Math.min(2000, Math.max(0, p.responseWindowMs)) : 0;
+          var waveMs = typeof p.waveHistoryMs === "number" ? Math.min(5000, Math.max(0, p.waveHistoryMs)) : 0;
+          var chromeOp = Math.min(1, cardOp + (1 - cardOp) * 0.533);
+          r.setAttribute("data-animations", animationsOn ? "on" : "off");
+          r.setAttribute("data-animation-style", styles[p.animationStyle] ? p.animationStyle : "mirror");
+          r.setAttribute("data-animation-layer", layer);
+          r.style.setProperty("--zap-anim-opacity", String(animOp));
+          r.style.setProperty("--zap-response-ms", String(respMs));
+          r.style.setProperty("--zap-wave-history-ms", String(waveMs));
+          var cardFill = animationsOn ? "color-mix(in srgb," + card + " " + Math.round(cardOp * 100) + "%, transparent)" : card;
+          var chromeFill = animationsOn
+            ? "color-mix(in srgb," + card + " " + Math.round(chromeOp * 100) + "%, transparent)"
+            : card;
+          r.style.setProperty("--background", page);
+          r.style.setProperty("--atmosphere", "linear-gradient(180deg," + page + " 0%," + page + " 100%)");
+          r.style.setProperty("--scrollbar-track", page);
+          r.style.setProperty("--card-solid", card);
+          r.style.setProperty("--background-mid", chromeFill);
+          r.style.setProperty("--card", cardFill);
+          r.style.setProperty("--secondary", cardFill);
+          r.style.setProperty("--muted", cardFill);
+          r.style.setProperty("--input", chromeFill);
+          r.style.setProperty("--popover", chromeFill);
+          r.style.setProperty("--primary", a[0]);
+          r.style.setProperty("--primary-foreground", a[1]);
+          r.style.setProperty("--accent", a[0]);
+          r.style.setProperty("--accent-foreground", a[1]);
+          r.style.setProperty("--positive", a[0]);
+          r.style.setProperty("--positive-foreground", a[1]);
+          r.style.setProperty("--signal", a[0]);
+          r.style.setProperty("--ring", a[0]);
+          r.style.setProperty("--glow-a", a[0]);
+          r.style.setProperty("--scrollbar-thumb-hover", a[0]);
+          r.style.setProperty("--frame-player-border", "4px solid " + a[0]);
+          r.style.setProperty("--frame-shadow", "8px 8px 0 color-mix(in oklab," + a[0] + " 35%,transparent)");
         } catch (e) {}
       })();
     </script>

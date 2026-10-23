@@ -25,9 +25,26 @@ export class TagAdminError extends Error {
   }
 }
 
-export async function listSystemTagsForAdmin(): Promise<SystemTagRow[]> {
-  const tags = await db.select().from(schema.tags).where(eq(schema.tags.kind, "system")).orderBy(asc(schema.tags.name));
-  if (tags.length === 0) return [];
+export async function listSystemTagsForAdmin(input: { limit?: number; offset?: number } = {}) {
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 200);
+  const offset = Math.max(input.offset ?? 0, 0);
+
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(schema.tags)
+    .where(eq(schema.tags.kind, "system"));
+
+  const tags = await db
+    .select()
+    .from(schema.tags)
+    .where(eq(schema.tags.kind, "system"))
+    .orderBy(asc(schema.tags.name), asc(schema.tags.id))
+    .limit(limit + 1)
+    .offset(offset);
+
+  const hasMore = tags.length > limit;
+  const page = hasMore ? tags.slice(0, limit) : tags;
+  if (page.length === 0) return { tags: [] as SystemTagRow[], hasMore: false, nextOffset: offset, total: total ?? 0 };
 
   const [usage, twins] = await Promise.all([
     db
@@ -40,7 +57,7 @@ export async function listSystemTagsForAdmin(): Promise<SystemTagRow[]> {
       .where(
         inArray(
           schema.mediaAssetTags.tagId,
-          tags.map((t) => t.id)
+          page.map((t) => t.id)
         )
       )
       .groupBy(schema.mediaAssetTags.tagId),
@@ -52,7 +69,7 @@ export async function listSystemTagsForAdmin(): Promise<SystemTagRow[]> {
           eq(schema.tags.kind, "custom"),
           inArray(
             schema.tags.slug,
-            tags.map((t) => t.slug)
+            page.map((t) => t.slug)
           )
         )
       )
@@ -61,7 +78,7 @@ export async function listSystemTagsForAdmin(): Promise<SystemTagRow[]> {
   const usageByTag = new Map(usage.map((u) => [u.tagId, u]));
   const twinsBySlug = new Map(twins.map((t) => [t.slug, t.count]));
 
-  return tags.map((tag) => ({
+  const rows: SystemTagRow[] = page.map((tag) => ({
     id: tag.id,
     name: tag.name,
     slug: tag.slug,
@@ -70,6 +87,8 @@ export async function listSystemTagsForAdmin(): Promise<SystemTagRow[]> {
     customTwins: twinsBySlug.get(tag.slug) ?? 0,
     createdAt: tag.createdAt.toISOString(),
   }));
+
+  return { tags: rows, hasMore, nextOffset: offset + rows.length, total: total ?? 0 };
 }
 
 export async function createSystemTag(rawName: string) {

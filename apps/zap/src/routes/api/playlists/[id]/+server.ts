@@ -14,6 +14,7 @@ import {
   setPlaylistExclusion,
   setPlaylistTagQuery,
   sortPlaylistTracksPersisted,
+  unfollowPlaylist,
   updatePlaylist,
 } from "$lib/server/playlists";
 
@@ -109,6 +110,10 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
       case "removeCollaborator": {
         if (!body.collaboratorUserId) throw error(400, "collaboratorUserId required");
         return json(await removeCollaborator(id, user.id, body.collaboratorUserId));
+      }
+      case "unfollow": {
+        await unfollowPlaylist(id, user.id);
+        return json({ ok: true });
       }
       default:
         throw error(400, "Unknown action");

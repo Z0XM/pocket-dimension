@@ -16,7 +16,7 @@ import {
   canSkip,
   type MemberPermissionRow,
 } from "./permissions";
-import { defaultSessionName, normalizeSessionName } from "./session-name";
+import { defaultSessionName, hostLabelForSession, normalizeSessionName } from "./session-name";
 import { buildSessionSnapshot } from "./snapshot";
 import type { SessionMemberPermissions, SessionSnapshot } from "./types";
 
@@ -84,7 +84,8 @@ async function markStaleInternal(sessionId: string) {
   const snapshot = await buildSessionSnapshot(sessionId);
   if (snapshot) sessionEventBus.publish(sessionId, snapshot);
   sessionEventBus.closeSession(sessionId);
-  void import("$lib/server/discord").then((m) => m.onSessionEnded(sessionId)).catch(() => {});
+  // Soft-disconnect Discord (keep channel selection for Reconnect); do not detach.
+  void import("$lib/server/discord").then((m) => m.onSessionStale(sessionId)).catch(() => {});
   return snapshot;
 }
 
@@ -214,9 +215,11 @@ export async function createSession(
   opts?: { perpetual?: boolean; name?: string | null }
 ): Promise<SessionSnapshot> {
   const joinCode = await allocateJoinCode();
+  const host = await db.query.user.findFirst({ where: eq(schema.user.id, hostUserId) });
+  const hostLabel = host ? hostLabelForSession(host) : null;
   let name: string;
   try {
-    name = normalizeSessionName(opts?.name) ?? defaultSessionName(joinCode);
+    name = normalizeSessionName(opts?.name) ?? defaultSessionName(joinCode, hostLabel);
   } catch (err) {
     throw new SessionError(err instanceof Error ? err.message : "Invalid session name");
   }

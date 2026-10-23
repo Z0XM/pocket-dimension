@@ -1,6 +1,9 @@
 <script lang="ts">
+  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
+  import DiscordSinkPanel from "$lib/components/DiscordSinkPanel.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
+  import PageHeader from "$lib/components/PageHeader.svelte";
   import SessionPlayer from "$lib/components/SessionPlayer.svelte";
   import SessionQueueList from "$lib/components/SessionQueueList.svelte";
   import SessionSetupPanel from "$lib/components/SessionSetupPanel.svelte";
@@ -204,52 +207,58 @@
 
 <audio bind:this={audioEl} preload="auto" class="hidden"></audio>
 
-<section class="space-y-6">
-  <div class="flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <h1 class="text-3xl font-semibold tracking-tight">Session</h1>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Shared listening ·
-        <a class="text-signal hover:underline" href="/session?stay=1">All sessions</a>
-      </p>
-    </div>
-    {#if !sessionLive}
-      <a href="/session?stay=1" class="auth-btn">Back to sessions</a>
-    {/if}
-  </div>
-
-  {#if sessionLive}
-    <div class="flex gap-1 border-b border-border/60" role="tablist" aria-label="Session views">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={tab === "now"}
-        class={`border-b-2 px-3 py-2 font-mono text-[11px] tracking-[0.12em] uppercase ${
-          tab === "now" ? "border-signal text-signal" : "border-transparent text-muted-foreground hover:text-foreground"
-        }`}
-        onclick={() => (tab = "now")}
-      >
-        Now playing
-      </button>
-      {#if canSetup}
+<section class="zap-page">
+  <PageHeader title="Session">
+    {#snippet actions()}
+      {#if !sessionLive}
+        <a href="/session?stay=1" class="auth-btn inline-flex items-center gap-1.5">
+          <ArrowLeftIcon class="size-3.5" aria-hidden="true" />
+          Sessions
+        </a>
+      {/if}
+    {/snippet}
+    {#if sessionLive}
+      <div class="flex flex-wrap gap-1 font-mono text-[11px]" role="tablist" aria-label="Session views">
         <button
           type="button"
           role="tab"
-          aria-selected={tab === "setup"}
-          class={`border-b-2 px-3 py-2 font-mono text-[11px] tracking-[0.12em] uppercase ${
-            tab === "setup" ? "border-signal text-signal" : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-          onclick={() => (tab = "setup")}
+          aria-selected={tab === "now"}
+          class={`zap-nav-link ${tab === "now" ? "zap-nav-link-active" : ""}`}
+          onclick={() => (tab = "now")}
         >
-          Setup
+          Now playing
         </button>
-      {/if}
-    </div>
-  {/if}
+        {#if canSetup}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "setup"}
+            class={`zap-nav-link ${tab === "setup" ? "zap-nav-link-active" : ""}`}
+            onclick={() => (tab = "setup")}
+          >
+            Setup
+          </button>
+        {/if}
+      </div>
+    {/if}
+  </PageHeader>
+
+  <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
 
   {#if tab === "setup" && sessionLive && canSetup}
     <SessionSetupPanel bind:snapshot bind:discordSinkActive />
   {:else}
+    {#if sessionLive}
+      {#key sessionRouteId}
+        <DiscordSinkPanel
+          sessionId={sessionRouteId}
+          canManage={canSetup}
+          variant="banner"
+          bind:active={discordSinkActive}
+        />
+      {/key}
+    {/if}
+
     <SessionPlayer bind:snapshot bind:audioEl />
 
     {#if sessionLive}
@@ -306,7 +315,7 @@
               <ListBusyOverlay busy={catalogueLoading && catalogue.length > 0} label="Updating…">
                 <ul
                   bind:this={catalogueScrollRoot}
-                  class="max-h-[min(32rem,70vh)] min-h-[8rem] divide-y divide-border/50 overflow-y-auto rounded-lg border border-border/70 bg-card/30"
+                  class="max-h-[min(32rem,70vh)] min-h-[8rem] divide-y divide-border/50 overflow-y-auto rounded-lg border border-border/70 bg-card"
                 >
                   {#if catalogue.length === 0}
                     <li class="px-4 py-8 text-center text-sm text-muted-foreground">No tracks.</li>
@@ -378,4 +387,5 @@
       </p>
     {/if}
   {/if}
+  </div>
 </section>

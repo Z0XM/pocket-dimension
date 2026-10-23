@@ -4,10 +4,21 @@ export type Point = { x: number; y: number };
 export type Rect = Point & { w: number; h: number };
 export type Viewport = { w: number; h: number };
 export type FloatingMode = "icon" | "panel" | "full";
+/** Visual tone for the bottom-edge drop band (queue docks; legacy stop was danger). */
+export type DropTone = "dock" | "danger";
+/** Where a float docks on drop: full bottom footer (queue) or bottom-right corner (devices). */
+export type DropAnchor = "footer" | "corner";
 
 export const ICON_SIZE = 52;
 /** Releasing a drag with the pointer this close to the bottom edge triggers the drop action. */
 export const DROP_ZONE_PX = 72;
+/** Height of the docked catalog queue footer bar. */
+export const DOCK_BAR_H = 72;
+/** Docked Devices panel size (bottom-right rectangle). */
+export const DEVICES_DOCK_W = 288;
+export const DEVICES_DOCK_H = 240;
+/** Hit-test size for the bottom-right corner drop target. */
+export const CORNER_DROP_PX = 168;
 export const PANEL_MIN = { w: 280, h: 240 } as const;
 const EDGE = 8;
 
@@ -48,6 +59,24 @@ export function clampRect(r: Rect, vp: Viewport): Rect {
 
 export function inDropZone(pointerY: number, vp: Viewport): boolean {
   return pointerY >= vp.h - DROP_ZONE_PX;
+}
+
+/**
+ * Bottom-right corner drop target (Devices).
+ * `bottomInset` lifts the zone when the queue footer is docked so the preview
+ * matches the eventual Devices dock placement (sitting on top of the footer).
+ */
+export function inCornerDropZone(pointerX: number, pointerY: number, vp: Viewport, bottomInset = 0): boolean {
+  const inset = Math.max(0, bottomInset);
+  const left = vp.w - CORNER_DROP_PX;
+  const top = vp.h - inset - CORNER_DROP_PX;
+  const bottom = vp.h - inset;
+  return pointerX >= left && pointerY >= top && pointerY <= bottom;
+}
+
+/** CSS bottom offset (px) for the Devices dock given whether the queue footer is showing. */
+export function devicesDockBottomPx(queueDocked: boolean): number {
+  return queueDocked ? DOCK_BAR_H : EDGE;
 }
 
 /** Icons stack upwards from the bottom-right corner; `slot` 0 is the lowest. */

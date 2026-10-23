@@ -4,9 +4,12 @@ import { requireZapAdmin } from "$lib/server/admin/access";
 import { TagAdminError, createSystemTag, deleteSystemTag, listSystemTagsForAdmin } from "$lib/server/admin/tags";
 import type { Actions, PageServerLoad } from "./$types";
 
+const PAGE_SIZE = 50;
+
 export const load: PageServerLoad = async ({ locals }) => {
   requireZapAdmin(locals);
-  return { tags: await listSystemTagsForAdmin() };
+  const result = await listSystemTagsForAdmin({ limit: PAGE_SIZE, offset: 0 });
+  return { ...result, pageSize: PAGE_SIZE };
 };
 
 export const actions: Actions = {

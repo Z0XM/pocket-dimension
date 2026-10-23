@@ -133,6 +133,7 @@ function wireConnectionLifecycle(sessionId: string, connection: VoiceConnection)
       if (runtime?.connection === connection) {
         killFfmpeg(runtime);
         runtimes.delete(sessionId);
+        notifyVoiceLost(sessionId, "Disconnected from voice channel");
       }
     }
   });
@@ -240,6 +241,8 @@ export async function leaveVoice(sessionId: string) {
   const runtime = runtimes.get(sessionId);
   if (!runtime) return;
   killFfmpeg(runtime);
+  // Remove before destroy so the Disconnected handler does not treat this as an unexpected drop.
+  runtimes.delete(sessionId);
   try {
     runtime.player.stop(true);
   } catch {
@@ -252,9 +255,34 @@ export async function leaveVoice(sessionId: string) {
   } catch {
     // ignore
   }
-  runtimes.delete(sessionId);
 }
 
 export function hasVoiceRuntime(sessionId: string) {
   return runtimes.has(sessionId);
+}
+
+/** True when this process still holds a non-destroyed voice connection for the session. */
+export function isVoiceConnected(sessionId: string): boolean {
+  const runtime = runtimes.get(sessionId);
+  if (!runtime) return false;
+  return runtime.connection.state.status !== VoiceConnectionStatus.Destroyed;
+}
+
+export function listVoiceSessionIds(): string[] {
+  return [...runtimes.keys()];
+}
+
+/** Optional hook when Discord tears down a connection (kick / network / destroy). */
+let onVoiceLost: ((sessionId: string, reason: string) => void) | null = null;
+
+export function setVoiceLostHandler(handler: ((sessionId: string, reason: string) => void) | null) {
+  onVoiceLost = handler;
+}
+
+function notifyVoiceLost(sessionId: string, reason: string) {
+  try {
+    onVoiceLost?.(sessionId, reason);
+  } catch (err) {
+    console.warn("[zap discord] voice-lost handler failed", err);
+  }
 }

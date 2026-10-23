@@ -9,7 +9,7 @@
 </script>
 
 <ul
-  class="divide-y divide-border/50 rounded-lg border border-border/70 bg-card/30"
+  class="divide-y divide-border/50 rounded-lg border border-border/70 bg-card"
   role="status"
   aria-live="polite"
   aria-busy="true"

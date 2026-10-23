@@ -47,3 +47,4 @@ Authenticated web app (SvelteKit). Core loops: Catalogue (search, filter, tag, p
 2. Multi-device / hangout continuity is core — queue and session state stay obvious.
 3. APIs and feature contracts stay stable while the visual world can be replaced.
 4. Dark, high-contrast, vibrant signal — the UI should feel electric and usable, not timid.
+5. Prefer **icons** or **icon+text** over text-only controls wherever it makes sense (search, delete/remove, add, transport). Text-only is fine when an icon would be ambiguous.

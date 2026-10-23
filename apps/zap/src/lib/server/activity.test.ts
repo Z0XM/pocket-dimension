@@ -1,25 +1,5 @@
 import { describe, expect, test } from "bun:test";
-
-/** Mirror of playlistLabel parsing used in activity.ts for unit coverage. */
-function playlistLabel(
-  sourceUrl: string,
-  summary: {
-    playlists?: string[] | { id: string; title: string }[];
-    playlistTitles?: string[];
-  } | null
-) {
-  if (sourceUrl.startsWith("youtube:connected:")) {
-    const titlesFromSummary =
-      summary?.playlistTitles ??
-      (Array.isArray(summary?.playlists) ? summary.playlists.map((p) => (typeof p === "string" ? p : p.title)).filter(Boolean) : []);
-    const label =
-      titlesFromSummary.length > 0
-        ? titlesFromSummary.join(", ")
-        : sourceUrl.slice("youtube:connected:".length).split(",").filter(Boolean).join(", ") || "YouTube playlists";
-    return { kind: "playlist_import" as const, label, playlistTitles: titlesFromSummary.length ? titlesFromSummary : undefined };
-  }
-  return { kind: "url_import" as const, label: sourceUrl };
-}
+import { importLinks, playlistLabel } from "$lib/activity-links";
 
 describe("playlist activity labels", () => {
   test("uses playlist titles from summary", () => {
@@ -35,9 +15,42 @@ describe("playlist activity labels", () => {
     expect(out.label).toBe("abc, def");
   });
 
-  test("treats other urls as url imports", () => {
+  test("uses song title from summary for url imports", () => {
+    const out = playlistLabel("https://youtu.be/xyz", {
+      items: [{ title: "Midnight City", status: "imported" }],
+    });
+    expect(out.kind).toBe("url_import");
+    expect(out.label).toBe("Midnight City");
+  });
+
+  test("falls back to raw url when no title metadata", () => {
     const out = playlistLabel("https://youtu.be/xyz", null);
     expect(out.kind).toBe("url_import");
     expect(out.label).toBe("https://youtu.be/xyz");
+  });
+});
+
+describe("import links", () => {
+  test("makes connected playlists clickable with titles", () => {
+    const sourceUrl = "youtube:connected:PLabc,PLdef";
+    const summary = { playlistTitles: ["Liked videos", "Chill"] };
+    const meta = playlistLabel(sourceUrl, summary);
+    expect(importLinks(sourceUrl, summary, meta)).toEqual([
+      { label: "Liked videos", href: "https://www.youtube.com/playlist?list=PLabc" },
+      { label: "Chill", href: "https://www.youtube.com/playlist?list=PLdef" },
+    ]);
+  });
+
+  test("url imports link song titles to the origin URL", () => {
+    const sourceUrl = "https://youtu.be/xyz";
+    const summary = { items: [{ title: "Midnight City", status: "imported" }] };
+    const meta = playlistLabel(sourceUrl, summary);
+    expect(importLinks(sourceUrl, summary, meta)).toEqual([{ label: "Midnight City", href: sourceUrl }]);
+  });
+
+  test("url imports fall back to raw url label without metadata", () => {
+    const sourceUrl = "https://youtu.be/xyz";
+    const meta = playlistLabel(sourceUrl, null);
+    expect(importLinks(sourceUrl, null, meta)).toEqual([{ label: sourceUrl, href: sourceUrl }]);
   });
 });

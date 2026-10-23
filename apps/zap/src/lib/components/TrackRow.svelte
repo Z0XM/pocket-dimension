@@ -5,6 +5,7 @@
   import ListStartIcon from "@lucide/svelte/icons/list-start";
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import CustomTagInput from "$lib/components/CustomTagInput.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
@@ -91,6 +92,7 @@
       return;
     }
     if (!queue) return;
+    // Play now = insert after the playhead and jump to it (normal queue playback).
     if (isCurrent) await queue.togglePlay();
     else await queue.playNow(track.id);
     if (queue.error) error = queue.error;
@@ -163,13 +165,13 @@
   }
 </script>
 
-<li class={`zap-track flex flex-col gap-3 px-4 py-3 ${isCurrent ? "is-current bg-signal/5" : ""}`}>
+<li class={`zap-track flex flex-col gap-3 px-4 py-3 ${isCurrent ? "is-current" : ""}`}>
   <div class="flex items-start gap-3 sm:items-center sm:gap-4">
     <button
       type="button"
       class="zap-track-play flex size-10 shrink-0 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
       disabled={!track.playable || !queue || (queue.pending > 0 && !isCurrent)}
-      title={unavailable ? "Song not available" : isCurrent ? undefined : "Play now (adds to your queue)"}
+      title={unavailable ? "Song not available" : isCurrent ? undefined : queue?.active ? "Play next (insert after current and skip to it)" : "Play"}
       aria-label={unavailable ? "Song not available" : isPlaying ? "Pause" : "Play"}
       onclick={togglePlay}
     >
@@ -223,12 +225,13 @@
           {#if canDelete}
             <button
               type="button"
-              class="rounded border border-destructive/40 px-2 py-0.5 font-mono text-[10px] text-destructive hover:bg-destructive/10 disabled:opacity-40"
-              title="Admin: delete song and its storage object"
+              class="inline-flex size-6 shrink-0 items-center justify-center rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-40"
+              aria-label={`Delete ${track.title}`}
+              title="Delete song"
               disabled={deleting}
               onclick={() => (deleteOpen = true)}
             >
-              Delete
+              <Trash2Icon class="size-3.5 shrink-0" aria-hidden="true" />
             </button>
           {/if}
           {#if queue && track.playable}

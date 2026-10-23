@@ -68,7 +68,7 @@
   <p class="text-sm text-muted-foreground">You don’t have setup permission for this session.</p>
 {:else if session && session.status === "live"}
   <div class="space-y-6">
-    <div class="space-y-3 rounded-lg border border-border/70 bg-card/30 p-4">
+    <div class="space-y-3 rounded-lg border border-border/70 bg-card p-4">
       <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Session options</h2>
       <form
         class="flex flex-wrap items-end gap-2"
@@ -106,14 +106,18 @@
           Auto-play
         </label>
         {#if isHost}
-          <label class="flex items-center gap-2" title="Keep this room when idle; rejoin anytime">
-            <input
-              class="zap-checkbox"
-              type="checkbox"
-              checked={session.perpetual}
+          <label class="flex items-center gap-2 font-mono text-[10px] text-muted-foreground" title="Keep this room when idle; rejoin anytime">
+            <button
+              type="button"
+              class="zap-toggle"
+              role="switch"
+              aria-checked={session.perpetual}
+              aria-label="Perpetual session"
               disabled={busy}
-              onchange={(e) => void patch({ perpetual: (e.currentTarget as HTMLInputElement).checked })}
-            />
+              onclick={() => void patch({ perpetual: !session.perpetual })}
+            >
+              <span class="zap-toggle-thumb"></span>
+            </button>
             Perpetual
           </label>
         {/if}
@@ -129,7 +133,7 @@
 
     <div class="space-y-3">
       <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Member outputs</h2>
-      <ul class="divide-y divide-border/50 rounded-lg border border-border/70 bg-card/30">
+      <ul class="divide-y divide-border/50 rounded-lg border border-border/70 bg-card">
         {#each snapshot.members as m (m.id)}
           <li class="space-y-2 px-3 py-2.5">
             <div class="flex flex-wrap items-center justify-between gap-2">
@@ -176,7 +180,7 @@
     <div class="space-y-3">
       <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Permissions</h2>
       <p class="text-xs text-muted-foreground">Host always has full access. Grant capabilities per joined user.</p>
-      <div class="overflow-x-auto rounded-lg border border-border/70 bg-card/30">
+      <div class="overflow-x-auto rounded-lg border border-border/70 bg-card">
         <table class="w-full min-w-[36rem] text-left font-mono text-[10px]">
           <thead>
             <tr class="border-b border-border/60 text-muted-foreground">

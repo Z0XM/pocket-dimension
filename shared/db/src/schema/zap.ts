@@ -18,6 +18,8 @@ export const sessionSinkType = zapSchema.enum("session_sink_type", ["web", "disc
 export const sessionSinkStatus = zapSchema.enum("session_sink_status", ["pending", "active", "error", "detached"]);
 export const playlistVisibility = zapSchema.enum("playlist_visibility", ["private", "public"]);
 export const playlistMemberRole = zapSchema.enum("playlist_member_role", ["owner", "collaborator"]);
+/** Standard = owned/hand-picked/tag; linked = multi-source aggregate (no manual track edits). */
+export const playlistKind = zapSchema.enum("playlist_kind", ["standard", "linked"]);
 /** `default` follows the portal access mode (`open` → allowed, `allowlist` → pending). */
 export const userAccessStatus = zapSchema.enum("user_access_status", ["default", "allowed", "blocked"]);
 
@@ -377,7 +379,7 @@ export const savedQueueItems = zapSchema.table(
   ]
 );
 
-/** Zap-native playlists (owned, optionally collaborative / public). */
+/** Zap-native playlists (owned, optionally collaborative / public / linked). */
 export const playlists = zapSchema.table(
   "playlists",
   {
@@ -390,13 +392,21 @@ export const playlists = zapSchema.table(
     /** Tag-query DSL (`lofi and not sad`) the playlist is built from; null for hand-picked playlists. */
     tagQuery: text("tag_query"),
     visibility: playlistVisibility("visibility").default("private").notNull(),
+    kind: playlistKind("kind").default("standard").notNull(),
+    /** Unique follow/share code (e.g. `K7M2QX`); private playlists still have one but cannot be followed. */
+    shareCode: text("share_code").notNull(),
     createdAt: timestamps.createdAt,
     updatedAt: timestamp("updated_at")
       .$default(() => sql`now()`)
       .$onUpdate(() => sql`now()`)
       .notNull(),
   },
-  (table) => [index("playlists_owner_user_id_idx").on(table.ownerUserId), index("playlists_visibility_idx").on(table.visibility)]
+  (table) => [
+    index("playlists_owner_user_id_idx").on(table.ownerUserId),
+    index("playlists_visibility_idx").on(table.visibility),
+    uniqueIndex("playlists_share_code_unique").on(table.shareCode),
+    index("playlists_kind_idx").on(table.kind),
+  ]
 );
 
 export const playlistItems = zapSchema.table(
@@ -454,6 +464,47 @@ export const playlistMembers = zapSchema.table(
   (table) => [
     uniqueIndex("playlist_members_playlist_user_unique").on(table.playlistId, table.userId),
     index("playlist_members_user_id_idx").on(table.userId),
+  ]
+);
+
+/** Read-only follow of a public playlist via share code (distinct from collaborator invite). */
+export const playlistFollows = zapSchema.table(
+  "playlist_follows",
+  {
+    id,
+    playlistId: uuid("playlist_id")
+      .notNull()
+      .references(() => playlists.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [
+    uniqueIndex("playlist_follows_playlist_user_unique").on(table.playlistId, table.userId),
+    index("playlist_follows_user_id_idx").on(table.userId),
+    index("playlist_follows_playlist_id_idx").on(table.playlistId),
+  ]
+);
+
+/**
+ * Source playlists that feed a linked playlist (kind=linked).
+ * Sources must be public standard playlists owned by different accounts.
+ */
+export const linkedPlaylistSources = zapSchema.table(
+  "linked_playlist_sources",
+  {
+    linkedPlaylistId: uuid("linked_playlist_id")
+      .notNull()
+      .references(() => playlists.id, { onDelete: "cascade" }),
+    sourcePlaylistId: uuid("source_playlist_id")
+      .notNull()
+      .references(() => playlists.id, { onDelete: "cascade" }),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [
+    primaryKey({ columns: [table.linkedPlaylistId, table.sourcePlaylistId] }),
+    index("linked_playlist_sources_source_idx").on(table.sourcePlaylistId),
   ]
 );
 
@@ -570,3 +621,51 @@ export const zapSettings = zapSchema.table("settings", {
     .$onUpdate(() => sql`now()`)
     .notNull(),
 });
+
+export const connectionProvider = zapSchema.enum("connection_provider", ["discord", "spotify", "youtube"]);
+
+/**
+ * Per-user YouTube playlist prefs (auto-sync) + cached titles for Connections UI.
+ * Additive sync only — never removes catalogue rows when YT drops a video.
+ */
+export const youtubePlaylistPrefs = zapSchema.table(
+  "youtube_playlist_prefs",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    youtubePlaylistId: text("youtube_playlist_id").notNull(),
+    title: text("title"),
+    autoSync: boolean("auto_sync").default(false).notNull(),
+    lastSyncedAt: timestamp("last_synced_at"),
+    lastSyncError: text("last_sync_error"),
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamp("updated_at")
+      .$default(() => sql`now()`)
+      .$onUpdate(() => sql`now()`)
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.youtubePlaylistId] }),
+    index("youtube_playlist_prefs_user_autosync_idx").on(table.userId, table.autoSync),
+  ]
+);
+
+/** Connection-scoped activity (Discord voice attach/reconnect, future Spotify, etc.). */
+export const connectionActivity = zapSchema.table(
+  "connection_activity",
+  {
+    id,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    provider: connectionProvider("provider").notNull(),
+    kind: text("kind").notNull(),
+    summary: text("summary").notNull(),
+    metaJson: text("meta_json"),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [
+    index("connection_activity_user_provider_idx").on(table.userId, table.provider, table.createdAt),
+  ]
+);

@@ -1,8 +1,30 @@
 /** Max stored length for a listening session display name. */
 export const SESSION_NAME_MAX_LEN = 80;
 
+/**
+ * Host label for default session names: display name → username → email local-part → null.
+ */
+export function hostLabelForSession(user: {
+  name?: string | null;
+  username?: string | null;
+  email?: string | null;
+}): string | null {
+  const name = user.name?.trim();
+  if (name) return name;
+  const username = user.username?.trim();
+  if (username) return username;
+  const email = user.email?.trim();
+  if (email) {
+    const local = email.split("@")[0]?.trim();
+    if (local) return local;
+  }
+  return null;
+}
+
 /** Default label when the host does not supply a name. */
-export function defaultSessionName(joinCode: string): string {
+export function defaultSessionName(joinCode: string, hostLabel?: string | null): string {
+  const label = hostLabel?.trim();
+  if (label) return `${label}'s session`;
   return `Session ${joinCode}`;
 }
 

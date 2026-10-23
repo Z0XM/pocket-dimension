@@ -1,12 +1,12 @@
 import { getContext, setContext } from "svelte";
-  import {
-    estimatePositionMs,
-    type CatalogDevice,
-    type CatalogQueueItem,
-    type CatalogQueueRunTrack,
-    type CatalogQueueSnapshot,
-    type EnqueueMode,
-  } from "$lib/catalog-queue";
+import {
+  estimatePositionMs,
+  type CatalogDevice,
+  type CatalogQueueItem,
+  type CatalogQueueRunTrack,
+  type CatalogQueueSnapshot,
+  type EnqueueMode,
+} from "$lib/catalog-queue";
 
 const CONTEXT_KEY = Symbol("zap-catalog-queue");
 const DEVICE_STORAGE_KEY = "zap.deviceId";
@@ -54,6 +54,8 @@ export class CatalogQueueClient {
   currentIndex = $derived(this.items.findIndex((i) => i.id === this.queue?.currentItemId));
   active = $derived(Boolean(this.queue) && this.items.length > 0);
   playing = $derived(this.queue?.playbackState === "playing" && Boolean(this.currentItem));
+  /** True when replacing the personal queue would discard an in-progress run. */
+  needsReplaceConfirm = $derived(this.active);
   positionMs = $derived.by(() => {
     if (this.localPositionMs != null) return this.localPositionMs;
     if (!this.queue) return 0;
@@ -142,6 +144,10 @@ export class CatalogQueueClient {
 
   // --- adding -------------------------------------------------------------
 
+  /**
+   * Catalogue / History “Play now”: insert after the playhead and start that track
+   * (same as enqueue mode `play` — continues as normal queue playback).
+   */
   playNow(mediaAssetId: string) {
     return this.command({ action: "enqueue", mediaAssetIds: [mediaAssetId], mode: "play" });
   }
@@ -163,6 +169,11 @@ export class CatalogQueueClient {
     return this.command({ action: "enqueuePlaylist", playlistId, mode });
   }
 
+  /** Close the current run (History) and start a fresh queue with these tracks. */
+  replaceTracks(mediaAssetIds: string[], opts: { play?: boolean } = {}) {
+    return this.command({ action: "replace", mediaAssetIds, play: opts.play !== false });
+  }
+
   // --- transport ----------------------------------------------------------
 
   play() {
@@ -178,8 +189,9 @@ export class CatalogQueueClient {
   }
 
   seek(positionMs: number) {
-    if (this.localPositionMs != null) this.localPositionMs = positionMs;
-    return this.command({ action: "seek", positionMs });
+    const ms = Math.max(0, Math.round(positionMs));
+    if (this.localPositionMs != null) this.localPositionMs = ms;
+    return this.command({ action: "seek", positionMs: ms });
   }
 
   next() {

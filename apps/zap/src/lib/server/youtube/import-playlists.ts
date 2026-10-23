@@ -7,6 +7,7 @@ import { mapPool, youtubeIngestConcurrency } from "$lib/server/ingest/map-pool";
 import { hasCatalogueAsset, ingestCatalogueVideo, type IngestItemResult, type SyncRunResult } from "$lib/server/ingest/pipeline";
 import type { SongProgress } from "$lib/server/ingest/progress";
 import { setUserLibraryOrder } from "$lib/server/library-order";
+import { libraryYoutubeIdentityKeys } from "$lib/server/connections/youtube-status";
 import { listYouTubePlaylistItems, listYouTubePlaylists, type ZapYouTubePlaylistItem } from "./api";
 import { parsePlaylistImportSort, sortPlaylistItemsForImport, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
 
@@ -22,6 +23,8 @@ export type PlaylistImportProgress = {
   currentTitle?: string | null;
   /** In-flight / recent songs with download→upload percents (parallel workers). */
   songs?: SongProgress[];
+  /** `listing` = crawling YouTube playlist pages; `importing` = yt-dlp / R2 work. */
+  phase?: "listing" | "importing";
 };
 
 type WorkItem = { kind: "skip"; entry: ZapYouTubePlaylistItem; reason: string } | { kind: "ingest"; entry: ZapYouTubePlaylistItem };
@@ -44,7 +47,13 @@ export async function importConnectedPlaylists(
   userId: string,
   playlistIds: string[],
   onProgress?: (progress: PlaylistImportProgress) => void | Promise<void>,
-  opts?: { tagIds?: string[]; customTags?: string[]; sort?: PlaylistImportSort | string }
+  opts?: {
+    tagIds?: string[];
+    customTags?: string[];
+    sort?: PlaylistImportSort | string;
+    /** Skip videos already in the user's library (additive sync / re-import). */
+    skipExisting?: boolean;
+  }
 ): Promise<SyncRunResult & { playlists: string[] }> {
   const uniqueIds = [...new Set(playlistIds.map((id) => id.trim()).filter(Boolean))];
   if (uniqueIds.length === 0) {
@@ -87,6 +96,7 @@ export async function importConnectedPlaylists(
       ...counts,
       currentTitle: extra?.currentTitle,
       songs: [...activeSongs.values()],
+      phase: "importing",
     };
     progressGate = progressGate
       .then(async () => {
@@ -108,22 +118,61 @@ export async function importConnectedPlaylists(
   };
 
   let workTotal = 0;
+  let listingLoaded = 0;
 
   try {
-    const [entryLists, knownPlaylists] = await Promise.all([
-      Promise.all(uniqueIds.map((playlistId) => listYouTubePlaylistItems(userId, playlistId))),
-      listYouTubePlaylists(userId).catch(() => []),
-    ]);
+    // First byte immediately so reverse proxies don't idle-timeout during the playlist crawl.
+    await onProgress?.({
+      total: 0,
+      done: 0,
+      remaining: 0,
+      imported: 0,
+      unavailable: 0,
+      skipped: 0,
+      failed: 0,
+      songs: [],
+      phase: "listing",
+      currentTitle: "Listing playlist…",
+    });
+
+    const knownPlaylistsPromise = listYouTubePlaylists(userId).catch(() => []);
+    const entryLists = await Promise.all(
+      uniqueIds.map((playlistId) =>
+        listYouTubePlaylistItems(userId, playlistId, {
+          onPage: async ({ pageSize }) => {
+            listingLoaded += pageSize;
+            await onProgress?.({
+              total: 0,
+              done: listingLoaded,
+              remaining: 0,
+              imported: 0,
+              unavailable: 0,
+              skipped: 0,
+              failed: 0,
+              songs: [],
+              phase: "listing",
+              currentTitle: `Listing… ${listingLoaded} tracks`,
+            });
+          },
+        })
+      )
+    );
+    const knownPlaylists = await knownPlaylistsPromise;
     const titleById = new Map(knownPlaylists.map((p) => [p.id, p.title]));
     playlistTitles = uniqueIds.map((id) => titleById.get(id) ?? id);
 
     // Sort each playlist independently, then concatenate in selection order.
     // Work list order = import order; mapPool preserves result slots despite parallel workers.
+    const allVideoIds = entryLists.flatMap((entries) => entries.map((e) => e.videoId));
+    const alreadyInLibrary = opts?.skipExisting ? await libraryYoutubeIdentityKeys(userId, allVideoIds) : new Set<string>();
+
     const work: WorkItem[] = [];
     for (const entries of entryLists) {
       const sorted = sortPlaylistItemsForImport(entries, sort);
       for (const entry of sorted) {
-        if (isOverDurationCap(entry.durationMs)) {
+        if (opts?.skipExisting && alreadyInLibrary.has(`youtube:${entry.videoId}`)) {
+          work.push({ kind: "skip", entry, reason: "Already in library" });
+        } else if (isOverDurationCap(entry.durationMs)) {
           work.push({ kind: "skip", entry, reason: DURATION_CAP_MESSAGE });
         } else {
           work.push({ kind: "ingest", entry });
@@ -141,8 +190,9 @@ export async function importConnectedPlaylists(
       skipped: 0,
       failed: 0,
       songs: [],
+      phase: "importing",
+      currentTitle: workTotal === 0 ? "Nothing new to import" : "Starting import…",
     });
-
     const orderedResults = await mapPool(work, concurrency, async (job) => {
       const identityKey = `youtube:${job.entry.videoId}`;
       let result: IngestItemResult;

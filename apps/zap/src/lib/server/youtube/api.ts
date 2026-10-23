@@ -143,7 +143,11 @@ async function youtubeFetch<T>(
     throw error(503, "YouTube Data API credentials are not configured");
   }
 
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, {
+    headers,
+    // Bound hung Google calls so playlist crawls fail cleanly instead of sitting until the proxy 502s.
+    signal: AbortSignal.timeout(30_000),
+  });
   const body = (await response.json().catch(() => ({}))) as T & {
     error?: { message?: string; errors?: Array<{ reason?: string }> };
   };
@@ -239,37 +243,55 @@ async function videoInfoMap(videoIds: string[], accessToken: string) {
   return map;
 }
 
-/** Paginate all items in a playlist (incl. Liked `LL`). */
-export async function listYouTubePlaylistItems(userId: string, playlistId: string): Promise<ZapYouTubePlaylistItem[]> {
+type PlaylistItemsPageBody = {
+  nextPageToken?: string;
+  items?: Array<{
+    snippet?: {
+      title?: string;
+      description?: string;
+      publishedAt?: string;
+      position?: number;
+      channelTitle?: string;
+      videoOwnerChannelTitle?: string;
+      videoOwnerChannelId?: string;
+      resourceId?: { videoId?: string };
+    };
+    contentDetails?: { videoId?: string; videoPublishedAt?: string };
+  }>;
+};
+
+/** Cap stored descriptions so ~700-track crawls stay small in memory (full text isn't needed for import). */
+const PLAYLIST_ITEM_DESCRIPTION_CAP = 480;
+
+export type ListYouTubePlaylistItemsOpts = {
+  /** Fired after each page is resolved (video status applied). Use for streaming progress. */
+  onPage?: (info: { loaded: number; pageSize: number }) => void | Promise<void>;
+};
+
+/**
+ * Paginate all items in a playlist (incl. Liked `LL`).
+ * Overlaps `videos.list` for page N with `playlistItems` for page N+1 so ~700-track
+ * crawls finish in roughly half the wall time of strictly sequential calls.
+ */
+export async function listYouTubePlaylistItems(
+  userId: string,
+  playlistId: string,
+  opts?: ListYouTubePlaylistItemsOpts
+): Promise<ZapYouTubePlaylistItem[]> {
   const accessToken = await requireYouTubeAccessTokenForUser(userId);
   const results: ZapYouTubePlaylistItem[] = [];
-  let pageToken: string | undefined;
 
-  do {
+  const fetchPage = (pageToken?: string) => {
     const params: Record<string, string> = {
       part: "snippet,contentDetails",
       playlistId,
       maxResults: "50",
     };
     if (pageToken) params.pageToken = pageToken;
+    return youtubeFetch<PlaylistItemsPageBody>("playlistItems", params, { accessToken, requireUserAuth: true });
+  };
 
-    const body = await youtubeFetch<{
-      nextPageToken?: string;
-      items?: Array<{
-        snippet?: {
-          title?: string;
-          description?: string;
-          publishedAt?: string;
-          position?: number;
-          channelTitle?: string;
-          videoOwnerChannelTitle?: string;
-          videoOwnerChannelId?: string;
-          resourceId?: { videoId?: string };
-        };
-        contentDetails?: { videoId?: string; videoPublishedAt?: string };
-      }>;
-    }>("playlistItems", params, { accessToken, requireUserAuth: true });
-
+  const parseRows = (body: PlaylistItemsPageBody) => {
     const pageIds: string[] = [];
     const pageRows: ZapYouTubePlaylistItem[] = [];
     for (const item of body.items ?? []) {
@@ -277,11 +299,14 @@ export async function listYouTubePlaylistItems(userId: string, playlistId: strin
       if (!videoId) continue;
       const ownerTitle = item.snippet?.videoOwnerChannelTitle ?? item.snippet?.channelTitle;
       const position = typeof item.snippet?.position === "number" ? item.snippet.position : null;
+      const rawDesc = item.snippet?.description != null ? youtubeText(item.snippet.description, "") : "";
+      const description =
+        rawDesc.length === 0 ? null : rawDesc.length > PLAYLIST_ITEM_DESCRIPTION_CAP ? `${rawDesc.slice(0, PLAYLIST_ITEM_DESCRIPTION_CAP)}…` : rawDesc;
       pageIds.push(videoId);
       pageRows.push({
         videoId,
         title: youtubeText(item.snippet?.title, "Untitled"),
-        description: item.snippet?.description != null ? youtubeText(item.snippet.description, "") || null : null,
+        description,
         channelTitle: ownerTitle ? youtubeText(ownerTitle, "") || null : null,
         channelId: item.snippet?.videoOwnerChannelId?.trim() || null,
         position,
@@ -292,7 +317,14 @@ export async function listYouTubePlaylistItems(userId: string, playlistId: strin
         unavailableReason: null,
       });
     }
+    return { pageIds, pageRows, nextPageToken: body.nextPageToken };
+  };
 
+  let body = await fetchPage(undefined);
+  while (true) {
+    const { pageIds, pageRows, nextPageToken } = parseRows(body);
+    // Pipeline: start the next playlistItems page while we resolve video status for this one.
+    const nextBodyPromise = nextPageToken ? fetchPage(nextPageToken) : null;
     const infos = await videoInfoMap(pageIds, accessToken);
     for (const row of pageRows) {
       const info = infos.get(row.videoId) ?? null;
@@ -305,9 +337,10 @@ export async function listYouTubePlaylistItems(userId: string, playlistId: strin
       }
       results.push(row);
     }
-
-    pageToken = body.nextPageToken;
-  } while (pageToken);
+    await opts?.onPage?.({ loaded: results.length, pageSize: pageRows.length });
+    if (!nextBodyPromise) break;
+    body = await nextBodyPromise;
+  }
 
   return results;
 }

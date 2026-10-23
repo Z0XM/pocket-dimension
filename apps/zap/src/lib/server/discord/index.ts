@@ -6,8 +6,12 @@ export {
   listDiscordTargets,
   listDiscordChannels,
   attachDiscordSink,
+  reconnectDiscordSink,
   detachDiscordSink,
+  disconnectDiscordVoice,
+  disconnectIdleDiscordVoices,
   getActiveDiscordSink,
   serializeDiscordSink,
+  onSessionStale,
   onSessionEnded,
 } from "./sink";

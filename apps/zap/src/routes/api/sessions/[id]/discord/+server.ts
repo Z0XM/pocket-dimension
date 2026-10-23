@@ -6,15 +6,15 @@ import {
   detachDiscordSink,
   describeDiscordCapability,
   getActiveDiscordSink,
+  reconnectDiscordSink,
   serializeDiscordSink,
 } from "$lib/server/discord";
 import { SessionError, getSessionForUser } from "$lib/server/sessions";
-import { canManageGuestPermissions } from "$lib/server/sessions/permissions";
 
-async function requireHost(sessionId: string, userId: string) {
+async function requireSetup(sessionId: string, userId: string) {
   const snapshot = await getSessionForUser(sessionId, userId);
-  if (!canManageGuestPermissions(snapshot.me?.role ?? null)) {
-    throw error(403, "Only the host can manage Discord sink");
+  if (!snapshot.me?.canSetup) {
+    throw error(403, "Only setup-capable members can manage Discord sink");
   }
   return snapshot;
 }
@@ -37,10 +37,20 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
   if (!locals.user.emailVerified) throw error(403, "Verify email first");
 
   try {
-    await requireHost(params.id!, locals.user.id);
-    const body = (await request.json().catch(() => ({}))) as { guildId?: string; channelId?: string };
+    await requireSetup(params.id!, locals.user.id);
+    const body = (await request.json().catch(() => ({}))) as {
+      action?: string;
+      guildId?: string;
+      channelId?: string;
+    };
+
+    if (body.action === "reconnect") {
+      const reconnected = await reconnectDiscordSink(params.id!);
+      return json({ sink: serializeDiscordSink(reconnected) });
+    }
+
     if (!body.guildId?.trim() || !body.channelId?.trim()) {
-      throw error(400, "guildId and channelId required");
+      throw error(400, "guildId and channelId required (or action: reconnect)");
     }
     const attached = await attachDiscordSink({
       sessionId: params.id!,
@@ -59,7 +69,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 export const DELETE: RequestHandler = async ({ locals, params }) => {
   if (!locals.user) throw error(401, "Sign in required");
   try {
-    await requireHost(params.id!, locals.user.id);
+    await requireSetup(params.id!, locals.user.id);
     const detached = await detachDiscordSink(params.id!);
     return json({ sink: serializeDiscordSink(detached), ok: true });
   } catch (err) {

@@ -5,14 +5,19 @@
   import GripIcon from "@lucide/svelte/icons/grip-horizontal";
   import { onMount, type Snippet } from "svelte";
   import {
+    CORNER_DROP_PX,
+    DROP_ZONE_PX,
     ICON_SIZE,
     clampPoint,
     clampRect,
     defaultIconPos,
     defaultPanelSize,
+    inCornerDropZone,
     inDropZone,
     panelRectNearIcon,
     parseStoredFloating,
+    type DropAnchor,
+    type DropTone,
     type FloatingMode,
     type Point,
     type Rect,
@@ -26,6 +31,17 @@
     active = false,
     badge = null,
     dropLabel = null,
+    dropTone = "dock",
+    dropAnchor = "footer",
+    /** Lift corner drop preview when the queue footer is docked (Devices). */
+    dropBottomInset = 0,
+    /** Force the panel into this mode once after mount (e.g. maximize from dock). */
+    openAs = null,
+    /**
+     * Leaving fullscreen: return true if the parent handled restore (e.g. re-dock).
+     * Used so maximize-from-dock → minimize returns to the footer, not a floating panel.
+     */
+    onExitFull = null,
     ondrop,
     icon,
     header,
@@ -39,8 +55,13 @@
     /** Glow the icon (e.g. while playing). */
     active?: boolean;
     badge?: string | number | null;
-    /** When set, dragging into the bottom edge shows this label and calls `ondrop` on release. */
+    /** When set, dragging into the drop target shows this label and calls `ondrop` on release. */
     dropLabel?: string | null;
+    dropTone?: DropTone;
+    dropAnchor?: DropAnchor;
+    dropBottomInset?: number;
+    openAs?: FloatingMode | null;
+    onExitFull?: (() => boolean) | null;
     ondrop?: () => void;
     icon: Snippet;
     header?: Snippet;
@@ -88,8 +109,12 @@
     }
     iconPos = stored.icon ? clampPoint(stored.icon, { w: ICON_SIZE, h: ICON_SIZE }, vp) : defaultIconPos(vp, slot);
     panel = stored.panel ? clampRect(stored.panel, vp) : null;
-    mode = stored.mode;
+    mode = openAs === "panel" || openAs === "full" || openAs === "icon" ? openAs : stored.mode;
+    if ((mode === "panel" || mode === "full") && !panel) {
+      panel = panelRectNearIcon(iconPos, defaultPanelSize(vp), vp);
+    }
     ready = true;
+    persist();
     const onResize = () => reclamp();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -105,6 +130,8 @@
   });
 
   function setMode(next: FloatingMode) {
+    // Maximize-from-dock: parent re-docks instead of collapsing to a floating panel/icon.
+    if (mode === "full" && next !== "full" && onExitFull?.()) return;
     if (next === "panel" && !panel) panel = panelRectNearIcon(iconPos, defaultPanelSize(viewport()), viewport());
     mode = next;
     persist();
@@ -131,7 +158,12 @@
     if (drag.kind === "icon") iconPos = clampPoint({ x: o.x + dx, y: o.y + dy }, { w: ICON_SIZE, h: ICON_SIZE }, vp);
     else if (drag.kind === "panel") panel = clampRect({ ...o, x: o.x + dx, y: o.y + dy }, vp);
     else panel = clampRect({ ...o, w: o.w + dx, h: o.h + dy }, vp);
-    overDrop = Boolean(dropLabel) && drag.kind !== "resize" && inDropZone(e.clientY, vp);
+    overDrop =
+      Boolean(dropLabel) &&
+      drag.kind !== "resize" &&
+      (dropAnchor === "corner"
+        ? inCornerDropZone(e.clientX, e.clientY, vp, dropBottomInset)
+        : inDropZone(e.clientY, vp));
   }
 
   function endDrag() {
@@ -142,6 +174,7 @@
     if (d.moved) suppressClick = d.kind === "icon";
     if (d.moved && overDrop) {
       overDrop = false;
+      // Snap back visually; the parent typically unmounts us (e.g. docks to the footer).
       if (d.kind === "icon") iconPos = { x: d.origin.x, y: d.origin.y };
       else panel = { ...d.origin };
       mode = "icon";
@@ -160,18 +193,37 @@
     }
     setMode("panel");
   }
+
+  const dropBandClass = $derived(
+    dropTone === "danger"
+      ? overDrop
+        ? "border-destructive bg-destructive/25 text-destructive"
+        : "border-destructive/40 bg-destructive/10 text-destructive/80"
+      : overDrop
+        ? "border-signal bg-signal/20 text-signal"
+        : "border-signal/40 bg-signal/10 text-signal/80"
+  );
 </script>
 
 {#if ready}
   {#if dragging && dropLabel}
-    <div
-      class={`pointer-events-none fixed inset-x-0 bottom-0 z-[45] flex h-[72px] items-center justify-center border-t font-mono text-[11px] tracking-[0.14em] uppercase transition-colors ${
-        overDrop ? "border-destructive bg-destructive/25 text-destructive" : "border-destructive/40 bg-destructive/10 text-destructive/80"
-      }`}
-      aria-hidden="true"
-    >
-      {dropLabel}
-    </div>
+    {#if dropAnchor === "corner"}
+      <div
+        class={`pointer-events-none fixed right-2 z-[45] flex items-center justify-center border font-mono text-[11px] tracking-[0.14em] uppercase transition-colors ${dropBandClass}`}
+        style={`bottom:${Math.max(0, dropBottomInset) + 8}px;width:${CORNER_DROP_PX}px;height:${CORNER_DROP_PX}px`}
+        aria-hidden="true"
+      >
+        {dropLabel}
+      </div>
+    {:else}
+      <div
+        class={`pointer-events-none fixed inset-x-0 bottom-0 z-[45] flex items-center justify-center border-t font-mono text-[11px] tracking-[0.14em] uppercase transition-colors ${dropBandClass}`}
+        style={`height:${DROP_ZONE_PX}px`}
+        aria-hidden="true"
+      >
+        {dropLabel}
+      </div>
+    {/if}
   {/if}
 
   {#if mode === "icon"}
@@ -182,7 +234,11 @@
       } ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
       style={`left:${iconPos.x}px;top:${iconPos.y}px;width:${ICON_SIZE}px;height:${ICON_SIZE}px`}
       aria-label={`Open ${title}`}
-      title={dropLabel ? `${title} — drag to the bottom edge to stop` : title}
+      title={dropLabel
+        ? dropAnchor === "corner"
+          ? `${title} — drag to the bottom-right to dock`
+          : `${title} — drag to the footer to dock`
+        : title}
       onpointerdown={(e) => startDrag(e, "icon")}
       onpointermove={moveDrag}
       onpointerup={endDrag}

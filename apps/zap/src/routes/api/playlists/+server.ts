@@ -1,7 +1,15 @@
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { isUuid } from "$lib/admin-access";
-import { PlaylistError, createPlaylist, listPlaylistsForUser, mergePlaylists } from "$lib/server/playlists";
+import {
+  PlaylistError,
+  createLinkedPlaylist,
+  createPlaylist,
+  followPlaylistByShareCode,
+  listPlaylistsForUser,
+  lookupPlaylistByShareCode,
+  mergePlaylists,
+} from "$lib/server/playlists";
 
 function requireVerifiedUser(locals: App.Locals) {
   if (!locals.user) throw error(401, "Sign in required");
@@ -31,6 +39,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       tagQuery?: string | null;
       sourcePlaylistIds?: string[];
       mediaAssetIds?: unknown;
+      shareCode?: string;
+      memberQueries?: string[];
     };
 
     if (body.action === "merge") {
@@ -39,6 +49,26 @@ export const POST: RequestHandler = async ({ locals, request }) => {
         sourcePlaylistIds: body.sourcePlaylistIds ?? [],
         name: body.name ?? "Merged playlist",
         visibility: body.visibility,
+      });
+      return json(detail, { status: 201 });
+    }
+
+    if (body.action === "follow") {
+      const detail = await followPlaylistByShareCode(user.id, body.shareCode ?? "");
+      return json(detail, { status: 201 });
+    }
+
+    if (body.action === "lookupShareCode") {
+      const summary = await lookupPlaylistByShareCode(user.id, body.shareCode ?? "");
+      return json(summary);
+    }
+
+    if (body.action === "createLinked") {
+      const detail = await createLinkedPlaylist({
+        userId: user.id,
+        name: body.name ?? "",
+        sourcePlaylistIds: (body.sourcePlaylistIds ?? []).filter((id): id is string => isUuid(id)),
+        memberQueries: Array.isArray(body.memberQueries) ? body.memberQueries.filter((q): q is string => typeof q === "string") : [],
       });
       return json(detail, { status: 201 });
     }

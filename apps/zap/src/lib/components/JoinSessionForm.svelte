@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import DoorOpenIcon from "@lucide/svelte/icons/door-open";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
 
   let {
@@ -45,24 +46,31 @@
     void join();
   }}
 >
-  <label class="block space-y-1">
-    <span class="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Join code</span>
-    <input
-      class="auth-field text-center font-mono text-lg tracking-[0.35em] uppercase"
-      bind:value={code}
-      placeholder="K7M2QX"
-      autocomplete="off"
-      maxlength="12"
-      required
-    />
-  </label>
+  <div class={`flex ${fullWidth ? "w-full flex-col gap-2 sm:flex-row sm:items-end" : "w-full flex-wrap items-end"} gap-3`}>
+    <label class={`block space-y-1 ${fullWidth ? "w-full sm:min-w-0 sm:flex-1" : "min-w-[10rem] flex-1"}`}>
+      <span class="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Join code</span>
+      <input
+        class="auth-field text-center font-mono text-lg tracking-[0.35em] uppercase"
+        bind:value={code}
+        placeholder="K7M2QX"
+        autocomplete="off"
+        maxlength="12"
+        required
+      />
+    </label>
+    <button
+      type="submit"
+      class={`auth-btn inline-flex shrink-0 items-center justify-center gap-1.5 ${fullWidth ? "w-full sm:w-fit px-5" : "w-fit px-5"}`}
+      disabled={loading || !code.trim()}
+    >
+      <DoorOpenIcon class="size-3.5" aria-hidden="true" />
+      {loading ? "Joining…" : "Join"}
+    </button>
+  </div>
   {#if error}
     <p class="auth-error">{error}</p>
   {/if}
   {#if loading}
     <BusyStatus label="Joining session…" detail="Looking up room…" />
   {/if}
-  <button type="submit" class={`auth-btn ${fullWidth ? "w-full" : "w-fit px-5"}`} disabled={loading || !code.trim()}>
-    {loading ? "Joining…" : "Join"}
-  </button>
 </form>

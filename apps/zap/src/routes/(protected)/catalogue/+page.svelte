@@ -8,7 +8,9 @@
   import { page } from "$app/state";
   import AddMusicDialog, { parseAddMusicTab, type AddMusicTab } from "$lib/components/AddMusicDialog.svelte";
   import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
+  import PageHeader from "$lib/components/PageHeader.svelte";
   import SaveTagPlaylistDialog from "$lib/components/SaveTagPlaylistDialog.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import TrackRow, { type TrackItem } from "$lib/components/TrackRow.svelte";
@@ -47,6 +49,7 @@
 
   let bulkBusy = $state(false);
   let bulkError = $state<string | null>(null);
+  let replaceOpen = $state(false);
   let sentinel = $state<HTMLDivElement | null>(null);
   let scrollRoot = $state<HTMLDivElement | null>(null);
 
@@ -91,11 +94,25 @@
 
   async function addAllFiltered(mode: "replace" | "last") {
     if (!queue || bulkBusy) return;
+    if (mode === "replace" && queue.needsReplaceConfirm) {
+      replaceOpen = true;
+      return;
+    }
     bulkBusy = true;
     bulkError = null;
     await queue.enqueueFiltered(filterInput(), mode);
     bulkError = queue.error;
     bulkBusy = false;
+  }
+
+  async function confirmReplaceAll() {
+    if (!queue || bulkBusy) return;
+    bulkBusy = true;
+    bulkError = null;
+    await queue.enqueueFiltered(filterInput(), "replace");
+    bulkError = queue.error;
+    bulkBusy = false;
+    replaceOpen = false;
   }
 
   function onDeleted(id: string, message: string) {
@@ -323,16 +340,10 @@
   </button>
 {/snippet}
 
-<section class="zap-catalogue flex min-h-0 flex-1 flex-col gap-3">
-  <div class="zap-catalogue-header shrink-0">
-    <h1 class="zap-catalogue-title text-2xl font-semibold tracking-tight sm:text-3xl">Catalogue</h1>
-    <p class="zap-catalogue-lede mt-1 text-sm text-muted-foreground">
-      Search the shared Zap catalogue. <span class="font-mono text-signal">Your library</span> = tracks you’ve tagged. Play adds to your personal
-      queue; use <span class="font-mono text-signal">+</span> to add music.
-    </p>
-  </div>
+<section class="zap-catalogue zap-page">
+  <PageHeader title="Catalogue" />
 
-  <div class="zap-filters-panel shrink-0 rounded-lg border border-border/70 bg-card/50 p-3">
+  <div class="zap-filters-panel shrink-0 rounded-lg border border-border/70 bg-card p-3">
     <CatalogueFilters
       collapsible
       bind:open={filtersOpen}
@@ -496,3 +507,11 @@
 
 <SaveTagPlaylistDialog bind:open={savePlaylistOpen} tagQuery={saveTagQuery} defaultName={savePlaylistDefaultName} onsaved={onPlaylistSaved} />
 <AddMusicDialog bind:open={addOpen} bind:tab={addTab} config={data.addMusic} {availableTags} onadded={onAdded} />
+<ConfirmDialog
+  bind:open={replaceOpen}
+  title="Replace your queue?"
+  body={`Your current queue of ${queue?.items.length ?? 0} song${(queue?.items.length ?? 0) === 1 ? "" : "s"} will be closed, and this queue will be started.`}
+  confirmLabel="Start this queue"
+  busy={bulkBusy}
+  onconfirm={confirmReplaceAll}
+/>

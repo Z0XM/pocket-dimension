@@ -1,7 +1,8 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, desc, eq, inArray, lt, type SQL } from "drizzle-orm";
-import { parseSyncSummary, playlistLabel } from "$lib/server/activity";
-import { mergeActivity, type AdminActivityEntry, type AdminActivityKind, type AdminActivityLink } from "./activity-merge";
+import { importLinks, parseSyncSummary, playlistLabel } from "$lib/activity-links";
+import { songHref } from "$lib/history-time";
+import { mergeActivity, type AdminActivityEntry, type AdminActivityKind } from "./activity-merge";
 
 export type AdminActivityQuery = {
   userId?: string | null;
@@ -13,50 +14,6 @@ export type AdminActivityQuery = {
 function where(...conditions: (SQL | undefined)[]) {
   const list = conditions.filter((c): c is SQL => Boolean(c));
   return list.length ? and(...list) : undefined;
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function playHref(externalUrl: string | null, title: string, mediaAssetId: string): string {
-  if (externalUrl && isHttpUrl(externalUrl)) return externalUrl;
-  const q = title.trim() || mediaAssetId;
-  return `/catalogue?q=${encodeURIComponent(q)}`;
-}
-
-function youtubePlaylistHref(playlistId: string): string {
-  return `https://www.youtube.com/playlist?list=${encodeURIComponent(playlistId)}`;
-}
-
-function importLinks(sourceUrl: string, summary: ReturnType<typeof parseSyncSummary>, meta: ReturnType<typeof playlistLabel>): AdminActivityLink[] {
-  if (meta.kind === "url_import") {
-    return isHttpUrl(sourceUrl) ? [{ label: sourceUrl, href: sourceUrl }] : [];
-  }
-
-  const ids = sourceUrl.startsWith("youtube:connected:")
-    ? sourceUrl
-        .slice("youtube:connected:".length)
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean)
-    : [];
-
-  const titlesFromSummary =
-    summary?.playlistTitles ??
-    (Array.isArray(summary?.playlists) ? summary.playlists.map((p) => (typeof p === "string" ? p : p.title)).filter(Boolean) : []);
-
-  if (ids.length === 0) return [];
-
-  return ids.map((id, index) => ({
-    label: titlesFromSummary[index] || id,
-    href: youtubePlaylistHref(id),
-  }));
 }
 
 /** Cross-user Zap activity (plays, sessions, joins, imports, uploads), newest first. */
@@ -157,7 +114,7 @@ export async function listAdminActivity(input: AdminActivityQuery = {}) {
         userLabel: label(event.userId),
         summary: title,
         detail: [artists, event.sessionId ? "in a session" : null].filter(Boolean).join(" · ") || null,
-        href: playHref(externalUrl, title, mediaAssetId),
+        href: songHref(externalUrl, title, mediaAssetId),
         links: null,
       })),
       hosted.map((s) => ({

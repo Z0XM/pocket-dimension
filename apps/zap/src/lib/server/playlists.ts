@@ -4,7 +4,14 @@ import { dedupeIds, isPermutation } from "$lib/catalog-queue";
 import { parsePlaylistTrackSort, sortPlaylistTracks, type PlaylistTrackSort } from "$lib/playlist-sort";
 import { evaluateUserTagQuery } from "$lib/server/catalogue";
 import { playlistDeleteAccess } from "$lib/playlist-permissions";
-import { userCanEditPlaylist, userCanViewPlaylist } from "$lib/server/playlist-access";
+import {
+  userCanEditPlaylist,
+  userCanRenamePlaylist,
+  userCanViewPlaylist,
+  userFollowsPlaylist,
+  userIsPlaylistMember,
+} from "$lib/server/playlist-access";
+import { generateShareCode, normalizeShareCode } from "$lib/server/playlist-share-code";
 import { SessionError, enqueueCatalogueTrack } from "$lib/server/sessions";
 import type { SessionSnapshot } from "$lib/server/sessions/types";
 import { formatTagQuery, parseTagQuery, type TagQueryNode } from "$lib/tag-query";
@@ -20,6 +27,8 @@ export class PlaylistError extends Error {
 }
 
 export type PlaylistVisibility = "private" | "public";
+export type PlaylistKind = "standard" | "linked";
+export type PlaylistRelation = "owner" | "collaborator" | "follower" | "linked_member" | "viewer";
 
 export type PlaylistSummary = {
   id: string;
@@ -28,9 +37,17 @@ export type PlaylistSummary = {
   /** Tag-query DSL the playlist is built from (null = hand-picked). */
   tagQuery: string | null;
   visibility: PlaylistVisibility;
+  kind: PlaylistKind;
+  /** Present for owners (share/copy); omitted for others. */
+  shareCode: string | null;
   ownerUserId: string;
   trackCount: number;
+  /** How this playlist appears for the requesting user. */
+  relation: PlaylistRelation;
+  /** Track edits (add/remove/reorder). Always false for linked + followers. */
   canEdit: boolean;
+  /** Name/description changes — members of linked playlists included. */
+  canRename: boolean;
   /** Owner-only: delete, visibility, and membership changes. */
   canDelete: boolean;
   createdAt: string;
@@ -51,13 +68,82 @@ export type PlaylistDetail = PlaylistSummary & {
   }[];
   exclusions: { mediaAssetId: string; title: string }[];
   collaborators: { userId: string; role: "owner" | "collaborator"; displayName: string }[];
+  /** Source playlists feeding a linked playlist (empty for standard). */
+  sources: { id: string; name: string; ownerUserId: string; shareCode: string | null }[];
 };
 
 const userCanEdit = userCanEditPlaylist;
 const userCanView = userCanViewPlaylist;
+const userCanRename = userCanRenamePlaylist;
 
 function displayName(user: { name: string | null; username: string | null; email: string }) {
   return user.name?.trim() || user.username?.trim() || user.email;
+}
+
+async function allocateShareCode(): Promise<string> {
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const code = generateShareCode();
+    const existing = await db.query.playlists.findFirst({
+      where: eq(schema.playlists.shareCode, code),
+      columns: { id: true },
+    });
+    if (!existing) return code;
+  }
+  throw new PlaylistError("Could not allocate a share code", 500);
+}
+
+function relationFor(
+  playlist: { ownerUserId: string; kind: PlaylistKind },
+  userId: string,
+  isMember: boolean,
+  isFollower: boolean
+): PlaylistRelation {
+  if (playlist.ownerUserId === userId) return "owner";
+  if (playlist.kind === "linked" && isMember) return "linked_member";
+  if (isMember) return "collaborator";
+  if (isFollower) return "follower";
+  return "viewer";
+}
+
+function toSummaryFields(
+  p: {
+    id: string;
+    name: string;
+    description: string | null;
+    tagQuery: string | null;
+    visibility: PlaylistVisibility;
+    kind: PlaylistKind;
+    shareCode: string;
+    ownerUserId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  opts: {
+    userId: string;
+    trackCount: number;
+    isMember: boolean;
+    isFollower: boolean;
+    canEdit: boolean;
+  }
+): PlaylistSummary {
+  const isOwner = p.ownerUserId === opts.userId;
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    tagQuery: p.tagQuery,
+    visibility: p.visibility,
+    kind: p.kind,
+    shareCode: isOwner ? p.shareCode : null,
+    ownerUserId: p.ownerUserId,
+    trackCount: opts.trackCount,
+    relation: relationFor(p, opts.userId, opts.isMember, opts.isFollower),
+    canEdit: opts.canEdit,
+    canRename: isOwner || opts.isMember,
+    canDelete: isOwner,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+  };
 }
 
 export const MAX_PLAYLIST_TAG_QUERY_LENGTH = 500;
@@ -105,6 +191,7 @@ async function replaceItemsWithMatches(playlistId: string, userId: string, asset
       }))
     );
   }
+  await syncLinkedPlaylistsForSource(playlistId, userId);
 }
 
 async function readyAssetIdsInOrder(ids: string[]): Promise<string[]> {
@@ -143,6 +230,7 @@ export async function createPlaylist(opts: {
   const matchedIds = tagQuery ? await tagQueryAssetIds(opts.userId, tagQuery.ast) : [];
   const freehandIds = tagQuery ? [] : await readyAssetIdsInOrder(dedupeIds(opts.mediaAssetIds ?? []).slice(0, 2000));
 
+  const shareCode = await allocateShareCode();
   const [row] = await db
     .insert(schema.playlists)
     .values({
@@ -151,6 +239,8 @@ export async function createPlaylist(opts: {
       description: opts.description?.trim().slice(0, 280) || null,
       tagQuery: tagQuery?.text ?? null,
       visibility: opts.visibility ?? "private",
+      kind: "standard",
+      shareCode,
     })
     .returning();
   if (!row) throw new PlaylistError("Failed to create playlist", 500);
@@ -169,19 +259,13 @@ export async function createPlaylist(opts: {
   }
   const trackCount = tagQuery ? await db.$count(schema.playlistItems, eq(schema.playlistItems.playlistId, row.id)) : freehandIds.length;
 
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    tagQuery: row.tagQuery,
-    visibility: row.visibility,
-    ownerUserId: row.ownerUserId,
+  return toSummaryFields(row, {
+    userId: opts.userId,
     trackCount,
+    isMember: true,
+    isFollower: false,
     canEdit: true,
-    canDelete: true,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
+  });
 }
 
 export async function listPlaylistsForUser(userId: string): Promise<PlaylistSummary[]> {
@@ -192,7 +276,14 @@ export async function listPlaylistsForUser(userId: string): Promise<PlaylistSumm
   const memberships = await db.query.playlistMembers.findMany({
     where: and(eq(schema.playlistMembers.userId, userId), eq(schema.playlistMembers.role, "collaborator")),
   });
-  const collabIds = memberships.map((m) => m.playlistId).filter((id) => !owned.some((o) => o.id === id));
+  const follows = await db.query.playlistFollows.findMany({
+    where: eq(schema.playlistFollows.userId, userId),
+  });
+
+  const ownedIds = new Set(owned.map((o) => o.id));
+  const collabIds = memberships.map((m) => m.playlistId).filter((id) => !ownedIds.has(id));
+  const followIds = follows.map((f) => f.playlistId).filter((id) => !ownedIds.has(id) && !collabIds.includes(id));
+
   const collab =
     collabIds.length > 0
       ? await db.query.playlists.findMany({
@@ -200,9 +291,19 @@ export async function listPlaylistsForUser(userId: string): Promise<PlaylistSumm
           orderBy: [desc(schema.playlists.updatedAt)],
         })
       : [];
+  const followed =
+    followIds.length > 0
+      ? await db.query.playlists.findMany({
+          where: and(inArray(schema.playlists.id, followIds), eq(schema.playlists.visibility, "public")),
+          orderBy: [desc(schema.playlists.updatedAt)],
+        })
+      : [];
 
-  const all = [...owned, ...collab];
+  const all = [...owned, ...collab, ...followed];
   if (all.length === 0) return [];
+
+  const memberSet = new Set([...ownedIds, ...collabIds]);
+  const followerSet = new Set(followed.map((p) => p.id));
 
   const items = await db.query.playlistItems.findMany({
     where: inArray(
@@ -213,27 +314,92 @@ export async function listPlaylistsForUser(userId: string): Promise<PlaylistSumm
   const countBy = new Map<string, number>();
   for (const i of items) countBy.set(i.playlistId, (countBy.get(i.playlistId) ?? 0) + 1);
 
-  return all.map((p) => ({
-    id: p.id,
-    name: p.name,
-    description: p.description,
-    tagQuery: p.tagQuery,
-    visibility: p.visibility,
-    ownerUserId: p.ownerUserId,
-    trackCount: countBy.get(p.id) ?? 0,
-    canEdit: p.ownerUserId === userId || collabIds.includes(p.id),
-    canDelete: p.ownerUserId === userId,
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-  }));
+  return all.map((p) => {
+    const isMember = memberSet.has(p.id);
+    const isFollower = followerSet.has(p.id);
+    const canEdit = p.kind !== "linked" && isMember;
+    return toSummaryFields(p, {
+      userId,
+      trackCount: countBy.get(p.id) ?? 0,
+      isMember,
+      isFollower,
+      canEdit,
+    });
+  });
+}
+
+/** Additive sync: append any new ready tracks from source playlists (never removes). */
+export async function syncLinkedPlaylistFromSources(linkedPlaylistId: string, actorUserId: string): Promise<number> {
+  const linked = await db.query.playlists.findFirst({ where: eq(schema.playlists.id, linkedPlaylistId) });
+  if (!linked || linked.kind !== "linked") return 0;
+
+  const sources = await db.query.linkedPlaylistSources.findMany({
+    where: eq(schema.linkedPlaylistSources.linkedPlaylistId, linkedPlaylistId),
+  });
+  if (sources.length === 0) return 0;
+
+  const sourceItems = await db.query.playlistItems.findMany({
+    where: inArray(
+      schema.playlistItems.playlistId,
+      sources.map((s) => s.sourcePlaylistId)
+    ),
+    orderBy: [asc(schema.playlistItems.createdAt), asc(schema.playlistItems.position)],
+  });
+
+  const existing = await db.query.playlistItems.findMany({
+    where: eq(schema.playlistItems.playlistId, linkedPlaylistId),
+  });
+  const have = new Set(existing.map((i) => i.mediaAssetId));
+  const last = existing.reduce((max, i) => Math.max(max, i.position), -1);
+
+  const toAdd: string[] = [];
+  const seen = new Set<string>();
+  for (const item of sourceItems) {
+    if (have.has(item.mediaAssetId) || seen.has(item.mediaAssetId)) continue;
+    seen.add(item.mediaAssetId);
+    toAdd.push(item.mediaAssetId);
+  }
+  if (toAdd.length === 0) return 0;
+
+  const ready = await readyAssetIdsInOrder(toAdd);
+  if (ready.length === 0) return 0;
+
+  await db.insert(schema.playlistItems).values(
+    ready.map((mediaAssetId, i) => ({
+      playlistId: linkedPlaylistId,
+      mediaAssetId,
+      position: last + 1 + i,
+      addedByUserId: actorUserId,
+    }))
+  );
+  await db
+    .update(schema.playlists)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(schema.playlists.id, linkedPlaylistId));
+  return ready.length;
+}
+
+/** After a source playlist gains tracks, push them into any linked playlists that use it. */
+async function syncLinkedPlaylistsForSource(sourcePlaylistId: string, actorUserId: string) {
+  const links = await db.query.linkedPlaylistSources.findMany({
+    where: eq(schema.linkedPlaylistSources.sourcePlaylistId, sourcePlaylistId),
+  });
+  for (const link of links) {
+    await syncLinkedPlaylistFromSources(link.linkedPlaylistId, actorUserId);
+  }
 }
 
 export async function getPlaylistDetail(playlistId: string, userId: string): Promise<PlaylistDetail> {
   if (!(await userCanView(playlistId, userId))) throw new PlaylistError("Playlist not found", 404);
-  const playlist = await db.query.playlists.findFirst({ where: eq(schema.playlists.id, playlistId) });
+  let playlist = await db.query.playlists.findFirst({ where: eq(schema.playlists.id, playlistId) });
   if (!playlist) throw new PlaylistError("Playlist not found", 404);
 
-  const [items, exclusions, members] = await Promise.all([
+  if (playlist.kind === "linked") {
+    await syncLinkedPlaylistFromSources(playlistId, playlist.ownerUserId);
+    playlist = (await db.query.playlists.findFirst({ where: eq(schema.playlists.id, playlistId) })) ?? playlist;
+  }
+
+  const [items, exclusions, members, sourceRows] = await Promise.all([
     db.query.playlistItems.findMany({
       where: eq(schema.playlistItems.playlistId, playlistId),
       orderBy: [asc(schema.playlistItems.position)],
@@ -244,6 +410,11 @@ export async function getPlaylistDetail(playlistId: string, userId: string): Pro
     db.query.playlistMembers.findMany({
       where: eq(schema.playlistMembers.playlistId, playlistId),
     }),
+    playlist.kind === "linked"
+      ? db.query.linkedPlaylistSources.findMany({
+          where: eq(schema.linkedPlaylistSources.linkedPlaylistId, playlistId),
+        })
+      : Promise.resolve([]),
   ]);
 
   const assetIds = [...new Set([...items.map((i) => i.mediaAssetId), ...exclusions.map((e) => e.mediaAssetId)])];
@@ -264,20 +435,29 @@ export async function getPlaylistDetail(playlistId: string, userId: string): Pro
       : [];
   const nameById = new Map(users.map((u) => [u.id, displayName(u)]));
 
+  const sourcePlaylists =
+    sourceRows.length > 0
+      ? await db.query.playlists.findMany({
+          where: inArray(
+            schema.playlists.id,
+            sourceRows.map((s) => s.sourcePlaylistId)
+          ),
+        })
+      : [];
+  const sourceById = new Map(sourcePlaylists.map((p) => [p.id, p]));
+
+  const isMember = await userIsPlaylistMember(playlistId, userId);
+  const isFollower = await userFollowsPlaylist(playlistId, userId);
   const canEdit = await userCanEdit(playlistId, userId);
 
   return {
-    id: playlist.id,
-    name: playlist.name,
-    description: playlist.description,
-    tagQuery: playlist.tagQuery,
-    visibility: playlist.visibility,
-    ownerUserId: playlist.ownerUserId,
-    trackCount: items.length,
-    canEdit,
-    canDelete: playlist.ownerUserId === userId,
-    createdAt: playlist.createdAt.toISOString(),
-    updatedAt: playlist.updatedAt.toISOString(),
+    ...toSummaryFields(playlist, {
+      userId,
+      trackCount: items.length,
+      isMember,
+      isFollower,
+      canEdit,
+    }),
     items: items.map((i) => {
       const a = assetById.get(i.mediaAssetId);
       return {
@@ -300,6 +480,15 @@ export async function getPlaylistDetail(playlistId: string, userId: string): Pro
       role: m.role,
       displayName: nameById.get(m.userId) ?? "Listener",
     })),
+    sources: sourceRows.map((s) => {
+      const src = sourceById.get(s.sourcePlaylistId);
+      return {
+        id: s.sourcePlaylistId,
+        name: src?.name ?? "Playlist",
+        ownerUserId: src?.ownerUserId ?? "",
+        shareCode: src?.shareCode ?? null,
+      };
+    }),
   };
 }
 
@@ -308,11 +497,17 @@ export async function updatePlaylist(
   userId: string,
   patch: { name?: string; description?: string | null; visibility?: PlaylistVisibility }
 ): Promise<PlaylistDetail> {
-  if (!(await userCanEdit(playlistId, userId))) throw new PlaylistError("Not allowed", 403);
   const playlist = await db.query.playlists.findFirst({ where: eq(schema.playlists.id, playlistId) });
   if (!playlist) throw new PlaylistError("Playlist not found", 404);
-  if (playlist.ownerUserId !== userId && patch.visibility !== undefined) {
-    throw new PlaylistError("Only the owner can change visibility", 403);
+
+  const renaming = patch.name !== undefined || patch.description !== undefined;
+  const changingVisibility = patch.visibility !== undefined;
+  if (!renaming && !changingVisibility) throw new PlaylistError("Nothing to update");
+
+  if (renaming && !(await userCanRename(playlistId, userId))) throw new PlaylistError("Not allowed", 403);
+  if (changingVisibility) {
+    if (playlist.ownerUserId !== userId) throw new PlaylistError("Only the owner can change visibility", 403);
+    if (playlist.kind === "linked") throw new PlaylistError("Linked playlists stay shared with their members", 400);
   }
 
   await db
@@ -347,6 +542,13 @@ export async function deletePlaylist(playlistId: string, userId: string): Promis
     await tx.delete(schema.playlistItems).where(eq(schema.playlistItems.playlistId, playlistId));
     await tx.delete(schema.playlistExclusions).where(eq(schema.playlistExclusions.playlistId, playlistId));
     await tx.delete(schema.playlistMembers).where(eq(schema.playlistMembers.playlistId, playlistId));
+    await tx.delete(schema.playlistFollows).where(eq(schema.playlistFollows.playlistId, playlistId));
+    await tx.delete(schema.linkedPlaylistSources).where(
+      or(
+        eq(schema.linkedPlaylistSources.linkedPlaylistId, playlistId),
+        eq(schema.linkedPlaylistSources.sourcePlaylistId, playlistId)
+      )
+    );
     await tx.delete(schema.playlists).where(eq(schema.playlists.id, playlistId));
   });
 }
@@ -381,6 +583,7 @@ export async function addPlaylistTrack(playlistId: string, userId: string, media
     .update(schema.playlists)
     .set({ updatedAt: sql`now()` })
     .where(eq(schema.playlists.id, playlistId));
+  await syncLinkedPlaylistsForSource(playlistId, userId);
   return getPlaylistDetail(playlistId, userId);
 }
 
@@ -486,7 +689,11 @@ export async function setPlaylistExclusion(playlistId: string, userId: string, m
       .delete(schema.playlistExclusions)
       .where(and(eq(schema.playlistExclusions.playlistId, playlistId), eq(schema.playlistExclusions.mediaAssetId, mediaAssetId)));
     const asset = await db.query.mediaAssets.findFirst({ where: eq(schema.mediaAssets.id, mediaAssetId) });
-    if (asset?.status === "ready") await appendPlaylistItem(playlistId, userId, mediaAssetId);
+    if (asset?.status === "ready") {
+      if (await appendPlaylistItem(playlistId, userId, mediaAssetId)) {
+        await syncLinkedPlaylistsForSource(playlistId, userId);
+      }
+    }
   }
   await db
     .update(schema.playlists)
@@ -570,6 +777,112 @@ export async function removeCollaborator(playlistId: string, ownerUserId: string
       )
     );
   return getPlaylistDetail(playlistId, ownerUserId);
+}
+
+export async function followPlaylistByShareCode(userId: string, rawCode: string): Promise<PlaylistDetail> {
+  const code = normalizeShareCode(rawCode);
+  if (!code) throw new PlaylistError("Enter a share code");
+
+  const playlist = await db.query.playlists.findFirst({ where: eq(schema.playlists.shareCode, code) });
+  if (!playlist) throw new PlaylistError("Playlist not found", 404);
+  if (playlist.visibility === "private") throw new PlaylistError("Private playlists cannot be followed", 403);
+  if (playlist.ownerUserId === userId) throw new PlaylistError("You already own this playlist");
+  if (await userIsPlaylistMember(playlist.id, userId)) {
+    throw new PlaylistError("You already collaborate on this playlist");
+  }
+
+  await db.insert(schema.playlistFollows).values({ playlistId: playlist.id, userId }).onConflictDoNothing();
+  return getPlaylistDetail(playlist.id, userId);
+}
+
+export async function unfollowPlaylist(playlistId: string, userId: string): Promise<void> {
+  await db
+    .delete(schema.playlistFollows)
+    .where(and(eq(schema.playlistFollows.playlistId, playlistId), eq(schema.playlistFollows.userId, userId)));
+}
+
+/**
+ * Linked playlist from public standard sources owned by different accounts.
+ * Members can play + rename; tracks only arrive via additive sync from sources.
+ */
+export async function createLinkedPlaylist(opts: {
+  userId: string;
+  name: string;
+  sourcePlaylistIds: string[];
+  /** Optional emails/usernames to add as members (in addition to the creator). */
+  memberQueries?: string[];
+}): Promise<PlaylistDetail> {
+  const name = opts.name.trim().slice(0, 80);
+  if (!name) throw new PlaylistError("Name is required");
+
+  const ids = [...new Set(opts.sourcePlaylistIds)].slice(0, 12);
+  if (ids.length < 2) throw new PlaylistError("Pick at least two source playlists");
+
+  const sources = await db.query.playlists.findMany({ where: inArray(schema.playlists.id, ids) });
+  if (sources.length !== ids.length) throw new PlaylistError("Source playlist not found", 404);
+
+  for (const src of sources) {
+    if (src.kind !== "standard") throw new PlaylistError("Only standard playlists can be link sources");
+    if (src.visibility === "private") throw new PlaylistError("Private playlists cannot be used as link sources", 403);
+  }
+
+  const ownerIds = sources.map((s) => s.ownerUserId);
+  if (new Set(ownerIds).size !== ownerIds.length) {
+    throw new PlaylistError("Source playlists must belong to different accounts");
+  }
+
+  const shareCode = await allocateShareCode();
+  const [row] = await db
+    .insert(schema.playlists)
+    .values({
+      ownerUserId: opts.userId,
+      name,
+      description: `Linked from ${ids.length} playlists`,
+      tagQuery: null,
+      visibility: "public",
+      kind: "linked",
+      shareCode,
+    })
+    .returning();
+  if (!row) throw new PlaylistError("Failed to create linked playlist", 500);
+
+  await db.insert(schema.playlistMembers).values({ playlistId: row.id, userId: opts.userId, role: "owner" });
+  await db.insert(schema.linkedPlaylistSources).values(
+    ids.map((sourcePlaylistId) => ({ linkedPlaylistId: row.id, sourcePlaylistId }))
+  );
+
+  const memberQueries = [...new Set((opts.memberQueries ?? []).map((q) => q.trim()).filter(Boolean))].slice(0, 12);
+  for (const q of memberQueries) {
+    const memberId = await findUserIdByEmailOrUsername(q);
+    if (!memberId) throw new PlaylistError(`Member not found: ${q}`, 404);
+    if (memberId === opts.userId) continue;
+    await db.insert(schema.playlistMembers).values({ playlistId: row.id, userId: memberId, role: "collaborator" }).onConflictDoNothing();
+  }
+
+  await syncLinkedPlaylistFromSources(row.id, opts.userId);
+  return getPlaylistDetail(row.id, opts.userId);
+}
+
+/** Resolve public playlists by share codes for the linked-create UI. */
+export async function lookupPlaylistByShareCode(userId: string, rawCode: string): Promise<PlaylistSummary> {
+  const code = normalizeShareCode(rawCode);
+  if (!code) throw new PlaylistError("Enter a share code");
+  const playlist = await db.query.playlists.findFirst({ where: eq(schema.playlists.shareCode, code) });
+  if (!playlist) throw new PlaylistError("Playlist not found", 404);
+  if (playlist.visibility === "private") throw new PlaylistError("Private playlists cannot be linked", 403);
+  if (playlist.kind !== "standard") throw new PlaylistError("Only standard playlists can be link sources");
+  if (!(await userCanView(playlist.id, userId))) throw new PlaylistError("Playlist not found", 404);
+
+  const trackCount = await db.$count(schema.playlistItems, eq(schema.playlistItems.playlistId, playlist.id));
+  const isMember = await userIsPlaylistMember(playlist.id, userId);
+  const isFollower = await userFollowsPlaylist(playlist.id, userId);
+  return toSummaryFields(playlist, {
+    userId,
+    trackCount,
+    isMember,
+    isFollower,
+    canEdit: false,
+  });
 }
 
 /** Merge two playlists (or libraries-as-playlists) into a new owned playlist. Dedupes by mediaAssetId. */

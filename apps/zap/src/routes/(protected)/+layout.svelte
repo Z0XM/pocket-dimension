@@ -1,6 +1,7 @@
 <script lang="ts">
   import { authClient } from "$lib/auth-client";
   import { CatalogQueueClient, setCatalogQueue } from "$lib/catalog-queue-client.svelte";
+  import BeatReactiveBackground from "$lib/components/BeatReactiveBackground.svelte";
   import CatalogQueueDock from "$lib/components/CatalogQueueDock.svelte";
   import PageSkeleton from "$lib/components/PageSkeleton.svelte";
   import SettingsMenu from "$lib/components/SettingsMenu.svelte";
@@ -21,10 +22,26 @@
   const catalogueActive = $derived(path === "/catalogue" || path.startsWith("/catalogue/"));
   const playlistsActive = $derived(path === "/playlists" || path.startsWith("/playlists/"));
   const sessionActive = $derived(path === "/session" || path.startsWith("/session/"));
-  const adminActivityActive = $derived(path === "/admin");
+  const adminActive = $derived(path === "/admin" || path.startsWith("/admin/"));
+  const historyActive = $derived(path === "/history" || path.startsWith("/history/"));
 
-  /** Catalogue / Admin activity pin the shell so only their list panes scroll. */
-  const fillViewport = $derived((catalogueActive || adminActivityActive) && !isNavigating);
+  const themeActive = $derived(path === "/theme" || path.startsWith("/theme/"));
+  const connectionsActive = $derived(path === "/connections" || path.startsWith("/connections/"));
+  const joinActive = $derived(path === "/join" || path.startsWith("/join/"));
+
+  /** Pin the shell so page headers stay put and list panes scroll (Catalogue-style). */
+  const fillViewport = $derived(
+    (catalogueActive ||
+      adminActive ||
+      historyActive ||
+      playlistsActive ||
+      sessionActive ||
+      themeActive ||
+      connectionsActive ||
+      homeActive ||
+      joinActive) &&
+      !isNavigating
+  );
 
   const skeletonPath = $derived(navTo ?? path);
   const skeletonShowFilters = $derived(skeletonPath.startsWith("/catalogue") || skeletonPath.startsWith("/session/"));
@@ -46,7 +63,11 @@
                 ? "Loading join"
                 : skeletonPath.startsWith("/admin")
                   ? "Loading admin"
-                  : "Loading"
+                  : skeletonPath.startsWith("/theme")
+                    ? "Loading theme"
+                    : skeletonPath.startsWith("/connections")
+                      ? "Loading connections"
+                      : "Loading"
   );
 
   async function signOut() {
@@ -54,6 +75,20 @@
     await authClient.signOut();
     await goto("/");
   }
+
+  // Additive YouTube playlist auto-sync once per shell mount (cooldown enforced server-side).
+  $effect(() => {
+    if (!data.user?.id) return;
+    const ac = new AbortController();
+    void fetch("/api/connections/youtube/auto-sync", {
+      method: "POST",
+      credentials: "same-origin",
+      signal: ac.signal,
+    }).catch(() => {
+      // not linked / not configured — ignore
+    });
+    return () => ac.abort();
+  });
 </script>
 
 {#snippet primaryNav(rail = false)}
@@ -79,8 +114,9 @@
   </nav>
 {/snippet}
 
-<div class={`zap-shell zap-wave-field zap-grid ${fillViewport ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
-  <aside class="zap-shell-rail" aria-label="App rail">
+<div class={`zap-shell zap-wave-field zap-grid relative ${fillViewport ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
+  <BeatReactiveBackground queue={catalogQueue} />
+  <aside class="zap-shell-rail relative z-10" aria-label="App rail">
     <a href="/home" class="flex items-center gap-2 px-2" aria-label="Zap home" aria-current={homeActive ? "page" : undefined}>
       <span class="text-lg font-semibold tracking-tight text-foreground">Zap</span>
       <WaveBars />
@@ -91,7 +127,7 @@
     </div>
   </aside>
 
-  <div class="zap-shell-body min-h-0">
+  <div class="zap-shell-body relative z-10 min-h-0 bg-transparent">
     <header class="zap-shell-top">
       {#if isNavigating}
         <div class="zap-nav-progress" aria-hidden="true"></div>

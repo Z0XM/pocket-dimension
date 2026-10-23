@@ -1,5 +1,7 @@
 /*
  * Frame chrome — app-wide topology + component language.
+ * Prefer icons or icon+text over text-only controls where it makes sense
+ * (search, delete/remove, add, transport, dismiss); text-only when an icon would be ambiguous.
  */
 
 html,
@@ -8,9 +10,39 @@ html body {
 }
 
 .zap-shell {
+  position: relative;
   display: flex;
   min-height: 100dvh;
   flex-direction: column;
+}
+
+/*
+ * Beat-reactive canvas: always full viewport (ported to document.body).
+ * Do not rely on parent size — shell has max-width descendants / overflow.
+ */
+.zap-beat-bg {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  width: 100dvw !important;
+  max-width: none !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  margin: 0 !important;
+  z-index: 1;
+  opacity: var(--zap-anim-opacity, 1);
+}
+
+html[data-animation-layer="top"] .zap-beat-bg {
+  z-index: 60;
+}
+
+html[data-animations="off"] .zap-beat-bg {
+  visibility: hidden;
 }
 
 .zap-shell-rail {
@@ -22,6 +54,7 @@ html body {
   min-width: 0;
   flex: 1;
   flex-direction: column;
+  background: transparent;
 }
 
 .zap-shell-top {
@@ -64,6 +97,7 @@ html body {
   width: 100%;
   max-width: 72rem;
   padding-inline: 1.5rem;
+  background: transparent;
 }
 
 .zap-shell-main.is-fill {
@@ -94,13 +128,31 @@ html body {
   background-image: none;
 }
 
-.zap-catalogue-header {
+/* Page chrome — Catalogue-inspired header shared across protected routes */
+.zap-page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.zap-page-header {
+  flex-shrink: 0;
   border-bottom: var(--frame-stage-rule);
   padding-bottom: 1rem;
   margin-bottom: 0.35rem;
 }
 
-.zap-catalogue-title {
+.zap-page-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.zap-page-title {
   font-family: var(--zap-font-display);
   font-size: clamp(2.25rem, 5.5vw, 4rem);
   font-weight: 800;
@@ -109,11 +161,20 @@ html body {
   text-transform: uppercase;
 }
 
-.zap-catalogue-lede {
-  margin-top: 0.65rem;
-  max-width: 40rem;
-  font-size: 0.95rem;
-  color: var(--muted-foreground);
+.zap-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zap-page-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  font-family: var(--zap-font-sans);
+  font-size: 0.72rem;
 }
 
 .zap-filters-panel {
@@ -152,7 +213,7 @@ html body {
 }
 
 .zap-track.is-current {
-  background: color-mix(in srgb, var(--signal) 12%, transparent);
+  background: transparent;
   box-shadow: none;
 }
 
@@ -215,6 +276,14 @@ html body {
   backdrop-filter: none !important;
 }
 
+.zap-queue-dock {
+  border-radius: 0;
+  border-color: var(--border);
+  border-top: var(--frame-player-border);
+  background: var(--background-mid);
+  backdrop-filter: none;
+}
+
 ::selection {
   background: var(--signal);
   color: var(--primary-foreground);
@@ -223,6 +292,23 @@ html body {
 :focus-visible {
   outline: 2px solid var(--signal);
   outline-offset: 2px;
+}
+
+/* Form fields: thin 1px border focus — avoid stacked thick outline + ring */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):focus,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible,
+.auth-field:focus,
+.auth-field:focus-visible {
+  outline: none;
+  outline-offset: 0;
+  border-color: var(--signal);
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
 }
 
 @media (prefers-reduced-motion: reduce) {

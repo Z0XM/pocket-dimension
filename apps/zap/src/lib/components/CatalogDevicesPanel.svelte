@@ -11,7 +11,6 @@
 
   const online = $derived(queue.devices.filter((d) => d.online));
   const offline = $derived(queue.devices.filter((d) => !d.online));
-  const audible = $derived(online.filter((d) => d.outputEnabled).length);
 
   function isMobile(d: CatalogDevice) {
     return /iOS|Android/.test(d.label);
@@ -90,9 +89,6 @@
 {/snippet}
 
 <div class="flex min-h-0 flex-1 flex-col">
-  <p class="shrink-0 border-b border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
-    Audio plays on every online device with output on ({audible}). Turn this device off to use it as a remote.
-  </p>
   <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
     <ul class="divide-y divide-border/50">
       {#each online as d (d.deviceId)}

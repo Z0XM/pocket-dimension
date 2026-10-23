@@ -82,18 +82,18 @@
   };
 </script>
 
-<div class="space-y-6">
+<div class="flex min-h-0 flex-1 flex-col gap-4">
   {#if form?.error}
-    <p class="auth-error">{form.error}</p>
+    <p class="auth-error shrink-0">{form.error}</p>
   {:else if form && "ok" in form && form.ok}
-    <p class="text-sm text-signal">{form.ok}</p>
+    <p class="shrink-0 text-sm text-signal">{form.ok}</p>
   {/if}
 
-  <div class="grid gap-4 md:grid-cols-2">
+  <div class="grid shrink-0 gap-4 md:grid-cols-2">
     <form
       method="POST"
       action="?/setMode"
-      class="space-y-3 rounded-lg border border-border/70 bg-card/50 p-4"
+      class="space-y-3 rounded-lg border border-border/70 bg-card p-4"
       bind:this={modeForm}
       use:enhance={submitWithBusy}
     >
@@ -111,7 +111,7 @@
     <form
       method="POST"
       action="?/addUser"
-      class="space-y-3 rounded-lg border border-border/70 bg-card/50 p-4"
+      class="space-y-3 rounded-lg border border-border/70 bg-card p-4"
       use:enhance={() => {
         busy = true;
         return async ({ result, update }) => {
@@ -134,8 +134,8 @@
     </form>
   </div>
 
-  <div class="space-y-3">
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+  <div class="flex min-h-0 flex-1 flex-col gap-3">
+    <div class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Accounts ({data.users.length})</h2>
         <p class="mt-1 text-sm text-muted-foreground">Everyone who has opened Zap or been set by an admin, most recently seen first.</p>
@@ -146,100 +146,102 @@
     {#if visibleUsers.length === 0}
       <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">No accounts.</p>
     {:else}
-      <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
-        {#each visibleUsers as u (u.userId)}
-          {@const isSelf = u.userId === data.currentUserId}
-          <li class="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
-            <div class="min-w-0">
-              <p class="flex flex-wrap items-center gap-2">
-                <span class="truncate font-medium">{nameOf(u)}</span>
-                {#if isSelf}<span class="font-mono text-[10px] text-muted-foreground">(you)</span>{/if}
-                <span class={`rounded-full border px-2 py-0.5 font-mono text-[10px] ${accessClasses[u.access]}`}>{accessLabels[u.access]}</span>
-                {#if u.isAdmin && u.status !== "default"}
-                  <span class="font-mono text-[10px] text-muted-foreground">status: {u.status}</span>
-                {/if}
-              </p>
-              <p class="font-mono text-[11px] text-muted-foreground">
-                {[u.username ? u.email : null, `last seen ${formatWhen(u.lastSeenAt)}`, `first seen ${formatWhen(u.firstSeenAt)}`]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-1 font-mono text-[11px]">
-              <a href={`/admin?user=${u.userId}`} class="rounded border border-border px-2 py-1 text-muted-foreground hover:bg-secondary">Activity</a>
-              {#if !u.isAdmin}
-                {#if u.status !== "allowed"}
-                  <form method="POST" action="?/setStatus" use:enhance={submitWithBusy}>
-                    <input type="hidden" name="userId" value={u.userId} />
-                    <input type="hidden" name="status" value="allowed" />
-                    <button type="submit" class="rounded border border-signal/40 px-2 py-1 text-signal hover:bg-signal/10" disabled={busy}
-                      >Allow</button
-                    >
-                  </form>
-                {/if}
-                {#if u.status !== "default"}
-                  <form method="POST" action="?/setStatus" use:enhance={submitWithBusy}>
-                    <input type="hidden" name="userId" value={u.userId} />
-                    <input type="hidden" name="status" value="default" />
+      <div class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain" role="region" aria-label="Accounts">
+        <ul class="divide-y divide-border/60">
+          {#each visibleUsers as u (u.userId)}
+            {@const isSelf = u.userId === data.currentUserId}
+            <li class="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
+              <div class="min-w-0">
+                <p class="flex flex-wrap items-center gap-2">
+                  <span class="truncate font-medium">{nameOf(u)}</span>
+                  {#if isSelf}<span class="font-mono text-[10px] text-muted-foreground">(you)</span>{/if}
+                  <span class={`rounded-full border px-2 py-0.5 font-mono text-[10px] ${accessClasses[u.access]}`}>{accessLabels[u.access]}</span>
+                  {#if u.isAdmin && u.status !== "default"}
+                    <span class="font-mono text-[10px] text-muted-foreground">status: {u.status}</span>
+                  {/if}
+                </p>
+                <p class="font-mono text-[11px] text-muted-foreground">
+                  {[u.username ? u.email : null, `last seen ${formatWhen(u.lastSeenAt)}`, `first seen ${formatWhen(u.firstSeenAt)}`]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center gap-1 font-mono text-[11px]">
+                <a href={`/admin?user=${u.userId}`} class="rounded border border-border px-2 py-1 text-muted-foreground hover:bg-secondary">Activity</a>
+                {#if !u.isAdmin}
+                  {#if u.status !== "allowed"}
+                    <form method="POST" action="?/setStatus" use:enhance={submitWithBusy}>
+                      <input type="hidden" name="userId" value={u.userId} />
+                      <input type="hidden" name="status" value="allowed" />
+                      <button type="submit" class="rounded border border-signal/40 px-2 py-1 text-signal hover:bg-signal/10" disabled={busy}
+                        >Allow</button
+                      >
+                    </form>
+                  {/if}
+                  {#if u.status !== "default"}
+                    <form method="POST" action="?/setStatus" use:enhance={submitWithBusy}>
+                      <input type="hidden" name="userId" value={u.userId} />
+                      <input type="hidden" name="status" value="default" />
+                      <button
+                        type="submit"
+                        class="rounded border border-border px-2 py-1 text-muted-foreground hover:bg-secondary"
+                        title="Follow the portal mode"
+                        disabled={busy}>Reset</button
+                      >
+                    </form>
+                  {/if}
+                  {#if u.status !== "blocked" && !isSelf}
                     <button
-                      type="submit"
-                      class="rounded border border-border px-2 py-1 text-muted-foreground hover:bg-secondary"
-                      title="Follow the portal mode"
-                      disabled={busy}>Reset</button
+                      type="button"
+                      class="rounded border border-destructive/40 px-2 py-1 text-destructive hover:bg-destructive/10"
+                      disabled={busy}
+                      onclick={() =>
+                        ask(
+                          { action: "setStatus", userId: u.userId, status: "blocked" },
+                          `Block ${nameOf(u)}?`,
+                          "They'll see a blocked page and every Zap page and API will refuse them. Sessions they host end now; they leave sessions they joined.",
+                          "Block",
+                          true
+                        )}>Block</button
                     >
-                  </form>
+                  {/if}
                 {/if}
-                {#if u.status !== "blocked" && !isSelf}
+                {#if u.isAdmin}
+                  {#if !isSelf}
+                    <button
+                      type="button"
+                      class="rounded border border-border px-2 py-1 text-muted-foreground hover:bg-secondary"
+                      disabled={busy}
+                      onclick={() =>
+                        ask(
+                          { action: "setAdmin", userId: u.userId, isAdmin: "false" },
+                          `Remove admin from ${nameOf(u)}?`,
+                          "They keep normal Zap access but lose the admin section, song deletion and tag management.",
+                          "Remove admin",
+                          true
+                        )}>Remove admin</button
+                    >
+                  {/if}
+                {:else if u.status !== "blocked"}
                   <button
                     type="button"
-                    class="rounded border border-destructive/40 px-2 py-1 text-destructive hover:bg-destructive/10"
+                    class="rounded border border-signal/40 px-2 py-1 text-signal hover:bg-signal/10"
                     disabled={busy}
                     onclick={() =>
                       ask(
-                        { action: "setStatus", userId: u.userId, status: "blocked" },
-                        `Block ${nameOf(u)}?`,
-                        "They'll see a blocked page and every Zap page and API will refuse them. Sessions they host end now; they leave sessions they joined.",
-                        "Block",
-                        true
-                      )}>Block</button
+                        { action: "setAdmin", userId: u.userId, isAdmin: "true" },
+                        `Make ${nameOf(u)} a Zap admin?`,
+                        "Admins can delete songs from storage, manage system tags, block users and see everyone's activity.",
+                        "Make admin",
+                        false
+                      )}>Make admin</button
                   >
                 {/if}
-              {/if}
-              {#if u.isAdmin}
-                {#if !isSelf}
-                  <button
-                    type="button"
-                    class="rounded border border-border px-2 py-1 text-muted-foreground hover:bg-secondary"
-                    disabled={busy}
-                    onclick={() =>
-                      ask(
-                        { action: "setAdmin", userId: u.userId, isAdmin: "false" },
-                        `Remove admin from ${nameOf(u)}?`,
-                        "They keep normal Zap access but lose the admin section, song deletion and tag management.",
-                        "Remove admin",
-                        true
-                      )}>Remove admin</button
-                  >
-                {/if}
-              {:else if u.status !== "blocked"}
-                <button
-                  type="button"
-                  class="rounded border border-signal/40 px-2 py-1 text-signal hover:bg-signal/10"
-                  disabled={busy}
-                  onclick={() =>
-                    ask(
-                      { action: "setAdmin", userId: u.userId, isAdmin: "true" },
-                      `Make ${nameOf(u)} a Zap admin?`,
-                      "Admins can delete songs from storage, manage system tags, block users and see everyone's activity.",
-                      "Make admin",
-                      false
-                    )}>Make admin</button
-                >
-              {/if}
-            </div>
-          </li>
-        {/each}
-      </ul>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      </div>
     {/if}
   </div>
 </div>
