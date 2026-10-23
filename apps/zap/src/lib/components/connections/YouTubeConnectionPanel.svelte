@@ -1,8 +1,9 @@
 <script lang="ts">
   import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
-  import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
-  import UnplugIcon from "@lucide/svelte/icons/unplug";
   import ListVideoIcon from "@lucide/svelte/icons/list-video";
+  import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
+  import SearchIcon from "@lucide/svelte/icons/search";
+  import UnplugIcon from "@lucide/svelte/icons/unplug";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import { youtubePlaylistHref } from "$lib/history-time";
 
@@ -44,6 +45,7 @@
   };
 
   let playlists = $state<PlaylistRow[]>([]);
+  let playlistQuery = $state("");
   let loadingPlaylists = $state(false);
   let listError = $state<string | null>(null);
   let busyId = $state<string | null>(null);
@@ -52,6 +54,12 @@
   let importBusy = $state(false);
   let importMessage = $state<string | null>(null);
   let disconnectOpen = $state(false);
+
+  const filteredPlaylists = $derived.by(() => {
+    const q = playlistQuery.trim().toLowerCase();
+    if (!q) return playlists;
+    return playlists.filter((p) => p.title.toLowerCase().includes(q));
+  });
 
   function when(iso: string | null) {
     if (!iso) return "—";
@@ -249,69 +257,87 @@
       {:else if playlists.length === 0}
         <p class="font-mono text-[11px] text-muted-foreground">No playlists found.</p>
       {:else}
-        <ul class="divide-y divide-border/50 border border-border/70 bg-card">
-          {#each playlists as row (row.id)}
-            <li class="space-y-2 px-3 py-3">
-              <div class="flex flex-wrap items-start justify-between gap-2">
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-medium">{row.title}</p>
-                  <p class="font-mono text-[10px] text-muted-foreground">
-                    {#if row.itemCount != null}
-                      {row.itemCount} tracks
-                      {#if row.alreadyImported > 0}
-                        · {row.alreadyImported} in library{/if}
-                      · {statusLabel(row.importStatus)}
-                    {:else}
-                      {statusLabel(row.importStatus)}
-                      {#if row.alreadyImported > 0}
-                        · {row.alreadyImported} in library{/if}
+        <div class="relative min-w-0">
+          <SearchIcon
+            class="pointer-events-none absolute top-1/2 left-2.5 size-4 shrink-0 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <input
+            class="auth-field w-full pl-9"
+            type="search"
+            placeholder="Search playlists…"
+            aria-label="Search playlists by name"
+            bind:value={playlistQuery}
+            autocomplete="off"
+          />
+        </div>
+        {#if filteredPlaylists.length === 0}
+          <p class="font-mono text-[11px] text-muted-foreground">No playlists match “{playlistQuery.trim()}”.</p>
+        {:else}
+          <ul class="divide-y divide-border/50 border border-border/70 bg-card">
+            {#each filteredPlaylists as row (row.id)}
+              <li class="space-y-2 px-3 py-3">
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-medium">{row.title}</p>
+                    <p class="font-mono text-[10px] text-muted-foreground">
+                      {#if row.itemCount != null}
+                        {row.itemCount} tracks
+                        {#if row.alreadyImported > 0}
+                          · {row.alreadyImported} in library{/if}
+                        · {statusLabel(row.importStatus)}
+                      {:else}
+                        {statusLabel(row.importStatus)}
+                        {#if row.alreadyImported > 0}
+                          · {row.alreadyImported} in library{/if}
+                      {/if}
+                      {#if row.lastSyncedAt}
+                        · synced {when(row.lastSyncedAt)}
+                      {/if}
+                    </p>
+                    {#if row.lastSyncError}
+                      <p class="font-mono text-[10px] text-destructive">{row.lastSyncError}</p>
                     {/if}
-                    {#if row.lastSyncedAt}
-                      · synced {when(row.lastSyncedAt)}
-                    {/if}
-                  </p>
-                  {#if row.lastSyncError}
-                    <p class="font-mono text-[10px] text-destructive">{row.lastSyncError}</p>
-                  {/if}
+                  </div>
+                  <a
+                    class="inline-flex size-7 items-center justify-center text-muted-foreground hover:text-signal"
+                    href={youtubePlaylistHref(row.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open on YouTube"
+                    title="Open on YouTube"
+                  >
+                    <ExternalLinkIcon class="size-3.5" aria-hidden="true" />
+                  </a>
                 </div>
-                <a
-                  class="inline-flex size-7 items-center justify-center text-muted-foreground hover:text-signal"
-                  href={youtubePlaylistHref(row.id)}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Open on YouTube"
-                  title="Open on YouTube"
-                >
-                  <ExternalLinkIcon class="size-3.5" aria-hidden="true" />
-                </a>
-              </div>
-              <div class="flex flex-wrap items-center gap-3">
-                <label class="inline-flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                <div class="flex flex-wrap items-center gap-3">
+                  <label class="inline-flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                    <button
+                      type="button"
+                      class="zap-toggle"
+                      role="switch"
+                      aria-checked={row.autoSync}
+                      aria-label={`Auto sync ${row.title}`}
+                      disabled={busyId === row.id}
+                      onclick={() => void toggleAutoSync(row, !row.autoSync)}
+                    >
+                      <span class="zap-toggle-thumb"></span>
+                    </button>
+                    Auto sync
+                  </label>
                   <button
                     type="button"
-                    class="zap-toggle"
-                    role="switch"
-                    aria-checked={row.autoSync}
-                    aria-label={`Auto sync ${row.title}`}
-                    disabled={busyId === row.id}
-                    onclick={() => void toggleAutoSync(row, !row.autoSync)}
+                    class="auth-btn !px-2.5 !py-1"
+                    disabled={busyId !== null || importBusy}
+                    onclick={() => void openImportPreview(row)}
                   >
-                    <span class="zap-toggle-thumb"></span>
+                    {busyId === row.id ? "…" : "Import"}
                   </button>
-                  Auto sync
-                </label>
-                <button
-                  type="button"
-                  class="auth-btn !px-2.5 !py-1"
-                  disabled={busyId !== null || importBusy}
-                  onclick={() => void openImportPreview(row)}
-                >
-                  {busyId === row.id ? "…" : "Import"}
-                </button>
-              </div>
-            </li>
-          {/each}
-        </ul>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
         <p class="font-mono text-[10px] text-muted-foreground">
           Import status is calculated when you open Import (preview). Auto sync runs when you open Zap (additive only —
           never removes songs).
