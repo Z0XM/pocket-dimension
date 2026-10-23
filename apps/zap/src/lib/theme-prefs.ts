@@ -81,7 +81,7 @@ export type ZapThemePrefs = {
    * >0 → peak-biased blend (55% peak / 45% avg) over the window.
    */
   responseWindowMs: number;
-  /** Oscilloscope / mirrored-wave history window in ms. 0 = live buffer only. */
+  /** Oscilloscope / mirrored-wave history window in ms (0–5000). 0 = live buffer only. */
   waveHistoryMs: number;
 };
 
