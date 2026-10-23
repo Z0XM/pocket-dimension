@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  CORNER_DROP_PX,
   DOCK_BAR_H,
   DROP_ZONE_PX,
   ICON_SIZE,
@@ -8,6 +9,8 @@ import {
   clampRect,
   defaultIconPos,
   defaultPanelSize,
+  devicesDockBottomPx,
+  inCornerDropZone,
   inDropZone,
   panelMax,
   panelRectNearIcon,
@@ -69,6 +72,24 @@ describe("drop zone", () => {
 
   test("dock bar height matches the drop band", () => {
     expect(DOCK_BAR_H).toBe(DROP_ZONE_PX);
+  });
+
+  test("corner drop is bottom-right only", () => {
+    expect(inCornerDropZone(desktop.w - 1, desktop.h - 1, desktop)).toBe(true);
+    expect(inCornerDropZone(desktop.w - CORNER_DROP_PX, desktop.h - CORNER_DROP_PX, desktop)).toBe(true);
+    expect(inCornerDropZone(desktop.w - CORNER_DROP_PX - 1, desktop.h - 1, desktop)).toBe(false);
+    expect(inCornerDropZone(desktop.w - 1, desktop.h - CORNER_DROP_PX - 1, desktop)).toBe(false);
+  });
+
+  test("corner drop lifts above a docked queue footer", () => {
+    const inset = DOCK_BAR_H;
+    expect(inCornerDropZone(desktop.w - 1, desktop.h - inset - 1, desktop, inset)).toBe(true);
+    expect(inCornerDropZone(desktop.w - 1, desktop.h - 1, desktop, inset)).toBe(false);
+  });
+
+  test("devices dock bottom tracks queue dock state", () => {
+    expect(devicesDockBottomPx(true)).toBe(DOCK_BAR_H);
+    expect(devicesDockBottomPx(false)).toBe(8);
   });
 });
 

@@ -3,28 +3,35 @@
   import MonitorSpeakerIcon from "@lucide/svelte/icons/monitor-speaker";
   import { onMount, untrack } from "svelte";
   import { page } from "$app/state";
+  import CatalogDevicesDock from "$lib/components/CatalogDevicesDock.svelte";
   import CatalogDevicesPanel from "$lib/components/CatalogDevicesPanel.svelte";
   import CatalogQueueDockBar from "$lib/components/CatalogQueueDockBar.svelte";
   import CatalogQueuePanel from "$lib/components/CatalogQueuePanel.svelte";
   import FloatingPanel from "$lib/components/FloatingPanel.svelte";
   import type { CatalogQueueItem, CatalogQueueState } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
-  import type { FloatingMode } from "$lib/floating-panel";
+  import { DOCK_BAR_H, type FloatingMode } from "$lib/floating-panel";
 
   let { queue }: { queue: CatalogQueueClient } = $props();
 
   const DOCK_KEY = "zap.queue.docked";
+  const DEVICES_DOCK_KEY = "zap.devices.docked";
   const FLOAT_KEY = "zap.float.queue";
+  const DEVICES_FLOAT_KEY = "zap.float.devices";
 
   let audioEl = $state<HTMLAudioElement | null>(null);
   let audioBlocked = $state(false);
   let appliedKey = "";
   let pendingSeekSec: number | null = null;
   let docked = $state(false);
+  let devicesDocked = $state(false);
   /** When true, exiting fullscreen restores the footer dock instead of a floating panel/icon. */
   let restoreDockOnExitFull = $state(false);
+  let restoreDevicesDockOnExitFull = $state(false);
   let floatOpenAs = $state<FloatingMode | null>(null);
   let floatEpoch = $state(0);
+  let devicesFloatOpenAs = $state<FloatingMode | null>(null);
+  let devicesFloatEpoch = $state(0);
 
   /** Session / join routes own their chrome; hide catalog floating queue + devices there. */
   const path = $derived(page.url.pathname);
@@ -35,9 +42,9 @@
   const showDevices = $derived(!hideCatalogFloats && (queue.active || queue.onlineDevices.length > 1));
   const localNote = $derived(!queue.thisDevice ? null : !deviceOutput ? "This device is remote-only." : null);
 
-  function readDocked(): boolean {
+  function readFlag(key: string): boolean {
     try {
-      return localStorage.getItem(DOCK_KEY) === "1";
+      return localStorage.getItem(key) === "1";
     } catch {
       return false;
     }
@@ -52,12 +59,21 @@
     }
   }
 
-  /** Prefer icon/panel/full when remounting the float after undock / maximize. */
-  function writeFloatMode(mode: FloatingMode) {
+  function setDevicesDocked(next: boolean) {
+    devicesDocked = next;
     try {
-      const raw = localStorage.getItem(FLOAT_KEY);
+      localStorage.setItem(DEVICES_DOCK_KEY, next ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Prefer icon/panel/full when remounting the float after undock / maximize. */
+  function writeFloatMode(storageKey: string, mode: FloatingMode) {
+    try {
+      const raw = localStorage.getItem(storageKey);
       const base = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-      localStorage.setItem(FLOAT_KEY, JSON.stringify({ ...base, mode }));
+      localStorage.setItem(storageKey, JSON.stringify({ ...base, mode }));
     } catch {
       // ignore
     }
@@ -70,7 +86,7 @@
 
   function undockToMini() {
     restoreDockOnExitFull = false;
-    writeFloatMode("icon");
+    writeFloatMode(FLOAT_KEY, "icon");
     floatOpenAs = "icon";
     floatEpoch++;
     setDocked(false);
@@ -78,7 +94,7 @@
 
   function maximizeFromDock() {
     restoreDockOnExitFull = true;
-    writeFloatMode("full");
+    writeFloatMode(FLOAT_KEY, "full");
     floatOpenAs = "full";
     floatEpoch++;
     setDocked(false);
@@ -92,8 +108,40 @@
     return true;
   }
 
+  function dockDevices() {
+    restoreDevicesDockOnExitFull = false;
+    setDevicesDocked(true);
+  }
+
+  function undockDevicesToMini() {
+    restoreDevicesDockOnExitFull = false;
+    writeFloatMode(DEVICES_FLOAT_KEY, "icon");
+    devicesFloatOpenAs = "icon";
+    devicesFloatEpoch++;
+    setDevicesDocked(false);
+  }
+
+  function maximizeDevicesFromDock() {
+    restoreDevicesDockOnExitFull = true;
+    writeFloatMode(DEVICES_FLOAT_KEY, "full");
+    devicesFloatOpenAs = "full";
+    devicesFloatEpoch++;
+    setDevicesDocked(false);
+  }
+
+  function exitDevicesFullFromFloat(): boolean {
+    if (!restoreDevicesDockOnExitFull) return false;
+    restoreDevicesDockOnExitFull = false;
+    setDevicesDocked(true);
+    return true;
+  }
+
+  /** Queue footer lifts the Devices corner drop target when both can be visible. */
+  const devicesDropInset = $derived(showQueue && docked ? DOCK_BAR_H : 0);
+
   onMount(() => {
-    docked = readDocked();
+    docked = readFlag(DOCK_KEY);
+    devicesDocked = readFlag(DEVICES_DOCK_KEY);
     queue.connect();
     return () => queue.disconnect();
   });
@@ -219,15 +267,37 @@
   {/key}
 {/if}
 
-{#if showDevices}
-  <FloatingPanel id="devices" title="Devices" slot={1} active={queue.onlineDevices.length > 1} badge={queue.onlineDevices.length}>
-    {#snippet icon()}
-      <MonitorSpeakerIcon class="size-5" />
-    {/snippet}
-    {#snippet children()}
-      <CatalogDevicesPanel {queue} />
-    {/snippet}
-  </FloatingPanel>
+{#if showDevices && devicesDocked}
+  <CatalogDevicesDock
+    {queue}
+    queueDocked={showQueue && docked}
+    onmaximize={maximizeDevicesFromDock}
+    onundock={undockDevicesToMini}
+  />
+{:else if showDevices}
+  {#key devicesFloatEpoch}
+    <FloatingPanel
+      id="devices"
+      title="Devices"
+      slot={1}
+      active={queue.onlineDevices.length > 1}
+      badge={queue.onlineDevices.length}
+      dropLabel="Release to dock"
+      dropTone="dock"
+      dropAnchor="corner"
+      dropBottomInset={devicesDropInset}
+      openAs={devicesFloatOpenAs}
+      onExitFull={exitDevicesFullFromFloat}
+      ondrop={dockDevices}
+    >
+      {#snippet icon()}
+        <MonitorSpeakerIcon class="size-5" />
+      {/snippet}
+      {#snippet children()}
+        <CatalogDevicesPanel {queue} />
+      {/snippet}
+    </FloatingPanel>
+  {/key}
 {/if}
 
 {#if queue.notice}
