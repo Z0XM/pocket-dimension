@@ -56,7 +56,7 @@ export type AnimationLayer = "behind" | "top";
 
 /** Slider ranges — defaults match pre-control look. */
 export const MOTION_CARD_OPACITY = { min: 0.15, max: 1, step: 0.05, default: 0.4 } as const;
-export const MOTION_ANIM_OPACITY = { min: 0.1, max: 1, step: 0.05, default: 1 } as const;
+export const MOTION_ANIM_OPACITY = { min: 0.1, max: 1, step: 0.05, default: 0.8 } as const;
 /** 0 = instant per-frame; max aggregates peak-biased energy over this many ms. */
 export const MOTION_RESPONSE_MS = { min: 0, max: 2000, step: 50, default: 0 } as const;
 /** 0 = live analyser buffer only; max ≈ 5s scrolling history (scope / mirror). */
@@ -90,12 +90,12 @@ export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
   page: "dark-purple",
   card: "ink",
   animations: true,
-  animationStyle: "radial",
-  cardOpacity: MOTION_CARD_OPACITY.default,
-  animationOpacity: MOTION_ANIM_OPACITY.default,
+  animationStyle: "mirror",
+  cardOpacity: MOTION_CARD_OPACITY.default, // 40%
+  animationOpacity: MOTION_ANIM_OPACITY.default, // 80%
   animationLayer: "behind",
-  responseWindowMs: MOTION_RESPONSE_MS.default,
-  waveHistoryMs: MOTION_WAVE_HISTORY_MS.default,
+  responseWindowMs: MOTION_RESPONSE_MS.default, // Instant
+  waveHistoryMs: MOTION_WAVE_HISTORY_MS.default, // Live
 };
 
 export function isAccentId(v: unknown): v is AccentId {
