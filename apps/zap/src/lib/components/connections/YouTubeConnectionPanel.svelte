@@ -255,9 +255,15 @@
                 <div class="min-w-0">
                   <p class="truncate text-sm font-medium">{row.title}</p>
                   <p class="font-mono text-[10px] text-muted-foreground">
-                    {statusLabel(row.importStatus)}
                     {#if row.itemCount != null}
-                      · {row.alreadyImported}/{row.itemCount} in library
+                      {row.itemCount} tracks
+                      {#if row.alreadyImported > 0}
+                        · {row.alreadyImported} in library{/if}
+                      · {statusLabel(row.importStatus)}
+                    {:else}
+                      {statusLabel(row.importStatus)}
+                      {#if row.alreadyImported > 0}
+                        · {row.alreadyImported} in library{/if}
                     {/if}
                     {#if row.lastSyncedAt}
                       · synced {when(row.lastSyncedAt)}
@@ -306,7 +312,8 @@
           {/each}
         </ul>
         <p class="font-mono text-[10px] text-muted-foreground">
-          Auto sync runs when you open Zap (additive only — never removes songs). Manual Import always previews first.
+          Import status is calculated when you open Import (preview). Auto sync runs when you open Zap (additive only —
+          never removes songs).
         </p>
       {/if}
     </div>

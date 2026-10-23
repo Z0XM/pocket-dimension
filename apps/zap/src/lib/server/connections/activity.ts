@@ -29,18 +29,24 @@ export async function listConnectionActivity(opts: {
   limit?: number;
 }) {
   const limit = Math.min(Math.max(opts.limit ?? 40, 1), 100);
-  const rows = await db.query.connectionActivity.findMany({
-    where: and(eq(schema.connectionActivity.userId, opts.userId), eq(schema.connectionActivity.provider, opts.provider)),
-    orderBy: [desc(schema.connectionActivity.createdAt)],
-    limit,
-  });
-  return rows.map((r) => ({
-    id: r.id,
-    kind: r.kind,
-    summary: r.summary,
-    meta: parseMeta(r.metaJson),
-    at: r.createdAt.toISOString(),
-  }));
+  try {
+    const rows = await db.query.connectionActivity.findMany({
+      where: and(eq(schema.connectionActivity.userId, opts.userId), eq(schema.connectionActivity.provider, opts.provider)),
+      orderBy: [desc(schema.connectionActivity.createdAt)],
+      limit,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      summary: r.summary,
+      meta: parseMeta(r.metaJson),
+      at: r.createdAt.toISOString(),
+    }));
+  } catch (err) {
+    // Table comes from migration 0060_zap_connections — missing migrate must not 500 /connections.
+    console.warn("[zap connections] connection_activity unavailable (apply migration 0060?)", err);
+    return [];
+  }
 }
 
 function parseMeta(raw: string | null): Record<string, unknown> | null {
