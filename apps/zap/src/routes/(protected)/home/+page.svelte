@@ -94,8 +94,10 @@
               <a href={`/playlists/${pl.id}`} class="block px-4 py-2.5 text-sm hover:text-signal">
                 <span class="font-medium">{pl.name}</span>
                 <span class="ml-2 font-mono text-[10px] text-muted-foreground"
-                  >{pl.trackCount} · {pl.visibility}{#if pl.ownerUserId !== data.user?.id}
-                    · collab{/if}</span
+                  >{pl.trackCount} · {pl.visibility}{#if pl.kind === "linked"}
+                    · Linked{:else if pl.relation === "follower"}
+                    · Followed{:else if pl.relation === "collaborator" || pl.ownerUserId !== data.user?.id}
+                    · Collaborator{/if}</span
                 >
               </a>
             </li>

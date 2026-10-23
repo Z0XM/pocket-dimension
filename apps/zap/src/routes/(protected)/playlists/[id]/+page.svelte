@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import CopyIcon from "@lucide/svelte/icons/copy";
   import EyeIcon from "@lucide/svelte/icons/eye";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
@@ -9,6 +10,7 @@
   import RadioIcon from "@lucide/svelte/icons/radio";
   import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
+  import UserMinusIcon from "@lucide/svelte/icons/user-minus";
   import XIcon from "@lucide/svelte/icons/x";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
@@ -18,6 +20,7 @@
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import { moveItem } from "$lib/catalog-queue";
   import { getCatalogQueue } from "$lib/catalog-queue-client.svelte";
+  import { playlistRelationBadge } from "$lib/playlist-relation-label";
   import { PLAYLIST_TRACK_SORT_OPTIONS, type PlaylistTrackSort } from "$lib/playlist-sort";
   import { effectiveTagQuery, tagFilterKey, tagQueryProblem } from "$lib/tag-filter";
   import type { PageData } from "./$types";
@@ -31,7 +34,9 @@
   let editTagQuery = $state("");
   let editTagIds = $state<string[]>([]);
   let collabQuery = $state("");
+  let renameValue = $state("");
   let loadMsg = $state<string | null>(null);
+  let copyMsg = $state<string | null>(null);
   let deleteOpen = $state(false);
   let deleting = $state(false);
   let sortBusy = $state(false);
@@ -45,6 +50,7 @@
   const queue = getCatalogQueue();
   const hasPlayable = $derived(playlist.items.some((i) => i.playable));
   const canReorder = $derived(playlist.canEdit);
+  const relationBadge = $derived(playlistRelationBadge(playlist.relation, playlist.kind));
   const replaceConfirmBody = $derived(
     `Your current queue of ${queue?.items.length ?? 0} song${(queue?.items.length ?? 0) === 1 ? "" : "s"} will be closed, and this queue will be started.`
   );
@@ -93,6 +99,7 @@
 
   $effect(() => {
     playlist = data.playlist;
+    renameValue = data.playlist.name;
   });
 
   const savedTagQuery = $derived(playlist.tagQuery ?? "");
@@ -220,6 +227,64 @@
     }
   }
 
+  async function saveRename() {
+    const name = renameValue.trim();
+    if (!name || !playlist.canRename || busy || name === playlist.name) return;
+    busy = true;
+    busyLabel = "Renaming…";
+    error = null;
+    try {
+      const res = await fetch(`/api/playlists/${playlist.id}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? "Rename failed");
+      playlist = body;
+      renameValue = body.name;
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Rename failed";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function copyShareCode() {
+    if (!playlist.shareCode) return;
+    try {
+      await navigator.clipboard.writeText(playlist.shareCode);
+      copyMsg = "Share code copied";
+      setTimeout(() => {
+        copyMsg = null;
+      }, 2000);
+    } catch {
+      copyMsg = playlist.shareCode;
+    }
+  }
+
+  async function unfollow() {
+    busy = true;
+    busyLabel = "Unfollowing…";
+    error = null;
+    try {
+      const res = await fetch(`/api/playlists/${playlist.id}`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unfollow" }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? "Unfollow failed");
+      await goto("/playlists", { invalidateAll: true });
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Unfollow failed";
+    } finally {
+      busy = false;
+    }
+  }
+
   async function deletePlaylist() {
     deleting = true;
     error = null;
@@ -276,6 +341,8 @@
     {/snippet}
     {#snippet meta()}
       {playlist.visibility} · {playlist.trackCount} tracks
+      {#if relationBadge}
+        · {relationBadge}{/if}
       {#if playlist.tagQuery && !playlist.canEdit}
         · tags: <span class="text-signal normal-case tracking-normal">{playlist.tagQuery}</span>
       {/if}
@@ -316,7 +383,32 @@
       {:else if data.canStart}
         <span class="font-mono text-[10px] text-muted-foreground self-center">Start a session to queue</span>
       {/if}
-      {#if playlist.canDelete}
+      {#if playlist.shareCode}
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded border border-border px-2.5 py-1.5 font-mono text-[10px] text-muted-foreground hover:text-signal disabled:opacity-40"
+          disabled={busy}
+          title={playlist.visibility === "private"
+            ? "Share code (make public before others can follow)"
+            : "Copy share code for others to follow"}
+          onclick={() => void copyShareCode()}
+        >
+          <CopyIcon class="size-3.5" aria-hidden="true" />
+          {playlist.shareCode}
+        </button>
+      {/if}
+      {#if playlist.relation === "follower"}
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded border border-border px-2.5 py-1.5 font-mono text-[10px] text-muted-foreground hover:text-destructive disabled:opacity-40"
+          disabled={busy}
+          onclick={() => void unfollow()}
+        >
+          <UserMinusIcon class="size-3.5" aria-hidden="true" />
+          Unfollow
+        </button>
+      {/if}
+      {#if playlist.canDelete && playlist.kind !== "linked"}
         <button
           type="button"
           class="inline-flex items-center gap-1.5 rounded border border-border px-2.5 py-1.5 font-mono text-[10px] text-muted-foreground transition-colors hover:border-signal/50 hover:bg-signal/10 hover:text-signal disabled:opacity-40"
@@ -332,6 +424,8 @@
             Make public
           {/if}
         </button>
+      {/if}
+      {#if playlist.canDelete}
         <button
           type="button"
           class="inline-flex items-center gap-1 rounded border border-destructive/40 px-2 py-1 font-mono text-[10px] text-destructive hover:bg-destructive/10 disabled:opacity-40"
@@ -356,6 +450,50 @@
   {/if}
   {#if loadMsg}
     <p class="text-sm text-signal">{loadMsg}</p>
+  {/if}
+  {#if copyMsg}
+    <p class="text-sm text-signal">{copyMsg}</p>
+  {/if}
+
+  {#if playlist.canRename}
+    <form
+      class="flex flex-col gap-2 rounded-lg border border-border/70 bg-card p-4 sm:flex-row sm:items-end"
+      onsubmit={(e) => {
+        e.preventDefault();
+        void saveRename();
+      }}
+    >
+      <label class="min-w-0 flex-1 space-y-1">
+        <span class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Name</span>
+        <input class="auth-field" bind:value={renameValue} maxlength="80" />
+      </label>
+      <button
+        type="submit"
+        class="rounded border border-border px-3 py-2 font-mono text-[11px] disabled:opacity-40"
+        disabled={busy || !renameValue.trim() || renameValue.trim() === playlist.name}
+      >
+        Save name
+      </button>
+    </form>
+  {/if}
+
+  {#if playlist.kind === "linked"}
+    <div class="rounded-lg border border-border/70 bg-card p-4">
+      <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Linked sources</p>
+      <p class="mb-2 font-mono text-[10px] text-muted-foreground">Tracks refresh automatically when sources gain songs. Manual adds are disabled.</p>
+      {#if playlist.sources?.length}
+        <ul class="space-y-1 font-mono text-[11px] text-muted-foreground">
+          {#each playlist.sources as src}
+            <li>
+              <a href={`/playlists/${src.id}`} class="hover:text-signal">{src.name}</a>
+              {#if src.shareCode}<span class="ml-1 opacity-70">· {src.shareCode}</span>{/if}
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="text-sm text-muted-foreground">No sources.</p>
+      {/if}
+    </div>
   {/if}
 
   {#if playlist.canEdit}
@@ -396,32 +534,40 @@
         {/if}
         <span class="font-mono text-[10px] text-muted-foreground">Uses your tags; removed tracks stay out of rebuilds.</span>
       </div>
+    </div>
+  {/if}
 
-      <div class="border-t border-border/50 pt-3">
-        <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Add collaborator</p>
-        <div class="flex gap-2">
-          <input class="auth-field flex-1" bind:value={collabQuery} placeholder="email or username" />
-          <button
-            type="button"
-            class="rounded border border-border px-2 py-1 font-mono text-[10px] disabled:opacity-40"
-            disabled={busy || !collabQuery.trim()}
-            onclick={() => void action("addCollaborator", { collaborator: collabQuery.trim() })}
-          >
-            Invite
-          </button>
-        </div>
+  {#if playlist.canDelete}
+    <div class="rounded-lg border border-border/70 bg-card p-4">
+      <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+        {playlist.kind === "linked" ? "Add member" : "Add collaborator"}
+      </p>
+      <div class="flex gap-2">
+        <input class="auth-field flex-1" bind:value={collabQuery} placeholder="email or username" />
+        <button
+          type="button"
+          class="rounded border border-border px-2 py-1 font-mono text-[10px] disabled:opacity-40"
+          disabled={busy || !collabQuery.trim()}
+          onclick={() => void action("addCollaborator", { collaborator: collabQuery.trim() })}
+        >
+          Invite
+        </button>
       </div>
+      {#if playlist.kind === "linked"}
+        <p class="mt-2 font-mono text-[10px] text-muted-foreground">Members can play and rename; tracks stay source-driven.</p>
+      {:else}
+        <p class="mt-2 font-mono text-[10px] text-muted-foreground">Collaborators can edit tracks. Following is separate (share code).</p>
+      {/if}
     </div>
   {/if}
 
   {#if playlist.collaborators.length}
     <ul class="font-mono text-[11px] text-muted-foreground">
       {#each playlist.collaborators as c}
-        <li>{c.displayName} · {c.role}</li>
+        <li>{c.displayName} · {playlist.kind === "linked" && c.role === "collaborator" ? "member" : c.role}</li>
       {/each}
     </ul>
   {/if}
-
   <div>
     <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
       <p class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Tracks</p>
@@ -455,7 +601,8 @@
       <TrackListSkeleton rows={4} compact />
     {:else if playlist.items.length === 0}
       <p class="text-sm text-muted-foreground">
-        Empty{#if playlist.canEdit}
+        Empty{#if playlist.kind === "linked"}
+          — waiting for tracks from linked sources{:else if playlist.canEdit}
           — build from tags above{/if}.
       </p>
     {:else}
