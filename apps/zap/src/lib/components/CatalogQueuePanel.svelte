@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
@@ -26,13 +27,18 @@
 
   const current = $derived(queue.currentItem);
   const durationMs = $derived(current?.durationMs ?? 0);
-  const pastItems = $derived(queue.currentIndex > 0 ? queue.items.slice(0, queue.currentIndex) : []);
+  /** Queue order before the playhead; display most recently played first. */
+  const pastItems = $derived.by(() => {
+    if (queue.currentIndex <= 0) return [];
+    return queue.items.slice(0, queue.currentIndex).toReversed();
+  });
   const activeItems = $derived(queue.currentIndex >= 0 ? queue.items.slice(queue.currentIndex) : queue.items);
 
   let scrubMs = $state<number | null>(null);
   let saveOpen = $state(false);
   let saveName = $state("");
   let savedLink = $state<{ id: string; name: string } | null>(null);
+  let pastOpen = $state(false);
 
   let dragFrom = $state<number | null>(null);
   let dragOver = $state<number | null>(null);
@@ -290,34 +296,49 @@
   </ul>
 
   {#if pastItems.length}
-    <div class="shrink-0 border-t border-border/60 px-3 py-2">
-      <p class="mb-1 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Added in the past</p>
-      <ul class="max-h-40 space-y-0.5 overflow-y-auto" aria-label="Added in the past">
-        {#each pastItems as item (item.id)}
-          {@const index = queue.items.findIndex((i) => i.id === item.id)}
-          <li class="group flex items-center gap-1">
-            <button
-              type="button"
-              class="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left text-muted-foreground hover:bg-signal/10 hover:text-foreground disabled:opacity-40"
-              disabled={!item.playable}
-              title={`Play from “${item.title}”`}
-              onclick={() => void queue.jump(item.id)}
-            >
-              <span class="w-6 shrink-0 text-right font-mono text-[10px] tabular-nums">{index + 1}</span>
-              <span class="min-w-0 flex-1 truncate text-[13px]">{item.title}</span>
-            </button>
-            <button
-              type="button"
-              class="inline-flex size-7 shrink-0 items-center justify-center rounded text-destructive opacity-70 group-hover:opacity-100 hover:bg-destructive/10"
-              aria-label={`Remove ${item.title}`}
-              title="Remove"
-              onclick={() => void queue.remove(item.id)}
-            >
-              <XIcon class="size-3.5" />
-            </button>
-          </li>
-        {/each}
-      </ul>
+    <div class="shrink-0 border-t border-border/60">
+      <button
+        type="button"
+        class="flex w-full items-center gap-1.5 px-3 py-2 text-left font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase hover:bg-signal/5 hover:text-signal"
+        aria-expanded={pastOpen}
+        aria-controls="queue-played-before"
+        onclick={() => (pastOpen = !pastOpen)}
+      >
+        <ChevronDownIcon
+          class={`size-3.5 shrink-0 transition-transform ${pastOpen ? "" : "-rotate-90"}`}
+          aria-hidden="true"
+        />
+        <span class="min-w-0 flex-1">Played before</span>
+        <span class="tabular-nums normal-case tracking-normal">{pastItems.length}</span>
+      </button>
+      {#if pastOpen}
+        <ul id="queue-played-before" class="max-h-40 space-y-0.5 overflow-y-auto px-3 pb-2" aria-label="Played before">
+          {#each pastItems as item (item.id)}
+            {@const index = queue.items.findIndex((i) => i.id === item.id)}
+            <li class="group flex items-center gap-1">
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left text-muted-foreground hover:bg-signal/10 hover:text-foreground disabled:opacity-40"
+                disabled={!item.playable}
+                title={`Play from “${item.title}”`}
+                onclick={() => void queue.jump(item.id)}
+              >
+                <span class="w-6 shrink-0 text-right font-mono text-[10px] tabular-nums">{index + 1}</span>
+                <span class="min-w-0 flex-1 truncate text-[13px]">{item.title}</span>
+              </button>
+              <button
+                type="button"
+                class="inline-flex size-7 shrink-0 items-center justify-center rounded text-destructive opacity-70 group-hover:opacity-100 hover:bg-destructive/10"
+                aria-label={`Remove ${item.title}`}
+                title="Remove"
+                onclick={() => void queue.remove(item.id)}
+              >
+                <XIcon class="size-3.5" />
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
     </div>
   {/if}
 </div>
