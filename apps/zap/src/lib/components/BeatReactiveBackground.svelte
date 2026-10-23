@@ -152,13 +152,24 @@
       }
     }
 
+    function viewportSize() {
+      const vv = window.visualViewport;
+      return {
+        // Prefer layout viewport width so we fill the screen, not a constrained parent.
+        w: Math.max(1, Math.round(vv?.width ?? window.innerWidth)),
+        h: Math.max(1, Math.round(vv?.height ?? window.innerHeight)),
+      };
+    }
+
     function resize() {
-      w = window.innerWidth;
-      h = window.innerHeight;
+      const vp = viewportSize();
+      w = vp.w;
+      h = vp.h;
       canvas!.width = Math.max(1, Math.floor(w * dpr));
       canvas!.height = Math.max(1, Math.floor(h * dpr));
-      canvas!.style.width = `${w}px`;
-      canvas!.style.height = `${h}px`;
+      // CSS size is owned by .zap-beat-bg (100dvw/100dvh); keep buffer in sync.
+      canvas!.style.width = "";
+      canvas!.style.height = "";
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       colors = readColors();
       signalRgb = parseRgb(colors.signal) ?? signalRgb;
@@ -636,8 +647,15 @@
 
     style = readAnimationStyle();
     styleAttr = style;
+
+    // Escape shell flex/overflow/max-width ancestors so fixed covers the real viewport.
+    const home = canvas.parentElement;
+    document.body.appendChild(canvas);
+
     resize();
     window.addEventListener("resize", resize);
+    window.visualViewport?.addEventListener("resize", resize);
+    window.visualViewport?.addEventListener("scroll", resize);
 
     const unsub = subscribePlaybackAudio(() => {
       samplePlaybackEnergy();
@@ -648,7 +666,11 @@
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      window.visualViewport?.removeEventListener("resize", resize);
+      window.visualViewport?.removeEventListener("scroll", resize);
       unsub();
+      if (home) home.appendChild(canvas);
+      else canvas.remove();
     };
   });
 
@@ -672,7 +694,7 @@
 -->
 <canvas
   bind:this={canvasEl}
-  class="zap-beat-bg pointer-events-none fixed inset-0 h-[100dvh] w-screen"
+  class="zap-beat-bg pointer-events-none"
   aria-hidden="true"
   data-analyser={usingAnalyser ? "live" : "fallback"}
   data-style={styleAttr}

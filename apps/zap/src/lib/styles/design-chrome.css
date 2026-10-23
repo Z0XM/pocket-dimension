@@ -17,10 +17,22 @@ html body {
 }
 
 /*
- * Beat-reactive canvas: full-viewport.
- * Layer via data-animation-layer; opacity via --zap-anim-opacity (theme prefs).
+ * Beat-reactive canvas: always full viewport (ported to document.body).
+ * Do not rely on parent size — shell has max-width descendants / overflow.
  */
 .zap-beat-bg {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  width: 100dvw !important;
+  max-width: none !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  margin: 0 !important;
   z-index: 1;
   opacity: var(--zap-anim-opacity, 1);
 }
