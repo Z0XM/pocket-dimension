@@ -58,9 +58,9 @@ export type AnimationLayer = "behind" | "top";
 export const MOTION_CARD_OPACITY = { min: 0.15, max: 1, step: 0.05, default: 0.4 } as const;
 export const MOTION_ANIM_OPACITY = { min: 0.1, max: 1, step: 0.05, default: 1 } as const;
 /** 0 = instant per-frame; max aggregates peak-biased energy over this many ms. */
-export const MOTION_RESPONSE_MS = { min: 0, max: 200, step: 10, default: 0 } as const;
-/** 0 = live analyser buffer only; max ≈ 1s scrolling history (scope / mirror). */
-export const MOTION_WAVE_HISTORY_MS = { min: 0, max: 1000, step: 50, default: 0 } as const;
+export const MOTION_RESPONSE_MS = { min: 0, max: 2000, step: 50, default: 0 } as const;
+/** 0 = live analyser buffer only; max ≈ 5s scrolling history (scope / mirror). */
+export const MOTION_WAVE_HISTORY_MS = { min: 0, max: 5000, step: 100, default: 0 } as const;
 
 export type ZapThemePrefs = {
   accent: AccentId;

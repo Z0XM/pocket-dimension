@@ -85,12 +85,14 @@
 
     /** Response-window energy samples (peak-biased aggregate). */
     const energyHist: { t: number; e: PlaybackEnergy }[] = [];
-    const FREQ_HIST_MAX = 16;
+    /** Enough frames for up to ~2s response window at ~60fps. */
+    const FREQ_HIST_MAX = 128;
+    const ENERGY_HIST_MAX = 150;
     const freqHist: { t: number; bins: Float32Array }[] = [];
 
-    /** Scrolling waveform history for scope / mirror (newest on the right). */
+    /** Scrolling waveform history for scope / mirror (newest on the right; up to 5s). */
     const HISTORY_RATE = 2400;
-    const HIST_CAP = Math.ceil((1000 / 1000) * HISTORY_RATE);
+    const HIST_CAP = Math.ceil((5000 / 1000) * HISTORY_RATE);
     const histBuf = new Float32Array(HIST_CAP);
     let histWrite = 0;
     let histCount = 0;
@@ -204,7 +206,7 @@
       const win = readResponseWindowMs();
       const cutoff = now - Math.max(win, 16);
       while (energyHist.length > 1 && energyHist[0]!.t < cutoff) energyHist.shift();
-      while (energyHist.length > 48) energyHist.shift();
+      while (energyHist.length > ENERGY_HIST_MAX) energyHist.shift();
     }
 
     /** 55% peak / 45% average over the response window (0 → instant). */

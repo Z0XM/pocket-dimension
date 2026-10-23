@@ -76,6 +76,13 @@
   function onWaveHistory(e: Event) {
     patch({ waveHistoryMs: Number((e.currentTarget as HTMLInputElement).value) });
   }
+
+  function formatMsWindow(ms: number, zeroLabel: string) {
+    if (ms <= 0) return zeroLabel;
+    if (ms < 1000) return `${ms} ms`;
+    const s = ms / 1000;
+    return Number.isInteger(s) ? `${s} s` : `${s.toFixed(2)} s`;
+  }
 </script>
 
 <div class="space-y-8">
@@ -272,7 +279,7 @@
           <span class="flex items-baseline justify-between gap-2">
             <span class="text-sm text-foreground">Response window</span>
             <span class="font-mono text-[10px] text-muted-foreground tabular-nums">
-              {prefs.responseWindowMs === 0 ? "Instant" : `${prefs.responseWindowMs} ms`}
+              {formatMsWindow(prefs.responseWindowMs, "Instant")}
             </span>
           </span>
           <input
@@ -287,7 +294,7 @@
             oninput={onResponse}
           />
           <span class="block font-mono text-[9px] text-muted-foreground">
-            0 = live frame. Higher averages/peaks energy over a short buffer before driving the visualizer.
+            Instant = live frame. Higher averages/peaks energy over up to 2 s before driving the visualizer.
           </span>
         </label>
 
@@ -295,7 +302,7 @@
           <span class="flex items-baseline justify-between gap-2">
             <span class="text-sm text-foreground">Wave history</span>
             <span class="font-mono text-[10px] text-muted-foreground tabular-nums">
-              {prefs.waveHistoryMs === 0 ? "Live" : `${(prefs.waveHistoryMs / 1000).toFixed(2)} s`}
+              {formatMsWindow(prefs.waveHistoryMs, "Live")}
             </span>
           </span>
           <input
@@ -310,7 +317,7 @@
             oninput={onWaveHistory}
           />
           <span class="block font-mono text-[9px] text-muted-foreground">
-            Oscilloscope & Mirrored wave: Live = current buffer; longer scrolls left with newest on the right (up to 1 s).
+            Oscilloscope & Mirrored wave: Live = current buffer; longer scrolls left with newest on the right (up to 5 s).
           </span>
         </label>
       </div>
