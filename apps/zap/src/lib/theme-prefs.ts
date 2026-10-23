@@ -41,7 +41,7 @@ export const CARD_PRESETS = [
  * Removed lattice variants (wave/noise/bars/bloom/vortex) migrate to `radial`.
  */
 export const ANIMATION_STYLES = [
-  { id: "radial", label: "Radial", blurb: "Dot lattice — splash rings from center" },
+  { id: "radial", label: "Radial", blurb: "Dot lattice — center-out beat rings" },
   { id: "scope", label: "Oscilloscope", blurb: "ECG-style time-domain waveform" },
   { id: "spectrum", label: "Spectrum", blurb: "Classic frequency bars" },
   { id: "ring", label: "Spectrum ring", blurb: "Circular frequency spectrum" },
