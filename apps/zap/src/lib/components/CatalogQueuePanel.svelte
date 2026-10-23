@@ -117,19 +117,10 @@
 <div class="flex min-h-0 flex-1 flex-col">
   <div class="shrink-0 space-y-2 border-b border-border/60 px-3 py-2.5">
     <div class="min-w-0">
-      {#if queue.interrupting}
-        <p class="truncate text-sm font-medium text-signal" title={queue.interruptTitle ?? undefined}>
-          {queue.interruptTitle ?? "Catalogue song"}
-        </p>
-        <p class="truncate font-mono text-[11px] text-muted-foreground">
-          {queue.interruptPaused ? "Catalogue song paused · queue stays paused" : "Playing from catalogue · queue paused"}
-        </p>
-      {:else}
-        <p class="truncate text-sm font-medium" title={current?.title}>{current?.title ?? "Queue finished — press play to start over"}</p>
-        <p class="truncate font-mono text-[11px] text-muted-foreground">
-          {current?.artists ?? "—"} · {queue.currentIndex >= 0 ? `${queue.currentIndex + 1} / ${queue.items.length}` : `${queue.items.length} tracks`}
-        </p>
-      {/if}
+      <p class="truncate text-sm font-medium" title={current?.title}>{current?.title ?? "Queue finished — press play to start over"}</p>
+      <p class="truncate font-mono text-[11px] text-muted-foreground">
+        {current?.artists ?? "—"} · {queue.currentIndex >= 0 ? `${queue.currentIndex + 1} / ${queue.items.length}` : `${queue.items.length} tracks`}
+      </p>
     </div>
     <div class="flex items-center gap-1.5">
       <button
@@ -145,12 +136,12 @@
       <button
         type="button"
         class="inline-flex size-9 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
-        aria-label={queue.playing || queue.interruptPlaying ? "Pause" : "Play"}
-        title={queue.playing || queue.interruptPlaying ? "Pause" : "Play"}
-        disabled={queue.items.length === 0 && !queue.interrupting}
+        aria-label={queue.playing ? "Pause" : "Play"}
+        title={queue.playing ? "Pause" : "Play"}
+        disabled={queue.items.length === 0}
         onclick={() => void queue.togglePlay()}
       >
-        {#if queue.playing || queue.interruptPlaying}
+        {#if queue.playing}
           <PauseIcon class="size-4" />
         {:else}
           <PlayIcon class="size-4" />
@@ -268,12 +259,9 @@
         <button
           type="button"
           class={`flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1.5 text-left hover:bg-signal/10 disabled:opacity-40 ${isCurrent ? "bg-signal/10" : ""}`}
-          disabled={!item.playable || queue.interrupting}
+          disabled={!item.playable}
           title={item.playable ? `Play from “${item.title}”` : "Not playable"}
-          onclick={() => {
-            queue.clearInterrupt();
-            void queue.jump(item.id);
-          }}
+          onclick={() => void queue.jump(item.id)}
         >
           <span class={`w-6 shrink-0 text-right font-mono text-[10px] tabular-nums ${isCurrent ? "text-signal" : "text-muted-foreground"}`}>
             {#if isCurrent && queue.playing}
@@ -311,12 +299,9 @@
             <button
               type="button"
               class="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left text-muted-foreground hover:bg-signal/10 hover:text-foreground disabled:opacity-40"
-              disabled={!item.playable || queue.interrupting}
+              disabled={!item.playable}
               title={`Play from “${item.title}”`}
-              onclick={() => {
-                queue.clearInterrupt();
-                void queue.jump(item.id);
-              }}
+              onclick={() => void queue.jump(item.id)}
             >
               <span class="w-6 shrink-0 text-right font-mono text-[10px] tabular-nums">{index + 1}</span>
               <span class="min-w-0 flex-1 truncate text-[13px]">{item.title}</span>
