@@ -15,9 +15,6 @@
   let canvasEl = $state<HTMLCanvasElement | null>(null);
   let usingAnalyser = $state(false);
 
-  type Ripple = { r: number; life: number; max: number };
-  type Molecule = { a: number; r: number; vr: number; size: number; life: number };
-
   function audioActuallyPlaying(): boolean {
     const el = getPlaybackAudioElement();
     if (!el) return false;
@@ -36,34 +33,59 @@
     if (!ctx) return;
 
     const mobile = window.matchMedia("(max-width: 640px)").matches;
-
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 2);
+
+    /** Rest lattice spacing — denser on desktop, throttled on mobile. */
+    const spacing = mobile ? 28 : 18;
+    const baseRadius = mobile ? 1.35 : 1.55;
+
     let w = 0;
     let h = 0;
-    let cx = 0;
-    let cy = 0;
+    let cols = 0;
+    let rows = 0;
+    let originX = 0;
+    let originY = 0;
     let raf = 0;
     let lastTs = 0;
     let settle = 0;
-    let ringPhase = 0;
-    let beatCooldown = 0;
-    const ripples: Ripple[] = [];
-    const molecules: Molecule[] = [];
-    const maxMolecules = mobile ? 64 : 120;
-    const ringCount = mobile ? 6 : 9;
+    let phase = 0;
+    let frameSkip = 0;
+
+    /** Precomputed rest positions (flat: i, j → x, y). */
+    let xs: Float32Array = new Float32Array(0);
+    let ys: Float32Array = new Float32Array(0);
 
     function readColors() {
       const cs = getComputedStyle(document.documentElement);
       return {
         signal: cs.getPropertyValue("--signal").trim() || "#ff6b4a",
         ink: cs.getPropertyValue("--foreground").trim() || "#f3efe9",
-        mute: cs.getPropertyValue("--border").trim() || "#2a2a2a",
       };
     }
     let colors = readColors();
+    let signalRgb = parseRgb(colors.signal) ?? { r: 255, g: 107, b: 74 };
+    let inkRgb = parseRgb(colors.ink) ?? { r: 243, g: 239, b: 233 };
+
+    function rebuildLattice() {
+      cols = Math.max(2, Math.floor(w / spacing) + 1);
+      rows = Math.max(2, Math.floor(h / spacing) + 1);
+      originX = (w - (cols - 1) * spacing) * 0.5;
+      originY = (h - (rows - 1) * spacing) * 0.5;
+      const n = cols * rows;
+      xs = new Float32Array(n);
+      ys = new Float32Array(n);
+      let k = 0;
+      for (let j = 0; j < rows; j++) {
+        for (let i = 0; i < cols; i++) {
+          xs[k] = originX + i * spacing;
+          ys[k] = originY + j * spacing;
+          k++;
+        }
+      }
+    }
 
     function resize() {
-      // Full viewport — not the flex parent (which can collapse / clip).
       w = window.innerWidth;
       h = window.innerHeight;
       canvas!.width = Math.max(1, Math.floor(w * dpr));
@@ -71,9 +93,10 @@
       canvas!.style.width = `${w}px`;
       canvas!.style.height = `${h}px`;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
-      cx = w * 0.5;
-      cy = h * 0.55;
       colors = readColors();
+      signalRgb = parseRgb(colors.signal) ?? signalRgb;
+      inkRgb = parseRgb(colors.ink) ?? inkRgb;
+      rebuildLattice();
     }
 
     function energyFrame(now: number): PlaybackEnergy {
@@ -86,117 +109,76 @@
         usingAnalyser = true;
         return sampled;
       }
-      // Analyser missing, silent, or CORS-blocked → visible fake pulse.
       usingAnalyser = false;
       return fakePlaybackEnergy(now);
     }
 
-    function spawnMolecules(mid: number, beat: number) {
-      const n = Math.floor(2 + mid * 4 + beat * 5);
-      for (let i = 0; i < n && molecules.length < maxMolecules; i++) {
-        molecules.push({
-          a: Math.random() * Math.PI * 2,
-          r: 10 + Math.random() * 28,
-          vr: 0.4 + mid * 2 + Math.random(),
-          size: 1.2 + Math.random() * 2.2,
-          life: 1,
-        });
-      }
-    }
+    function draw(ts: number) {
+      const playing = isPlaying();
+      const dt = Math.min(0.05, (ts - (lastTs || ts)) / 1000);
+      lastTs = ts;
 
-    function draw(ts: number, forceIdle = false) {
-      const playing = !forceIdle && isPlaying();
-      const dt = forceIdle ? 0.016 : Math.min(0.05, (ts - (lastTs || ts)) / 1000);
-      if (!forceIdle) lastTs = ts;
-
-      settle += ((playing ? 1 : 0) - settle) * Math.min(1, dt * (playing ? 4 : 1.8));
-      if (settle < 0.008 && !playing) {
+      settle += ((playing ? 1 : 0) - settle) * Math.min(1, dt * (playing ? 3.5 : 2));
+      if (settle < 0.01 && !playing) {
         ctx!.clearRect(0, 0, w, h);
         return;
       }
 
-      const e = forceIdle ? fakePlaybackEnergy(0) : energyFrame(ts);
-      // Keep a strong base so cymatics stay visible even on quiet tracks / fake idle.
-      const intensity = settle * (0.55 + 0.45 * (0.45 * e.bass + 0.3 * e.rms + 0.25 * e.mid));
-
-      beatCooldown = Math.max(0, beatCooldown - dt);
-      if (playing && e.beat > 0.28 && beatCooldown <= 0) {
-        ripples.push({ r: 16, life: 1, max: Math.min(w, h) * (0.35 + e.bass * 0.25) });
-        spawnMolecules(e.mid, e.beat);
-        beatCooldown = 0.12;
-      } else if (playing && Math.random() < dt * (1.2 + e.mid * 2.5)) {
-        spawnMolecules(e.mid * 0.7, 0);
+      const e = energyFrame(ts);
+      // Advance wave phase; bass slows the carrier, high adds shimmer speed.
+      if (!reduced && playing) {
+        phase += dt * (1.1 + e.bass * 1.4 + e.mid * 0.6);
       }
-
-      ringPhase += dt * (0.4 + e.bass * 1.6);
 
       ctx!.clearRect(0, 0, w, h);
 
-      // Soft water wash (no globalAlpha — per-fill alpha only)
-      const wash = ctx!.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.62);
-      wash.addColorStop(0, withAlpha(colors.signal, (0.1 + e.bass * 0.1) * settle));
-      wash.addColorStop(0.5, withAlpha(colors.ink, 0.04 * settle));
-      wash.addColorStop(1, withAlpha(colors.mute, 0));
-      ctx!.fillStyle = wash;
-      ctx!.fillRect(0, 0, w, h);
+      const n = xs.length;
+      const invCols = cols > 1 ? 1 / (cols - 1) : 0;
+      const invRows = rows > 1 ? 1 / (rows - 1) : 0;
 
-      // Cymatics rings — dotted circular lattices (readable first-draft contrast)
-      for (let i = 0; i < ringCount; i++) {
-        const base = 36 + i * (mobile ? 32 : 42);
-        const wobble = Math.sin(ringPhase + i * 0.7) * (6 + e.mid * 14);
-        const radius = base + e.bass * (22 + i * 5) + wobble;
-        const dots = Math.floor(22 + i * 12 + e.high * 10);
-        const alpha = (0.55 - i * 0.04) * (0.65 + intensity * 0.5) * settle;
-        ctx!.fillStyle = withAlpha(i % 2 === 0 ? colors.signal : colors.ink, alpha);
-        for (let d = 0; d < dots; d++) {
-          const a = (d / dots) * Math.PI * 2 + ringPhase * (0.12 + i * 0.02);
-          const jitter = (Math.sin(ringPhase * 2 + d + i) * 0.5 + 0.5) * e.high * 4;
-          const x = cx + Math.cos(a) * (radius + jitter);
-          const y = cy + Math.sin(a) * (radius + jitter) * 0.9;
-          const sz = 1.8 + e.rms * 2.2;
-          ctx!.beginPath();
-          ctx!.arc(x, y, sz, 0, Math.PI * 2);
-          ctx!.fill();
-        }
-      }
+      // Wavelengths in lattice units — bass travels long, high is fine.
+      const kBass = Math.PI * 1.15;
+      const kMid = Math.PI * 2.4;
+      const kHigh = Math.PI * 4.6;
+      const ampBass = e.bass * (reduced ? 0 : 1);
+      const ampMid = e.mid * (reduced ? 0 : 1);
+      const ampHigh = e.high * (reduced ? 0 : 1);
+      const beatKick = e.beat * (reduced ? 0 : 1);
+      const restGlow = 0.22 * settle; // quiet medium at rest / low energy
+      const maxDisplace = spacing * (0.35 + e.rms * 0.45);
 
-      for (let i = ripples.length - 1; i >= 0; i--) {
-        const rp = ripples[i]!;
-        rp.r += dt * (110 + e.bass * 160);
-        rp.life -= dt * 0.5;
-        if (rp.life <= 0 || rp.r > rp.max) {
-          ripples.splice(i, 1);
-          continue;
-        }
-        ctx!.strokeStyle = withAlpha(colors.signal, 0.35 * rp.life * settle);
-        ctx!.lineWidth = 1.25 + (1 - rp.life) * 2;
-        ctx!.beginPath();
-        ctx!.ellipse(cx, cy, rp.r, rp.r * 0.88, 0, 0, Math.PI * 2);
-        ctx!.stroke();
-        ctx!.strokeStyle = withAlpha(colors.ink, 0.16 * rp.life * settle);
-        ctx!.beginPath();
-        ctx!.ellipse(cx, cy, rp.r * 0.7, rp.r * 0.62, 0, 0, Math.PI * 2);
-        ctx!.stroke();
-      }
+      for (let k = 0; k < n; k++) {
+        const i = k % cols;
+        const j = (k / cols) | 0;
+        const u = i * invCols;
+        const v = j * invRows;
 
-      for (let i = molecules.length - 1; i >= 0; i--) {
-        const m = molecules[i]!;
-        m.r += m.vr * (70 * dt) * (0.7 + e.mid);
-        m.life -= dt * (0.16 + e.high * 0.12);
-        m.a += dt * 0.18;
-        if (m.life <= 0 || m.r > Math.max(w, h) * 0.75) {
-          molecules.splice(i, 1);
-          continue;
-        }
-        const x = cx + Math.cos(m.a) * m.r;
-        const y = cy + Math.sin(m.a) * m.r * 0.88;
-        ctx!.fillStyle = withAlpha(colors.signal, 0.45 * m.life * settle);
+        // Traveling wavefronts through the lattice (frequency → band).
+        const bassWave = Math.sin(u * kBass - phase * 1.05 + v * 0.35) * ampBass;
+        const midWave = Math.sin((u + v) * kMid - phase * 1.55) * ampMid;
+        const highWave = Math.sin(v * kHigh - phase * 2.35 + u * 1.1) * ampHigh;
+        // Soft radial beat pulse from center on kicks.
+        const dx = u - 0.5;
+        const dy = v - 0.5;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const beatWave = Math.sin(dist * Math.PI * 3.2 - phase * 2.8) * beatKick * 0.85;
+
+        const field = bassWave * 0.55 + midWave * 0.3 + highWave * 0.2 + beatWave * 0.45;
+        const excite = Math.max(0, Math.min(1.35, 0.35 + field + e.rms * 0.25));
+
+        const x = xs[k]! + field * maxDisplace * 0.35;
+        const y = ys[k]! + field * maxDisplace;
+        const r = baseRadius * (0.75 + excite * 0.9);
+        const alpha = Math.min(0.92, (restGlow + excite * 0.55) * settle);
+
+        // Blend signal (peaks) ↔ ink (rest) by excitation.
+        const t = Math.max(0, Math.min(1, excite * 0.85));
+        const cr = (inkRgb.r + (signalRgb.r - inkRgb.r) * t) | 0;
+        const cg = (inkRgb.g + (signalRgb.g - inkRgb.g) * t) | 0;
+        const cb = (inkRgb.b + (signalRgb.b - inkRgb.b) * t) | 0;
+        ctx!.fillStyle = `rgba(${cr},${cg},${cb},${alpha})`;
         ctx!.beginPath();
-        ctx!.arc(x, y, m.size, 0, Math.PI * 2);
-        ctx!.fill();
-        ctx!.fillStyle = withAlpha(colors.ink, 0.28 * m.life * settle);
-        ctx!.beginPath();
-        ctx!.arc(x + m.size * 2.4, y - m.size, m.size * 0.5, 0, Math.PI * 2);
+        ctx!.arc(x, y, r, 0, Math.PI * 2);
         ctx!.fill();
       }
     }
@@ -204,6 +186,11 @@
     function frame(ts: number) {
       raf = requestAnimationFrame(frame);
       if (document.hidden) return;
+      // Mobile: draw every other frame to keep CPU/GPU calm.
+      if (mobile) {
+        frameSkip ^= 1;
+        if (frameSkip === 0) return;
+      }
       draw(ts);
     }
 
@@ -211,7 +198,6 @@
     window.addEventListener("resize", resize);
 
     const unsub = subscribePlaybackAudio(() => {
-      // Resume AudioContext when a playback <audio> registers / starts.
       samplePlaybackEnergy();
     });
 
@@ -224,24 +210,23 @@
     };
   });
 
-  function withAlpha(color: string, alpha: number) {
-    const a = Math.max(0, Math.min(1, alpha));
+  function parseRgb(color: string): { r: number; g: number; b: number } | null {
     if (color.startsWith("#") && (color.length === 7 || color.length === 4)) {
       const hex =
         color.length === 4 ? `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}` : color;
-      const r = Number.parseInt(hex.slice(1, 3), 16);
-      const g = Number.parseInt(hex.slice(3, 5), 16);
-      const b = Number.parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r},${g},${b},${a})`;
+      return {
+        r: Number.parseInt(hex.slice(1, 3), 16),
+        g: Number.parseInt(hex.slice(3, 5), 16),
+        b: Number.parseInt(hex.slice(5, 7), 16),
+      };
     }
-    // color-mix / hsl tokens — fall back to signal coral
-    return `rgba(255,107,74,${a})`;
+    return null;
   }
 </script>
 
 <!--
-  Fixed full-viewport layer above the page atmosphere, below chrome (z-10+) and floats (z-40).
-  Shell body must stay transparent so dots show through between UI.
+  Full-viewport particle lattice under chrome. Waves flow through the grid from
+  analyser bands (bass/mid/high) — not concentric cymatics rings.
 -->
 <canvas
   bind:this={canvasEl}
