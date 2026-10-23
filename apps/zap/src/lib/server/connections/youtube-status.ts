@@ -78,7 +78,7 @@ export async function loadPlaylistPrefs(userId: string) {
   } catch (err) {
     // Table comes from migration 0060_zap_connections — missing migrate should not 502 the list API.
     console.warn("[zap connections] youtube_playlist_prefs unavailable (apply migration 0060?)", err);
-    return new Map<string, never>();
+    return new Map();
   }
 }
 
