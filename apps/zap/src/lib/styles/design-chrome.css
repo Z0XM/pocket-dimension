@@ -16,9 +16,12 @@ html body {
   flex-direction: column;
 }
 
-/* Beat-reactive canvas sits behind chrome; keep panels readable. */
+/*
+ * Beat-reactive canvas: fixed full-viewport under chrome (z-10) / floats (z-40).
+ * Shell body/main stay transparent so cymatics show through page gaps.
+ */
 .zap-beat-bg {
-  z-index: 0;
+  z-index: 1;
 }
 
 .zap-shell-rail {
@@ -30,6 +33,7 @@ html body {
   min-width: 0;
   flex: 1;
   flex-direction: column;
+  background: transparent;
 }
 
 .zap-shell-top {
@@ -72,6 +76,7 @@ html body {
   width: 100%;
   max-width: 72rem;
   padding-inline: 1.5rem;
+  background: transparent;
 }
 
 .zap-shell-main.is-fill {
