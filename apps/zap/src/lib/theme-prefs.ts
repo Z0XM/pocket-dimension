@@ -1,4 +1,4 @@
-/** User theme prefs — accent, page background, card/window surface. */
+/** User theme prefs — accent, page background, card/window surface, animations. */
 
 export const ZAP_THEME_STORAGE_KEY = "zap.theme.prefs";
 
@@ -43,13 +43,20 @@ export type ZapThemePrefs = {
   accent: AccentId;
   page: PageId;
   card: CardId;
+  /** Master switch for beat-reactive bg and future motion. Default on. */
+  animations: boolean;
 };
 
 export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
   accent: "coral",
   page: "dark-purple",
   card: "ink",
+  animations: true,
 };
+
+/** Card fill alpha when animations are on (cymatics show through). */
+export const ANIMATIONS_CARD_ALPHA = 0.4;
+export const ANIMATIONS_CHROME_ALPHA = 0.72;
 
 export function isAccentId(v: unknown): v is AccentId {
   return ACCENT_PRESETS.some((p) => p.id === v);
@@ -73,6 +80,7 @@ export function readThemePrefs(): ZapThemePrefs {
       accent: isAccentId(parsed.accent) ? parsed.accent : DEFAULT_THEME_PREFS.accent,
       page: isPageId(parsed.page) ? parsed.page : DEFAULT_THEME_PREFS.page,
       card: isCardId(parsed.card) ? parsed.card : DEFAULT_THEME_PREFS.card,
+      animations: typeof parsed.animations === "boolean" ? parsed.animations : DEFAULT_THEME_PREFS.animations,
     };
   } catch {
     return { ...DEFAULT_THEME_PREFS };
@@ -107,26 +115,37 @@ function cardById(id: CardId) {
   );
 }
 
-/** Apply prefs to `:root` CSS custom properties. */
+function mixCard(solid: string, alpha: number) {
+  return `color-mix(in srgb, ${solid} ${Math.round(alpha * 100)}%, transparent)`;
+}
+
+/** Apply prefs to `:root` CSS custom properties + `data-animations`. */
 export function applyThemePrefs(prefs: ZapThemePrefs) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const accent = accentById(prefs.accent);
   const page = pageById(prefs.page);
   const card = cardById(prefs.card);
+  const animationsOn = prefs.animations !== false;
+
+  root.setAttribute("data-animations", animationsOn ? "on" : "off");
 
   root.style.setProperty("--background", page.value);
   root.style.setProperty("--atmosphere", `linear-gradient(180deg, ${page.value} 0%, ${page.value} 100%)`);
   root.style.setProperty("--scrollbar-track", page.value);
 
-  root.style.setProperty("--background-mid", card.value);
-  root.style.setProperty("--card", card.value);
+  root.style.setProperty("--card-solid", card.value);
+  const cardFill = animationsOn ? mixCard(card.value, ANIMATIONS_CARD_ALPHA) : card.value;
+  const chromeFill = animationsOn ? mixCard(card.value, ANIMATIONS_CHROME_ALPHA) : card.value;
+
+  root.style.setProperty("--background-mid", chromeFill);
+  root.style.setProperty("--card", cardFill);
   root.style.setProperty("--card-foreground", "#f3efe9");
-  root.style.setProperty("--secondary", card.value);
+  root.style.setProperty("--secondary", cardFill);
   root.style.setProperty("--secondary-foreground", "#f3efe9");
-  root.style.setProperty("--muted", card.value);
-  root.style.setProperty("--input", card.value);
-  root.style.setProperty("--popover", card.value);
+  root.style.setProperty("--muted", cardFill);
+  root.style.setProperty("--input", chromeFill);
+  root.style.setProperty("--popover", chromeFill);
   root.style.setProperty("--popover-foreground", "#f3efe9");
 
   root.style.setProperty("--primary", accent.value);
@@ -146,4 +165,10 @@ export function applyThemePrefs(prefs: ZapThemePrefs) {
 export function persistAndApplyTheme(prefs: ZapThemePrefs) {
   writeThemePrefs(prefs);
   applyThemePrefs(prefs);
+}
+
+/** True when the master animations switch is on (DOM attribute). */
+export function animationsEnabled(): boolean {
+  if (typeof document === "undefined") return DEFAULT_THEME_PREFS.animations;
+  return document.documentElement.getAttribute("data-animations") !== "off";
 }

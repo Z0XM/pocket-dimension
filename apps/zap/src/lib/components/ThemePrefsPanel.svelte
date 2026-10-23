@@ -2,6 +2,7 @@
   import AppWindowIcon from "@lucide/svelte/icons/app-window";
   import LayoutPanelTopIcon from "@lucide/svelte/icons/layout-panel-top";
   import PaletteIcon from "@lucide/svelte/icons/palette";
+  import SparklesIcon from "@lucide/svelte/icons/sparkles";
   import { onMount } from "svelte";
   import {
     ACCENT_PRESETS,
@@ -34,6 +35,11 @@
 
   function setCard(id: CardId) {
     prefs = { ...prefs, card: id };
+    persistAndApplyTheme(prefs);
+  }
+
+  function setAnimations(on: boolean) {
+    prefs = { ...prefs, animations: on };
     persistAndApplyTheme(prefs);
   }
 </script>
@@ -109,5 +115,30 @@
         </button>
       {/each}
     </div>
+  </section>
+
+  <section class="space-y-3">
+    <h2 class="flex items-center gap-2 font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
+      <SparklesIcon class="size-3.5 shrink-0 text-signal" aria-hidden="true" />
+      Motion
+    </h2>
+    <label class="flex items-center justify-between gap-4 border border-border/70 bg-card p-3">
+      <span class="min-w-0">
+        <span class="block text-sm text-foreground">Animations</span>
+        <span class="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+          Beat-reactive background and future motion. Cards go translucent while on.
+        </span>
+      </span>
+      <button
+        type="button"
+        class="zap-toggle shrink-0"
+        role="switch"
+        aria-checked={prefs.animations}
+        aria-label="Animations"
+        onclick={() => setAnimations(!prefs.animations)}
+      >
+        <span class="zap-toggle-thumb"></span>
+      </button>
+    </label>
   </section>
 </div>

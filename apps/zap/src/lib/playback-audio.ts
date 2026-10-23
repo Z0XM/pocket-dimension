@@ -1,27 +1,62 @@
 /**
- * Shared catalog playback audio element + optional Web Audio analyser.
- * CatalogQueueDock registers its <audio>; BeatReactiveBackground taps energy.
+ * Shared playback audio element(s) + optional Web Audio analyser.
+ * CatalogQueueDock and SessionPlayer register their <audio>; BeatReactiveBackground taps energy.
  */
 
 type Listener = () => void;
 
-let audioEl: HTMLAudioElement | null = null;
+const registered = new Set<HTMLAudioElement>();
 const listeners = new Set<Listener>();
 
 let audioCtx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
-let sourcedEl: HTMLAudioElement | null = null;
+/** One MediaElementSource per element (Web Audio allows only one). */
+const mediaSources = new WeakMap<HTMLAudioElement, MediaElementAudioSourceNode>();
+let analyserTap: MediaElementAudioSourceNode | null = null;
 let freqBuf: Uint8Array | null = null;
 let timeBuf: Uint8Array | null = null;
 
-export function setPlaybackAudioElement(el: HTMLAudioElement | null) {
-  if (audioEl === el) return;
-  audioEl = el;
+function notify() {
   for (const fn of listeners) fn();
 }
 
-export function getPlaybackAudioElement() {
-  return audioEl;
+/** Prefer an element that is actually outputting audio. */
+export function getPlaybackAudioElement(): HTMLAudioElement | null {
+  for (const el of registered) {
+    if (!el.paused && !el.ended && el.readyState >= 2) return el;
+  }
+  for (const el of registered) {
+    if (el.getAttribute("src") || el.currentSrc) return el;
+  }
+  return registered.values().next().value ?? null;
+}
+
+/**
+ * Register a playback <audio> element. Returns cleanup (call on destroy / effect teardown).
+ * Multiple sources (catalog queue + session) may be registered; the active one is preferred.
+ */
+export function registerPlaybackAudio(el: HTMLAudioElement) {
+  registered.add(el);
+  notify();
+  return () => {
+    registered.delete(el);
+    if (analyserTap && mediaSources.get(el) === analyserTap) {
+      try {
+        analyserTap.disconnect(analyser!);
+      } catch {
+        // already disconnected
+      }
+      analyserTap = null;
+    }
+    notify();
+  };
+}
+
+/** @deprecated Prefer registerPlaybackAudio — kept for simple single-element callers. */
+export function setPlaybackAudioElement(el: HTMLAudioElement | null) {
+  registered.clear();
+  if (el) registered.add(el);
+  notify();
 }
 
 export function subscribePlaybackAudio(fn: Listener) {
@@ -30,7 +65,7 @@ export function subscribePlaybackAudio(fn: Listener) {
 }
 
 function ensureAnalyser(): AnalyserNode | null {
-  const el = audioEl;
+  const el = getPlaybackAudioElement();
   if (!el || typeof window === "undefined") return null;
 
   try {
@@ -40,18 +75,32 @@ function ensureAnalyser(): AnalyserNode | null {
       audioCtx = new Ctx();
     }
 
-    if (sourcedEl !== el) {
-      // MediaElementSource can only be created once per element — first registration wins.
-      if (sourcedEl) return analyser;
-      const source = audioCtx.createMediaElementSource(el);
+    if (!analyser) {
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.82;
-      source.connect(analyser);
-      analyser.connect(audioCtx.destination);
-      sourcedEl = el;
       freqBuf = new Uint8Array(analyser.frequencyBinCount);
       timeBuf = new Uint8Array(analyser.fftSize);
+    }
+
+    let source = mediaSources.get(el);
+    if (!source) {
+      source = audioCtx.createMediaElementSource(el);
+      mediaSources.set(el, source);
+      // Element audio is routed through the graph — keep it audible.
+      source.connect(audioCtx.destination);
+    }
+
+    if (analyserTap !== source) {
+      if (analyserTap && analyser) {
+        try {
+          analyserTap.disconnect(analyser);
+        } catch {
+          // ignore
+        }
+      }
+      source.connect(analyser);
+      analyserTap = source;
     }
 
     if (audioCtx.state === "suspended") {

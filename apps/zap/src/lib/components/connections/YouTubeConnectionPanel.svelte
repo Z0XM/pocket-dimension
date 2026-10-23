@@ -191,7 +191,7 @@
 
 <div class="space-y-6">
   <div class="flex flex-wrap items-start justify-between gap-2">
-    <div class="space-y-3 min-w-0 flex-1 border border-border/70 bg-card/30 p-4">
+    <div class="space-y-3 min-w-0 flex-1 border border-border/70 bg-card p-4">
       <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Details</h2>
       {#if !oauthConfigured}
         <p class="text-sm text-muted-foreground">
@@ -248,7 +248,7 @@
       {:else if playlists.length === 0}
         <p class="font-mono text-[11px] text-muted-foreground">No playlists found.</p>
       {:else}
-        <ul class="divide-y divide-border/50 border border-border/70 bg-card/20">
+        <ul class="divide-y divide-border/50 border border-border/70 bg-card">
           {#each playlists as row (row.id)}
             <li class="space-y-2 px-3 py-3">
               <div class="flex flex-wrap items-start justify-between gap-2">
@@ -317,7 +317,7 @@
     {#if activity.length === 0}
       <p class="font-mono text-[11px] text-muted-foreground">No YouTube activity yet.</p>
     {:else}
-      <ul class="divide-y divide-border/50 border border-border/70 bg-card/20">
+      <ul class="divide-y divide-border/50 border border-border/70 bg-card">
         {#each activity as entry (entry.id)}
           <li class="px-3 py-2.5">
             <p class="text-sm text-foreground">{entry.summary}</p>

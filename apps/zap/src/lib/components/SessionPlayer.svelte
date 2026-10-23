@@ -5,6 +5,7 @@
   import SkipForwardIcon from "@lucide/svelte/icons/skip-forward";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import { formatClock } from "$lib/catalog-queue";
+  import { registerPlaybackAudio } from "$lib/playback-audio";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
 
   let {
@@ -86,6 +87,12 @@
   }
 
   $effect(() => {
+    const el = audioEl;
+    if (!el) return;
+    return registerPlaybackAudio(el);
+  });
+
+  $effect(() => {
     if (!session) return;
     void outputEnabled;
     void volume;
@@ -163,7 +170,7 @@
   }
 </script>
 
-<div class="space-y-4 rounded-lg border border-border/70 bg-card/40 p-4">
+<div class="space-y-4 rounded-lg border border-border/70 bg-card p-4">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
       <p class="font-mono text-[10px] tracking-[0.2em] text-signal uppercase">Now playing</p>

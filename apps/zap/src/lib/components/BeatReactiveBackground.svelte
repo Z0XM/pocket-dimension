@@ -8,6 +8,7 @@
     subscribePlaybackAudio,
     type PlaybackEnergy,
   } from "$lib/playback-audio";
+  import { animationsEnabled } from "$lib/theme-prefs";
 
   let { queue }: { queue: CatalogQueueClient } = $props();
 
@@ -24,6 +25,7 @@
   }
 
   function isPlaying(): boolean {
+    if (!animationsEnabled()) return false;
     return Boolean(queue.playing) || audioActuallyPlaying();
   }
 
@@ -33,7 +35,6 @@
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const mobile = window.matchMedia("(max-width: 640px)").matches;
 
     const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 2);
@@ -210,17 +211,11 @@
     window.addEventListener("resize", resize);
 
     const unsub = subscribePlaybackAudio(() => {
-      // Resume AudioContext when the catalog <audio> registers / starts.
+      // Resume AudioContext when a playback <audio> registers / starts.
       samplePlaybackEnergy();
     });
 
-    if (reduced) {
-      // One static frame so the layer is still visible when motion is off.
-      settle = 1;
-      draw(performance.now(), true);
-    } else {
-      raf = requestAnimationFrame(frame);
-    }
+    raf = requestAnimationFrame(frame);
 
     return () => {
       cancelAnimationFrame(raf);

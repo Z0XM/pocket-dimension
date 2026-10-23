@@ -133,7 +133,7 @@
 <div class="flex min-h-0 flex-1 flex-col gap-4">
   <ul class="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4">
     {#each stats as stat (stat.label)}
-      <li class="rounded-lg border border-border/70 bg-card/40 px-3 py-2">
+      <li class="rounded-lg border border-border/70 bg-card px-3 py-2">
         <p class="font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase">{stat.label}</p>
         <p class="mt-1 text-xl font-semibold tabular-nums">{stat.value}</p>
       </li>

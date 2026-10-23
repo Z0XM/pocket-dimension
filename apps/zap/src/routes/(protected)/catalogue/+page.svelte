@@ -343,7 +343,7 @@
 <section class="zap-catalogue zap-page">
   <PageHeader title="Catalogue" />
 
-  <div class="zap-filters-panel shrink-0 rounded-lg border border-border/70 bg-card/50 p-3">
+  <div class="zap-filters-panel shrink-0 rounded-lg border border-border/70 bg-card p-3">
     <CatalogueFilters
       collapsible
       bind:open={filtersOpen}

@@ -145,7 +145,7 @@
   {/if}
 
   <div class="space-y-2">
-    <ul bind:this={listEl} class="max-h-[min(32rem,70vh)] min-h-[8rem] overflow-y-auto rounded-lg border border-border/70 bg-card/30 py-1" aria-label="Session queue">
+    <ul bind:this={listEl} class="max-h-[min(32rem,70vh)] min-h-[8rem] overflow-y-auto rounded-lg border border-border/70 bg-card py-1" aria-label="Session queue">
       {#if snapshot.queue.length === 0}
         <li class="px-4 py-8 text-center text-sm text-muted-foreground">Queue empty — add from the library.</li>
       {:else}
@@ -220,7 +220,7 @@
     {#if pastItems.length}
       <div>
         <p class="mb-1 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Added in the past</p>
-        <ul class="max-h-40 space-y-0.5 overflow-y-auto rounded-lg border border-border/50 bg-card/20 py-1" aria-label="Added in the past">
+        <ul class="max-h-40 space-y-0.5 overflow-y-auto rounded-lg border border-border/50 bg-card py-1" aria-label="Added in the past">
           {#each pastItems as item (item.id)}
             {@const index = snapshot.queue.findIndex((q) => q.id === item.id)}
             <li class="group flex items-center gap-1 px-1.5">

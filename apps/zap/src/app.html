@@ -36,20 +36,25 @@
             "blue-ink": "#10141c",
             "purple-ink": "#14101a",
           };
-          /* Defaults: coral + dark-purple + ink (match theme-prefs DEFAULT_THEME_PREFS) */
+          /* Defaults: coral + dark-purple + ink + animations on (match theme-prefs DEFAULT_THEME_PREFS) */
           var r = document.documentElement;
           var a = accents[p.accent] || accents.coral;
           var page = pages[p.page] || pages["dark-purple"];
           var card = cards[p.card] || cards.ink;
+          var animationsOn = p.animations !== false;
+          r.setAttribute("data-animations", animationsOn ? "on" : "off");
+          var cardFill = animationsOn ? "color-mix(in srgb," + card + " 40%, transparent)" : card;
+          var chromeFill = animationsOn ? "color-mix(in srgb," + card + " 72%, transparent)" : card;
           r.style.setProperty("--background", page);
           r.style.setProperty("--atmosphere", "linear-gradient(180deg," + page + " 0%," + page + " 100%)");
           r.style.setProperty("--scrollbar-track", page);
-          r.style.setProperty("--background-mid", card);
-          r.style.setProperty("--card", card);
-          r.style.setProperty("--secondary", card);
-          r.style.setProperty("--muted", card);
-          r.style.setProperty("--input", card);
-          r.style.setProperty("--popover", card);
+          r.style.setProperty("--card-solid", card);
+          r.style.setProperty("--background-mid", chromeFill);
+          r.style.setProperty("--card", cardFill);
+          r.style.setProperty("--secondary", cardFill);
+          r.style.setProperty("--muted", cardFill);
+          r.style.setProperty("--input", chromeFill);
+          r.style.setProperty("--popover", chromeFill);
           r.style.setProperty("--primary", a[0]);
           r.style.setProperty("--primary-foreground", a[1]);
           r.style.setProperty("--accent", a[0]);

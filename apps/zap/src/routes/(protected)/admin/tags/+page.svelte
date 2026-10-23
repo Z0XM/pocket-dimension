@@ -103,7 +103,7 @@
   <form
     method="POST"
     action="?/create"
-    class="shrink-0 space-y-3 rounded-lg border border-border/70 bg-card/50 p-4"
+    class="shrink-0 space-y-3 rounded-lg border border-border/70 bg-card p-4"
     use:enhance={() => {
       busy = true;
       return async ({ result, update }) => {

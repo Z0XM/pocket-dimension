@@ -315,7 +315,7 @@
               <ListBusyOverlay busy={catalogueLoading && catalogue.length > 0} label="Updating…">
                 <ul
                   bind:this={catalogueScrollRoot}
-                  class="max-h-[min(32rem,70vh)] min-h-[8rem] divide-y divide-border/50 overflow-y-auto rounded-lg border border-border/70 bg-card/30"
+                  class="max-h-[min(32rem,70vh)] min-h-[8rem] divide-y divide-border/50 overflow-y-auto rounded-lg border border-border/70 bg-card"
                 >
                   {#if catalogue.length === 0}
                     <li class="px-4 py-8 text-center text-sm text-muted-foreground">No tracks.</li>

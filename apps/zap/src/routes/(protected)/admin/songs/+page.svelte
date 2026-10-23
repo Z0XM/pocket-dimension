@@ -143,7 +143,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col gap-4">
   <form
-    class="grid shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card/50 p-4 sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
+    class="grid shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card p-4 sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
     onsubmit={(e) => {
       e.preventDefault();
       navigate({});

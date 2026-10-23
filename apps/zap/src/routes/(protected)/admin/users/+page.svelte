@@ -93,7 +93,7 @@
     <form
       method="POST"
       action="?/setMode"
-      class="space-y-3 rounded-lg border border-border/70 bg-card/50 p-4"
+      class="space-y-3 rounded-lg border border-border/70 bg-card p-4"
       bind:this={modeForm}
       use:enhance={submitWithBusy}
     >
@@ -111,7 +111,7 @@
     <form
       method="POST"
       action="?/addUser"
-      class="space-y-3 rounded-lg border border-border/70 bg-card/50 p-4"
+      class="space-y-3 rounded-lg border border-border/70 bg-card p-4"
       use:enhance={() => {
         busy = true;
         return async ({ result, update }) => {

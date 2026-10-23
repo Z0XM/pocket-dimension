@@ -132,7 +132,7 @@
       No queues yet — press play on a track in the <a href="/catalogue" class="text-signal hover:underline">Catalogue</a>.
     </p>
   {:else}
-    <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card/30">
+    <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card">
       {#each data.queueRuns as run (run.id)}
         {@const isActive = run.id === activeRunId}
         <li class="space-y-2 px-4 py-3">

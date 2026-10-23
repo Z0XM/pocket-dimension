@@ -35,7 +35,7 @@
     </div>
   {:else}
     {#if showFilters}
-      <div class="space-y-3 rounded-lg border border-border/70 bg-card/50 p-4">
+      <div class="space-y-3 rounded-lg border border-border/70 bg-card p-4">
         <div class="flex gap-2">
           <div class="zap-skeleton h-8 w-14 rounded-sm"></div>
           <div class="zap-skeleton h-8 w-24 rounded-sm"></div>
