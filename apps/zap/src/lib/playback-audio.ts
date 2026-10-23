@@ -77,8 +77,9 @@ function ensureAnalyser(): AnalyserNode | null {
 
     if (!analyser) {
       analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.82;
+      // 512 → enough bins for spectrum/scope without heavy mobile cost.
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.72;
       freqBuf = new Uint8Array(analyser.frequencyBinCount);
       timeBuf = new Uint8Array(analyser.fftSize);
     }
@@ -192,4 +193,50 @@ export function fakePlaybackEnergy(tMs: number): PlaybackEnergy {
     beat: Math.max(kick, 0.15 + 0.25 * (0.5 + 0.5 * Math.sin(t * 2.1))),
     rms: 0.35 + 0.45 * kick,
   };
+}
+
+/** Frequency bins normalized 0–1 (length = analyser frequencyBinCount, typically 256). */
+export function samplePlaybackFrequency(out: Float32Array): boolean {
+  const node = ensureAnalyser();
+  if (!node || !freqBuf) return false;
+  node.getByteFrequencyData(freqBuf as unknown as Uint8Array<ArrayBuffer>);
+  const n = Math.min(out.length, freqBuf.length);
+  for (let i = 0; i < n; i++) out[i] = freqBuf[i]! / 255;
+  for (let i = n; i < out.length; i++) out[i] = 0;
+  return true;
+}
+
+/** Time-domain samples normalized −1…1 (length = analyser fftSize, typically 512). */
+export function samplePlaybackWaveform(out: Float32Array): boolean {
+  const node = ensureAnalyser();
+  if (!node || !timeBuf) return false;
+  node.getByteTimeDomainData(timeBuf as unknown as Uint8Array<ArrayBuffer>);
+  const n = Math.min(out.length, timeBuf.length);
+  for (let i = 0; i < n; i++) out[i] = (timeBuf[i]! - 128) / 128;
+  for (let i = n; i < out.length; i++) out[i] = 0;
+  return true;
+}
+
+/** Synthetic waveform when analyser is blocked — shaped by fakePlaybackEnergy. */
+export function fakePlaybackWaveform(tMs: number, out: Float32Array) {
+  const e = fakePlaybackEnergy(tMs);
+  const t = tMs / 1000;
+  for (let i = 0; i < out.length; i++) {
+    const x = i / Math.max(1, out.length - 1);
+    const fund = Math.sin(x * Math.PI * 2 * 3 + t * 6.2) * (0.35 + e.bass * 0.55);
+    const harm = Math.sin(x * Math.PI * 2 * 9 + t * 11) * (0.12 + e.high * 0.35);
+    const kick = e.beat * Math.sin(x * Math.PI) * 0.45;
+    out[i] = Math.max(-1, Math.min(1, fund + harm + kick));
+  }
+}
+
+/** Synthetic spectrum when analyser is blocked. */
+export function fakePlaybackFrequency(tMs: number, out: Float32Array) {
+  const e = fakePlaybackEnergy(tMs);
+  for (let i = 0; i < out.length; i++) {
+    const x = i / Math.max(1, out.length - 1);
+    const envelope =
+      e.bass * Math.exp(-x * 4.5) + e.mid * Math.exp(-Math.pow(x - 0.35, 2) * 18) + e.high * Math.exp(-Math.pow(x - 0.75, 2) * 22);
+    out[i] = clamp01(envelope * (0.7 + e.rms * 0.5));
+  }
 }

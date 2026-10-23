@@ -35,14 +35,17 @@ export const CARD_PRESETS = [
   { id: "purple-ink", label: "Purple ink", value: "#14101a" },
 ] as const;
 
-/** Beat-reactive lattice styles (Theme → Motion). */
+/**
+ * Beat-reactive visualizer styles (Theme → Motion).
+ * Each style must sync to live playback via the shared Web Audio analyser.
+ * Removed lattice variants (wave/noise/bars/bloom/vortex) migrate to `radial`.
+ */
 export const ANIMATION_STYLES = [
-  { id: "radial", label: "Radial", blurb: "Beat rings expand from center" },
-  { id: "wave", label: "Smooth wave", blurb: "Soft continuous flow through the lattice" },
-  { id: "noise", label: "Noise", blurb: "Grainy static reacting to energy" },
-  { id: "bars", label: "Bars", blurb: "Spectrum as columns of dots" },
-  { id: "bloom", label: "Bloom", blurb: "Soft pulse bloom from the center" },
-  { id: "vortex", label: "Vortex", blurb: "Spiral twist through the medium" },
+  { id: "radial", label: "Radial", blurb: "Dot lattice — splash rings from center" },
+  { id: "scope", label: "Oscilloscope", blurb: "ECG-style time-domain waveform" },
+  { id: "spectrum", label: "Spectrum", blurb: "Classic frequency bars" },
+  { id: "ring", label: "Spectrum ring", blurb: "Circular frequency spectrum" },
+  { id: "mirror", label: "Mirrored wave", blurb: "Mirrored time-domain waveform" },
 ] as const;
 
 export type AccentId = (typeof ACCENT_PRESETS)[number]["id"];
@@ -56,7 +59,7 @@ export type ZapThemePrefs = {
   card: CardId;
   /** Master switch for beat-reactive bg and future motion. Default on. */
   animations: boolean;
-  /** Lattice visualizer style when animations are on. */
+  /** Visualizer style when animations are on. */
   animationStyle: AnimationStyleId;
 };
 
@@ -94,7 +97,7 @@ export function readThemePrefs(): ZapThemePrefs {
     const raw = localStorage.getItem(ZAP_THEME_STORAGE_KEY);
     if (!raw) return { ...DEFAULT_THEME_PREFS };
     const parsed = JSON.parse(raw) as Partial<ZapThemePrefs>;
-    return {
+    const prefs: ZapThemePrefs = {
       accent: isAccentId(parsed.accent) ? parsed.accent : DEFAULT_THEME_PREFS.accent,
       page: isPageId(parsed.page) ? parsed.page : DEFAULT_THEME_PREFS.page,
       card: isCardId(parsed.card) ? parsed.card : DEFAULT_THEME_PREFS.card,
@@ -103,6 +106,11 @@ export function readThemePrefs(): ZapThemePrefs {
         ? parsed.animationStyle
         : DEFAULT_THEME_PREFS.animationStyle,
     };
+    // Migrate removed styles (wave/noise/bars/bloom/vortex/…) back to radial.
+    if (parsed.animationStyle !== prefs.animationStyle) {
+      writeThemePrefs(prefs);
+    }
+    return prefs;
   } catch {
     return { ...DEFAULT_THEME_PREFS };
   }

@@ -42,7 +42,7 @@
           var page = pages[p.page] || pages["dark-purple"];
           var card = cards[p.card] || cards.ink;
           var animationsOn = p.animations !== false;
-          var styles = { radial: 1, wave: 1, noise: 1, bars: 1, bloom: 1, vortex: 1 };
+          var styles = { radial: 1, scope: 1, spectrum: 1, ring: 1, mirror: 1 };
           r.setAttribute("data-animations", animationsOn ? "on" : "off");
           r.setAttribute("data-animation-style", styles[p.animationStyle] ? p.animationStyle : "radial");
           var cardFill = animationsOn ? "color-mix(in srgb," + card + " 40%, transparent)" : card;
