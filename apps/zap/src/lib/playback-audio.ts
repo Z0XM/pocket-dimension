@@ -127,17 +127,20 @@ function clamp01(n: number) {
   return Math.min(1, Math.max(0, n));
 }
 
-/** Soft pulse when analyser isn't available — still looks alive while "playing". */
+/**
+ * Soft pulse when analyser isn't available — still looks alive while "playing".
+ * Amplitudes stay high enough that cymatics dots remain visible on first draft.
+ */
 export function fakePlaybackEnergy(tMs: number): PlaybackEnergy {
   const t = tMs / 1000;
-  const kick = Math.pow(Math.max(0, Math.sin(t * Math.PI * 2 * 1.05)), 8);
-  const hat = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 7.3));
+  const kick = Math.pow(Math.max(0, Math.sin(t * Math.PI * 2 * 1.05)), 6);
+  const hat = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t * 7.3));
   return {
     live: false,
-    bass: 0.25 + 0.55 * kick,
-    mid: 0.2 + 0.35 * (0.5 + 0.5 * Math.sin(t * 2.7 + 1)),
-    high: 0.1 + 0.25 * hat,
-    beat: kick,
-    rms: 0.2 + 0.4 * kick,
+    bass: 0.4 + 0.55 * kick,
+    mid: 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(t * 2.7 + 1)),
+    high: 0.2 + 0.35 * hat,
+    beat: Math.max(kick, 0.15 + 0.25 * (0.5 + 0.5 * Math.sin(t * 2.1))),
+    rms: 0.35 + 0.45 * kick,
   };
 }

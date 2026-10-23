@@ -115,8 +115,8 @@
 {/snippet}
 
 <div class={`zap-shell zap-wave-field zap-grid relative ${fillViewport ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
-  <BeatReactiveBackground />
-  <aside class="zap-shell-rail relative z-[1]" aria-label="App rail">
+  <BeatReactiveBackground queue={catalogQueue} />
+  <aside class="zap-shell-rail relative z-10" aria-label="App rail">
     <a href="/home" class="flex items-center gap-2 px-2" aria-label="Zap home" aria-current={homeActive ? "page" : undefined}>
       <span class="text-lg font-semibold tracking-tight text-foreground">Zap</span>
       <WaveBars />
@@ -127,7 +127,7 @@
     </div>
   </aside>
 
-  <div class="zap-shell-body relative z-[1] min-h-0">
+  <div class="zap-shell-body relative z-10 min-h-0 bg-transparent">
     <header class="zap-shell-top">
       {#if isNavigating}
         <div class="zap-nav-progress" aria-hidden="true"></div>
