@@ -30,6 +30,11 @@
     dropTone = "dock",
     /** Force the panel into this mode once after mount (e.g. maximize from dock). */
     openAs = null,
+    /**
+     * Leaving fullscreen: return true if the parent handled restore (e.g. re-dock).
+     * Used so maximize-from-dock → minimize returns to the footer, not a floating panel.
+     */
+    onExitFull = null,
     ondrop,
     icon,
     header,
@@ -47,6 +52,7 @@
     dropLabel?: string | null;
     dropTone?: DropTone;
     openAs?: FloatingMode | null;
+    onExitFull?: (() => boolean) | null;
     ondrop?: () => void;
     icon: Snippet;
     header?: Snippet;
@@ -115,6 +121,8 @@
   });
 
   function setMode(next: FloatingMode) {
+    // Maximize-from-dock: parent re-docks instead of collapsing to a floating panel/icon.
+    if (mode === "full" && next !== "full" && onExitFull?.()) return;
     if (next === "panel" && !panel) panel = panelRectNearIcon(iconPos, defaultPanelSize(viewport()), viewport());
     mode = next;
     persist();

@@ -21,6 +21,8 @@
   let appliedKey = "";
   let pendingSeekSec: number | null = null;
   let docked = $state(false);
+  /** When true, exiting fullscreen restores the footer dock instead of a floating panel/icon. */
+  let restoreDockOnExitFull = $state(false);
   let floatOpenAs = $state<FloatingMode | null>(null);
   let floatEpoch = $state(0);
 
@@ -62,10 +64,12 @@
   }
 
   function dockQueue() {
+    restoreDockOnExitFull = false;
     setDocked(true);
   }
 
   function undockToMini() {
+    restoreDockOnExitFull = false;
     writeFloatMode("icon");
     floatOpenAs = "icon";
     floatEpoch++;
@@ -73,10 +77,19 @@
   }
 
   function maximizeFromDock() {
+    restoreDockOnExitFull = true;
     writeFloatMode("full");
     floatOpenAs = "full";
     floatEpoch++;
     setDocked(false);
+  }
+
+  /** FloatingPanel calls this when leaving fullscreen; re-dock if we maximized from the footer. */
+  function exitFullFromFloat(): boolean {
+    if (!restoreDockOnExitFull) return false;
+    restoreDockOnExitFull = false;
+    setDocked(true);
+    return true;
   }
 
   onMount(() => {
@@ -193,6 +206,7 @@
       dropLabel="Release to dock"
       dropTone="dock"
       openAs={floatOpenAs}
+      onExitFull={exitFullFromFloat}
       ondrop={dockQueue}
     >
       {#snippet icon()}
