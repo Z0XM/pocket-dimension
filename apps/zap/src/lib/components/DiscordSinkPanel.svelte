@@ -1,20 +1,24 @@
 <script lang="ts">
+  import HeadphonesIcon from "@lucide/svelte/icons/headphones";
+  import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
+  import UnplugIcon from "@lucide/svelte/icons/unplug";
   import ZapSelect from "$lib/components/ZapSelect.svelte";
 
   let {
     sessionId,
     canManage = false,
     active = $bindable(false),
+    /** `full` = setup attach/detach UI; `banner` = compact presence + reconnect on the session surface. */
+    variant = "full",
   }: {
     sessionId: string;
     canManage?: boolean;
     /** True while a Discord sink is attached (pending/active/error until detached). */
     active?: boolean;
+    variant?: "full" | "banner";
   } = $props();
 
-  let configured = $state(false);
-  let inviteUrl = $state<string | null>(null);
-  let sink = $state<{
+  type SinkState = {
     id: string;
     status: string;
     guildId: string | null;
@@ -22,7 +26,12 @@
     guildName: string | null;
     channelName: string | null;
     errorMessage: string | null;
-  } | null>(null);
+    voiceConnected: boolean;
+  };
+
+  let configured = $state(false);
+  let inviteUrl = $state<string | null>(null);
+  let sink = $state<SinkState | null>(null);
 
   function syncActive() {
     active = Boolean(sink && sink.status !== "detached");
@@ -35,6 +44,9 @@
   let error = $state<string | null>(null);
   let loaded = $state(false);
 
+  const channelLabel = $derived(sink?.channelName ?? sink?.channelId ?? "voice");
+  const needsReconnect = $derived(Boolean(sink && sink.status !== "detached" && !sink.voiceConnected));
+
   async function refresh(signal?: AbortSignal) {
     const res = await fetch(`/api/sessions/${sessionId}/discord`, {
       credentials: "same-origin",
@@ -44,7 +56,19 @@
     if (!res.ok) throw new Error(body?.message ?? `Status ${res.status}`);
     configured = Boolean(body.configured);
     inviteUrl = body.inviteUrl ?? null;
-    sink = body.sink ?? null;
+    const next = body.sink ?? null;
+    sink = next
+      ? {
+          id: next.id,
+          status: next.status,
+          guildId: next.guildId ?? null,
+          channelId: next.channelId ?? null,
+          guildName: next.guildName ?? null,
+          channelName: next.channelName ?? null,
+          errorMessage: next.errorMessage ?? null,
+          voiceConnected: Boolean(next.voiceConnected),
+        }
+      : null;
     syncActive();
   }
 
@@ -96,10 +120,29 @@
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Attach failed (${res.status})`);
-      sink = body.sink ?? null;
-      syncActive();
+      await refresh();
     } catch (err) {
       error = err instanceof Error ? err.message : "Attach failed";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function reconnect() {
+    busy = true;
+    error = null;
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/discord`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ action: "reconnect" }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? `Reconnect failed (${res.status})`);
+      await refresh();
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Reconnect failed";
     } finally {
       busy = false;
     }
@@ -124,7 +167,7 @@
     }
   }
 
-  // One status fetch per sessionId mount — not on every parent snapshot tick
+  // Status fetch per session mount + light poll so kick/idle shows up without a full reload.
   $effect(() => {
     const id = sessionId;
     if (!id) return;
@@ -144,19 +187,77 @@
       }
     })();
 
-    return () => ac.abort();
+    const poll = setInterval(() => {
+      if (ac.signal.aborted) return;
+      void refresh(ac.signal).catch(() => {
+        // keep last known state on transient poll failures
+      });
+    }, 15_000);
+
+    return () => {
+      ac.abort();
+      clearInterval(poll);
+    };
   });
 </script>
 
-{#if loaded}
+{#if variant === "banner"}
+  {#if loaded && sink && sink.status !== "detached"}
+    <div
+      class={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+        sink.voiceConnected ? "border-signal/40 bg-signal/5" : "border-border/70 bg-card/40"
+      }`}
+      role="status"
+    >
+      {#if sink.voiceConnected}
+        <HeadphonesIcon class="size-3.5 shrink-0 text-signal" aria-hidden="true" />
+      {:else}
+        <UnplugIcon class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      {/if}
+      <p class="min-w-0 flex-1 font-mono text-[11px] text-muted-foreground">
+        {#if sink.voiceConnected}
+          Bot in <span class="text-signal">{channelLabel}</span>
+        {:else}
+          Bot not in <span class="text-foreground">{channelLabel}</span>
+          {#if sink.errorMessage}
+            <span class="text-muted-foreground"> — {sink.errorMessage}</span>
+          {/if}
+        {/if}
+      </p>
+      {#if canManage && needsReconnect}
+        <button
+          type="button"
+          class="auth-btn inline-flex items-center gap-1.5 !px-2.5 !py-1"
+          disabled={busy}
+          onclick={() => void reconnect()}
+        >
+          <RefreshCwIcon class={`size-3.5 ${busy ? "animate-spin" : ""}`} aria-hidden="true" />
+          {busy ? "Reconnecting…" : "Reconnect"}
+        </button>
+      {/if}
+      {#if error}
+        <p class="basis-full auth-error !mt-0">{error}</p>
+      {/if}
+    </div>
+  {/if}
+{:else if loaded}
   <div class="space-y-3 rounded-lg border border-border/70 bg-card/30 p-4">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Discord sink</h2>
       <div class="flex items-center gap-2">
         {#if sink}
-          <span class="font-mono text-[10px] text-signal"
-            >{sink.status} · {sink.guildName ?? sink.guildId} / {sink.channelName ?? sink.channelId}</span
-          >
+          <span class="inline-flex items-center gap-1.5 font-mono text-[10px] text-signal">
+            {#if sink.voiceConnected}
+              <HeadphonesIcon class="size-3" aria-hidden="true" />
+              connected
+            {:else}
+              <UnplugIcon class="size-3" aria-hidden="true" />
+              disconnected
+            {/if}
+            <span class="text-muted-foreground"
+              >· {sink.guildName ?? sink.guildId} / {sink.channelName ?? sink.channelId}</span
+            >
+          </span>
         {/if}
         {#if canManage}
           <button
@@ -185,15 +286,38 @@
       </p>
     {:else if !canManage}
       <p class="font-mono text-[11px] text-muted-foreground">
-        {sink ? `Bot is in ${sink.channelName ?? "voice"} — host controls playback in Zap.` : "Host can attach Discord as an output sink."}
+        {#if sink && sink.voiceConnected}
+          Bot is in {channelLabel} — host controls playback in Zap.
+        {:else if sink}
+          Bot is not in {channelLabel}. Ask someone with setup permission to reconnect.
+        {:else}
+          Host can attach Discord as an output sink.
+        {/if}
       </p>
     {:else if sink && sink.status !== "detached"}
-      {#if sink.errorMessage}
+      {#if sink.errorMessage && !sink.voiceConnected}
+        <p class="auth-error">{sink.errorMessage}</p>
+      {:else if sink.errorMessage}
         <p class="auth-error">{sink.errorMessage}</p>
       {/if}
-      <p class="font-mono text-[11px] text-muted-foreground">
-        Audio goes to Discord. This browser is muted by default — enable “This browser” under Outputs to monitor locally.
-      </p>
+      {#if needsReconnect}
+        <div class="flex flex-wrap items-center gap-2">
+          <p class="font-mono text-[11px] text-muted-foreground">Bot left the selected channel. Reconnect to resume Discord audio.</p>
+          <button
+            type="button"
+            class="auth-btn inline-flex items-center gap-1.5"
+            disabled={busy}
+            onclick={() => void reconnect()}
+          >
+            <RefreshCwIcon class={`size-3.5 ${busy ? "animate-spin" : ""}`} aria-hidden="true" />
+            {busy ? "Reconnecting…" : "Reconnect"}
+          </button>
+        </div>
+      {:else}
+        <p class="font-mono text-[11px] text-muted-foreground">
+          Audio goes to Discord. This browser is muted by default — enable “This browser” under Outputs to monitor locally.
+        </p>
+      {/if}
       <button type="button" class="rounded border border-border px-3 py-1.5 font-mono text-[11px]" disabled={busy} onclick={() => void detach()}>
         Detach Discord
       </button>
@@ -238,6 +362,6 @@
       <p class="auth-error">{error}</p>
     {/if}
   </div>
-{:else}
+{:else if variant === "full"}
   <div class="rounded-lg border border-border/70 bg-card/30 px-4 py-3 font-mono text-[11px] text-muted-foreground">Loading Discord sink…</div>
 {/if}

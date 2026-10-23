@@ -1,6 +1,7 @@
 <script lang="ts">
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
+  import DiscordSinkPanel from "$lib/components/DiscordSinkPanel.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
   import PageHeader from "$lib/components/PageHeader.svelte";
   import SessionPlayer from "$lib/components/SessionPlayer.svelte";
@@ -247,6 +248,17 @@
   {#if tab === "setup" && sessionLive && canSetup}
     <SessionSetupPanel bind:snapshot bind:discordSinkActive />
   {:else}
+    {#if sessionLive}
+      {#key sessionRouteId}
+        <DiscordSinkPanel
+          sessionId={sessionRouteId}
+          canManage={canSetup}
+          variant="banner"
+          bind:active={discordSinkActive}
+        />
+      {/key}
+    {/if}
+
     <SessionPlayer bind:snapshot bind:audioEl />
 
     {#if sessionLive}

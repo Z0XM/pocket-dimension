@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { DISCORD_BOT_PERMISSIONS, buildDiscordInviteUrl, isDiscordConfigured, parseDiscordSinkConfig } from "./config";
 
+import { DISCORD_VOICE_IDLE_MS, SESSION_IDLE_MS } from "$lib/server/sessions/idle";
+
 describe("discord config", () => {
+  test("Discord voice idle matches session idle (15m)", () => {
+    expect(DISCORD_VOICE_IDLE_MS).toBe(SESSION_IDLE_MS);
+    expect(DISCORD_VOICE_IDLE_MS).toBe(15 * 60 * 1000);
+  });
+
   test("invite URL includes bot scope and permissions", () => {
     const url = buildDiscordInviteUrl("123456789012345678");
     expect(url).toContain("client_id=123456789012345678");

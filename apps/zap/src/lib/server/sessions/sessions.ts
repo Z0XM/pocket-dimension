@@ -84,7 +84,8 @@ async function markStaleInternal(sessionId: string) {
   const snapshot = await buildSessionSnapshot(sessionId);
   if (snapshot) sessionEventBus.publish(sessionId, snapshot);
   sessionEventBus.closeSession(sessionId);
-  void import("$lib/server/discord").then((m) => m.onSessionEnded(sessionId)).catch(() => {});
+  // Soft-disconnect Discord (keep channel selection for Reconnect); do not detach.
+  void import("$lib/server/discord").then((m) => m.onSessionStale(sessionId)).catch(() => {});
   return snapshot;
 }
 
