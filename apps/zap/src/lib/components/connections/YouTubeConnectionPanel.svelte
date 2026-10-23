@@ -1,15 +1,24 @@
 <script lang="ts">
-  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
   import UnplugIcon from "@lucide/svelte/icons/unplug";
   import ListVideoIcon from "@lucide/svelte/icons/list-video";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
-  import PageHeader from "$lib/components/PageHeader.svelte";
   import { youtubePlaylistHref } from "$lib/history-time";
-  import type { PageData } from "./$types";
 
-  let { data }: { data: PageData } = $props();
+  let {
+    oauthConfigured,
+    linked,
+    linkedAt = null,
+    activity = [],
+    connectHref,
+  }: {
+    oauthConfigured: boolean;
+    linked: boolean;
+    linkedAt?: string | null;
+    activity?: Array<{ id: string; kind: string; summary: string; at: string }>;
+    connectHref: string;
+  } = $props();
 
   type PlaylistRow = {
     id: string;
@@ -60,7 +69,7 @@
   }
 
   async function loadPlaylists() {
-    if (!data.linked) return;
+    if (!linked) return;
     loadingPlaylists = true;
     listError = null;
     try {
@@ -168,7 +177,7 @@
     try {
       const res = await fetch("/api/me/youtube-link", { method: "DELETE", credentials: "same-origin" });
       if (!res.ok) throw new Error("Disconnect failed");
-      window.location.reload();
+      window.location.href = "/connections?tab=youtube";
     } catch (err) {
       listError = err instanceof Error ? err.message : "Disconnect failed";
       busyId = null;
@@ -176,55 +185,30 @@
   }
 
   $effect(() => {
-    if (data.linked) void loadPlaylists();
+    if (linked) void loadPlaylists();
   });
 </script>
 
-<section class="zap-page">
-  <PageHeader title="YouTube">
-    {#snippet crumb()}
-      <a href="/connections" class="inline-flex items-center gap-1 hover:text-signal">
-        <ArrowLeftIcon class="size-3" aria-hidden="true" />
-        Connections
-      </a>
-    {/snippet}
-    {#snippet meta()}
-      Playlists · preview · additive auto-sync
-    {/snippet}
-    {#snippet actions()}
-      {#if data.linked}
-        <button
-          type="button"
-          class="inline-flex size-8 items-center justify-center border border-border text-muted-foreground hover:border-signal/50 hover:text-signal disabled:opacity-40"
-          aria-label="Refresh playlists"
-          disabled={loadingPlaylists || busyId !== null}
-          onclick={() => void loadPlaylists()}
-        >
-          <RefreshCwIcon class={`size-3.5 ${loadingPlaylists ? "animate-spin" : ""}`} aria-hidden="true" />
-        </button>
-      {/if}
-    {/snippet}
-  </PageHeader>
-
-  <div class="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain">
-    <div class="space-y-3 border border-border/70 bg-card/30 p-4">
+<div class="space-y-6">
+  <div class="flex flex-wrap items-start justify-between gap-2">
+    <div class="space-y-3 min-w-0 flex-1 border border-border/70 bg-card/30 p-4">
       <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Details</h2>
-      {#if !data.oauthConfigured}
+      {#if !oauthConfigured}
         <p class="text-sm text-muted-foreground">
           Set <span class="font-mono text-signal">GOOGLE_CLIENT_ID</span> and
           <span class="font-mono text-signal">GOOGLE_CLIENT_SECRET</span> to enable Connect YouTube.
         </p>
-      {:else if !data.linked}
+      {:else if !linked}
         <p class="flex items-center gap-2 text-sm text-muted-foreground">
           <ListVideoIcon class="size-4 shrink-0" aria-hidden="true" />
           Not connected
         </p>
-        <a class="auth-btn inline-flex items-center gap-2" href={data.connectHref}>Connect YouTube</a>
+        <a class="auth-btn inline-flex items-center gap-2" href={connectHref}>Connect YouTube</a>
       {:else}
         <p class="flex flex-wrap items-center gap-2 text-sm">
           <ListVideoIcon class="size-4 text-signal" aria-hidden="true" />
           Connected
-          <span class="font-mono text-[11px] text-muted-foreground">since {when(data.linkedAt)}</span>
+          <span class="font-mono text-[11px] text-muted-foreground">since {when(linkedAt)}</span>
         </p>
         <button
           type="button"
@@ -237,102 +221,113 @@
         </button>
       {/if}
     </div>
-
-    {#if data.linked}
-      <div class="space-y-3">
-        <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Playlists</h2>
-        {#if listError}
-          <p class="auth-error">{listError}</p>
-        {/if}
-        {#if importMessage}
-          <p class="font-mono text-[11px] text-signal">{importMessage}</p>
-        {/if}
-        {#if loadingPlaylists && playlists.length === 0}
-          <p class="font-mono text-[11px] text-muted-foreground">Loading playlists…</p>
-        {:else if playlists.length === 0}
-          <p class="font-mono text-[11px] text-muted-foreground">No playlists found.</p>
-        {:else}
-          <ul class="divide-y divide-border/50 border border-border/70 bg-card/20">
-            {#each playlists as row (row.id)}
-              <li class="space-y-2 px-3 py-3">
-                <div class="flex flex-wrap items-start justify-between gap-2">
-                  <div class="min-w-0">
-                    <p class="truncate text-sm font-medium">{row.title}</p>
-                    <p class="font-mono text-[10px] text-muted-foreground">
-                      {statusLabel(row.importStatus)}
-                      {#if row.itemCount != null}
-                        · {row.alreadyImported}/{row.itemCount} in library
-                      {/if}
-                      {#if row.lastSyncedAt}
-                        · synced {when(row.lastSyncedAt)}
-                      {/if}
-                    </p>
-                    {#if row.lastSyncError}
-                      <p class="font-mono text-[10px] text-destructive">{row.lastSyncError}</p>
-                    {/if}
-                  </div>
-                  <a
-                    class="inline-flex size-7 items-center justify-center text-muted-foreground hover:text-signal"
-                    href={youtubePlaylistHref(row.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Open on YouTube"
-                    title="Open on YouTube"
-                  >
-                    <ExternalLinkIcon class="size-3.5" aria-hidden="true" />
-                  </a>
-                </div>
-                <div class="flex flex-wrap items-center gap-3">
-                  <label class="inline-flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
-                    <button
-                      type="button"
-                      class="zap-toggle"
-                      role="switch"
-                      aria-checked={row.autoSync}
-                      aria-label={`Auto sync ${row.title}`}
-                      disabled={busyId === row.id}
-                      onclick={() => void toggleAutoSync(row, !row.autoSync)}
-                    >
-                      <span class="zap-toggle-thumb"></span>
-                    </button>
-                    Auto sync
-                  </label>
-                  <button
-                    type="button"
-                    class="auth-btn !px-2.5 !py-1"
-                    disabled={busyId !== null || importBusy}
-                    onclick={() => void openImportPreview(row)}
-                  >
-                    {busyId === row.id ? "…" : "Import"}
-                  </button>
-                </div>
-              </li>
-            {/each}
-          </ul>
-          <p class="font-mono text-[10px] text-muted-foreground">
-            Auto sync runs when you open Zap (additive only — never removes songs). Manual Import always previews first.
-          </p>
-        {/if}
-      </div>
+    {#if linked}
+      <button
+        type="button"
+        class="inline-flex size-8 items-center justify-center border border-border text-muted-foreground hover:border-signal/50 hover:text-signal disabled:opacity-40"
+        aria-label="Refresh playlists"
+        disabled={loadingPlaylists || busyId !== null}
+        onclick={() => void loadPlaylists()}
+      >
+        <RefreshCwIcon class={`size-3.5 ${loadingPlaylists ? "animate-spin" : ""}`} aria-hidden="true" />
+      </button>
     {/if}
+  </div>
 
+  {#if linked}
     <div class="space-y-3">
-      <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Activity</h2>
-      {#if data.activity.length === 0}
-        <p class="font-mono text-[11px] text-muted-foreground">No YouTube activity yet.</p>
+      <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Playlists</h2>
+      {#if listError}
+        <p class="auth-error">{listError}</p>
+      {/if}
+      {#if importMessage}
+        <p class="font-mono text-[11px] text-signal">{importMessage}</p>
+      {/if}
+      {#if loadingPlaylists && playlists.length === 0}
+        <p class="font-mono text-[11px] text-muted-foreground">Loading playlists…</p>
+      {:else if playlists.length === 0}
+        <p class="font-mono text-[11px] text-muted-foreground">No playlists found.</p>
       {:else}
         <ul class="divide-y divide-border/50 border border-border/70 bg-card/20">
-          {#each data.activity as entry (entry.id)}
-            <li class="px-3 py-2.5">
-              <p class="text-sm text-foreground">{entry.summary}</p>
-              <p class="mt-0.5 font-mono text-[10px] text-muted-foreground">{entry.kind} · {when(entry.at)}</p>
+          {#each playlists as row (row.id)}
+            <li class="space-y-2 px-3 py-3">
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-medium">{row.title}</p>
+                  <p class="font-mono text-[10px] text-muted-foreground">
+                    {statusLabel(row.importStatus)}
+                    {#if row.itemCount != null}
+                      · {row.alreadyImported}/{row.itemCount} in library
+                    {/if}
+                    {#if row.lastSyncedAt}
+                      · synced {when(row.lastSyncedAt)}
+                    {/if}
+                  </p>
+                  {#if row.lastSyncError}
+                    <p class="font-mono text-[10px] text-destructive">{row.lastSyncError}</p>
+                  {/if}
+                </div>
+                <a
+                  class="inline-flex size-7 items-center justify-center text-muted-foreground hover:text-signal"
+                  href={youtubePlaylistHref(row.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open on YouTube"
+                  title="Open on YouTube"
+                >
+                  <ExternalLinkIcon class="size-3.5" aria-hidden="true" />
+                </a>
+              </div>
+              <div class="flex flex-wrap items-center gap-3">
+                <label class="inline-flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                  <button
+                    type="button"
+                    class="zap-toggle"
+                    role="switch"
+                    aria-checked={row.autoSync}
+                    aria-label={`Auto sync ${row.title}`}
+                    disabled={busyId === row.id}
+                    onclick={() => void toggleAutoSync(row, !row.autoSync)}
+                  >
+                    <span class="zap-toggle-thumb"></span>
+                  </button>
+                  Auto sync
+                </label>
+                <button
+                  type="button"
+                  class="auth-btn !px-2.5 !py-1"
+                  disabled={busyId !== null || importBusy}
+                  onclick={() => void openImportPreview(row)}
+                >
+                  {busyId === row.id ? "…" : "Import"}
+                </button>
+              </div>
             </li>
           {/each}
         </ul>
+        <p class="font-mono text-[10px] text-muted-foreground">
+          Auto sync runs when you open Zap (additive only — never removes songs). Manual Import always previews first.
+        </p>
       {/if}
     </div>
+  {/if}
+
+  <div class="space-y-3">
+    <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Activity</h2>
+    {#if activity.length === 0}
+      <p class="font-mono text-[11px] text-muted-foreground">No YouTube activity yet.</p>
+    {:else}
+      <ul class="divide-y divide-border/50 border border-border/70 bg-card/20">
+        {#each activity as entry (entry.id)}
+          <li class="px-3 py-2.5">
+            <p class="text-sm text-foreground">{entry.summary}</p>
+            <p class="mt-0.5 font-mono text-[10px] text-muted-foreground">{entry.kind} · {when(entry.at)}</p>
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </div>
-</section>
+</div>
 
 <ConfirmDialog
   bind:open={previewOpen}

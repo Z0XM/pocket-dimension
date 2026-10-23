@@ -1,49 +1,70 @@
 <script lang="ts">
-  import CableIcon from "@lucide/svelte/icons/cable";
-  import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+  import { goto } from "$app/navigation";
   import Disc3Icon from "@lucide/svelte/icons/disc-3";
   import HeadphonesIcon from "@lucide/svelte/icons/headphones";
   import ListVideoIcon from "@lucide/svelte/icons/list-video";
+  import DiscordConnectionPanel from "$lib/components/connections/DiscordConnectionPanel.svelte";
+  import SpotifyConnectionPanel from "$lib/components/connections/SpotifyConnectionPanel.svelte";
+  import YouTubeConnectionPanel from "$lib/components/connections/YouTubeConnectionPanel.svelte";
   import PageHeader from "$lib/components/PageHeader.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
 
-  function iconFor(id: string) {
-    if (id === "discord") return HeadphonesIcon;
-    if (id === "spotify") return Disc3Icon;
-    if (id === "youtube") return ListVideoIcon;
-    return CableIcon;
+  const tabs = [
+    { id: "discord" as const, label: "Discord", icon: HeadphonesIcon },
+    { id: "spotify" as const, label: "Spotify", icon: Disc3Icon },
+    { id: "youtube" as const, label: "YouTube", icon: ListVideoIcon },
+  ];
+
+  const tab = $derived(data.tab);
+
+  function setTab(next: "discord" | "spotify" | "youtube") {
+    if (next === tab) return;
+    void goto(`/connections?tab=${next}`, { replaceState: true, keepFocus: true, noScroll: true });
   }
 </script>
 
 <section class="zap-page">
   <PageHeader title="Connections">
     {#snippet meta()}
-      Link accounts and manage Discord / YouTube imports
+      Discord · Spotify · YouTube
     {/snippet}
+    <div class="flex flex-wrap gap-1 font-mono text-[11px]" role="tablist" aria-label="Connection providers">
+      {#each tabs as t (t.id)}
+        {@const Icon = t.icon}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === t.id}
+          class={`zap-nav-link inline-flex items-center gap-1.5 ${tab === t.id ? "zap-nav-link-active" : ""}`}
+          onclick={() => setTab(t.id)}
+        >
+          <Icon class="size-3.5" aria-hidden="true" />
+          {t.label}
+        </button>
+      {/each}
+    </div>
   </PageHeader>
 
-  <div class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain">
-    {#each data.connections as c (c.id)}
-      {@const Icon = iconFor(c.id)}
-      <a
-        href={c.href}
-        class="flex items-center gap-3 border border-border/70 bg-card/30 px-4 py-3 transition-colors hover:border-signal/40 hover:bg-signal/5"
-      >
-        <span
-          class={`inline-flex size-9 items-center justify-center border ${
-            c.connected ? "border-signal/50 text-signal" : "border-border text-muted-foreground"
-          }`}
-        >
-          <Icon class="size-4" aria-hidden="true" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium text-foreground">{c.name}</p>
-          <p class="truncate font-mono text-[11px] text-muted-foreground">{c.detail}</p>
-        </div>
-        <ChevronRightIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      </a>
-    {/each}
+  <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain" role="tabpanel">
+    {#if tab === "discord"}
+      <DiscordConnectionPanel
+        configured={data.discord.configured}
+        inviteUrl={data.discord.inviteUrl}
+        live={data.discord.live}
+        activity={data.discord.activity}
+      />
+    {:else if tab === "spotify"}
+      <SpotifyConnectionPanel />
+    {:else}
+      <YouTubeConnectionPanel
+        oauthConfigured={data.youtube.oauthConfigured}
+        linked={data.youtube.linked}
+        linkedAt={data.youtube.linkedAt}
+        activity={data.youtube.activity}
+        connectHref={data.youtube.connectHref}
+      />
+    {/if}
   </div>
 </section>

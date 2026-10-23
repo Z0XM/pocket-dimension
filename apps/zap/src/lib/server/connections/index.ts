@@ -27,7 +27,7 @@ export async function listConnectionsSummary(userId: string) {
       {
         id: "discord" as const,
         name: "Discord",
-        href: "/connections/discord",
+        href: "/connections?tab=discord",
         configured: discordCap.configured,
         connected: discordLive > 0,
         detail: !discordCap.configured
@@ -39,7 +39,7 @@ export async function listConnectionsSummary(userId: string) {
       {
         id: "spotify" as const,
         name: "Spotify",
-        href: "/connections/spotify",
+        href: "/connections?tab=spotify",
         configured: false,
         connected: false,
         detail: "Not available yet",
@@ -47,7 +47,7 @@ export async function listConnectionsSummary(userId: string) {
       {
         id: "youtube" as const,
         name: "YouTube",
-        href: "/connections/youtube",
+        href: "/connections?tab=youtube",
         configured: isGoogleOAuthConfigured(),
         connected: yt.linked,
         detail: !isGoogleOAuthConfigured()
