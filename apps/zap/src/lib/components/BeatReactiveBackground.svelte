@@ -214,11 +214,13 @@
       return `rgba(${rgb.r},${rgb.g},${rgb.b},${Math.max(0, Math.min(1, a))})`;
     }
 
+    /** Radial lattice — restored to `6ca8f09` (center-out rings, outward lift). */
     function drawRadial(e: PlaybackEnergy, dt: number, playing: boolean) {
       beatCooldown = Math.max(0, beatCooldown - dt);
       energyCooldown = Math.max(0, energyCooldown - dt);
 
       if (playing && !reduced) {
+        // Beat / kick → new radial wavefront from center (overlaps allowed).
         if (sBeat > 0.3 && e.beat > 0.28 && beatCooldown <= 0) {
           spawnWave(0.55 + e.beat * 0.9 + e.bass * 0.35, e);
           beatCooldown = 0.09;
@@ -226,6 +228,7 @@
           spawnWave(0.35 + e.rms * 0.55 + e.mid * 0.25, e);
           energyCooldown = 0.28;
         }
+        // Ambient carrier drifts slowly from center → edge, then restarts.
         ambientR += (42 + sBass * 28 + sRms * 18) * dt;
         if (ambientR > maxRadius + 80) ambientR = 0;
       }
@@ -239,24 +242,24 @@
 
       const n = xs.length;
       const restGlow = 0.2 * settle;
-      const motion = reduced ? 0 : 1;
+      const ambientStrength = reduced ? 0 : (0.18 + sBass * 0.22 + sRms * 0.12) * settle;
+      const ambientWidth = 52 + sBass * 36;
+      const displaceScale = spacing * (0.22 + sRms * 0.28);
 
       for (let k = 0; k < n; k++) {
         const d = dist[k]!;
-        const ambientStrength = motion * (0.18 + sBass * 0.22 + sRms * 0.12) * settle;
-        let field = ringField(d, ambientR, 52 + sBass * 36, ambientStrength, 1);
+        let field = ringField(d, ambientR, ambientWidth, ambientStrength, 1);
         for (let wi = 0; wi < waves.length; wi++) {
           const wv = waves[wi]!;
-          const lead = ringField(d, wv.r + wv.width * 0.35, wv.width * 0.85, wv.strength * 0.7, wv.life);
-          field += ringField(d, wv.r, wv.width, wv.strength, wv.life) + lead;
+          field += ringField(d, wv.r, wv.width, wv.strength, wv.life);
         }
         field += field * sHigh * 0.12;
 
-        const dip = field * spacing * (0.55 + sRms * 0.4);
-        const ox = ux[k]! * field * spacing * 0.06;
-        const oy = dip;
         const excite = Math.max(0, Math.min(1.4, 0.28 + field));
-        const sizeMul = Math.max(0.35, 1.05 - excite * 0.55);
+        const push = field * displaceScale;
+        const x = xs[k]! + ux[k]! * push;
+        const y = ys[k]! + uy[k]! * push;
+        const r = baseRadius * (0.72 + excite * 0.85);
         const alpha = Math.min(0.9, (restGlow + excite * 0.58) * settle);
         const t = Math.max(0, Math.min(1, excite * 0.9));
         const cr = (inkRgb.r + (signalRgb.r - inkRgb.r) * t) | 0;
@@ -264,7 +267,7 @@
         const cb = (inkRgb.b + (signalRgb.b - inkRgb.b) * t) | 0;
         ctx!.fillStyle = `rgba(${cr},${cg},${cb},${alpha})`;
         ctx!.beginPath();
-        ctx!.arc(xs[k]! + ox, ys[k]! + oy, baseRadius * sizeMul, 0, Math.PI * 2);
+        ctx!.arc(x, y, r, 0, Math.PI * 2);
         ctx!.fill();
       }
     }
