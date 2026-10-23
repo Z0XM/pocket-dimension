@@ -64,13 +64,21 @@
 
   let deletedIds = $state<string[]>([]);
   let deleteMessage = $state<string | null>(null);
+  /** Tag edits on suggestion rows (those come from `data`, not the mutable `assets` list). */
+  let suggestionTagsById = $state<Record<string, TrackItem["tags"]>>({});
   const MISSING_PLAYLIST_NOTICE = "That playlist is no longer available — showing your library.";
   /** Playlists that 404'd since the page loaded (deleted elsewhere); hidden from the scope + “Add to playlist” menus. */
   let missingPlaylistIds = $state<string[]>([]);
   let scopeNotice = $state<string | null>(null);
   const filtering = $derived(Boolean(q.trim() || tagQuery.trim() || selected.length));
   const scopedPlaylistId = $derived(libraryScope.startsWith("playlist:") ? libraryScope.slice("playlist:".length) : null);
-  const suggestions = $derived(filtering || scopedPlaylistId ? [] : (data.suggestions ?? []).filter((t) => !deletedIds.includes(t.id)));
+  const suggestions = $derived(
+    filtering || scopedPlaylistId
+      ? []
+      : (data.suggestions ?? [])
+          .filter((t) => !deletedIds.includes(t.id))
+          .map((t) => (suggestionTagsById[t.id] ? { ...t, tags: suggestionTagsById[t.id]! } : t))
+  );
   const playlistOptions = $derived((data.playlistOptions ?? []).filter((p) => !missingPlaylistIds.includes(p.id)));
   const scopeOptions = $derived.by(() => {
     const opts = [{ value: "all", label: "All tracks" }, ...playlistOptions.map((p) => ({ value: `playlist:${p.id}`, label: `▸ ${p.name}` }))];
@@ -124,6 +132,9 @@
 
   function onTagsSaved(id: string, tags: TrackItem["tags"]) {
     assets = assets.map((a) => (a.id === id ? { ...a, tags } : a));
+    if ((data.suggestions ?? []).some((t) => t.id === id)) {
+      suggestionTagsById = { ...suggestionTagsById, [id]: tags };
+    }
     void refreshTags();
   }
 
