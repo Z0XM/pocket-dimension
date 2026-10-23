@@ -3,6 +3,7 @@ import type { RequestHandler } from "./$types";
 import { readCustomTagNamesFromJson } from "$lib/custom-tags";
 import { ensureCustomTags } from "$lib/server/catalogue";
 import { IngestError, ingestPublicUrl, resolveYtDlpBin } from "$lib/server/ingest";
+import { createNdjsonSender } from "$lib/server/ingest/ndjson-stream";
 import { isStorageConfigured } from "$lib/server/storage";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
@@ -25,10 +26,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   const userId = locals.user.id;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const encoder = new TextEncoder();
-      const send = (payload: Record<string, unknown>) => {
-        controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
-      };
+      const { send, close } = createNdjsonSender(controller);
       try {
         const tagIds = [...selectedTagIds, ...(await ensureCustomTags(userId, customTagNames))];
         const result = await ingestPublicUrl(
@@ -56,7 +54,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
           message: err instanceof IngestError || err instanceof Error ? err.message : "Ingest failed",
         });
       } finally {
-        controller.close();
+        close();
       }
     },
   });

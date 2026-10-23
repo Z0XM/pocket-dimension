@@ -1,6 +1,7 @@
 import { error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { readCustomTagNamesFromJson } from "$lib/custom-tags";
+import { createNdjsonSender } from "$lib/server/ingest/ndjson-stream";
 import { getYoutubeLinkStatus, importConnectedPlaylists } from "$lib/server/youtube";
 import { isStorageConfigured } from "$lib/server/storage";
 import { resolveYtDlpBin } from "$lib/server/ingest";
@@ -34,10 +35,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   const userId = locals.user.id;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const encoder = new TextEncoder();
-      const send = (payload: Record<string, unknown>) => {
-        controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
-      };
+      const { send, close } = createNdjsonSender(controller);
 
       try {
         const result = await importConnectedPlaylists(
@@ -66,7 +64,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
           message: err instanceof Error ? err.message : "Import failed",
         });
       } finally {
-        controller.close();
+        close();
       }
     },
   });

@@ -48,6 +48,16 @@ async function findReadyAsset(identityKey: string) {
   });
 }
 
+/** yt-dlp + upload can take several minutes; waiters must outlive a typical download. */
+const FETCH_JOB_STALE_MS = 20 * 60 * 1000;
+const WAIT_FOR_READY_MAX_MS = 18 * 60 * 1000;
+const WAIT_FOR_READY_POLL_MS = 1_000;
+
+function isFetchJobStale(job: { updatedAt: Date; createdAt: Date }) {
+  const t = (job.updatedAt ?? job.createdAt).getTime();
+  return Number.isFinite(t) && Date.now() - t > FETCH_JOB_STALE_MS;
+}
+
 async function claimFetchJob(identityKey: string, sourceUrl: string) {
   const existing = await db.query.fetchJobs.findFirst({
     where: eq(schema.fetchJobs.identityKey, identityKey),
@@ -56,37 +66,55 @@ async function claimFetchJob(identityKey: string, sourceUrl: string) {
   if (existing?.status === "ready" && existing.mediaAssetId) {
     return { kind: "ready" as const, job: existing };
   }
-  if (existing?.status === "running") {
+  if (existing?.status === "running" && !isFetchJobStale(existing)) {
     return { kind: "running" as const, job: existing };
   }
 
   if (existing) {
+    // Reclaim failed / stale-running / pending rows.
     const [job] = await db
       .update(schema.fetchJobs)
-      .set({ status: "running", sourceUrl, errorMessage: null })
+      .set({ status: "running", sourceUrl, errorMessage: null, updatedAt: new Date() })
       .where(eq(schema.fetchJobs.id, existing.id))
       .returning();
     return { kind: "claimed" as const, job: job! };
   }
 
-  const [job] = await db.insert(schema.fetchJobs).values({ identityKey, status: "running", sourceUrl }).returning();
-  return { kind: "claimed" as const, job: job! };
+  try {
+    const [job] = await db.insert(schema.fetchJobs).values({ identityKey, status: "running", sourceUrl }).returning();
+    return { kind: "claimed" as const, job: job! };
+  } catch {
+    // Unique race: another worker inserted first — join their run.
+    const raced = await db.query.fetchJobs.findFirst({
+      where: eq(schema.fetchJobs.identityKey, identityKey),
+    });
+    if (raced?.status === "ready" && raced.mediaAssetId) return { kind: "ready" as const, job: raced };
+    if (raced) return { kind: "running" as const, job: raced };
+    throw new Error("Could not claim fetch job");
+  }
 }
 
-async function waitForReadyAsset(identityKey: string, attempts = 30): Promise<typeof schema.mediaAssets.$inferSelect | null> {
-  for (let i = 0; i < attempts; i++) {
+async function waitForReadyAsset(identityKey: string, maxMs = WAIT_FOR_READY_MAX_MS): Promise<typeof schema.mediaAssets.$inferSelect | null> {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
     const asset = await findReadyAsset(identityKey);
     if (asset?.status === "ready") return asset;
     if (asset?.status === "failed") return asset;
+    if (asset?.status === "unavailable") return asset;
     const job = await db.query.fetchJobs.findFirst({ where: eq(schema.fetchJobs.identityKey, identityKey) });
     if (job?.status === "failed") return null;
     if (job?.status === "ready" && job.mediaAssetId) {
       return (await findReadyAsset(identityKey)) ?? null;
     }
-    await Bun.sleep(500);
+    // Primary worker died without updating the job — stop waiting so caller can reclaim.
+    if (!job || (job.status === "running" && isFetchJobStale(job))) return null;
+    await Bun.sleep(WAIT_FOR_READY_POLL_MS);
   }
   return null;
 }
+
+/** Same-process coalesce so parallel playlist workers share one yt-dlp run per identity. */
+const inflightCatalogueIngest = new Map<string, Promise<IngestItemResult>>();
 
 export type IngestMetaHints = {
   description?: string | null;
@@ -187,8 +215,7 @@ export async function saveUnavailableAsset(input: {
   return raced;
 }
 
-/** Single catalogue video ingest (no sync_run row) — used by URL paste + connected playlist import. */
-export async function ingestCatalogueVideo(opts: {
+type IngestCatalogueVideoOpts = {
   userId: string;
   url: string;
   identityKey: string;
@@ -203,7 +230,23 @@ export async function ingestCatalogueVideo(opts: {
   /** Pre-flight reason from playlist metadata (e.g. API says private/deleted) — skips yt-dlp. */
   unavailableReason?: string | null;
   onSongProgress?: (progress: SongProgress) => void | Promise<void>;
-}): Promise<IngestItemResult> {
+};
+
+/** Single catalogue video ingest (no sync_run row) — used by URL paste + connected playlist import. */
+export async function ingestCatalogueVideo(opts: IngestCatalogueVideoOpts): Promise<IngestItemResult> {
+  const existing = inflightCatalogueIngest.get(opts.identityKey);
+  if (existing) return existing;
+
+  const promise = ingestCatalogueVideoOnce(opts).finally(() => {
+    if (inflightCatalogueIngest.get(opts.identityKey) === promise) {
+      inflightCatalogueIngest.delete(opts.identityKey);
+    }
+  });
+  inflightCatalogueIngest.set(opts.identityKey, promise);
+  return promise;
+}
+
+async function ingestCatalogueVideoOnce(opts: IngestCatalogueVideoOpts): Promise<IngestItemResult> {
   const { userId, url, identityKey } = opts;
   const emit = async (phase: SongProgress["phase"], percent: number, title?: string | null) => {
     await opts.onSongProgress?.({
@@ -259,7 +302,7 @@ export async function ingestCatalogueVideo(opts: {
     return { status: "failed", reason: "Object storage is not configured", identityKey, title: opts.titleHint };
   }
 
-  const claim = await claimFetchJob(identityKey, url);
+  let claim = await claimFetchJob(identityKey, url);
   if (claim.kind === "ready" && claim.job.mediaAssetId) {
     const asset = await findReadyAsset(identityKey);
     if (asset?.status === "ready") {
@@ -279,9 +322,26 @@ export async function ingestCatalogueVideo(opts: {
         return markUnavailable(settled.errorMessage ?? "Video unavailable");
       }
     }
-    console.error("[zap ingest] failed", { identityKey, reason: "Concurrent fetch did not finish" });
-    await emit("failed", 0);
-    return { status: "failed", reason: "Concurrent fetch did not finish", identityKey, title: opts.titleHint };
+    // Wait timed out or primary went stale — try to reclaim once instead of dropping the track.
+    claim = await claimFetchJob(identityKey, url);
+    if (claim.kind === "running") {
+      const retried = await waitForReadyAsset(identityKey, 60_000);
+      if (retried?.status === "ready" && retried.storageKey) {
+        await emit("done", 100, retried.title);
+        return { status: "reused", mediaAssetId: retried.id, identityKey, title: retried.title };
+      }
+      console.error("[zap ingest] failed", { identityKey, reason: "Concurrent fetch did not finish" });
+      await emit("failed", 0);
+      return { status: "failed", reason: "Concurrent fetch did not finish", identityKey, title: opts.titleHint };
+    }
+    if (claim.kind === "ready" && claim.job.mediaAssetId) {
+      const ready = await findReadyAsset(identityKey);
+      if (ready?.status === "ready") {
+        await emit("done", 100, ready.title);
+        return { status: "reused", mediaAssetId: ready.id, identityKey, title: ready.title };
+      }
+    }
+    // claim.kind === "claimed" — fall through and run yt-dlp ourselves
   }
 
   let workDir: string | null = null;

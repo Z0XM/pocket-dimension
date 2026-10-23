@@ -6,6 +6,7 @@ import { db, schema } from "@pocket-dimension/db";
 import { readCustomTagNamesFromForm } from "$lib/custom-tags";
 import { ensureCustomTags, setUserAssetTags } from "$lib/server/catalogue";
 import { MAX_TRACK_DURATION_MS } from "$lib/server/ingest/limits";
+import { createNdjsonSender } from "$lib/server/ingest/ndjson-stream";
 import { isStorageConfigured, putMediaObject } from "$lib/server/storage";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
@@ -36,10 +37,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const encoder = new TextEncoder();
-      const send = (payload: Record<string, unknown>) => {
-        controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
-      };
+      const { send, close } = createNdjsonSender(controller);
 
       try {
         // Client already transferred the file in this request body; treat that as download=100.
@@ -120,7 +118,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
           message: err instanceof Error ? err.message : "Upload failed",
         });
       } finally {
-        controller.close();
+        close();
       }
     },
   });

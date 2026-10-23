@@ -167,9 +167,12 @@ export async function importConnectedPlaylists(
     const alreadyInLibrary = opts?.skipExisting ? await libraryYoutubeIdentityKeys(userId, allVideoIds) : new Set<string>();
 
     const work: WorkItem[] = [];
+    const seenVideoIds = new Set<string>();
     for (const entries of entryLists) {
       const sorted = sortPlaylistItemsForImport(entries, sort);
       for (const entry of sorted) {
+        if (seenVideoIds.has(entry.videoId)) continue;
+        seenVideoIds.add(entry.videoId);
         if (opts?.skipExisting && alreadyInLibrary.has(`youtube:${entry.videoId}`)) {
           work.push({ kind: "skip", entry, reason: "Already in library" });
         } else if (isOverDurationCap(entry.durationMs)) {
@@ -312,6 +315,9 @@ export async function importConnectedPlaylists(
       })
       .where(eq(schema.syncRuns.id, run.id));
 
+    // Drain queued progress writes before the NDJSON controller closes.
+    await progressGate;
+
     return {
       syncRunId: run.id,
       imported: summary.imported,
@@ -324,6 +330,7 @@ export async function importConnectedPlaylists(
       playlists: uniqueIds,
     };
   } catch (err) {
+    await progressGate.catch(() => {});
     const message = err instanceof Error ? err.message : "Playlist import failed";
     const summary = summarizeIngestItems(items);
     await db
