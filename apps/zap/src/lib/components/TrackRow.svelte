@@ -41,6 +41,7 @@
     playlists = [],
     canDelete = false,
     ondeleted,
+    ontags,
   }: {
     track: TrackItem;
     availableTags: TagOption[];
@@ -51,6 +52,8 @@
     /** Zap admins only; the server enforces it regardless. */
     canDelete?: boolean;
     ondeleted?: (id: string, message: string) => void;
+    /** Fired after a successful tag save so the parent can update local row state. */
+    ontags?: (id: string, tags: TrackItem["tags"]) => void;
   } = $props();
 
   let deleteOpen = $state(false);
@@ -313,8 +316,15 @@
       class="space-y-2 rounded border border-border/60 bg-background/40 p-3"
       use:enhance={() => {
         return async ({ result, update }) => {
-          await update();
-          if (result.type === "success") editing = false;
+          // Keep local catalogue list; apply returned tags via ontags (invalidateAll would reload
+          // data but catalogue hydration ignores tag-only changes).
+          await update({ reset: false, invalidateAll: false });
+          if (result.type !== "success") return;
+          const data = result.data as { tagOk?: boolean; mediaAssetId?: string; tags?: TrackItem["tags"] } | undefined;
+          if (data?.tagOk && Array.isArray(data.tags)) {
+            ontags?.(track.id, data.tags);
+          }
+          editing = false;
         };
       }}
     >

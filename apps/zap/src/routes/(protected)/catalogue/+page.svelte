@@ -122,6 +122,11 @@
     deleteMessage = message;
   }
 
+  function onTagsSaved(id: string, tags: TrackItem["tags"]) {
+    assets = assets.map((a) => (a.id === id ? { ...a, tags } : a));
+    void refreshTags();
+  }
+
   $effect(() => {
     availableTags = data.availableTags;
     topTagIds = data.topTagIds;
@@ -452,7 +457,7 @@
               </h2>
               <ul class="zap-track-list zap-suggestions divide-y divide-border/50 border-b border-border/70">
                 {#each suggestions as track (track.id)}
-                  <TrackRow {track} {availableTags} {queue} playlists={editablePlaylists} canDelete={data.zapAdmin} ondeleted={onDeleted} />
+                  <TrackRow {track} {availableTags} {queue} playlists={editablePlaylists} canDelete={data.zapAdmin} ondeleted={onDeleted} ontags={onTagsSaved} />
                 {/each}
               </ul>
               <h2
@@ -482,7 +487,7 @@
                 </li>
               {:else}
                 {#each assets as track (track.id)}
-                  <TrackRow {track} {availableTags} {queue} playlists={editablePlaylists} canDelete={data.zapAdmin} ondeleted={onDeleted} />
+                  <TrackRow {track} {availableTags} {queue} playlists={editablePlaylists} canDelete={data.zapAdmin} ondeleted={onDeleted} ontags={onTagsSaved} />
                 {/each}
               {/if}
             </ul>

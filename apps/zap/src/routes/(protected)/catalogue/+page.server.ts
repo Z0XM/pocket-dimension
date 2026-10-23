@@ -107,7 +107,11 @@ export const actions: Actions = {
 
     const nextTagIds = [...tagIds, ...(await ensureCustomTags(userId, customTagNames))];
 
-    await setUserAssetTags(userId, mediaAssetId, nextTagIds);
-    return { tagOk: true, mediaAssetId };
+    const tags = await setUserAssetTags(userId, mediaAssetId, nextTagIds);
+    return {
+      tagOk: true,
+      mediaAssetId,
+      tags: tags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
+    };
   },
 };
