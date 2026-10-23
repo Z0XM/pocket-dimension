@@ -279,7 +279,7 @@ export function animationsEnabled(): boolean {
   return document.documentElement.getAttribute("data-animations") !== "off";
 }
 
-/** Active visualizer style from `data-animation-style` (falls back to radial). */
+/** Active visualizer style from `data-animation-style` (falls back to default). */
 export function readAnimationStyle(): AnimationStyleId {
   if (typeof document === "undefined") return DEFAULT_THEME_PREFS.animationStyle;
   const v = document.documentElement.getAttribute("data-animation-style");
