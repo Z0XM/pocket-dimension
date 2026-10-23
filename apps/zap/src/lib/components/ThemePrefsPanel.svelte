@@ -6,12 +6,14 @@
   import { onMount } from "svelte";
   import {
     ACCENT_PRESETS,
+    ANIMATION_STYLES,
     CARD_PRESETS,
     DEFAULT_THEME_PREFS,
     PAGE_PRESETS,
     persistAndApplyTheme,
     readThemePrefs,
     type AccentId,
+    type AnimationStyleId,
     type CardId,
     type PageId,
     type ZapThemePrefs,
@@ -40,6 +42,11 @@
 
   function setAnimations(on: boolean) {
     prefs = { ...prefs, animations: on };
+    persistAndApplyTheme(prefs);
+  }
+
+  function setAnimationStyle(id: AnimationStyleId) {
+    prefs = { ...prefs, animationStyle: id };
     persistAndApplyTheme(prefs);
   }
 </script>
@@ -140,5 +147,31 @@
         <span class="zap-toggle-thumb"></span>
       </button>
     </label>
+
+    <div
+      class={`space-y-2 ${prefs.animations ? "" : "pointer-events-none opacity-45"}`}
+      role="listbox"
+      aria-label="Animation style"
+      aria-disabled={!prefs.animations}
+    >
+      <p class="font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase">Style</p>
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {#each ANIMATION_STYLES as style (style.id)}
+          <button
+            type="button"
+            role="option"
+            aria-selected={prefs.animationStyle === style.id}
+            disabled={!prefs.animations}
+            class={`border px-3 py-2 text-left ${
+              prefs.animationStyle === style.id ? "border-signal bg-signal/10" : "border-border hover:border-signal/40"
+            }`}
+            onclick={() => setAnimationStyle(style.id)}
+          >
+            <span class="block text-sm text-foreground">{style.label}</span>
+            <span class="mt-0.5 block font-mono text-[9px] leading-snug text-muted-foreground">{style.blurb}</span>
+          </button>
+        {/each}
+      </div>
+    </div>
   </section>
 </div>

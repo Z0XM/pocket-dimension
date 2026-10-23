@@ -35,9 +35,20 @@ export const CARD_PRESETS = [
   { id: "purple-ink", label: "Purple ink", value: "#14101a" },
 ] as const;
 
+/** Beat-reactive lattice styles (Theme → Motion). */
+export const ANIMATION_STYLES = [
+  { id: "radial", label: "Radial", blurb: "Beat rings expand from center" },
+  { id: "wave", label: "Smooth wave", blurb: "Soft continuous flow through the lattice" },
+  { id: "noise", label: "Noise", blurb: "Grainy static reacting to energy" },
+  { id: "bars", label: "Bars", blurb: "Spectrum as columns of dots" },
+  { id: "bloom", label: "Bloom", blurb: "Soft pulse bloom from the center" },
+  { id: "vortex", label: "Vortex", blurb: "Spiral twist through the medium" },
+] as const;
+
 export type AccentId = (typeof ACCENT_PRESETS)[number]["id"];
 export type PageId = (typeof PAGE_PRESETS)[number]["id"];
 export type CardId = (typeof CARD_PRESETS)[number]["id"];
+export type AnimationStyleId = (typeof ANIMATION_STYLES)[number]["id"];
 
 export type ZapThemePrefs = {
   accent: AccentId;
@@ -45,6 +56,8 @@ export type ZapThemePrefs = {
   card: CardId;
   /** Master switch for beat-reactive bg and future motion. Default on. */
   animations: boolean;
+  /** Lattice visualizer style when animations are on. */
+  animationStyle: AnimationStyleId;
 };
 
 export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
@@ -52,6 +65,7 @@ export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
   page: "dark-purple",
   card: "ink",
   animations: true,
+  animationStyle: "radial",
 };
 
 /** Card fill alpha when animations are on (cymatics show through). */
@@ -70,6 +84,10 @@ export function isCardId(v: unknown): v is CardId {
   return CARD_PRESETS.some((p) => p.id === v);
 }
 
+export function isAnimationStyleId(v: unknown): v is AnimationStyleId {
+  return ANIMATION_STYLES.some((p) => p.id === v);
+}
+
 export function readThemePrefs(): ZapThemePrefs {
   if (typeof localStorage === "undefined") return { ...DEFAULT_THEME_PREFS };
   try {
@@ -81,6 +99,9 @@ export function readThemePrefs(): ZapThemePrefs {
       page: isPageId(parsed.page) ? parsed.page : DEFAULT_THEME_PREFS.page,
       card: isCardId(parsed.card) ? parsed.card : DEFAULT_THEME_PREFS.card,
       animations: typeof parsed.animations === "boolean" ? parsed.animations : DEFAULT_THEME_PREFS.animations,
+      animationStyle: isAnimationStyleId(parsed.animationStyle)
+        ? parsed.animationStyle
+        : DEFAULT_THEME_PREFS.animationStyle,
     };
   } catch {
     return { ...DEFAULT_THEME_PREFS };
@@ -129,6 +150,10 @@ export function applyThemePrefs(prefs: ZapThemePrefs) {
   const animationsOn = prefs.animations !== false;
 
   root.setAttribute("data-animations", animationsOn ? "on" : "off");
+  root.setAttribute(
+    "data-animation-style",
+    isAnimationStyleId(prefs.animationStyle) ? prefs.animationStyle : DEFAULT_THEME_PREFS.animationStyle
+  );
 
   root.style.setProperty("--background", page.value);
   root.style.setProperty("--atmosphere", `linear-gradient(180deg, ${page.value} 0%, ${page.value} 100%)`);
@@ -171,4 +196,11 @@ export function persistAndApplyTheme(prefs: ZapThemePrefs) {
 export function animationsEnabled(): boolean {
   if (typeof document === "undefined") return DEFAULT_THEME_PREFS.animations;
   return document.documentElement.getAttribute("data-animations") !== "off";
+}
+
+/** Active lattice style from `data-animation-style` (falls back to radial). */
+export function readAnimationStyle(): AnimationStyleId {
+  if (typeof document === "undefined") return DEFAULT_THEME_PREFS.animationStyle;
+  const v = document.documentElement.getAttribute("data-animation-style");
+  return isAnimationStyleId(v) ? v : DEFAULT_THEME_PREFS.animationStyle;
 }
