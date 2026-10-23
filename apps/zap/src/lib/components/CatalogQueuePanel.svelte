@@ -121,7 +121,9 @@
         <p class="truncate text-sm font-medium text-signal" title={queue.interruptTitle ?? undefined}>
           {queue.interruptTitle ?? "Catalogue song"}
         </p>
-        <p class="truncate font-mono text-[11px] text-muted-foreground">Playing from catalogue · queue paused</p>
+        <p class="truncate font-mono text-[11px] text-muted-foreground">
+          {queue.interruptPaused ? "Catalogue song paused · queue stays paused" : "Playing from catalogue · queue paused"}
+        </p>
       {:else}
         <p class="truncate text-sm font-medium" title={current?.title}>{current?.title ?? "Queue finished — press play to start over"}</p>
         <p class="truncate font-mono text-[11px] text-muted-foreground">
@@ -143,12 +145,12 @@
       <button
         type="button"
         class="inline-flex size-9 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
-        aria-label={queue.playing ? "Pause" : "Play"}
-        title={queue.playing ? "Pause" : "Play"}
-        disabled={queue.items.length === 0}
+        aria-label={queue.playing || queue.interruptPlaying ? "Pause" : "Play"}
+        title={queue.playing || queue.interruptPlaying ? "Pause" : "Play"}
+        disabled={queue.items.length === 0 && !queue.interrupting}
         onclick={() => void queue.togglePlay()}
       >
-        {#if queue.playing}
+        {#if queue.playing || queue.interruptPlaying}
           <PauseIcon class="size-4" />
         {:else}
           <PlayIcon class="size-4" />

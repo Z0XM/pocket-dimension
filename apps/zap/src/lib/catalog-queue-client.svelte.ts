@@ -45,11 +45,15 @@ export class CatalogQueueClient {
   /** Playhead from this device's audio element while it is the one producing sound. */
   localPositionMs = $state<number | null>(null);
   /**
-   * Catalogue one-shot: pause the personal queue, play this media, then resume.
-   * Not part of the queue snapshot — local to this device.
+   * Catalogue one-shot: pause the personal queue, play this media; resume the queue only when
+   * the interrupt ends naturally (not when the user pauses). Local to this device.
    */
   interruptMediaAssetId = $state<string | null>(null);
   interruptTitle = $state<string | null>(null);
+  /** User paused the catalogue interrupt — queue stays paused; do not auto-resume. */
+  interruptPaused = $state(false);
+  /** Bumped when the user seeks during an interrupt so the dock applies `localPositionMs`. */
+  interruptSeekGen = $state(0);
 
   queue = $derived(this.snapshot?.queue ?? null);
   items = $derived<CatalogQueueItem[]>(this.snapshot?.items ?? []);
@@ -61,6 +65,7 @@ export class CatalogQueueClient {
   active = $derived(Boolean(this.queue) && this.items.length > 0);
   playing = $derived(this.queue?.playbackState === "playing" && Boolean(this.currentItem) && !this.interruptMediaAssetId);
   interrupting = $derived(Boolean(this.interruptMediaAssetId));
+  interruptPlaying = $derived(Boolean(this.interruptMediaAssetId) && !this.interruptPaused);
   /** True when replacing the personal queue would discard an in-progress run. */
   needsReplaceConfirm = $derived(this.active);
   positionMs = $derived.by(() => {
@@ -75,6 +80,7 @@ export class CatalogQueueClient {
   private es: EventSource | null = null;
   private ticker: ReturnType<typeof setInterval> | null = null;
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Whether to resume the personal queue when the interrupt ends naturally. */
   private interruptResumePlaying = false;
 
   connect() {
@@ -156,40 +162,64 @@ export class CatalogQueueClient {
   clearInterrupt() {
     this.interruptMediaAssetId = null;
     this.interruptTitle = null;
+    this.interruptPaused = false;
     this.interruptResumePlaying = false;
     this.localPositionMs = null;
   }
 
+  /** Pause the catalogue interrupt without resuming the background queue. */
+  pauseInterrupt() {
+    if (!this.interruptMediaAssetId) return;
+    this.interruptPaused = true;
+  }
+
+  /** Resume a paused catalogue interrupt (queue stays paused until natural end). */
+  resumeInterrupt() {
+    if (!this.interruptMediaAssetId) return;
+    this.interruptPaused = false;
+  }
+
   /**
    * Catalogue row Play: if a personal queue is active, pause it and play this song as a one-shot;
-   * when it ends, resume the queue. With no active queue, enqueue+play as usual.
+   * when it *ends*, resume the queue. User pause does not resume the queue.
+   * With no active queue, enqueue+play as usual.
    */
   async playCatalogueSong(mediaAssetId: string, meta?: { title?: string | null }) {
     this.error = null;
-    // Same catalogue song while interrupting → stop interrupt and resume queue if it was playing.
+    // Same catalogue interrupt → toggle pause/play on the interrupt only (never resume the queue).
     if (this.interruptMediaAssetId === mediaAssetId) {
-      await this.finishInterrupt();
+      if (this.interruptPaused) this.resumeInterrupt();
+      else this.pauseInterrupt();
       return null;
     }
     if (this.active) {
-      const wasPlaying = this.queue?.playbackState === "playing" || Boolean(this.interruptMediaAssetId && this.interruptResumePlaying);
+      const wasPlaying =
+        this.queue?.playbackState === "playing" || Boolean(this.interruptMediaAssetId && this.interruptResumePlaying);
+      // Pause the queue using its own playhead — not the interrupt scrubber position.
       if (this.queue?.playbackState === "playing") {
-        await this.command({ action: "pause", positionMs: this.positionMs });
+        const queuePos =
+          this.interruptMediaAssetId != null
+            ? estimatePositionMs(this.queue, Date.now() + this.clockOffsetMs, this.currentItem?.durationMs)
+            : this.positionMs;
+        await this.command({ action: "pause", positionMs: queuePos });
       }
       this.interruptResumePlaying = wasPlaying;
       this.interruptMediaAssetId = mediaAssetId;
       this.interruptTitle = meta?.title?.trim() || null;
+      this.interruptPaused = false;
       this.localPositionMs = 0;
+      this.interruptSeekGen++;
       return null;
     }
     this.clearInterrupt();
     return this.command({ action: "enqueue", mediaAssetIds: [mediaAssetId], mode: "play" });
   }
 
+  /** Natural end of the catalogue interrupt — only place that may resume the personal queue. */
   async finishInterrupt() {
     const resume = this.interruptResumePlaying;
     this.clearInterrupt();
-    if (resume && this.active) await this.play();
+    if (resume && this.active) await this.command({ action: "play" });
   }
 
   /** @deprecated Prefer playCatalogueSong for catalogue rows; kept for History one-offs that should interrupt. */
@@ -226,15 +256,14 @@ export class CatalogQueueClient {
   // --- transport ----------------------------------------------------------
 
   play() {
-    if (this.interruptMediaAssetId) {
-      this.clearInterrupt();
-    }
+    // Explicit queue play from the dock dismisses any catalogue interrupt without auto-resume race.
+    if (this.interruptMediaAssetId) this.clearInterrupt();
     return this.command({ action: "play" });
   }
 
   pause() {
     if (this.interruptMediaAssetId) {
-      this.clearInterrupt();
+      this.pauseInterrupt();
       return null;
     }
     return this.command({ action: "pause", positionMs: this.positionMs });
@@ -242,15 +271,22 @@ export class CatalogQueueClient {
 
   togglePlay() {
     if (this.interruptMediaAssetId) {
-      void this.finishInterrupt();
+      if (this.interruptPaused) this.resumeInterrupt();
+      else this.pauseInterrupt();
       return null;
     }
     return this.playing ? this.pause() : this.play();
   }
 
   seek(positionMs: number) {
-    if (this.localPositionMs != null) this.localPositionMs = positionMs;
-    return this.command({ action: "seek", positionMs });
+    const ms = Math.max(0, Math.round(positionMs));
+    if (this.interruptMediaAssetId) {
+      this.localPositionMs = ms;
+      this.interruptSeekGen++;
+      return null;
+    }
+    if (this.localPositionMs != null) this.localPositionMs = ms;
+    return this.command({ action: "seek", positionMs: ms });
   }
 
   next() {

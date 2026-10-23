@@ -68,8 +68,12 @@
 
   const unavailable = $derived(track.available === false);
   const isCurrent = $derived(Boolean(queue?.currentItem && queue.currentItem.mediaAssetId === track.id));
-  const isPlaying = $derived(isCurrent && Boolean(queue?.playing));
-  const durationMs = $derived(track.durationMs ?? queue?.currentItem?.durationMs ?? 0);
+  const isInterrupt = $derived(Boolean(queue?.interruptMediaAssetId === track.id));
+  /** Seek + “now playing” chrome follow the interrupt row when one is active. */
+  const showTransport = $derived(isInterrupt || (isCurrent && !queue?.interruptMediaAssetId));
+  const isPlaying = $derived(isCurrent && Boolean(queue?.playing) && !queue?.interruptMediaAssetId);
+  const isPlayingRow = $derived((isInterrupt && Boolean(queue?.interruptPlaying)) || isPlaying);
+  const durationMs = $derived(track.durationMs ?? (isCurrent ? (queue?.currentItem?.durationMs ?? 0) : 0));
 
   async function confirmDelete() {
     deleting = true;
@@ -84,9 +88,6 @@
     ondeleted?.(track.id, outcome.message);
   }
 
-  const isInterrupt = $derived(Boolean(queue?.interruptMediaAssetId === track.id));
-  const isPlayingRow = $derived(isInterrupt || isPlaying);
-
   async function togglePlay() {
     error = null;
     if (!track.playable) {
@@ -94,7 +95,7 @@
       return;
     }
     if (!queue) return;
-    // Catalogue play: interrupt an active queue (pause → play song → resume), or toggle if this row is current.
+    // Catalogue play: interrupt an active queue (pause → play song → resume on end), or toggle if this row is current.
     if (isCurrent && !queue.interruptMediaAssetId) await queue.togglePlay();
     else await queue.playCatalogueSong(track.id, { title: track.title });
     if (queue.error) error = queue.error;
@@ -167,13 +168,13 @@
   }
 </script>
 
-<li class={`zap-track flex flex-col gap-3 px-4 py-3 ${isCurrent || isInterrupt ? "is-current" : ""}`}>
+<li class={`zap-track flex flex-col gap-3 px-4 py-3 ${showTransport ? "is-current" : ""}`}>
   <div class="flex items-start gap-3 sm:items-center sm:gap-4">
     <button
       type="button"
       class="zap-track-play flex size-10 shrink-0 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
-      disabled={!track.playable || !queue || (queue.pending > 0 && !isCurrent && !isInterrupt)}
-      title={unavailable ? "Song not available" : isCurrent ? undefined : queue?.active ? "Play (pauses your queue until this song ends)" : "Play"}
+      disabled={!track.playable || !queue || (queue.pending > 0 && !showTransport)}
+      title={unavailable ? "Song not available" : showTransport ? undefined : queue?.active ? "Play (pauses your queue until this song ends)" : "Play"}
       aria-label={unavailable ? "Song not available" : isPlayingRow ? "Pause" : "Play"}
       onclick={togglePlay}
     >
@@ -188,7 +189,7 @@
       <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div class="min-w-0 flex-1">
           <p
-            class="zap-track-title truncate font-medium {isCurrent || isInterrupt ? 'text-signal' : unavailable ? 'text-muted-foreground' : 'text-foreground'}"
+            class="zap-track-title truncate font-medium {showTransport ? 'text-signal' : unavailable ? 'text-muted-foreground' : 'text-foreground'}"
             title={track.title}
           >
             {track.title}
@@ -251,7 +252,7 @@
         </div>
       </div>
 
-      {#if isCurrent && queue}
+      {#if showTransport && queue}
         <div class="flex items-center gap-2">
           <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(queue.positionMs)}</span>
           <input
