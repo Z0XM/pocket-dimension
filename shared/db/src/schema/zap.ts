@@ -624,8 +624,14 @@ export const zapSettings = zapSchema.table("settings", {
 
 export const connectionProvider = zapSchema.enum("connection_provider", ["discord", "spotify", "youtube"]);
 
+export const youtubePlaylistImportStatus = zapSchema.enum("youtube_playlist_import_status", [
+  "fully_imported",
+  "partially_imported",
+  "not_imported",
+]);
+
 /**
- * Per-user YouTube playlist prefs (auto-sync) + cached titles for Connections UI.
+ * Per-user YouTube playlist prefs (auto-sync, hide, cached import status) for Connections UI.
  * Additive sync only — never removes catalogue rows when YT drops a video.
  */
 export const youtubePlaylistPrefs = zapSchema.table(
@@ -637,6 +643,11 @@ export const youtubePlaylistPrefs = zapSchema.table(
     youtubePlaylistId: text("youtube_playlist_id").notNull(),
     title: text("title"),
     autoSync: boolean("auto_sync").default(false).notNull(),
+    /** Soft-hide from default Connections playlist views. */
+    hidden: boolean("hidden").default(false).notNull(),
+    /** Last known library coverage (updated on preview / import / auto-sync). */
+    importStatus: youtubePlaylistImportStatus("import_status").default("not_imported").notNull(),
+    alreadyImported: integer("already_imported").default(0).notNull(),
     lastSyncedAt: timestamp("last_synced_at"),
     lastSyncError: text("last_sync_error"),
     createdAt: timestamps.createdAt,

@@ -7,7 +7,7 @@ import { mapPool, youtubeIngestConcurrency } from "$lib/server/ingest/map-pool";
 import { hasCatalogueAsset, ingestCatalogueVideo, type IngestItemResult, type SyncRunResult } from "$lib/server/ingest/pipeline";
 import type { SongProgress } from "$lib/server/ingest/progress";
 import { setUserLibraryOrder } from "$lib/server/library-order";
-import { libraryYoutubeIdentityKeys } from "$lib/server/connections/youtube-status";
+import { libraryYoutubeIdentityKeys, recordPlaylistImportCoverage } from "$lib/server/connections/youtube-status";
 import { listYouTubePlaylistItems, listYouTubePlaylists, type ZapYouTubePlaylistItem } from "./api";
 import { parsePlaylistImportSort, sortPlaylistItemsForImport, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
 
@@ -138,7 +138,7 @@ export async function importConnectedPlaylists(
     });
 
     const knownPlaylistsPromise = listYouTubePlaylists(userId).catch(() => []);
-    const entryLists = await Promise.all(
+    const entryLists: ZapYouTubePlaylistItem[][] = await Promise.all(
       uniqueIds.map((playlistId) =>
         listYouTubePlaylistItems(userId, playlistId, {
           onPage: async ({ pageSize }) => {
@@ -321,6 +321,29 @@ export async function importConnectedPlaylists(
         finishedAt: new Date(),
       })
       .where(eq(schema.syncRuns.id, run.id));
+
+    // Persist per-playlist coverage so Connections stops showing stale "Not imported".
+    try {
+      const postImportKeys = await libraryYoutubeIdentityKeys(
+        userId,
+        entryLists.flatMap((entries) => entries.map((e) => e.videoId))
+      );
+      for (let i = 0; i < uniqueIds.length; i++) {
+        const entries = entryLists[i] ?? [];
+        const alreadyImported = entries.filter((e) => postImportKeys.has(`youtube:${e.videoId}`)).length;
+        await recordPlaylistImportCoverage({
+          userId,
+          youtubePlaylistId: uniqueIds[i]!,
+          title: playlistTitles[i] ?? null,
+          total: entries.length,
+          alreadyImported,
+          synced: true,
+          lastSyncError: null,
+        });
+      }
+    } catch (err) {
+      console.warn("[zap youtube import status prefs]", err);
+    }
 
     // Drain queued progress writes before the NDJSON controller closes.
     await progressGate;

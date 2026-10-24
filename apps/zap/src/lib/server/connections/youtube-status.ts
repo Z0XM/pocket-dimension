@@ -87,6 +87,9 @@ export async function upsertPlaylistPref(opts: {
   youtubePlaylistId: string;
   title?: string | null;
   autoSync?: boolean;
+  hidden?: boolean;
+  importStatus?: PlaylistImportStatus;
+  alreadyImported?: number;
   lastSyncedAt?: Date | null;
   lastSyncError?: string | null;
 }) {
@@ -102,6 +105,9 @@ export async function upsertPlaylistPref(opts: {
       .set({
         ...(opts.title !== undefined ? { title: opts.title } : {}),
         ...(opts.autoSync !== undefined ? { autoSync: opts.autoSync } : {}),
+        ...(opts.hidden !== undefined ? { hidden: opts.hidden } : {}),
+        ...(opts.importStatus !== undefined ? { importStatus: opts.importStatus } : {}),
+        ...(opts.alreadyImported !== undefined ? { alreadyImported: opts.alreadyImported } : {}),
         ...(opts.lastSyncedAt !== undefined ? { lastSyncedAt: opts.lastSyncedAt } : {}),
         ...(opts.lastSyncError !== undefined ? { lastSyncError: opts.lastSyncError } : {}),
       })
@@ -121,6 +127,9 @@ export async function upsertPlaylistPref(opts: {
       youtubePlaylistId: opts.youtubePlaylistId,
       title: opts.title ?? null,
       autoSync: opts.autoSync ?? false,
+      hidden: opts.hidden ?? false,
+      importStatus: opts.importStatus ?? "not_imported",
+      alreadyImported: opts.alreadyImported ?? 0,
       lastSyncedAt: opts.lastSyncedAt ?? null,
       lastSyncError: opts.lastSyncError ?? null,
     })
@@ -128,28 +137,55 @@ export async function upsertPlaylistPref(opts: {
   return row!;
 }
 
+/** Persist coverage after a preview crawl or completed import. */
+export async function recordPlaylistImportCoverage(opts: {
+  userId: string;
+  youtubePlaylistId: string;
+  title?: string | null;
+  total: number;
+  alreadyImported: number;
+  /** When true, also stamp lastSyncedAt (completed import / auto-sync). */
+  synced?: boolean;
+  lastSyncError?: string | null;
+}) {
+  return upsertPlaylistPref({
+    userId: opts.userId,
+    youtubePlaylistId: opts.youtubePlaylistId,
+    title: opts.title,
+    importStatus: importStatusFromCounts(opts.total, opts.alreadyImported),
+    alreadyImported: opts.alreadyImported,
+    ...(opts.synced
+      ? { lastSyncedAt: new Date(), lastSyncError: opts.lastSyncError ?? null }
+      : opts.lastSyncError !== undefined
+        ? { lastSyncError: opts.lastSyncError }
+        : {}),
+  });
+}
+
 export type EnrichedPlaylist = ZapYouTubePlaylist & {
   importStatus: PlaylistImportStatus;
   alreadyImported: number;
   autoSync: boolean;
+  hidden: boolean;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
 };
 
 /**
- * Enrich playlist list with library import status (sampled via itemCount when listing;
- * full accuracy needs per-playlist item fetch — done on preview/import).
- * Uses a lightweight identity scan when itemCount is small; otherwise marks unknown as not_imported until preview.
+ * Enrich playlist list with cached import status from prefs (written on preview / import / auto-sync).
+ * Listing every playlist's items here would 502 large accounts — see {@link previewYouTubePlaylist}.
  */
 export async function enrichPlaylistsWithStatus(userId: string, playlists: ZapYouTubePlaylist[]): Promise<EnrichedPlaylist[]> {
   const prefs = await loadPlaylistPrefs(userId);
   return playlists.map((p) => {
     const pref = prefs.get(p.id);
+    const importStatus = (pref?.importStatus as PlaylistImportStatus | undefined) ?? "not_imported";
     return {
       ...p,
-      importStatus: "not_imported" as PlaylistImportStatus,
-      alreadyImported: 0,
+      importStatus,
+      alreadyImported: pref?.alreadyImported ?? 0,
       autoSync: pref?.autoSync ?? false,
+      hidden: pref?.hidden ?? false,
       lastSyncedAt: pref?.lastSyncedAt?.toISOString() ?? null,
       lastSyncError: pref?.lastSyncError ?? null,
     };
