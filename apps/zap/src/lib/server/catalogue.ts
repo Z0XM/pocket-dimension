@@ -1,5 +1,5 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import type { CatalogueScope } from "$lib/catalogue-scope";
 import { MAX_CUSTOM_TAG_LENGTH, parseCustomTagNames, slugifyTag } from "$lib/custom-tags";
 import { rankTopTagIds } from "$lib/tag-filter";
@@ -20,7 +20,7 @@ const catalogueVisible = () => inArray(schema.mediaAssets.status, [...CATALOGUE_
 
 export const CATALOGUE_PAGE_SIZE = 25;
 
-export type CatalogueOrder = "title" | "library";
+export type CatalogueOrder = "recent" | "title" | "library";
 
 export type CatalogueQuery = {
   userId: string;
@@ -37,7 +37,11 @@ export type CatalogueQuery = {
   tagQuery?: string;
   /** When true, only assets with no tags for this user (mutually exclusive with tagIds / tagQuery). */
   untagged?: boolean;
-  /** `library` uses per-user sort keys (playlist import order). Default title. */
+  /**
+   * List sort. Default `recent` (newest `media_assets.created_at` first).
+   * `library` uses per-user sort keys (newest import batch first).
+   * `title` is A–Z. Playlist scope always uses playlist position.
+   */
   order?: CatalogueOrder;
   /** 0-based page offset in items (not pages). */
   offset?: number;
@@ -164,7 +168,8 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
     conditions.push(or(ilike(schema.mediaAssets.title, pattern), ilike(schema.mediaAssets.artists, pattern))!);
   }
 
-  const useLibraryOrder = (input.order ?? "title") === "library" || scope === "yours";
+  const order = input.order ?? "recent";
+  const useLibraryOrder = order === "library";
 
   let assets: CatalogueAsset[];
   let hasMore: boolean;
@@ -184,7 +189,7 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
     hasMore = joined.length > limit;
     assets = (hasMore ? joined.slice(0, limit) : joined).map((r) => r.asset);
   } else if (useLibraryOrder) {
-    // Prefer durable per-user sort keys; untitled/unkeyed rows fall back after keyed ones.
+    // Higher sortKey = more recently imported batch → newest first.
     const joined = await db
       .select({
         asset: schema.mediaAssets,
@@ -196,17 +201,32 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
         and(eq(schema.userLibraryEntries.mediaAssetId, schema.mediaAssets.id), eq(schema.userLibraryEntries.userId, input.userId))
       )
       .where(and(...conditions))
-      .orderBy(sql`${schema.userLibraryEntries.sortKey} asc nulls last`, asc(schema.mediaAssets.title), asc(schema.mediaAssets.id))
+      .orderBy(
+        sql`${schema.userLibraryEntries.sortKey} desc nulls last`,
+        desc(schema.mediaAssets.createdAt),
+        desc(schema.mediaAssets.id)
+      )
       .limit(limit + 1)
       .offset(offset);
     hasMore = joined.length > limit;
     assets = (hasMore ? joined.slice(0, limit) : joined).map((r) => r.asset);
-  } else {
+  } else if (order === "title") {
     const rows = await db
       .select()
       .from(schema.mediaAssets)
       .where(and(...conditions))
       .orderBy(asc(schema.mediaAssets.title), asc(schema.mediaAssets.id))
+      .limit(limit + 1)
+      .offset(offset);
+    hasMore = rows.length > limit;
+    assets = hasMore ? rows.slice(0, limit) : rows;
+  } else {
+    // Default `recent`: most recently added catalogue assets on top.
+    const rows = await db
+      .select()
+      .from(schema.mediaAssets)
+      .where(and(...conditions))
+      .orderBy(desc(schema.mediaAssets.createdAt), desc(schema.mediaAssets.id))
       .limit(limit + 1)
       .offset(offset);
     hasMore = rows.length > limit;
