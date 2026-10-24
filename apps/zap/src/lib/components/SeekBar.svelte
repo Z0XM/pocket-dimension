@@ -51,7 +51,7 @@
 </script>
 
 <input
-  class={`zap-seek cursor-pointer appearance-none rounded-full disabled:opacity-40 ${className}`}
+  class={`zap-seek zap-seek--progress cursor-pointer appearance-none rounded-full disabled:opacity-40 ${className}`}
   style={`--seek-pct: ${pct}%`}
   type="range"
   min="0"
