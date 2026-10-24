@@ -12,6 +12,7 @@
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
   import { DOCK_BAR_H, type FloatingMode } from "$lib/floating-panel";
   import { registerPlaybackAudio } from "$lib/playback-audio";
+  import { subscribeTabAudioLeader } from "$lib/tab-audio-leader";
 
   let { queue }: { queue: CatalogQueueClient } = $props();
 
@@ -22,6 +23,8 @@
 
   let audioEl = $state<HTMLAudioElement | null>(null);
   let audioBlocked = $state(false);
+  /** Only one same-browser tab emits sound (shared deviceId); others stay silent followers. */
+  let isAudioLeader = $state(false);
   let appliedKey = "";
   let pendingSeekSec: number | null = null;
   let docked = $state(false);
@@ -38,10 +41,18 @@
   const path = $derived(page.url.pathname);
   const hideCatalogFloats = $derived(path.startsWith("/session") || path.startsWith("/join"));
   const deviceOutput = $derived(queue.thisDevice?.outputEnabled ?? false);
-  const outputHere = $derived(deviceOutput && !hideCatalogFloats);
+  const outputHere = $derived(deviceOutput && isAudioLeader && !hideCatalogFloats);
   const showQueue = $derived(queue.active && !hideCatalogFloats);
   const showDevices = $derived(!hideCatalogFloats && (queue.active || queue.onlineDevices.length > 1));
-  const localNote = $derived(!queue.thisDevice ? null : !deviceOutput ? "This device is remote-only." : null);
+  const localNote = $derived(
+    !queue.thisDevice
+      ? null
+      : !deviceOutput
+        ? "This device is remote-only."
+        : !isAudioLeader
+          ? "Audio is playing in another Zap tab."
+          : null
+  );
 
   function readFlag(key: string): boolean {
     try {
@@ -144,7 +155,11 @@
     docked = readFlag(DOCK_KEY);
     devicesDocked = readFlag(DEVICES_DOCK_KEY);
     queue.connect();
+    const stopLeader = subscribeTabAudioLeader((leader) => {
+      isAudioLeader = leader;
+    });
     return () => {
+      stopLeader();
       queue.disconnect();
     };
   });
@@ -209,7 +224,7 @@
     const item = queue.currentItem;
     const output = outputHere;
     if (!el) return;
-    const key = `${state?.id}|${state?.playbackGeneration}|${state?.playbackState}|${item?.id}|${output}`;
+    const key = `${state?.id}|${state?.playbackGeneration}|${state?.playbackState}|${item?.id}|${output}|${isAudioLeader}`;
     if (key === appliedKey) return;
     appliedKey = key;
     untrack(() => void apply(el, state, item, output));
