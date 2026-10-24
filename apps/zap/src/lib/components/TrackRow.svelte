@@ -5,15 +5,14 @@
   import ListStartIcon from "@lucide/svelte/icons/list-start";
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import TagsIcon from "@lucide/svelte/icons/tags";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
-  import CustomTagInput from "$lib/components/CustomTagInput.svelte";
+  import EditTagsDialog from "$lib/components/EditTagsDialog.svelte";
   import SeekBar from "$lib/components/SeekBar.svelte";
-  import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import { deleteSongAsAdmin, SONG_DELETE_CONFIRM_BODY } from "$lib/admin-song-delete";
   import { formatClock, type EnqueueMode } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
-  import { enhance } from "$app/forms";
   import { toast } from "$lib/toast.svelte";
 
   export type TrackItem = {
@@ -60,11 +59,7 @@
 
   let deleteOpen = $state(false);
   let deleting = $state(false);
-  let editing = $state(false);
-  let editTagIds = $state<string[]>([]);
-  let editCustomTags = $state<string[]>([]);
-  let editCustomDraft = $state("");
-  let tagFormEl = $state<HTMLFormElement | null>(null);
+  let editTagsOpen = $state(false);
   let scrubMs = $state<number | null>(null);
 
   let menuOpen = $state(false);
@@ -156,12 +151,6 @@
     };
   });
 
-  function startEdit() {
-    editing = true;
-    editTagIds = track.tags.map((t) => t.id);
-    editCustomTags = [];
-    editCustomDraft = "";
-  }
 </script>
 
 <li class={`zap-track flex flex-col gap-3 px-4 py-3 ${isCurrent ? "is-current" : ""}`}>
@@ -216,10 +205,11 @@
           {/each}
           <button
             type="button"
-            class="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-signal hover:bg-signal/10"
-            onclick={() => (editing ? (editing = false) : startEdit())}
+            class="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 font-mono text-[10px] text-signal hover:bg-signal/10"
+            onclick={() => (editTagsOpen = true)}
           >
-            {editing ? "Cancel" : "Edit tags"}
+            <TagsIcon class="size-3" aria-hidden="true" />
+            Edit tags
           </button>
           {#if canDelete}
             <button
@@ -298,44 +288,14 @@
     </div>
   {/if}
 
-  {#if editing}
-    <form
-      method="POST"
-      action="?/setTags"
-      class="space-y-2 rounded border border-border/60 bg-background/40 p-3"
-      bind:this={tagFormEl}
-      use:enhance={() => {
-        return async ({ result, update }) => {
-          // Keep local catalogue list; apply returned tags via ontags (invalidateAll would reload
-          // data but catalogue hydration ignores tag-only changes).
-          await update({ reset: false, invalidateAll: false });
-          if (result.type === "failure") {
-            const data = result.data as { tagError?: string } | undefined;
-            toast.error(data?.tagError ?? "Could not update tags");
-            return;
-          }
-          if (result.type !== "success") return;
-          const data = result.data as { tagOk?: boolean; mediaAssetId?: string; tags?: TrackItem["tags"] } | undefined;
-          if (data?.tagOk && Array.isArray(data.tags)) {
-            ontags?.(track.id, data.tags);
-            toast.success("Tags updated.");
-          }
-          editing = false;
-        };
-      }}
-    >
-      <input type="hidden" name="mediaAssetId" value={track.id} />
-      <TagMultiSelect
-        options={availableTags}
-        bind:selected={editTagIds}
-        name="tagIds"
-        placeholder="Select tags…"
-        onconfirm={() => tagFormEl?.requestSubmit()}
-      />
-      <CustomTagInput bind:tags={editCustomTags} bind:draft={editCustomDraft} name="customTags" />
-      <button type="submit" class="auth-btn w-fit">Save tags</button>
-    </form>
-  {/if}
+  <EditTagsDialog
+    bind:open={editTagsOpen}
+    mediaAssetId={track.id}
+    trackTitle={track.title}
+    {availableTags}
+    initialSelected={track.tags.map((t) => t.id)}
+    onsaved={(tags) => ontags?.(track.id, tags)}
+  />
 
   {#if canDelete}
     <ConfirmDialog
