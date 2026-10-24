@@ -8,6 +8,7 @@
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import CustomTagInput from "$lib/components/CustomTagInput.svelte";
+  import SeekBar from "$lib/components/SeekBar.svelte";
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import { deleteSongAsAdmin, SONG_DELETE_CONFIRM_BODY } from "$lib/admin-song-delete";
   import { formatClock, type EnqueueMode } from "$lib/catalog-queue";
@@ -64,6 +65,7 @@
   let editCustomTags = $state<string[]>([]);
   let editCustomDraft = $state("");
   let tagFormEl = $state<HTMLFormElement | null>(null);
+  let scrubMs = $state<number | null>(null);
 
   let menuOpen = $state(false);
   let menuBtn = $state<HTMLButtonElement | null>(null);
@@ -249,16 +251,15 @@
 
       {#if isCurrent && queue}
         <div class="flex items-center gap-2">
-          <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(queue.positionMs)}</span>
-          <input
-            class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)]"
-            type="range"
-            min="0"
-            max={Math.max(durationMs / 1000, 1)}
-            step="0.5"
-            value={queue.positionMs / 1000}
-            aria-label={`Seek ${track.title}`}
-            onchange={(e) => void queue.seek(Number((e.currentTarget as HTMLInputElement).value) * 1000)}
+          <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums"
+            >{formatClock(scrubMs ?? queue.positionMs)}</span
+          >
+          <SeekBar
+            valueMs={queue.positionMs}
+            {durationMs}
+            ariaLabel={`Seek ${track.title}`}
+            onseek={(ms) => void queue.seek(ms)}
+            onscrub={(ms) => (scrubMs = ms)}
           />
           <span class="w-10 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(durationMs)}</span>
         </div>

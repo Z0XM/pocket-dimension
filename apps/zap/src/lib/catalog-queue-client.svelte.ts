@@ -46,6 +46,11 @@ export class CatalogQueueClient {
   now = $state(Date.now());
   /** Playhead from this device's audio element while it is the one producing sound. */
   localPositionMs = $state<number | null>(null);
+  /**
+   * Optimistic seek target. While set, ignore stale `timeupdate` positions that haven't
+   * caught up yet (avoids the thumb flashing back on mouse-up).
+   */
+  pendingSeekMs = $state<number | null>(null);
 
   queue = $derived(this.snapshot?.queue ?? null);
   items = $derived<CatalogQueueItem[]>(this.snapshot?.items ?? []);
@@ -191,8 +196,23 @@ export class CatalogQueueClient {
 
   seek(positionMs: number) {
     const ms = Math.max(0, Math.round(positionMs));
-    if (this.localPositionMs != null) this.localPositionMs = ms;
+    this.localPositionMs = ms;
+    this.pendingSeekMs = ms;
     return this.command({ action: "seek", positionMs: ms });
+  }
+
+  /** Apply audio element position; no-ops while a seek is still catching up. */
+  noteAudioPosition(positionMs: number) {
+    const ms = Math.max(0, Math.round(positionMs));
+    if (this.pendingSeekMs != null) {
+      if (Math.abs(ms - this.pendingSeekMs) > 750) return;
+      this.pendingSeekMs = null;
+    }
+    this.localPositionMs = ms;
+  }
+
+  clearPendingSeek() {
+    this.pendingSeekMs = null;
   }
 
   next() {

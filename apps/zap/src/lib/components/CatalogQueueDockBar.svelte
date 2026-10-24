@@ -7,6 +7,7 @@
   import SkipForwardIcon from "@lucide/svelte/icons/skip-forward";
   import { formatClock } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
+  import SeekBar from "$lib/components/SeekBar.svelte";
   import { DOCK_BAR_H, DROP_ZONE_PX, inDropZone } from "$lib/floating-panel";
 
   let {
@@ -36,16 +37,6 @@
   let undockDragging = $state(false);
   let undockWillLeave = $state(false);
   let undockStart: { x: number; y: number } | null = null;
-
-  function onSeekInput(e: Event) {
-    scrubMs = Number((e.currentTarget as HTMLInputElement).value) * 1000;
-  }
-
-  function onSeekCommit(e: Event) {
-    const ms = Number((e.currentTarget as HTMLInputElement).value) * 1000;
-    scrubMs = null;
-    if (Number.isFinite(ms)) void queue.seek(ms);
-  }
 
   function startUndock(e: PointerEvent) {
     if (e.button !== 0) return;
@@ -143,17 +134,13 @@
       <span class="hidden w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums sm:inline"
         >{formatClock(scrubMs ?? queue.positionMs)}</span
       >
-      <input
-        class="zap-seek h-1.5 w-full min-w-[4rem] cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)] disabled:opacity-40"
-        type="range"
-        min="0"
-        max={Math.max(durationMs / 1000, 1)}
-        step="0.5"
-        value={(scrubMs ?? queue.positionMs) / 1000}
+      <SeekBar
+        class="h-1.5 w-full min-w-[4rem]"
+        valueMs={queue.positionMs}
+        {durationMs}
         disabled={!current}
-        aria-label="Seek"
-        oninput={onSeekInput}
-        onchange={onSeekCommit}
+        onseek={(ms) => void queue.seek(ms)}
+        onscrub={(ms) => (scrubMs = ms)}
       />
       <span class="hidden w-9 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums sm:inline"
         >{formatClock(durationMs)}</span

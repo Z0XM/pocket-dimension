@@ -177,6 +177,7 @@
       el.load();
     }
     delete el.dataset.itemId;
+    queue.clearPendingSeek();
     queue.localPositionMs = null;
     pendingSeekSec = null;
   }
@@ -188,15 +189,25 @@
       return;
     }
     if (el.dataset.itemId !== item.id) {
+      queue.clearPendingSeek();
       el.src = `/api/media/${item.mediaAssetId}/audio`;
       el.dataset.itemId = item.id;
       el.load();
     }
-    // A new generation means the server moved the playhead (seek / track change); follow it, not our element.
-    queue.localPositionMs = null;
-    const target = untrack(() => queue.positionMs) / 1000;
+    // Server moved the playhead (seek / track change). Keep optimistic seek position until
+    // timeupdate confirms; otherwise clear local and follow the snapshot estimate.
+    const pending = untrack(() => queue.pendingSeekMs);
+    const targetMs = pending ?? untrack(() => {
+      queue.localPositionMs = null;
+      return queue.positionMs;
+    });
+    const target = targetMs / 1000;
+    queue.localPositionMs = targetMs;
     if (el.readyState >= 1) {
-      if (Math.abs(el.currentTime - target) > 1) el.currentTime = target;
+      if (Math.abs(el.currentTime - target) > 0.35) el.currentTime = target;
+      if (pending != null && Math.abs(el.currentTime * 1000 - pending) <= 750) {
+        queue.clearPendingSeek();
+      }
     } else {
       pendingSeekSec = target;
     }
@@ -234,17 +245,21 @@
     if (!audioEl || pendingSeekSec == null) return;
     audioEl.currentTime = pendingSeekSec;
     pendingSeekSec = null;
+    if (queue.pendingSeekMs != null && Math.abs(audioEl.currentTime * 1000 - queue.pendingSeekMs) <= 750) {
+      queue.clearPendingSeek();
+    }
   }
 
   function onTimeUpdate() {
     if (!audioEl || !outputHere || audioEl.dataset.itemId !== queue.currentItem?.id) return;
-    queue.localPositionMs = Math.round(audioEl.currentTime * 1000);
+    queue.noteAudioPosition(audioEl.currentTime * 1000);
   }
 
   function onEnded() {
     const state = queue.queue;
     const itemId = audioEl?.dataset.itemId;
     if (!state || !itemId || itemId !== state.currentItemId) return;
+    queue.clearPendingSeek();
     queue.localPositionMs = null;
     void queue.ended(itemId, state.playbackGeneration);
   }
