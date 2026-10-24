@@ -62,6 +62,7 @@
   let editTagIds = $state<string[]>([]);
   let editCustomTags = $state<string[]>([]);
   let editCustomDraft = $state("");
+  let tagFormEl = $state<HTMLFormElement | null>(null);
   let error = $state<string | null>(null);
   let info = $state<string | null>(null);
 
@@ -314,6 +315,7 @@
       method="POST"
       action="?/setTags"
       class="space-y-2 rounded border border-border/60 bg-background/40 p-3"
+      bind:this={tagFormEl}
       use:enhance={() => {
         return async ({ result, update }) => {
           // Keep local catalogue list; apply returned tags via ontags (invalidateAll would reload
@@ -329,7 +331,13 @@
       }}
     >
       <input type="hidden" name="mediaAssetId" value={track.id} />
-      <TagMultiSelect options={availableTags} bind:selected={editTagIds} name="tagIds" placeholder="Select tags…" />
+      <TagMultiSelect
+        options={availableTags}
+        bind:selected={editTagIds}
+        name="tagIds"
+        placeholder="Select tags…"
+        onconfirm={() => tagFormEl?.requestSubmit()}
+      />
       <CustomTagInput bind:tags={editCustomTags} bind:draft={editCustomDraft} name="customTags" />
       <button type="submit" class="auth-btn w-fit">Save tags</button>
     </form>
