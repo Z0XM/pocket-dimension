@@ -1,6 +1,7 @@
 import { ensureCustomTags } from "$lib/server/catalogue";
 import { ingestCatalogueVideo, ingestPublicUrl, type IngestItemResult } from "$lib/server/ingest/pipeline";
 import { importConnectedPlaylists } from "$lib/server/youtube/import-playlists";
+import { clearJobLiveSongs, setJobLiveSongs } from "./live-progress";
 import {
   completeJob,
   getImportJobItem,
@@ -69,11 +70,13 @@ export async function runImportJob(jobId: string): Promise<void> {
         userId,
         url,
         async (song) => {
+          setJobLiveSongs(jobId, [song]);
           await updateJobProgress(jobId, { currentTitle: song.title ?? null });
         },
         { tagIds: resolvedTagIds }
       );
       await persistResults(jobId, result.items);
+      clearJobLiveSongs(jobId);
       await completeJob(jobId, {
         status: result.failed > 0 && result.imported === 0 ? "failed" : "completed",
         syncRunId: result.syncRunId,
@@ -90,10 +93,12 @@ export async function runImportJob(jobId: string): Promise<void> {
 
     if (row.kind === "youtube_playlist") {
       const playlistIds = Array.isArray(source.playlistIds) ? (source.playlistIds as string[]) : [];
+      let itemPosition = 0;
       const result = await importConnectedPlaylists(
         userId,
         playlistIds,
         async (progress) => {
+          setJobLiveSongs(jobId, progress.songs ?? []);
           await updateJobProgress(jobId, {
             total: progress.total,
             done: progress.done,
@@ -109,9 +114,18 @@ export async function runImportJob(jobId: string): Promise<void> {
           customTags,
           sort: typeof source.sort === "string" ? source.sort : "playlist",
           skipExisting: Boolean(source.skipExisting),
+          onItemResult: async (item) => {
+            const identityKey = item.identityKey ?? `unknown:${itemPosition}`;
+            await recordIngestResult(jobId, item, {
+              sourceUrl: sourceUrlForIdentity(identityKey),
+              position: itemPosition++,
+            });
+          },
         }
       );
+      // Ensure final set is persisted (idempotent upserts).
       await persistResults(jobId, result.items);
+      clearJobLiveSongs(jobId);
       await completeJob(jobId, {
         status: "completed",
         syncRunId: result.syncRunId,
@@ -134,6 +148,7 @@ export async function runImportJob(jobId: string): Promise<void> {
     console.error("[zap import-jobs] run failed", jobId, err);
     await completeJob(jobId, { status: "failed", errorMessage: message }).catch(() => {});
   } finally {
+    clearJobLiveSongs(jobId);
     runningLocal.delete(jobId);
   }
 }

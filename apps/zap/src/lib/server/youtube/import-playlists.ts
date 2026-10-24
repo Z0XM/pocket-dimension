@@ -53,6 +53,8 @@ export async function importConnectedPlaylists(
     sort?: PlaylistImportSort | string;
     /** Skip videos already in the user's library (additive sync / re-import). */
     skipExisting?: boolean;
+    /** Fired as each playlist entry finishes (skip / ingest), before ordered finalization. */
+    onItemResult?: (result: IngestItemResult, position: number) => void | Promise<void>;
   }
 ): Promise<SyncRunResult & { playlists: string[] }> {
   const uniqueIds = [...new Set(playlistIds.map((id) => id.trim()).filter(Boolean))];
@@ -272,6 +274,11 @@ export async function importConnectedPlaylists(
         });
       }
       await publish({ currentTitle: job.entry.title });
+      try {
+        await opts?.onItemResult?.(result, items.length - 1);
+      } catch (err) {
+        console.warn("[zap youtube import onItemResult]", err);
+      }
       // Drop finished songs from the active list shortly so the UI stays focused on in-flight work
       activeSongs.delete(identityKey);
       return result;

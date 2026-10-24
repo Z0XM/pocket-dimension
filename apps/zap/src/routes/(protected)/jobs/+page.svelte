@@ -3,6 +3,7 @@
   import LoaderIcon from "@lucide/svelte/icons/loader";
   import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
   import PageHeader from "$lib/components/PageHeader.svelte";
+  import SongProgressList from "$lib/components/SongProgressList.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -31,10 +32,13 @@
   }
 
   $effect(() => {
-    if (runningCount <= 0 && tab !== "active") return;
+    // Poll faster while jobs are running so per-song bars stay live.
+    const active = runningCount > 0 || tab === "active";
+    if (!active) return;
+    const ms = runningCount > 0 ? 1200 : 4000;
     const id = setInterval(() => {
       void refresh();
-    }, 2500);
+    }, ms);
     return () => clearInterval(id);
   });
 
@@ -143,6 +147,20 @@
               <div class="h-1 overflow-hidden rounded bg-border/60">
                 <div class="h-full bg-signal transition-all" style={`width: ${Math.min(100, Math.round((job.done / job.total) * 100))}%`}></div>
               </div>
+            {/if}
+            {#if job.songs?.length}
+              <SongProgressList songs={job.songs} />
+            {:else if (job.status === "queued" || job.status === "running") && job.currentTitle}
+              <SongProgressList
+                songs={[
+                  {
+                    identityKey: `current:${job.id}`,
+                    title: job.currentTitle,
+                    phase: "downloading",
+                    percent: job.total > 0 ? Math.min(99, Math.round((job.done / job.total) * 100)) : 0,
+                  },
+                ]}
+              />
             {/if}
             <p class="font-mono text-[10px] text-muted-foreground">Updated {when(job.updatedAt)}</p>
           </li>

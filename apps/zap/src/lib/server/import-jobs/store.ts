@@ -1,6 +1,8 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { IngestItemResult } from "$lib/server/ingest/pipeline";
+import type { SongProgress } from "$lib/server/ingest/progress";
+import { getJobLiveSongs } from "./live-progress";
 
 export type ImportJobKind = "url" | "youtube_playlist" | "upload";
 export type ImportJobStatus = "queued" | "running" | "completed" | "failed";
@@ -14,6 +16,14 @@ export type ImportJobSource = {
   sort?: string;
   skipExisting?: boolean;
   title?: string;
+};
+
+/** Per-song progress row for the Running Jobs UI (matches SongProgressList). */
+export type ImportJobSongProgress = {
+  identityKey: string;
+  title: string | null;
+  phase: string;
+  percent: number;
 };
 
 export type ImportJobSummary = {
@@ -32,6 +42,8 @@ export type ImportJobSummary = {
   createdAt: string;
   updatedAt: string;
   finishedAt: string | null;
+  /** Live / recent per-song progress for Active tab. */
+  songs: ImportJobSongProgress[];
 };
 
 export type ImportJobItemSummary = {
@@ -55,7 +67,7 @@ function parseSource(raw: string | null): ImportJobSource {
   }
 }
 
-function toSummary(row: typeof schema.importJobs.$inferSelect): ImportJobSummary {
+function toSummary(row: typeof schema.importJobs.$inferSelect, songs: ImportJobSongProgress[] = []): ImportJobSummary {
   return {
     id: row.id,
     kind: row.kind,
@@ -72,7 +84,38 @@ function toSummary(row: typeof schema.importJobs.$inferSelect): ImportJobSummary
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     finishedAt: row.finishedAt?.toISOString() ?? null,
+    songs,
   };
+}
+
+function itemStatusToPhase(status: ImportJobItemStatus): { phase: string; percent: number } {
+  if (status === "imported" || status === "reused") return { phase: "done", percent: 100 };
+  if (status === "skipped") return { phase: "skipped", percent: 100 };
+  if (status === "unavailable") return { phase: "unavailable", percent: 100 };
+  if (status === "failed") return { phase: "failed", percent: 0 };
+  if (status === "running") return { phase: "downloading", percent: 0 };
+  return { phase: "probing", percent: 0 };
+}
+
+function liveToSong(s: SongProgress): ImportJobSongProgress {
+  return {
+    identityKey: s.identityKey ?? "unknown",
+    title: s.title ?? null,
+    phase: s.phase,
+    percent: s.percent,
+  };
+}
+
+function mergeJobSongs(jobId: string, items: ImportJobSongProgress[], _status: ImportJobStatus): ImportJobSongProgress[] {
+  const live = getJobLiveSongs(jobId).map(liveToSong);
+  if (live.length === 0) {
+    // Recently finished jobs / reload without in-process workers: show persisted items.
+    return items.slice(-12);
+  }
+  const liveKeys = new Set(live.map((s) => s.identityKey));
+  const recentDone = items.filter((s) => !liveKeys.has(s.identityKey)).slice(-8);
+  // In-flight first (with live percent), then a few finished for context.
+  return [...live, ...recentDone];
 }
 
 export async function createImportJob(opts: {
@@ -115,6 +158,40 @@ export async function countRunningImportJobs(userId: string): Promise<number> {
   }
 }
 
+export async function listItemsForJobs(jobIds: string[], perJob = 40): Promise<Map<string, ImportJobSongProgress[]>> {
+  const out = new Map<string, ImportJobSongProgress[]>();
+  if (jobIds.length === 0) return out;
+  const rows = await db
+    .select({
+      jobId: schema.importJobItems.jobId,
+      identityKey: schema.importJobItems.identityKey,
+      title: schema.importJobItems.title,
+      status: schema.importJobItems.status,
+      position: schema.importJobItems.position,
+      updatedAt: schema.importJobItems.updatedAt,
+    })
+    .from(schema.importJobItems)
+    .where(inArray(schema.importJobItems.jobId, jobIds))
+    .orderBy(asc(schema.importJobItems.position), asc(schema.importJobItems.updatedAt));
+
+  for (const row of rows) {
+    const list = out.get(row.jobId) ?? [];
+    const { phase, percent } = itemStatusToPhase(row.status);
+    list.push({
+      identityKey: row.identityKey,
+      title: row.title,
+      phase,
+      percent,
+    });
+    out.set(row.jobId, list);
+  }
+  // Cap per job (keep newest by position order already — trim from the front for huge jobs).
+  for (const [jobId, list] of out) {
+    if (list.length > perJob) out.set(jobId, list.slice(list.length - perJob));
+  }
+  return out;
+}
+
 export async function listActiveImportJobs(userId: string, limit = 40): Promise<ImportJobSummary[]> {
   const rows = await db.query.importJobs.findMany({
     where: and(eq(schema.importJobs.userId, userId), inArray(schema.importJobs.status, ["queued", "running"])),
@@ -137,7 +214,11 @@ export async function listActiveImportJobs(userId: string, limit = 40): Promise<
     if (seen.has(r.id)) continue;
     merged.push(r);
   }
-  return merged.map(toSummary);
+  const itemsByJob = await listItemsForJobs(merged.map((r) => r.id));
+  return merged.map((row) => {
+    const persisted = itemsByJob.get(row.id) ?? [];
+    return toSummary(row, mergeJobSongs(row.id, persisted, row.status));
+  });
 }
 
 export async function listFailedImportItems(userId: string, limit = 100): Promise<ImportJobItemSummary[]> {
