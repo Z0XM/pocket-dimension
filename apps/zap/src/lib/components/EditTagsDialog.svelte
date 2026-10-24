@@ -76,6 +76,11 @@
     selected = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
   }
 
+  function keepSearchFocus() {
+    // List options are not in the tab order; still re-assert after scroll/toggle.
+    queueMicrotask(() => filterEl?.focus({ preventScroll: true }));
+  }
+
   function moveHighlight(delta: number) {
     const n = filteredOptions.length;
     if (n === 0) return;
@@ -83,32 +88,39 @@
     queueMicrotask(() => {
       const el = listEl?.querySelector<HTMLElement>(`[data-tag-index="${highlightIndex}"]`);
       el?.scrollIntoView({ block: "nearest" });
+      filterEl?.focus({ preventScroll: true });
     });
   }
 
   function toggleHighlighted() {
     const tag = filteredOptions[highlightIndex];
     if (tag) toggle(tag.id);
+    keepSearchFocus();
   }
 
-  function onPickerKeydown(e: KeyboardEvent) {
+  /** Keyboard nav stays on the search input (aria-activedescendant highlights the list). */
+  function onSearchKeydown(e: KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
+      e.stopPropagation();
       moveHighlight(1);
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
+      e.stopPropagation();
       moveHighlight(-1);
       return;
     }
     if (e.key === " " || e.code === "Space") {
       e.preventDefault();
+      e.stopPropagation();
       toggleHighlighted();
       return;
     }
     if (e.key === "Enter") {
       e.preventDefault();
+      e.stopPropagation();
       formEl?.requestSubmit();
     }
   }
@@ -178,8 +190,7 @@
       </button>
     </div>
 
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="flex min-h-0 flex-1 flex-col gap-2 p-4" role="presentation" onkeydown={onPickerKeydown}>
+    <div class="flex min-h-0 flex-1 flex-col gap-2 p-4">
       {#if selectedTags.length > 0}
         <div class="flex flex-wrap gap-1">
           {#each selectedTags as tag (tag.id)}
@@ -188,7 +199,11 @@
               class="inline-flex items-center gap-1 rounded-full border border-signal/40 bg-signal/10 px-2 py-0.5 font-mono text-[10px] text-signal hover:bg-signal/20"
               title={`Remove ${tag.name}`}
               disabled={busy}
-              onclick={() => toggle(tag.id)}
+              onmousedown={(e) => e.preventDefault()}
+              onclick={() => {
+                toggle(tag.id);
+                keepSearchFocus();
+              }}
             >
               {tag.name}
               <XIcon class="size-2.5" aria-hidden="true" />
@@ -208,16 +223,19 @@
           type="search"
           placeholder="Search tags… · ↑↓ · Space · Enter"
           aria-label="Search tags"
+          aria-controls="edit-tags-listbox"
+          aria-autocomplete="list"
           aria-activedescendant={filteredOptions[highlightIndex] ? `edit-tag-opt-${filteredOptions[highlightIndex]!.id}` : undefined}
           bind:value={filter}
           autocomplete="off"
           disabled={busy}
-          onkeydown={onPickerKeydown}
+          onkeydown={onSearchKeydown}
         />
       </div>
 
       <div
         bind:this={listEl}
+        id="edit-tags-listbox"
         class="min-h-[12rem] flex-1 overflow-y-auto overscroll-contain rounded border border-border/70 bg-background/40"
         role="listbox"
         aria-multiselectable="true"
@@ -226,19 +244,22 @@
         {#each filteredOptions as tag, index (tag.id)}
           {@const isOn = selected.includes(tag.id)}
           {@const isHi = index === highlightIndex}
-          <button
-            type="button"
+          <div
             id={`edit-tag-opt-${tag.id}`}
             data-tag-index={index}
             role="option"
+            tabindex="-1"
             aria-selected={isOn}
-            class={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-xs transition ${
+            class={`flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left font-mono text-xs transition ${
               isHi ? "bg-signal/15 text-signal" : isOn ? "text-signal hover:bg-signal/10" : "text-muted-foreground hover:bg-signal/10"
             }`}
-            disabled={busy}
-            onclick={() => {
+            onmousedown={(e) => {
+              // Keep the search input focused when picking with the mouse.
+              e.preventDefault();
+              if (busy) return;
               highlightIndex = index;
               toggle(tag.id);
+              keepSearchFocus();
             }}
             onmouseenter={() => (highlightIndex = index)}
           >
@@ -249,7 +270,7 @@
             </span>
             <span class="min-w-0 flex-1 truncate">{tag.name}</span>
             <span class="text-[10px] uppercase opacity-60">{tag.kind}</span>
-          </button>
+          </div>
         {:else}
           <p class="px-3 py-4 text-center text-xs text-muted-foreground">
             {availableTags.length === 0 ? "No tags available." : "No tags match."}
