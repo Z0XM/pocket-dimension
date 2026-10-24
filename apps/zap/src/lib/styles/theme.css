@@ -28,7 +28,8 @@
   --popover: #0f0f0f;
   --popover-foreground: #f3efe9;
   --destructive: #ffb09d;
-  --destructive-foreground: #ffb09d;
+  /* Ink on coral — must contrast with --destructive (was identical → invisible Delete labels). */
+  --destructive-foreground: #1a0d08;
   --signal: #ff6b4a;
   --graph: #f3efe9;
   --glow-a: #ff6b4a;

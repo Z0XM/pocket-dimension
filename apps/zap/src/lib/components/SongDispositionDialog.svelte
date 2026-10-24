@@ -66,7 +66,7 @@
     <div class="flex flex-wrap justify-end gap-2">
       <button
         type="button"
-        class="rounded border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary disabled:opacity-40"
+        class="rounded border border-border bg-transparent px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40"
         disabled={busy}
         onclick={onCancel}
       >
@@ -75,7 +75,7 @@
       {#if showArchive}
         <button
           type="button"
-          class="rounded border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-secondary disabled:opacity-40"
+          class="rounded border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-secondary disabled:opacity-40"
           disabled={busy}
           onclick={() => void onArchiveClick()}
         >
@@ -84,7 +84,7 @@
       {/if}
       <button
         type="button"
-        class="rounded bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:opacity-90 disabled:opacity-40"
+        class="rounded border border-destructive/50 bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:opacity-90 disabled:opacity-40"
         disabled={busy}
         onclick={() => void onDeleteClick()}
       >
