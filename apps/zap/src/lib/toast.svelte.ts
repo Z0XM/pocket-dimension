@@ -7,16 +7,20 @@ export type ToastItem = {
 };
 
 let seq = 0;
-/** Shared reactive toast queue — read from Toaster / call `toast.*` from anywhere. */
-export let toastItems = $state<ToastItem[]>([]);
-
 const timers = new Map<number, ReturnType<typeof setTimeout>>();
+
+/** Shared reactive toast queue — mutate `.items`; do not reassign the export. */
+class ToastQueue {
+  items = $state<ToastItem[]>([]);
+}
+
+export const toastQueue = new ToastQueue();
 
 function push(kind: ToastKind, message: string, ms: number) {
   const text = message.trim();
   if (!text) return;
   const id = ++seq;
-  toastItems = [...toastItems, { id, kind, message: text }];
+  toastQueue.items = [...toastQueue.items, { id, kind, message: text }];
   const prev = timers.get(id);
   if (prev) clearTimeout(prev);
   timers.set(
@@ -29,7 +33,7 @@ export function dismissToast(id: number) {
   const t = timers.get(id);
   if (t) clearTimeout(t);
   timers.delete(id);
-  toastItems = toastItems.filter((item) => item.id !== id);
+  toastQueue.items = toastQueue.items.filter((item) => item.id !== id);
 }
 
 export const toast = {

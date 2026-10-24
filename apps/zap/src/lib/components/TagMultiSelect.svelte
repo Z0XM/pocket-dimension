@@ -185,12 +185,13 @@
   </button>
 
   {#if open}
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class={`absolute z-50 flex w-full flex-col overflow-hidden rounded border border-border bg-popover shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_12%,transparent)] ${
         placement.openUp ? "bottom-full mb-1" : "top-full mt-1"
       }`}
       style={`max-height: ${placement.maxHeightPx}px`}
+      role="presentation"
       onkeydown={onPickerKeydown}
     >
       <input

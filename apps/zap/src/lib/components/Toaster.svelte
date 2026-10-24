@@ -1,6 +1,6 @@
 <script lang="ts">
   import XIcon from "@lucide/svelte/icons/x";
-  import { dismissToast, toastItems, type ToastKind } from "$lib/toast.svelte";
+  import { dismissToast, toastQueue, type ToastKind } from "$lib/toast.svelte";
 
   function kindClass(kind: ToastKind) {
     if (kind === "error") return "border-destructive/50 text-destructive";
@@ -9,13 +9,13 @@
   }
 </script>
 
-{#if toastItems.length > 0}
+{#if toastQueue.items.length > 0}
   <div
     class="pointer-events-none fixed inset-x-0 bottom-4 z-[80] flex flex-col items-center gap-2 px-4 sm:bottom-6"
     aria-live="polite"
     aria-relevant="additions"
   >
-    {#each toastItems as item (item.id)}
+    {#each toastQueue.items as item (item.id)}
       <div
         class={`pointer-events-auto flex max-w-md items-start gap-2 rounded border bg-popover/95 px-3 py-2 font-mono text-[11px] shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_10%,transparent)] backdrop-blur-sm ${kindClass(item.kind)}`}
         role="status"
