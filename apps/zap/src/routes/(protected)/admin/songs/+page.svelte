@@ -7,6 +7,7 @@
   import ZapSelect from "$lib/components/ZapSelect.svelte";
   import { deleteSongAsAdmin, SONG_DELETE_CONFIRM_BODY } from "$lib/admin-song-delete";
   import type { AdminSongRow } from "$lib/server/admin/media";
+  import { toast } from "$lib/toast.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -31,7 +32,6 @@
   let hasMore = $state(false);
   let total = $state(0);
   let loadingMore = $state(false);
-  let listError = $state<string | null>(null);
   let scrollRoot = $state<HTMLDivElement | null>(null);
   let sentinel = $state<HTMLDivElement | null>(null);
   let fetchGen = 0;
@@ -43,15 +43,12 @@
     nextOffset = data.nextOffset;
     hasMore = data.hasMore;
     total = data.total;
-    listError = null;
     scrollRoot?.scrollTo({ top: 0 });
   });
 
   let target = $state<AdminSongRow | null>(null);
   let confirmOpen = $state(false);
   let busy = $state(false);
-  let message = $state<string | null>(null);
-  let errorMessage = $state<string | null>(null);
 
   function navigate(next: { q?: string; status?: string }) {
     const params = new URLSearchParams();
@@ -68,7 +65,6 @@
     const gen = ++fetchGen;
     const offset = nextOffset;
     loadingMore = true;
-    listError = null;
     try {
       const params = new URLSearchParams();
       params.set("offset", String(offset));
@@ -88,7 +84,7 @@
       total = body.total;
     } catch (err) {
       if (gen !== fetchGen) return;
-      listError = err instanceof Error ? err.message : "Failed to load songs";
+      toast.error(err instanceof Error ? err.message : "Failed to load songs");
     } finally {
       if (gen === fetchGen) loadingMore = false;
     }
@@ -114,16 +110,14 @@
   async function confirmDelete() {
     if (!target) return;
     busy = true;
-    errorMessage = null;
-    message = null;
     const outcome = await deleteSongAsAdmin(target.id);
     busy = false;
     confirmOpen = false;
     if (outcome.ok) {
-      message = outcome.message;
+      toast.success(outcome.message);
       await invalidateAll();
     } else {
-      errorMessage = outcome.message;
+      toast.error(outcome.message);
     }
   }
 
@@ -174,10 +168,6 @@
       Object storage isn’t configured here — deletes remove DB rows but can’t delete R2 objects.
     </p>
   {/if}
-  {#if message}<p class="shrink-0 text-sm text-signal">{message}</p>{/if}
-  {#if errorMessage}<p class="auth-error shrink-0">{errorMessage}</p>{/if}
-  {#if listError}<p class="auth-error mb-0 shrink-0 p-2">{listError}</p>{/if}
-
   <p class="shrink-0 font-mono text-[11px] text-muted-foreground">{total} song(s){data.filters.q || data.filters.status ? " match" : ""}</p>
 
   {#if songs.length === 0}

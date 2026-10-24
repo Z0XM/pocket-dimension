@@ -8,6 +8,7 @@
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import { invalidateAll } from "$app/navigation";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import { toast } from "$lib/toast.svelte";
   import { formatClock, runTrackDisplayTitle, type CatalogQueueRunTrack } from "$lib/catalog-queue";
   import { getCatalogQueue } from "$lib/catalog-queue-client.svelte";
   import type { PageData } from "./$types";
@@ -16,10 +17,8 @@
 
   const queue = getCatalogQueue();
   let busyRunId = $state<string | null>(null);
-  let runError = $state<string | null>(null);
   let saveRunId = $state<string | null>(null);
   let saveName = $state("");
-  let saved = $state<{ runId: string; id: string; name: string } | null>(null);
   let deleteRunId = $state<string | null>(null);
   let deleteOpen = $state(false);
   let replaceOpen = $state(false);
@@ -33,9 +32,8 @@
   async function runAction(runId: string, fn: () => Promise<unknown>) {
     if (!queue || busyRunId) return;
     busyRunId = runId;
-    runError = null;
     await fn();
-    runError = queue.error;
+    if (queue.error) toast.error(queue.error);
     busyRunId = null;
     await invalidateAll();
   }
@@ -72,7 +70,6 @@
   }
 
   function openSave(runId: string, createdAt: string) {
-    saved = null;
     saveRunId = saveRunId === runId ? null : runId;
     saveName = `Queue · ${runTitle(createdAt)}`;
   }
@@ -102,31 +99,26 @@
     viewTracksRunId = runId;
     viewTracks = null;
     viewTracksLoading = true;
-    runError = null;
     const tracks = await queue.fetchRunTracks(runId);
     if (viewTracksRunId !== runId) return;
     viewTracksLoading = false;
     if (tracks) viewTracks = tracks;
-    else runError = queue.error;
+    else if (queue.error) toast.error(queue.error);
   }
 
   async function saveRun(runId: string) {
     if (!queue || !saveName.trim()) return;
     busyRunId = runId;
-    runError = null;
     const playlist = await queue.saveRunAsPlaylist(runId, saveName.trim());
     busyRunId = null;
     if (playlist) {
-      saved = { runId, id: playlist.id, name: playlist.name };
+      toast.success(`Saved as “${playlist.name}”.`);
       saveRunId = null;
-    } else runError = queue.error;
+    } else if (queue.error) toast.error(queue.error);
   }
 </script>
 
 <div class="space-y-3">
-  {#if runError}
-    <p class="auth-error mb-0 p-2">{runError}</p>
-  {/if}
   {#if !data.queueRuns?.length}
     <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
       No queues yet — press play on a track in the <a href="/catalogue" class="text-signal hover:underline">Catalogue</a>.
@@ -256,11 +248,6 @@
                 disabled={!saveName.trim() || busyRunId !== null}>Save</button
               >
             </form>
-          {/if}
-          {#if saved?.runId === run.id}
-            <p class="font-mono text-[11px] text-signal">
-              Saved as <a class="underline hover:text-foreground" href={`/playlists/${saved.id}`}>{saved.name}</a>.
-            </p>
           {/if}
         </li>
       {/each}

@@ -3,10 +3,11 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
   import XIcon from "@lucide/svelte/icons/x";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import { toast } from "$lib/toast.svelte";
   import type { SystemTagRow } from "$lib/server/admin/tags";
-  import type { ActionData, PageData } from "./$types";
+  import type { PageData } from "./$types";
 
-  let { data, form }: { data: PageData; form: ActionData } = $props();
+  let { data }: { data: PageData } = $props();
 
   let name = $state("");
   let busy = $state(false);
@@ -19,7 +20,6 @@
   let hasMore = $state(false);
   let total = $state(0);
   let loadingMore = $state(false);
-  let listError = $state<string | null>(null);
   let scrollRoot = $state<HTMLDivElement | null>(null);
   let sentinel = $state<HTMLDivElement | null>(null);
   let fetchGen = 0;
@@ -29,7 +29,6 @@
     nextOffset = data.nextOffset;
     hasMore = data.hasMore;
     total = data.total;
-    listError = null;
     scrollRoot?.scrollTo({ top: 0 });
   });
 
@@ -43,7 +42,6 @@
     const gen = ++fetchGen;
     const offset = nextOffset;
     loadingMore = true;
-    listError = null;
     try {
       const params = new URLSearchParams();
       params.set("offset", String(offset));
@@ -61,7 +59,7 @@
       total = body.total;
     } catch (err) {
       if (gen !== fetchGen) return;
-      listError = err instanceof Error ? err.message : "Failed to load tags";
+      toast.error(err instanceof Error ? err.message : "Failed to load tags");
     } finally {
       if (gen === fetchGen) loadingMore = false;
     }
@@ -94,12 +92,6 @@
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col gap-4">
-  {#if form?.error}
-    <p class="auth-error shrink-0">{form.error}</p>
-  {:else if form && "ok" in form && form.ok}
-    <p class="shrink-0 text-sm text-signal">{form.ok}</p>
-  {/if}
-
   <form
     method="POST"
     action="?/create"
@@ -109,7 +101,16 @@
       return async ({ result, update }) => {
         await update({ reset: false });
         busy = false;
-        if (result.type === "success") name = "";
+        if (result.type === "failure") {
+          const data = result.data as { error?: string } | undefined;
+          toast.error(data?.error ?? "Could not add tag");
+          return;
+        }
+        if (result.type === "success") {
+          const data = result.data as { ok?: string } | undefined;
+          if (data?.ok) toast.success(data.ok);
+          name = "";
+        }
       };
     }}
   >
@@ -130,9 +131,6 @@
 
   <div class="flex min-h-0 flex-1 flex-col gap-3">
     <h2 class="shrink-0 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">System tags ({total})</h2>
-    {#if listError}
-      <p class="auth-error mb-0 shrink-0 p-2">{listError}</p>
-    {/if}
     {#if tags.length === 0}
       <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">No system tags.</p>
     {:else}
@@ -180,10 +178,19 @@
   bind:this={deleteForm}
   use:enhance={() => {
     busy = true;
-    return async ({ update }) => {
+    return async ({ result, update }) => {
       await update();
       busy = false;
       confirmOpen = false;
+      if (result.type === "failure") {
+        const data = result.data as { error?: string } | undefined;
+        toast.error(data?.error ?? "Could not remove tag");
+        return;
+      }
+      if (result.type === "success") {
+        const data = result.data as { ok?: string } | undefined;
+        if (data?.ok) toast.success(data.ok);
+      }
     };
   }}
 >

@@ -6,6 +6,7 @@
   import PageHeader from "$lib/components/PageHeader.svelte";
   import SessionPlayer from "$lib/components/SessionPlayer.svelte";
   import SessionQueueList from "$lib/components/SessionQueueList.svelte";
+  import { toast } from "$lib/toast.svelte";
   import SessionSetupPanel from "$lib/components/SessionSetupPanel.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import type { EnqueueMode } from "$lib/catalog-queue";
@@ -34,7 +35,6 @@
   let tagQuery = $state(data.catalogueTagQuery ?? "");
   let tagQueryError = $state<string | null>(data.catalogueTagQueryError ?? null);
   let queueBusy = $state(false);
-  let queueError = $state<string | null>(null);
   let discordSinkActive = $state(false);
   let catalogueFetchGen = 0;
   let playlists = $state(data.playlists ?? []);
@@ -186,7 +186,6 @@
   async function enqueue(mediaAssetId: string, mode: EnqueueMode) {
     if (!snapshot.session) return;
     queueBusy = true;
-    queueError = null;
     try {
       const res = await fetch(`/api/sessions/${snapshot.session.id}/queue`, {
         method: "POST",
@@ -198,7 +197,7 @@
       if (!res.ok) throw new Error(body?.message ?? `Enqueue failed (${res.status})`);
       snapshot = body as SessionSnapshot;
     } catch (err) {
-      queueError = err instanceof Error ? err.message : "Enqueue failed";
+      toast.error(err instanceof Error ? err.message : "Enqueue failed");
     } finally {
       queueBusy = false;
     }
@@ -306,9 +305,6 @@
               busy={catalogueLoading}
               onchange={() => void fetchCatalogue({ reset: true })}
             />
-            {#if queueError}
-              <p class="auth-error">{queueError}</p>
-            {/if}
             {#if catalogueLoading && catalogue.length === 0}
               <TrackListSkeleton rows={5} compact />
             {:else}
@@ -373,10 +369,7 @@
           </div>
         {:else}
           <div role="tabpanel" aria-label="Queue">
-            <SessionQueueList bind:snapshot busy={queueBusy} showHeading={false} onerror={(m) => (queueError = m)} />
-            {#if queueError && nowSubTab === "queue"}
-              <p class="mt-2 auth-error">{queueError}</p>
-            {/if}
+            <SessionQueueList bind:snapshot busy={queueBusy} showHeading={false} onerror={(m) => { if (m) toast.error(m); }} />
           </div>
         {/if}
       </div>

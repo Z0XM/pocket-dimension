@@ -7,6 +7,7 @@
   import UnplugIcon from "@lucide/svelte/icons/unplug";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import { youtubePlaylistHref } from "$lib/history-time";
+  import { toast } from "$lib/toast.svelte";
 
   let {
     oauthConfigured,
@@ -48,12 +49,10 @@
   let playlists = $state<PlaylistRow[]>([]);
   let playlistQuery = $state("");
   let loadingPlaylists = $state(false);
-  let listError = $state<string | null>(null);
   let busyId = $state<string | null>(null);
   let preview = $state<Preview | null>(null);
   let previewOpen = $state(false);
   let importBusy = $state(false);
-  let importMessage = $state<string | null>(null);
   let disconnectOpen = $state(false);
 
   const filteredPlaylists = $derived.by(() => {
@@ -80,14 +79,13 @@
   async function loadPlaylists() {
     if (!linked) return;
     loadingPlaylists = true;
-    listError = null;
     try {
       const res = await fetch("/api/connections/youtube/playlists", { credentials: "same-origin" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Failed (${res.status})`);
       playlists = body.playlists ?? [];
     } catch (err) {
-      listError = err instanceof Error ? err.message : "Failed to load playlists";
+      toast.error(err instanceof Error ? err.message : "Failed to load playlists");
     } finally {
       loadingPlaylists = false;
     }
@@ -95,7 +93,6 @@
 
   async function toggleAutoSync(row: PlaylistRow, next: boolean) {
     busyId = row.id;
-    listError = null;
     try {
       const res = await fetch(`/api/connections/youtube/playlists/${encodeURIComponent(row.id)}`, {
         method: "PATCH",
@@ -107,7 +104,7 @@
       if (!res.ok) throw new Error(body?.message ?? `Failed (${res.status})`);
       playlists = playlists.map((p) => (p.id === row.id ? { ...p, autoSync: Boolean(body.autoSync) } : p));
     } catch (err) {
-      listError = err instanceof Error ? err.message : "Could not update auto-sync";
+      toast.error(err instanceof Error ? err.message : "Could not update auto-sync");
     } finally {
       busyId = null;
     }
@@ -115,8 +112,6 @@
 
   async function openImportPreview(row: PlaylistRow) {
     busyId = row.id;
-    listError = null;
-    importMessage = null;
     try {
       const qs = row.title ? `?title=${encodeURIComponent(row.title)}` : "";
       const res = await fetch(`/api/connections/youtube/playlists/${encodeURIComponent(row.id)}${qs}`, {
@@ -127,7 +122,7 @@
       preview = { ...body.preview, title: body.preview?.title ?? row.title };
       previewOpen = true;
     } catch (err) {
-      listError = err instanceof Error ? err.message : "Preview failed";
+      toast.error(err instanceof Error ? err.message : "Preview failed");
     } finally {
       busyId = null;
     }
@@ -136,7 +131,6 @@
   async function confirmImport() {
     if (!preview) return;
     importBusy = true;
-    importMessage = null;
     try {
       const res = await fetch("/api/youtube/import", {
         method: "POST",
@@ -146,12 +140,12 @@
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok && res.status !== 202) throw new Error(body?.message ?? `Import failed (${res.status})`);
-      importMessage = "Import started — open Running Jobs for progress.";
+      toast.info("Import started — open Running Jobs for progress.");
       previewOpen = false;
       preview = null;
       await goto("/jobs");
     } catch (err) {
-      listError = err instanceof Error ? err.message : "Import failed";
+      toast.error(err instanceof Error ? err.message : "Import failed");
       previewOpen = false;
     } finally {
       importBusy = false;
@@ -166,7 +160,7 @@
       if (!res.ok) throw new Error("Disconnect failed");
       window.location.href = "/connections?tab=youtube";
     } catch (err) {
-      listError = err instanceof Error ? err.message : "Disconnect failed";
+      toast.error(err instanceof Error ? err.message : "Disconnect failed");
       busyId = null;
     }
   }
@@ -224,12 +218,6 @@
   {#if linked}
     <div class="space-y-3">
       <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Playlists</h2>
-      {#if listError}
-        <p class="auth-error">{listError}</p>
-      {/if}
-      {#if importMessage}
-        <p class="font-mono text-[11px] text-signal">{importMessage}</p>
-      {/if}
       {#if loadingPlaylists && playlists.length === 0}
         <p class="font-mono text-[11px] text-muted-foreground">Loading playlists…</p>
       {:else if playlists.length === 0}

@@ -13,6 +13,7 @@
   import { formatClock, type EnqueueMode } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
   import { enhance } from "$app/forms";
+  import { toast } from "$lib/toast.svelte";
 
   export type TrackItem = {
     id: string;
@@ -63,8 +64,6 @@
   let editCustomTags = $state<string[]>([]);
   let editCustomDraft = $state("");
   let tagFormEl = $state<HTMLFormElement | null>(null);
-  let error = $state<string | null>(null);
-  let info = $state<string | null>(null);
 
   let menuOpen = $state(false);
   let menuBtn = $state<HTMLButtonElement | null>(null);
@@ -78,42 +77,36 @@
 
   async function confirmDelete() {
     deleting = true;
-    error = null;
     const outcome = await deleteSongAsAdmin(track.id);
     deleting = false;
     deleteOpen = false;
     if (!outcome.ok) {
-      error = outcome.message;
+      toast.error(outcome.message);
       return;
     }
     ondeleted?.(track.id, outcome.message);
   }
 
   async function togglePlay() {
-    error = null;
     if (!track.playable) {
-      error = unavailable ? "Song not available — no audio source yet." : "No audio file for this track.";
+      toast.error(unavailable ? "Song not available — no audio source yet." : "No audio file for this track.");
       return;
     }
     if (!queue) return;
     // Play now = insert after the playhead and jump to it (normal queue playback).
     if (isCurrent) await queue.togglePlay();
     else await queue.playNow(track.id);
-    if (queue.error) error = queue.error;
+    // queue client already toasts request failures
   }
 
   async function enqueue(mode: EnqueueMode) {
     menuOpen = false;
     if (!queue) return;
-    error = null;
     await queue.enqueue([track.id], mode);
-    if (queue.error) error = queue.error;
   }
 
   async function addToPlaylist(pl: PlaylistOption) {
     menuOpen = false;
-    error = null;
-    info = null;
     try {
       const res = await fetch(`/api/playlists/${pl.id}`, {
         method: "POST",
@@ -123,9 +116,9 @@
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? "Add failed");
-      info = `Added to “${pl.name}”.`;
+      toast.success(`Added to “${pl.name}”.`);
     } catch (err) {
-      error = err instanceof Error ? err.message : "Add failed";
+      toast.error(err instanceof Error ? err.message : "Add failed");
     }
   }
 
@@ -270,12 +263,6 @@
           <span class="w-10 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(durationMs)}</span>
         </div>
       {/if}
-      {#if error}
-        <p class="font-mono text-[11px] text-destructive">{error}</p>
-      {/if}
-      {#if info}
-        <p class="font-mono text-[11px] text-signal">{info}</p>
-      {/if}
     </div>
   </div>
 
@@ -321,10 +308,16 @@
           // Keep local catalogue list; apply returned tags via ontags (invalidateAll would reload
           // data but catalogue hydration ignores tag-only changes).
           await update({ reset: false, invalidateAll: false });
+          if (result.type === "failure") {
+            const data = result.data as { tagError?: string } | undefined;
+            toast.error(data?.tagError ?? "Could not update tags");
+            return;
+          }
           if (result.type !== "success") return;
           const data = result.data as { tagOk?: boolean; mediaAssetId?: string; tags?: TrackItem["tags"] } | undefined;
           if (data?.tagOk && Array.isArray(data.tags)) {
             ontags?.(track.id, data.tags);
+            toast.success("Tags updated.");
           }
           editing = false;
         };

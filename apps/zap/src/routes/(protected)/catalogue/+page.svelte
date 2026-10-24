@@ -17,9 +17,10 @@
   import { getCatalogQueue, type CatalogueFilterInput } from "$lib/catalog-queue-client.svelte";
   import { withoutPlaylistScope } from "$lib/catalogue-scope";
   import { effectiveTagQuery, findPlaylistMatchingTagFilter, tagFilterKey } from "$lib/tag-filter";
-  import type { ActionData, PageData } from "./$types";
+  import { toast } from "$lib/toast.svelte";
+  import type { PageData } from "./$types";
 
-  let { data, form }: { data: PageData; form: ActionData } = $props();
+  let { data }: { data: PageData } = $props();
 
   const FILTERS_OPEN_KEY = "zap.catalogue.filtersOpen";
   const queue = getCatalogQueue();
@@ -39,17 +40,14 @@
   let topTagIds = $state<string[]>([]);
   let tagPlaylists = $state<PageData["tagPlaylists"]>([]);
   let savePlaylistOpen = $state(false);
-  let savedPlaylistMessage = $state<string | null>(null);
 
   let assets = $state<TrackItem[]>([]);
   let hasMore = $state(false);
   let nextOffset = $state(0);
   let loading = $state(false);
   let loadingMore = $state(false);
-  let listError = $state<string | null>(null);
 
   let bulkBusy = $state(false);
-  let bulkError = $state<string | null>(null);
   let replaceOpen = $state(false);
   let sentinel = $state<HTMLDivElement | null>(null);
   let scrollRoot = $state<HTMLDivElement | null>(null);
@@ -58,19 +56,16 @@
   let filtersPrefLoaded = false;
   let addOpen = $state(false);
   let addTab = $state<AddMusicTab>("url");
-  let addMessage = $state<string | null>(null);
 
   let fetchGen = 0;
   let hydratedKey = $state("");
 
   let deletedIds = $state<string[]>([]);
-  let deleteMessage = $state<string | null>(null);
   /** Tag edits on suggestion rows (those come from `data`, not the mutable `assets` list). */
   let suggestionTagsById = $state<Record<string, TrackItem["tags"]>>({});
   const MISSING_PLAYLIST_NOTICE = "That playlist is no longer available — showing your library.";
   /** Playlists that 404'd since the page loaded (deleted elsewhere); hidden from the scope + “Add to playlist” menus. */
   let missingPlaylistIds = $state<string[]>([]);
-  let scopeNotice = $state<string | null>(null);
   const filtering = $derived(Boolean(q.trim() || tagQuery.trim() || selected.length || untagged));
   const scopedPlaylistId = $derived(libraryScope.startsWith("playlist:") ? libraryScope.slice("playlist:".length) : null);
   const suggestions = $derived(
@@ -109,18 +104,14 @@
       return;
     }
     bulkBusy = true;
-    bulkError = null;
     await queue.enqueueFiltered(filterInput(), mode);
-    bulkError = queue.error;
     bulkBusy = false;
   }
 
   async function confirmReplaceAll() {
     if (!queue || bulkBusy) return;
     bulkBusy = true;
-    bulkError = null;
     await queue.enqueueFiltered(filterInput(), "replace");
-    bulkError = queue.error;
     bulkBusy = false;
     replaceOpen = false;
   }
@@ -129,7 +120,7 @@
     deletedIds = [...deletedIds, id];
     assets = assets.filter((a) => a.id !== id);
     nextOffset = Math.max(nextOffset - 1, 0);
-    deleteMessage = message;
+    toast.success(message);
   }
 
   function onTagsSaved(id: string, tags: TrackItem["tags"]) {
@@ -170,7 +161,9 @@
 
   function onPlaylistSaved(playlist: { id: string; name: string; tagQuery: string | null; trackCount: number }) {
     tagPlaylists = [...tagPlaylists, { id: playlist.id, name: playlist.name, tagQuery: playlist.tagQuery }];
-    savedPlaylistMessage = `Saved playlist “${playlist.name}” (${playlist.trackCount} track${playlist.trackCount === 1 ? "" : "s"}).`;
+    toast.success(
+      `Saved playlist “${playlist.name}” (${playlist.trackCount} track${playlist.trackCount === 1 ? "" : "s"}).`
+    );
   }
 
   $effect(() => {
@@ -178,7 +171,7 @@
     if (key === hydratedKey) return;
     hydratedKey = key;
     libraryScope = scopeFromData();
-    scopeNotice = data.playlistMissing ? MISSING_PLAYLIST_NOTICE : null;
+    if (data.playlistMissing) toast.info(MISSING_PLAYLIST_NOTICE);
     q = data.q;
     untagged = Boolean(data.untagged);
     tagQuery = data.tagQuery ?? "";
@@ -228,7 +221,6 @@
 
   function openAdd(tab: AddMusicTab = addTab) {
     addTab = tab;
-    addMessage = null;
     addOpen = true;
   }
 
@@ -245,7 +237,7 @@
   }
 
   function onAdded(message: string) {
-    addMessage = message;
+    toast.success(message);
     void fetchPage({ reset: true });
     void refreshTags();
   }
@@ -289,7 +281,6 @@
     const gen = ++fetchGen;
     if (opts.reset) {
       loading = true;
-      listError = null;
       tagQueryError = null;
     } else loadingMore = true;
 
@@ -304,7 +295,7 @@
         if (gen !== fetchGen) return;
         missingPlaylistIds = [...missingPlaylistIds, requestedPlaylistId];
         libraryScope = "";
-        scopeNotice = MISSING_PLAYLIST_NOTICE;
+        toast.info(MISSING_PLAYLIST_NOTICE);
         void fetchPage({ reset: true });
         return;
       }
@@ -326,7 +317,7 @@
       }
     } catch (err) {
       if (gen !== fetchGen) return;
-      listError = err instanceof Error ? err.message : "Browse failed";
+      toast.error(err instanceof Error ? err.message : "Browse failed");
     } finally {
       if (gen === fetchGen) {
         loading = false;
@@ -384,8 +375,6 @@
       busy={loading}
       actions={addButton}
       onchange={() => {
-        savedPlaylistMessage = null;
-        scopeNotice = null;
         // Your library is tagged-only — Untagged needs All (or a playlist).
         if (untagged && libraryScope === "") libraryScope = "all";
         void fetchPage({ reset: true });
@@ -432,38 +421,11 @@
         >
           <ListEndIcon class="size-3.5" aria-hidden="true" /> Add all to queue
         </button>
-        {#if bulkError}<span class="text-destructive">{bulkError}</span>{/if}
       </div>
     {/if}
   </div>
 
   <div class="zap-catalogue-list-col flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-    {#if form?.tagError || form?.tagOk || listError || deleteMessage || addMessage || savedPlaylistMessage || scopeNotice}
-      <div class="shrink-0 space-y-1">
-        {#if scopeNotice}
-          <p class="text-sm text-muted-foreground">{scopeNotice}</p>
-        {/if}
-        {#if form?.tagError}
-          <p class="auth-error mb-0 p-2">{form.tagError}</p>
-        {/if}
-        {#if form?.tagOk}
-          <p class="text-sm text-signal">Tags updated.</p>
-        {/if}
-        {#if listError}
-          <p class="auth-error mb-0 p-2">{listError}</p>
-        {/if}
-        {#if deleteMessage}
-          <p class="text-sm text-signal">{deleteMessage}</p>
-        {/if}
-        {#if addMessage}
-          <p class="text-sm text-signal">{addMessage}</p>
-        {/if}
-        {#if savedPlaylistMessage}
-          <p class="text-sm text-signal">{savedPlaylistMessage}</p>
-        {/if}
-      </div>
-    {/if}
-
     <div class="min-h-[12rem] flex-1">
       {#if loading && assets.length === 0}
         <div class="h-full overflow-hidden">

@@ -12,6 +12,7 @@
   import TagQueryEditor from "$lib/components/TagQueryEditor.svelte";
   import { playlistRelationBadge } from "$lib/playlist-relation-label";
   import { effectiveTagQuery, tagQueryProblem } from "$lib/tag-filter";
+  import { toast } from "$lib/toast.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -19,7 +20,6 @@
   let playlists = $state(data.playlists ?? []);
   let busy = $state(false);
   let busyLabel = $state("Working…");
-  let error = $state<string | null>(null);
   let newName = $state("");
   let newTagsOpen = $state(false);
   let newTagQuery = $state("");
@@ -28,7 +28,6 @@
   let deleteTarget = $state<{ id: string; name: string; trackCount: number } | null>(null);
   let deleteOpen = $state(false);
   let deleting = $state(false);
-  let deletedMessage = $state<string | null>(null);
 
   let followCode = $state("");
   let linkOpen = $state(false);
@@ -56,7 +55,6 @@
     if (!newName.trim() || busy || newTagQueryProblem) return;
     busy = true;
     busyLabel = "Creating playlist…";
-    error = null;
     try {
       const res = await fetch("/api/playlists", {
         method: "POST",
@@ -70,7 +68,7 @@
       await refresh();
       window.location.href = `/playlists/${body.id}`;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Create failed";
+      toast.error(err instanceof Error ? err.message : "Create failed");
     } finally {
       busy = false;
     }
@@ -80,7 +78,6 @@
     if (!followCode.trim() || busy) return;
     busy = true;
     busyLabel = "Following playlist…";
-    error = null;
     try {
       const res = await fetch("/api/playlists", {
         method: "POST",
@@ -93,7 +90,7 @@
       followCode = "";
       window.location.href = `/playlists/${body.id}`;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Follow failed";
+      toast.error(err instanceof Error ? err.message : "Follow failed");
     } finally {
       busy = false;
     }
@@ -103,7 +100,6 @@
     if (!linkCodeInput.trim() || busy) return;
     busy = true;
     busyLabel = "Looking up playlist…";
-    error = null;
     try {
       const res = await fetch("/api/playlists", {
         method: "POST",
@@ -124,7 +120,7 @@
       ];
       linkCodeInput = "";
     } catch (err) {
-      error = err instanceof Error ? err.message : "Lookup failed";
+      toast.error(err instanceof Error ? err.message : "Lookup failed");
     } finally {
       busy = false;
     }
@@ -134,7 +130,6 @@
     if (!linkName.trim() || linkSources.length < 2 || busy) return;
     busy = true;
     busyLabel = "Creating linked playlist…";
-    error = null;
     try {
       const members = linkMemberQuery
         .split(/[,;\n]/)
@@ -159,7 +154,7 @@
       linkOpen = false;
       window.location.href = `/playlists/${body.id}`;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Create failed";
+      toast.error(err instanceof Error ? err.message : "Create failed");
     } finally {
       busy = false;
     }
@@ -171,7 +166,6 @@
 
   function askDelete(pl: { id: string; name: string; trackCount: number }) {
     deleteTarget = pl;
-    deletedMessage = null;
     deleteOpen = true;
   }
 
@@ -179,16 +173,15 @@
     const target = deleteTarget;
     if (!target) return;
     deleting = true;
-    error = null;
     try {
       const res = await fetch(`/api/playlists/${target.id}`, { method: "DELETE", credentials: "same-origin" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok && res.status !== 404) throw new Error(body?.message ?? "Delete failed");
       playlists = playlists.filter((p) => p.id !== target.id);
       mergeIds = mergeIds.filter((id) => id !== target.id);
-      deletedMessage = `Deleted “${target.name}”.`;
+      toast.success(`Deleted “${target.name}”.`);
     } catch (err) {
-      error = err instanceof Error ? err.message : "Delete failed";
+      toast.error(err instanceof Error ? err.message : "Delete failed");
     } finally {
       deleting = false;
       deleteOpen = false;
@@ -200,7 +193,6 @@
     if (mergeIds.length < 2 || busy) return;
     busy = true;
     busyLabel = "Merging playlists…";
-    error = null;
     try {
       const res = await fetch("/api/playlists", {
         method: "POST",
@@ -217,7 +209,7 @@
       mergeIds = [];
       window.location.href = `/playlists/${body.id}`;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Merge failed";
+      toast.error(err instanceof Error ? err.message : "Merge failed");
     } finally {
       busy = false;
     }
@@ -382,13 +374,6 @@
     {#if busy}
       <BusyStatus label={busyLabel} />
     {/if}
-    {#if error}
-      <p class="auth-error mb-0">{error}</p>
-    {/if}
-    {#if deletedMessage}
-      <p class="text-sm text-signal">{deletedMessage}</p>
-    {/if}
-
     <div class="space-y-2">
       <h2 class="zap-section-label font-mono text-[10px] tracking-[0.18em] uppercase">Zap playlists</h2>
       {#if playlists.length === 0}

@@ -5,6 +5,7 @@
   import CatalogQueueDock from "$lib/components/CatalogQueueDock.svelte";
   import PageSkeleton from "$lib/components/PageSkeleton.svelte";
   import SettingsMenu from "$lib/components/SettingsMenu.svelte";
+  import Toaster from "$lib/components/Toaster.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
   import icon from "$lib/assets/icon.svg";
   import type { LayoutData } from "../$types";
@@ -195,3 +196,4 @@
 </div>
 
 <CatalogQueueDock queue={catalogQueue} />
+<Toaster />

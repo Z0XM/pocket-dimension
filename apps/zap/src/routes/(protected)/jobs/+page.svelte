@@ -4,6 +4,7 @@
   import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
   import PageHeader from "$lib/components/PageHeader.svelte";
   import SongProgressList from "$lib/components/SongProgressList.svelte";
+  import { toast } from "$lib/toast.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -13,7 +14,6 @@
   let failedItems = $state(data.failedItems ?? []);
   let runningCount = $state(data.runningCount ?? 0);
   let busyItemId = $state<string | null>(null);
-  let error = $state<string | null>(null);
 
   $effect(() => {
     tab = data.tab === "failed" ? "failed" : "active";
@@ -49,7 +49,6 @@
 
   async function retryItem(itemId: string) {
     busyItemId = itemId;
-    error = null;
     try {
       const res = await fetch(`/api/jobs/items/${encodeURIComponent(itemId)}/retry`, {
         method: "POST",
@@ -59,7 +58,7 @@
       if (!res.ok) throw new Error(body?.message ?? "Retry failed");
       await refresh();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Retry failed";
+      toast.error(err instanceof Error ? err.message : "Retry failed");
     } finally {
       busyItemId = null;
     }
@@ -109,10 +108,6 @@
       Failed
     </button>
   </div>
-
-  {#if error}
-    <p class="auth-error">{error}</p>
-  {/if}
 
   {#if tab === "active"}
     {#if jobs.length === 0}

@@ -4,6 +4,7 @@
   import SkipBackIcon from "@lucide/svelte/icons/skip-back";
   import SkipForwardIcon from "@lucide/svelte/icons/skip-forward";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import { toast } from "$lib/toast.svelte";
   import { formatClock } from "$lib/catalog-queue";
   import { registerPlaybackAudio } from "$lib/playback-audio";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
@@ -17,7 +18,6 @@
   } = $props();
 
   let busy = $state(false);
-  let localError = $state<string | null>(null);
   let appliedGen = $state(-1);
   let endConfirmOpen = $state(false);
   let scrubMs = $state<number | null>(null);
@@ -78,7 +78,7 @@
       try {
         await audioEl.play();
       } catch (err) {
-        localError = err instanceof Error ? err.message : "Playback blocked";
+        toast.error(err instanceof Error ? err.message : "Playback blocked");
       }
     } else {
       audioEl.pause();
@@ -113,7 +113,6 @@
   async function transport(action: "play" | "pause" | "skip" | "previous" | "seek" | "ended", positionMs?: number) {
     if (!session) return;
     busy = true;
-    localError = null;
     try {
       const res = await fetch(`/api/sessions/${session.id}/transport`, {
         method: "POST",
@@ -125,7 +124,7 @@
       if (!res.ok) throw new Error(body?.message ?? `Transport failed (${res.status})`);
       snapshot = body as SessionSnapshot;
     } catch (err) {
-      localError = err instanceof Error ? err.message : "Transport failed";
+      toast.error(err instanceof Error ? err.message : "Transport failed");
     } finally {
       busy = false;
     }
@@ -145,7 +144,6 @@
   async function endSession() {
     if (!session) return;
     busy = true;
-    localError = null;
     try {
       const res = await fetch(`/api/sessions/${session.id}`, { method: "DELETE", credentials: "same-origin" });
       const body = await res.json().catch(() => ({}));
@@ -153,7 +151,7 @@
       snapshot = body as SessionSnapshot;
       endConfirmOpen = false;
     } catch (err) {
-      localError = err instanceof Error ? err.message : "End failed";
+      toast.error(err instanceof Error ? err.message : "End failed");
     } finally {
       busy = false;
     }
@@ -274,9 +272,6 @@
     onconfirm={endSession}
   />
 
-  {#if localError}
-    <p class="font-mono text-[11px] text-destructive">{localError}</p>
-  {/if}
 
   {#if !snapshot.me?.canAdd && snapshot.me?.role === "guest"}
     <p class="font-mono text-[11px] text-muted-foreground">You don’t have permission to add to the queue.</p>

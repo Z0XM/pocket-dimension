@@ -2,9 +2,10 @@
   import { enhance } from "$app/forms";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import ZapSelect from "$lib/components/ZapSelect.svelte";
-  import type { ActionData, PageData } from "./$types";
+  import { toast } from "$lib/toast.svelte";
+  import type { PageData } from "./$types";
 
-  let { data, form }: { data: PageData; form: ActionData } = $props();
+  let { data }: { data: PageData } = $props();
 
   const modeOptions = [
     { value: "open", label: "Open — everyone except blocked" },
@@ -71,24 +72,31 @@
     }
   }
 
+  function toastFormResult(result: { type: string; data?: unknown }) {
+    if (result.type === "failure") {
+      const data = result.data as { error?: string } | undefined;
+      toast.error(data?.error ?? "Action failed");
+      return;
+    }
+    if (result.type === "success") {
+      const data = result.data as { ok?: string } | undefined;
+      if (data?.ok) toast.success(data.ok);
+    }
+  }
+
   const submitWithBusy = () => {
     busy = true;
-    return async ({ update }: { update: () => Promise<void> }) => {
+    return async ({ result, update }: { result: { type: string; data?: unknown }; update: () => Promise<void> }) => {
       await update();
       busy = false;
       confirmOpen = false;
       modeConfirmOpen = false;
+      toastFormResult(result);
     };
   };
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col gap-4">
-  {#if form?.error}
-    <p class="auth-error shrink-0">{form.error}</p>
-  {:else if form && "ok" in form && form.ok}
-    <p class="shrink-0 text-sm text-signal">{form.ok}</p>
-  {/if}
-
   <div class="grid shrink-0 gap-4 md:grid-cols-2">
     <form
       method="POST"
@@ -117,6 +125,7 @@
         return async ({ result, update }) => {
           await update({ reset: false });
           busy = false;
+          toastFormResult(result);
           if (result.type === "success") addLogin = "";
         };
       }}

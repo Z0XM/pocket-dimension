@@ -324,13 +324,3 @@
   {/key}
 {/if}
 
-{#if queue.notice}
-  <div
-    class={`pointer-events-none fixed left-1/2 z-50 -translate-x-1/2 rounded border border-signal/40 bg-popover/95 px-3 py-1.5 font-mono text-[11px] text-signal shadow-lg ${
-      showQueue && docked ? "bottom-[5.25rem]" : "bottom-4"
-    }`}
-    role="status"
-  >
-    {queue.notice}
-  </div>
-{/if}

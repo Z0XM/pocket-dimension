@@ -4,6 +4,7 @@
   import PencilIcon from "@lucide/svelte/icons/pencil";
   import XIcon from "@lucide/svelte/icons/x";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import { toast } from "$lib/toast.svelte";
 
   type SessionIndexRowData = {
     id: string;
@@ -29,7 +30,6 @@
   let editing = $state(false);
   let draftName = $state("");
   let busy = $state(false);
-  let error = $state<string | null>(null);
   let closeOpen = $state(false);
 
   function beginRename(e: MouseEvent) {
@@ -37,19 +37,16 @@
     e.stopPropagation();
     draftName = row.name;
     editing = true;
-    error = null;
   }
 
   function cancelRename() {
     if (busy) return;
     editing = false;
-    error = null;
   }
 
   async function saveRename() {
     if (busy) return;
     busy = true;
-    error = null;
     try {
       const res = await fetch(`/api/sessions/${row.id}`, {
         method: "PATCH",
@@ -62,7 +59,7 @@
       editing = false;
       onchanged();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Could not rename";
+      toast.error(err instanceof Error ? err.message : "Could not rename");
     } finally {
       busy = false;
     }
@@ -71,7 +68,6 @@
   async function closeSession() {
     if (busy) return;
     busy = true;
-    error = null;
     try {
       const res = await fetch(`/api/sessions/${row.id}`, {
         method: "DELETE",
@@ -83,7 +79,7 @@
       closeOpen = false;
       onchanged();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Could not close session";
+      toast.error(err instanceof Error ? err.message : "Could not close session");
     } finally {
       busy = false;
     }
@@ -137,10 +133,6 @@
       {/if}
     </button>
   {/if}
-  {#if error}
-    <span class="mt-1 block font-mono text-[10px] text-destructive sm:hidden">{error}</span>
-  {/if}
-
   <span class="flex shrink-0 flex-wrap items-center gap-1.5">
     {#if row.canRename && !editing}
       <button
@@ -177,9 +169,6 @@
       <LogInIcon class="size-3.5" aria-hidden="true" />
     </a>
   </span>
-  {#if error}
-    <span class="hidden w-full font-mono text-[10px] text-destructive sm:block">{error}</span>
-  {/if}
 </li>
 
 <ConfirmDialog

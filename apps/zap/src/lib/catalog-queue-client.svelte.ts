@@ -7,6 +7,7 @@ import {
   type CatalogQueueSnapshot,
   type EnqueueMode,
 } from "$lib/catalog-queue";
+import { toast } from "$lib/toast.svelte";
 
 const CONTEXT_KEY = Symbol("zap-catalog-queue");
 const DEVICE_STORAGE_KEY = "zap.deviceId";
@@ -112,9 +113,7 @@ export class CatalogQueueClient {
   }
 
   private flash(message: string) {
-    this.notice = message;
-    if (this.noticeTimer) clearTimeout(this.noticeTimer);
-    this.noticeTimer = setTimeout(() => (this.notice = null), 4000);
+    toast.success(message);
   }
 
   private async send(url: string, init: RequestInit): Promise<CommandResult> {
@@ -133,6 +132,7 @@ export class CatalogQueueClient {
       return body as CommandResult;
     } catch (err) {
       this.error = err instanceof Error ? err.message : "Request failed";
+      toast.error(this.error);
       return null;
     } finally {
       this.pending--;
