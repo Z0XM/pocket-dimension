@@ -198,7 +198,6 @@
         type="search"
         placeholder="Search tags… · ↑↓ · Space · Enter"
         aria-label="Search tags"
-        aria-controls={listEl ? undefined : undefined}
         aria-activedescendant={filteredOptions[highlightIndex] ? `tag-opt-${filteredOptions[highlightIndex]!.id}` : undefined}
         bind:this={filterEl}
         bind:value={filter}
