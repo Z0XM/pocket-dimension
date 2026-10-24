@@ -11,7 +11,7 @@
         <div class="grid p-0 md:grid-cols-2">
           {@render children()}
           <div class="relative hidden bg-secondary md:block">
-            <img src={icon} alt="" class="absolute inset-0 h-full w-full object-cover opacity-90" />
+            <img src={icon} alt="" class="absolute inset-0 h-full w-full object-contain p-10 opacity-95" />
           </div>
         </div>
       </div>

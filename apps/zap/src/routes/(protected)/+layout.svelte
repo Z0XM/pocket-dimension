@@ -6,6 +6,7 @@
   import PageSkeleton from "$lib/components/PageSkeleton.svelte";
   import SettingsMenu from "$lib/components/SettingsMenu.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
+  import icon from "$lib/assets/icon.svg";
   import type { LayoutData } from "../$types";
   import { navigating, page } from "$app/state";
   import { goto } from "$app/navigation";
@@ -155,6 +156,7 @@
   <BeatReactiveBackground queue={catalogQueue} />
   <aside class="zap-shell-rail relative z-10" aria-label="App rail">
     <a href="/home" class="flex items-center gap-2 px-2" aria-label="Zap home" aria-current={homeActive ? "page" : undefined}>
+      <img src={icon} alt="" class="size-8 rounded-md" width="32" height="32" />
       <span class="text-lg font-semibold tracking-tight text-foreground">Zap</span>
       <WaveBars />
     </a>
@@ -172,6 +174,7 @@
       {/if}
       <div class="zap-shell-top-inner mx-auto flex max-w-5xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
         <a href="/home" class="zap-shell-brand flex items-center gap-3" aria-label="Zap home" aria-current={homeActive ? "page" : undefined}>
+          <img src={icon} alt="" class="size-9 rounded-lg" width="36" height="36" />
           <span class="text-xl font-semibold tracking-tight text-foreground">Zap</span>
           <WaveBars />
         </a>

@@ -2,6 +2,7 @@
   import { goto } from "$app/navigation";
   import { authClient } from "$lib/auth-client";
   import WaveBars from "$lib/components/WaveBars.svelte";
+  import icon from "$lib/assets/icon.svg";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -20,6 +21,7 @@
 
 <main class="zap-wave-field zap-grid relative min-h-screen overflow-hidden">
   <div class="relative z-10 mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6 py-16">
+    <img src={icon} alt="" class="mb-4 size-14 rounded-xl" width="56" height="56" />
     <p class="font-mono text-xs tracking-[0.35em] text-signal/80 uppercase">Zap</p>
     <h1 class="mt-4 text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
       {pending ? "Access pending" : "Access blocked"}
