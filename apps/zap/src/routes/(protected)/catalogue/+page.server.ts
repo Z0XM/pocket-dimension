@@ -35,8 +35,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const scope = parsed.scope === "playlist" && !playlistOk ? "yours" : parsed.scope;
   const playlistId = scope === "playlist" ? parsed.playlistId : null;
   const q = url.searchParams.get("q") ?? "";
-  const tagIds = url.searchParams.getAll("tag").filter(Boolean);
-  const tagQuery = url.searchParams.get("tq") ?? "";
+  const untagged = url.searchParams.get("untagged") === "1";
+  const tagIds = untagged ? [] : url.searchParams.getAll("tag").filter(Boolean);
+  const tagQuery = untagged ? "" : (url.searchParams.get("tq") ?? "");
 
   const [{ assets, tagsByAsset, hasMore, nextOffset, tagQueryError }, tagOptions, playlists, suggestions, ytDlpBin, youtubeLink] = await Promise.all([
     listCatalogue({
@@ -44,6 +45,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
       scope,
       playlistId,
       q,
+      untagged,
       tagIds: tagQuery.trim() ? [] : tagIds,
       tagQuery,
       offset: 0,
@@ -67,6 +69,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     /** Scope dropdown + “Add to playlist” targets. */
     playlistOptions: playlists.map((p) => ({ id: p.id, name: p.name, canEdit: p.canEdit, trackCount: p.trackCount })),
     q,
+    untagged,
     selectedTagIds: tagIds,
     tagQuery,
     tagQueryError: tagQueryError ?? null,

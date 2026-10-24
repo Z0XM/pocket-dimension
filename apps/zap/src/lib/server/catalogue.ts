@@ -28,13 +28,15 @@ export type CatalogueQuery = {
   scope?: CatalogueScope;
   /** Required when `scope` is `playlist`; the caller must have checked view access. */
   playlistId?: string | null;
-  /** Tag ids that must ALL be present (AND). Ignored when `tagQuery` is set. */
+  /** Tag ids that must ALL be present (AND). Ignored when `tagQuery` or `untagged` is set. */
   tagIds?: string[];
   /**
    * Nested boolean tag filter, e.g. `love and (soft not upbeat)`.
    * Supports AND / OR / NOT and parentheses. Tag leaves match name or slug.
    */
   tagQuery?: string;
+  /** When true, only assets with no tags for this user (mutually exclusive with tagIds / tagQuery). */
+  untagged?: boolean;
   /** `library` uses per-user sort keys (playlist import order). Default title. */
   order?: CatalogueOrder;
   /** 0-based page offset in items (not pages). */
@@ -59,8 +61,9 @@ export type CatalogueTag = typeof schema.tags.$inferSelect;
 export async function listCatalogue(input: CatalogueQuery, options: ListOptions = {}): Promise<CatalogueListResult> {
   const scope = input.scope ?? "all";
   const q = input.q?.trim() ?? "";
-  const tagIds = input.tagIds?.filter(Boolean) ?? [];
-  const tagQueryRaw = input.tagQuery?.trim() ?? "";
+  const untagged = Boolean(input.untagged);
+  const tagQueryRaw = untagged ? "" : (input.tagQuery?.trim() ?? "");
+  const tagIds = untagged || tagQueryRaw ? [] : (input.tagIds?.filter(Boolean) ?? []);
   const limit = Math.min(Math.max(input.limit ?? CATALOGUE_PAGE_SIZE, 1), options.maxLimit ?? 100);
   const offset = Math.max(input.offset ?? 0, 0);
 
@@ -76,6 +79,8 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
   let assetIds: string[] | null = null;
   let tagQueryError: string | null = null;
   let tagQueryAst: TagQueryNode | null = null;
+  /** Apply NOT EXISTS tag filter in SQL when the scope is not already narrowed to an id list. */
+  let untaggedSql = false;
 
   if (scope === "yours") {
     const tagged = await db
@@ -94,7 +99,21 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
     if (assetIds.length === 0) return empty;
   }
 
-  if (tagQueryRaw) {
+  if (untagged) {
+    // "Your library" is defined as tagged tracks — untagged ∩ yours is always empty.
+    if (scope === "yours") return empty;
+    if (assetIds) {
+      const tagged = await db
+        .selectDistinct({ mediaAssetId: schema.mediaAssetTags.mediaAssetId })
+        .from(schema.mediaAssetTags)
+        .where(and(eq(schema.mediaAssetTags.userId, input.userId), inArray(schema.mediaAssetTags.mediaAssetId, assetIds)));
+      const taggedSet = new Set(tagged.map((row) => row.mediaAssetId));
+      assetIds = assetIds.filter((id) => !taggedSet.has(id));
+      if (assetIds.length === 0) return empty;
+    } else {
+      untaggedSql = true;
+    }
+  } else if (tagQueryRaw) {
     const parsed = parseTagQuery(tagQueryRaw);
     if (!parsed.ok) {
       return { ...empty, tagQueryError: parsed.error };
@@ -130,6 +149,15 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
   const conditions = [catalogueVisible()];
   if (assetIds) {
     conditions.push(inArray(schema.mediaAssets.id, assetIds));
+  }
+  if (untaggedSql) {
+    conditions.push(
+      sql`not exists (
+        select 1 from ${schema.mediaAssetTags}
+        where ${schema.mediaAssetTags.mediaAssetId} = ${schema.mediaAssets.id}
+          and ${schema.mediaAssetTags.userId} = ${input.userId}
+      )`
+    );
   }
   if (q) {
     const pattern = `%${q}%`;

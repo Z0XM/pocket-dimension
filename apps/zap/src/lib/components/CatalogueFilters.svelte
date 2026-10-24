@@ -14,6 +14,7 @@
     q = $bindable(""),
     tagQuery = $bindable(""),
     selectedTagIds = $bindable<string[]>([]),
+    untagged = $bindable(false),
     open = $bindable(true),
     availableTags = [],
     topTagIds,
@@ -32,6 +33,7 @@
     q?: string;
     tagQuery?: string;
     selectedTagIds?: string[];
+    untagged?: boolean;
     /** Tag filter panel expanded (only used when `collapsible`). */
     open?: boolean;
     availableTags?: TagFilterTag[];
@@ -50,7 +52,7 @@
   } = $props();
 
   const panelId = $props.id();
-  const activeTagFilters = $derived(tagQuery.trim() ? 1 : selectedTagIds.length);
+  const activeTagFilters = $derived(tagQuery.trim() ? 1 : untagged ? 1 : selectedTagIds.length);
 
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -139,7 +141,7 @@
     </div>
 
     <div id={panelId} hidden={!open}>
-      <TagQueryEditor layout="grid" bind:tagQuery bind:selectedTagIds {availableTags} {topTagIds} {tagQueryError} {onchange} />
+      <TagQueryEditor layout="grid" bind:tagQuery bind:selectedTagIds bind:untagged {availableTags} {topTagIds} {tagQueryError} {onchange} />
     </div>
   </div>
 {:else}
@@ -163,6 +165,6 @@
       autocomplete="off"
     />
 
-    <TagQueryEditor bind:tagQuery bind:selectedTagIds {availableTags} {topTagIds} {tagQueryError} {compact} {onchange} />
+    <TagQueryEditor bind:tagQuery bind:selectedTagIds bind:untagged {availableTags} {topTagIds} {tagQueryError} {compact} {onchange} />
   </div>
 {/if}

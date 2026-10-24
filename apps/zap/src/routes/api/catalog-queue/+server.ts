@@ -19,7 +19,14 @@ import { PlaylistError, listPlaylistAssetIds } from "$lib/server/playlists";
 
 const TRANSPORT_ACTIONS: readonly TransportAction[] = ["play", "pause", "seek", "next", "previous", "jump", "ended"];
 
-type FilterBody = { scope?: string; playlistId?: string | null; q?: string; tagQuery?: string; tagIds?: string[] };
+type FilterBody = {
+  scope?: string;
+  playlistId?: string | null;
+  q?: string;
+  tagQuery?: string;
+  tagIds?: string[];
+  untagged?: boolean;
+};
 
 type Body = {
   action?: string;
@@ -84,15 +91,17 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       const scope: CatalogueScope = f.scope === "playlist" ? "playlist" : f.scope === "yours" ? "yours" : "all";
       const playlistId = scope === "playlist" && isUuid(f.playlistId) ? f.playlistId : null;
       if (scope === "playlist" && (!playlistId || !(await userCanViewPlaylist(playlistId, user.id)))) throw error(404, "Playlist not found");
-      const tagQuery = typeof f.tagQuery === "string" ? f.tagQuery : "";
+      const untagged = Boolean(f.untagged);
+      const tagQuery = untagged ? "" : typeof f.tagQuery === "string" ? f.tagQuery : "";
       const { ids, truncated, tagQueryError } = await listPlayableCatalogueIds(
         {
           userId: user.id,
           scope,
           playlistId,
           q: typeof f.q === "string" ? f.q : "",
+          untagged,
           tagQuery,
-          tagIds: tagQuery.trim() ? [] : stringIds(f.tagIds, 50),
+          tagIds: untagged || tagQuery.trim() ? [] : stringIds(f.tagIds, 50),
         },
         MAX_BULK_ENQUEUE
       );

@@ -32,6 +32,7 @@
   let libraryScope = $state(scopeFromData());
   let q = $state("");
   let selected = $state<string[]>([]);
+  let untagged = $state(false);
   let tagQuery = $state("");
   let tagQueryError = $state<string | null>(null);
   let availableTags = $state<PageData["availableTags"]>([]);
@@ -70,7 +71,7 @@
   /** Playlists that 404'd since the page loaded (deleted elsewhere); hidden from the scope + “Add to playlist” menus. */
   let missingPlaylistIds = $state<string[]>([]);
   let scopeNotice = $state<string | null>(null);
-  const filtering = $derived(Boolean(q.trim() || tagQuery.trim() || selected.length));
+  const filtering = $derived(Boolean(q.trim() || tagQuery.trim() || selected.length || untagged));
   const scopedPlaylistId = $derived(libraryScope.startsWith("playlist:") ? libraryScope.slice("playlist:".length) : null);
   const suggestions = $derived(
     filtering || scopedPlaylistId
@@ -90,13 +91,14 @@
   const canAddAll = $derived(Boolean(queue) && (filtering || Boolean(scopedPlaylistId)) && assets.length > 0 && !tagQueryError);
 
   function filterInput(): CatalogueFilterInput {
-    const tq = tagQuery.trim();
+    const tq = untagged ? "" : tagQuery.trim();
     return {
       scope: scopedPlaylistId ? "playlist" : libraryScope === "all" ? "all" : "yours",
       playlistId: scopedPlaylistId,
       q: q.trim(),
+      untagged,
       tagQuery: tq,
-      tagIds: tq ? [] : selected,
+      tagIds: untagged || tq ? [] : selected,
     };
   }
 
@@ -172,12 +174,13 @@
   }
 
   $effect(() => {
-    const key = `${data.scope}|${data.playlistId}|${data.playlistMissing}|${data.q}|${data.tagQuery}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
+    const key = `${data.scope}|${data.playlistId}|${data.playlistMissing}|${data.q}|${data.untagged}|${data.tagQuery}|${data.selectedTagIds.join(",")}|${data.nextOffset}|${data.assets.map((a) => a.id).join(",")}`;
     if (key === hydratedKey) return;
     hydratedKey = key;
     libraryScope = scopeFromData();
     scopeNotice = data.playlistMissing ? MISSING_PLAYLIST_NOTICE : null;
     q = data.q;
+    untagged = Boolean(data.untagged);
     tagQuery = data.tagQuery ?? "";
     tagQueryError = data.tagQueryError ?? null;
     selected = [...data.selectedTagIds];
@@ -257,9 +260,12 @@
     const params = new URLSearchParams();
     setScopeParams(params, true);
     if (q.trim()) params.set("q", q.trim());
-    const tq = tagQuery.trim();
-    if (tq) params.set("tq", tq);
-    else for (const id of selected) params.append("tag", id);
+    if (untagged) params.set("untagged", "1");
+    else {
+      const tq = tagQuery.trim();
+      if (tq) params.set("tq", tq);
+      else for (const id of selected) params.append("tag", id);
+    }
     if (offset > 0) params.set("offset", String(offset));
     params.set("limit", String(data.pageSize));
     return params;
@@ -269,9 +275,12 @@
     const params = new URLSearchParams();
     setScopeParams(params, false);
     if (q.trim()) params.set("q", q.trim());
-    const tq = tagQuery.trim();
-    if (tq) params.set("tq", tq);
-    else for (const id of selected) params.append("tag", id);
+    if (untagged) params.set("untagged", "1");
+    else {
+      const tq = tagQuery.trim();
+      if (tq) params.set("tq", tq);
+      else for (const id of selected) params.append("tag", id);
+    }
     const qs = params.toString();
     replaceState(qs ? `${page.url.pathname}?${qs}` : page.url.pathname, {});
   }
@@ -368,6 +377,7 @@
       bind:q
       bind:tagQuery
       bind:selectedTagIds={selected}
+      bind:untagged
       {availableTags}
       {topTagIds}
       {tagQueryError}
@@ -376,6 +386,8 @@
       onchange={() => {
         savedPlaylistMessage = null;
         scopeNotice = null;
+        // Your library is tagged-only — Untagged needs All (or a playlist).
+        if (untagged && libraryScope === "") libraryScope = "all";
         void fetchPage({ reset: true });
       }}
     />

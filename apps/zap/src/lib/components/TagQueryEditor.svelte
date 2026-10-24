@@ -8,6 +8,7 @@
   let {
     tagQuery = $bindable(""),
     selectedTagIds = $bindable<string[]>([]),
+    untagged = $bindable(false),
     availableTags = [],
     topTagIds,
     tagQueryError = null,
@@ -17,8 +18,10 @@
   }: {
     tagQuery?: string;
     selectedTagIds?: string[];
+    /** Filter to tracks with no tags for this user. */
+    untagged?: boolean;
     availableTags?: TagFilterTag[];
-    /** Chips shown inline (most relevant first); the rest live in the “More” dropdown. Defaults to system tags by name. */
+    /** Tags shown as chips; the rest live in the “More” dropdown. Defaults to system tags by name. */
     topTagIds?: string[];
     tagQueryError?: string | null;
     /** `grid`: query and tags side by side (catalogue panel). `stack`: query above tags. */
@@ -37,9 +40,11 @@
   const visibleTags = $derived(visibleIds.map((id) => tagById.get(id)!));
   const moreTags = $derived(availableTags.filter((t) => !visibleIds.includes(t.id)));
   const extraSelected = $derived(
-    queryMode ? [] : selectedTagIds.filter((id) => !visibleIds.includes(id) && tagById.has(id)).map((id) => tagById.get(id)!)
+    queryMode || untagged ? [] : selectedTagIds.filter((id) => !visibleIds.includes(id) && tagById.has(id)).map((id) => tagById.get(id)!)
   );
-  const moreSelectedCount = $derived(queryMode ? 0 : moreTags.filter((t) => selectedTagIds.includes(t.id)).length);
+  const moreSelectedCount = $derived(
+    queryMode ? 0 : (untagged ? 1 : 0) + moreTags.filter((t) => selectedTagIds.includes(t.id)).length
+  );
 
   let tagQueryInput = $state<HTMLInputElement | null>(null);
   let typingTimer: ReturnType<typeof setTimeout> | null = null;
@@ -61,13 +66,27 @@
   }
 
   function onTagQueryInput() {
-    if (tagQuery.trim()) selectedTagIds = [];
+    if (tagQuery.trim()) {
+      selectedTagIds = [];
+      untagged = false;
+    }
     emitSoon();
   }
 
   function clearTagQuery() {
     if (!tagQuery && !tagQueryError) return;
     tagQuery = "";
+    onchange?.();
+  }
+
+  function toggleUntagged() {
+    if (queryMode) {
+      tagQuery = "";
+    }
+    const next = !untagged;
+    untagged = next;
+    if (next) selectedTagIds = [];
+    moreOpen = false;
     onchange?.();
   }
 
@@ -82,6 +101,7 @@
     const needsSpaceAfter = after.length > 0 && !/^\s/.test(after) && !/^[)\]]/.test(after);
     tagQuery = `${before}${needsSpaceBefore ? " " : ""}${piece}${needsSpaceAfter ? " " : ""}${after}`;
     selectedTagIds = [];
+    untagged = false;
     queueMicrotask(() => {
       if (!el) return;
       const pos = before.length + (needsSpaceBefore ? 1 : 0) + piece.length + (needsSpaceAfter ? 1 : 0);
@@ -100,6 +120,7 @@
       moreOpen = false;
       return;
     }
+    untagged = false;
     selectedTagIds = selectedTagIds.includes(id) ? selectedTagIds.filter((t) => t !== id) : [...selectedTagIds, id];
     onchange?.();
   }
@@ -182,11 +203,24 @@
 
 {#snippet chips()}
   <div class="flex flex-wrap items-center gap-1.5">
-    {#each visibleTags as tag (tag.id)}
-      {@const isOn = !queryMode && selectedTagIds.includes(tag.id)}
+    {#if untagged && !queryMode}
       <button
         type="button"
-        class={`zap-tag-chip font-mono ${chipClass} ${isOn && !queryMode ? "zap-tag-chip-on" : ""}`}
+        class={`zap-tag-chip zap-tag-chip-on inline-flex items-center gap-1 font-mono ${chipClass}`}
+        aria-pressed="true"
+        aria-label="Clear untagged filter"
+        title="Clear"
+        onclick={toggleUntagged}
+      >
+        Untagged
+        <XIcon class="size-3" aria-hidden="true" />
+      </button>
+    {/if}
+    {#each visibleTags as tag (tag.id)}
+      {@const isOn = !queryMode && !untagged && selectedTagIds.includes(tag.id)}
+      <button
+        type="button"
+        class={`zap-tag-chip font-mono ${chipClass} ${isOn ? "zap-tag-chip-on" : ""}`}
         aria-pressed={isOn}
         onclick={() => toggleTag(tag.id)}
       >
@@ -207,72 +241,95 @@
       </button>
     {/each}
 
-    {#if moreTags.length}
-      <div class="relative" bind:this={moreRoot}>
-        <button
-          type="button"
-          class={`zap-tag-chip inline-flex items-center gap-1 border-dashed font-mono ${chipClass} ${
-            moreOpen || moreSelectedCount ? "zap-tag-chip-on border-dashed" : ""
+    <div class="relative" bind:this={moreRoot}>
+      <button
+        type="button"
+        class={`zap-tag-chip inline-flex items-center gap-1 border-dashed font-mono ${chipClass} ${
+          moreOpen || moreSelectedCount ? "zap-tag-chip-on border-dashed" : ""
+        }`}
+        bind:this={moreTrigger}
+        aria-haspopup="listbox"
+        aria-expanded={moreOpen}
+        onclick={toggleMore}
+      >
+        {visibleTags.length ? "More" : "Tags"}
+        <span class="tabular-nums opacity-70">
+          {#if moreSelectedCount}
+            {moreSelectedCount}{#if moreTags.length}/{moreTags.length + 1}{:else}/1{/if}
+          {:else}
+            {moreTags.length + 1}
+          {/if}
+        </span>
+        <ChevronDownIcon class={`size-3 transition ${moreOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+
+      {#if moreOpen}
+        <div
+          class={`absolute left-0 z-50 flex w-56 flex-col overflow-hidden rounded border border-border bg-popover shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_12%,transparent)] ${
+            morePlacement.openUp ? "bottom-full mb-1" : "top-full mt-1"
           }`}
-          bind:this={moreTrigger}
-          aria-haspopup="listbox"
-          aria-expanded={moreOpen}
-          onclick={toggleMore}
+          style={`max-height: ${morePlacement.maxHeightPx}px`}
         >
-          {visibleTags.length ? "More" : "Tags"}
-          <span class="tabular-nums opacity-70">{moreSelectedCount ? `${moreSelectedCount}/${moreTags.length}` : moreTags.length}</span>
-          <ChevronDownIcon class={`size-3 transition ${moreOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-        </button>
-
-        {#if moreOpen}
-          <div
-            class={`absolute left-0 z-50 flex w-56 flex-col overflow-hidden rounded border border-border bg-popover shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_12%,transparent)] ${
-              morePlacement.openUp ? "bottom-full mb-1" : "top-full mt-1"
-            }`}
-            style={`max-height: ${morePlacement.maxHeightPx}px`}
-          >
-            {#if moreTags.length > 8}
-              <input
-                class="m-1.5 shrink-0 rounded border border-border bg-background px-2 py-1 font-mono text-xs outline-none focus:border-signal"
-                type="search"
-                placeholder="Filter tags…"
-                aria-label="Filter tags"
-                bind:value={moreFilter}
-                autocomplete="off"
-              />
-            {/if}
-            <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain" role="listbox" aria-multiselectable={!queryMode}>
-              {#each moreFiltered as tag (tag.id)}
-                {@const isOn = !queryMode && selectedTagIds.includes(tag.id)}
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isOn}
-                  class={`flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs transition hover:bg-signal/10 ${isOn ? "text-signal" : "text-muted-foreground"}`}
-                  onclick={() => toggleTag(tag.id)}
+          {#if moreTags.length > 8}
+            <input
+              class="m-1.5 shrink-0 rounded border border-border bg-background px-2 py-1 font-mono text-xs outline-none focus:border-signal"
+              type="search"
+              placeholder="Filter tags…"
+              aria-label="Filter tags"
+              bind:value={moreFilter}
+              autocomplete="off"
+            />
+          {/if}
+          <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain" role="listbox" aria-multiselectable={!queryMode}>
+            <button
+              type="button"
+              role="option"
+              aria-selected={!queryMode && untagged}
+              class={`flex w-full items-center gap-2 border-b border-border/50 px-3 py-1.5 text-left font-mono text-xs transition hover:bg-signal/10 ${
+                !queryMode && untagged ? "text-signal" : "text-muted-foreground"
+              }`}
+              onclick={toggleUntagged}
+            >
+              <span
+                class={`flex size-4 shrink-0 items-center justify-center rounded border ${
+                  !queryMode && untagged ? "border-signal bg-signal/20" : "border-border"
+                }`}
+              >
+                {#if !queryMode && untagged}
+                  <CheckIcon class="size-3" />
+                {/if}
+              </span>
+              <span class="min-w-0 flex-1 truncate">Untagged</span>
+              <span class="text-[10px] uppercase opacity-60">filter</span>
+            </button>
+            {#each moreFiltered as tag (tag.id)}
+              {@const isOn = !queryMode && !untagged && selectedTagIds.includes(tag.id)}
+              <button
+                type="button"
+                role="option"
+                aria-selected={isOn}
+                class={`flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs transition hover:bg-signal/10 ${isOn ? "text-signal" : "text-muted-foreground"}`}
+                onclick={() => toggleTag(tag.id)}
+              >
+                <span
+                  class={`flex size-4 shrink-0 items-center justify-center rounded border ${isOn ? "border-signal bg-signal/20" : "border-border"}`}
                 >
-                  <span
-                    class={`flex size-4 shrink-0 items-center justify-center rounded border ${isOn ? "border-signal bg-signal/20" : "border-border"}`}
-                  >
-                    {#if isOn}
-                      <CheckIcon class="size-3" />
-                    {/if}
-                  </span>
-                  <span class="min-w-0 flex-1 truncate">{tag.name}</span>
-                  <span class="text-[10px] uppercase opacity-60">{tag.kind}</span>
-                </button>
-              {:else}
+                  {#if isOn}
+                    <CheckIcon class="size-3" />
+                  {/if}
+                </span>
+                <span class="min-w-0 flex-1 truncate">{tag.name}</span>
+                <span class="text-[10px] uppercase opacity-60">{tag.kind}</span>
+              </button>
+            {:else}
+              {#if moreFilter.trim()}
                 <p class="px-3 py-2 text-xs text-muted-foreground">No tags match.</p>
-              {/each}
-            </div>
+              {/if}
+            {/each}
           </div>
-        {/if}
-      </div>
-    {/if}
-
-    {#if availableTags.length === 0}
-      <span class="font-mono text-[11px] text-muted-foreground">No tags yet — tag tracks to filter by them.</span>
-    {/if}
+        </div>
+      {/if}
+    </div>
   </div>
 {/snippet}
 

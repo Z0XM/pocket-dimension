@@ -17,6 +17,7 @@ export type CatalogueFilterInput = {
   q?: string;
   tagQuery?: string;
   tagIds?: string[];
+  untagged?: boolean;
 };
 
 type CommandResult = (CatalogQueueSnapshot & { notice?: string }) | null;
