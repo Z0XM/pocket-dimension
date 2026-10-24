@@ -5,7 +5,15 @@ import type { RequestHandler } from "./$types";
 import { db, schema } from "@pocket-dimension/db";
 import { readCustomTagNamesFromForm } from "$lib/custom-tags";
 import { ensureCustomTags, setUserAssetTags } from "$lib/server/catalogue";
-import { completeJob, createImportJob, markJobRunning, recordIngestResult, updateJobProgress } from "$lib/server/import-jobs";
+import {
+  clearJobLiveSongs,
+  completeJob,
+  createImportJob,
+  markJobRunning,
+  recordIngestResult,
+  setJobLiveSongs,
+  updateJobProgress,
+} from "$lib/server/import-jobs";
 import { MAX_TRACK_DURATION_MS } from "$lib/server/ingest/limits";
 import { createNdjsonSender } from "$lib/server/ingest/ndjson-stream";
 import { isStorageConfigured, putMediaObject } from "$lib/server/storage";
@@ -50,6 +58,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       const { send, close } = createNdjsonSender(controller);
 
       try {
+        setJobLiveSongs(job.id, [{ identityKey: "upload:pending", title: displayTitle, phase: "downloading", percent: 100 }]);
         send({
           type: "song",
           identityKey: "upload:pending",
@@ -68,6 +77,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
         });
 
         if (!asset) {
+          setJobLiveSongs(job.id, [{ identityKey, title: displayTitle, phase: "uploading", percent: 0 }]);
           send({
             type: "song",
             identityKey,
@@ -82,6 +92,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
             contentType: file.type || "audio/mpeg",
             ext: file.name.split(".").pop() || "mp3",
             onUploadPercent: (percent) => {
+              setJobLiveSongs(job.id, [{ identityKey, title: displayTitle, phase: "uploading", percent }]);
               send({
                 type: "song",
                 identityKey,
@@ -121,6 +132,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
           identityKey,
           title: asset.title,
         });
+        clearJobLiveSongs(job.id);
         await completeJob(job.id, {
           status: "completed",
           importedCount: 1,
@@ -140,6 +152,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
       } catch (err) {
         console.error("[zap ingest upload]", err);
         const message = err instanceof Error ? err.message : "Upload failed";
+        clearJobLiveSongs(job.id);
         await completeJob(job.id, { status: "failed", errorMessage: message, total: 1, done: 1, failedCount: 1 }).catch(() => {});
         send({
           type: "error",
