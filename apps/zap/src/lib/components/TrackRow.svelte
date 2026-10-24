@@ -7,10 +7,10 @@
   import PlayIcon from "@lucide/svelte/icons/play";
   import TagsIcon from "@lucide/svelte/icons/tags";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
-  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import EditTagsDialog from "$lib/components/EditTagsDialog.svelte";
   import SeekBar from "$lib/components/SeekBar.svelte";
-  import { deleteSongAsAdmin, SONG_DELETE_CONFIRM_BODY } from "$lib/admin-song-delete";
+  import SongDispositionDialog from "$lib/components/SongDispositionDialog.svelte";
+  import { archiveSongAsAdmin, deleteSongAsAdmin } from "$lib/admin-song-delete";
   import { formatClock, type EnqueueMode } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
   import { toast } from "$lib/toast.svelte";
@@ -42,6 +42,7 @@
     playlists = [],
     canDelete = false,
     ondeleted,
+    onarchived,
     ontags,
   }: {
     track: TrackItem;
@@ -53,12 +54,13 @@
     /** Zap admins only; the server enforces it regardless. */
     canDelete?: boolean;
     ondeleted?: (id: string, message: string) => void;
+    onarchived?: (id: string, message: string) => void;
     /** Fired after a successful tag save so the parent can update local row state. */
     ontags?: (id: string, tags: TrackItem["tags"]) => void;
   } = $props();
 
   let deleteOpen = $state(false);
-  let deleting = $state(false);
+  let disposing = $state(false);
   let editTagsOpen = $state(false);
   let scrubMs = $state<number | null>(null);
 
@@ -72,10 +74,23 @@
   const isPlaying = $derived(isCurrent && Boolean(queue?.playing));
   const durationMs = $derived(track.durationMs ?? queue?.currentItem?.durationMs ?? 0);
 
+  async function confirmArchive() {
+    disposing = true;
+    const outcome = await archiveSongAsAdmin(track.id);
+    disposing = false;
+    deleteOpen = false;
+    if (!outcome.ok) {
+      toast.error(outcome.message);
+      return;
+    }
+    if (onarchived) onarchived(track.id, outcome.message);
+    else ondeleted?.(track.id, outcome.message);
+  }
+
   async function confirmDelete() {
-    deleting = true;
+    disposing = true;
     const outcome = await deleteSongAsAdmin(track.id);
-    deleting = false;
+    disposing = false;
     deleteOpen = false;
     if (!outcome.ok) {
       toast.error(outcome.message);
@@ -217,7 +232,7 @@
               class="inline-flex size-6 shrink-0 items-center justify-center rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-40"
               aria-label={`Delete ${track.title}`}
               title="Delete song"
-              disabled={deleting}
+              disabled={disposing}
               onclick={() => (deleteOpen = true)}
             >
               <Trash2Icon class="size-3.5 shrink-0" aria-hidden="true" />
@@ -298,14 +313,13 @@
   />
 
   {#if canDelete}
-    <ConfirmDialog
+    <SongDispositionDialog
       bind:open={deleteOpen}
-      title={`Delete "${track.title}"?`}
-      body={SONG_DELETE_CONFIRM_BODY}
-      confirmLabel="Delete song"
-      danger
-      busy={deleting}
-      onconfirm={confirmDelete}
+      title={`Remove "${track.title}"?`}
+      body={`Archive hides it from everyone except Admin → Songs (reversible). Delete permanently removes the catalogue row and storage object.`}
+      busy={disposing}
+      onarchive={confirmArchive}
+      ondelete={confirmDelete}
     />
   {/if}
 </li>

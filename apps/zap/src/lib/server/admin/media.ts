@@ -161,6 +161,143 @@ export async function deleteMediaAsset(mediaAssetId: string): Promise<MediaDelet
   };
 }
 
+export type MediaArchiveResult = {
+  id: string;
+  title: string;
+  status: "archived";
+  affectedLiveSessions: number;
+  removedQueueItems: number;
+  removedCatalogQueueItems: number;
+};
+
+/**
+ * Soft-hide a song: set status to `archived` and strip it from live session queues and personal
+ * catalogue queues so it cannot appear in active playback. Playlist / library / history rows stay;
+ * user-facing list queries exclude `archived`.
+ */
+export async function archiveMediaAsset(mediaAssetId: string): Promise<MediaArchiveResult | null> {
+  const asset = await db.query.mediaAssets.findFirst({ where: eq(schema.mediaAssets.id, mediaAssetId) });
+  if (!asset) return null;
+  if (asset.status === "archived") {
+    return {
+      id: asset.id,
+      title: asset.title,
+      status: "archived",
+      affectedLiveSessions: 0,
+      removedQueueItems: 0,
+      removedCatalogQueueItems: 0,
+    };
+  }
+
+  const outcome = await db.transaction(async (tx) => {
+    await tx.update(schema.mediaAssets).set({ status: "archived", errorMessage: null }).where(eq(schema.mediaAssets.id, asset.id));
+
+    const removedQueue = await tx
+      .delete(schema.queueItems)
+      .where(eq(schema.queueItems.mediaAssetId, asset.id))
+      .returning({ id: schema.queueItems.id, sessionId: schema.queueItems.sessionId, position: schema.queueItems.position });
+    const removedQueueById = new Map(removedQueue.map((r) => [r.id, r]));
+    const sessionIds = [...new Set(removedQueue.map((r) => r.sessionId))];
+    const sessions = sessionIds.length > 0 ? await tx.select().from(schema.sessions).where(inArray(schema.sessions.id, sessionIds)) : [];
+
+    const liveSessionIds: string[] = [];
+    for (const session of sessions) {
+      const remaining = await compactQueueItems(tx, session.id);
+      if (session.status !== "live") continue;
+      liveSessionIds.push(session.id);
+      const removedCurrent = session.currentQueueItemId ? removedQueueById.get(session.currentQueueItemId) : undefined;
+      if (!removedCurrent) continue;
+      const patch = nextPlaybackAfterRemoval({
+        removedCurrentPosition: removedCurrent.position,
+        playbackState: session.playbackState,
+        remaining,
+      });
+      await tx
+        .update(schema.sessions)
+        .set({ ...patch, positionUpdatedAt: new Date(), playbackGeneration: session.playbackGeneration + 1 })
+        .where(eq(schema.sessions.id, session.id));
+    }
+
+    const catalogRemoved = await tx
+      .delete(schema.catalogQueueItems)
+      .where(eq(schema.catalogQueueItems.mediaAssetId, asset.id))
+      .returning({ id: schema.catalogQueueItems.id, queueId: schema.catalogQueueItems.queueId });
+
+    for (const queueId of new Set(catalogRemoved.map((r) => r.queueId))) {
+      const rows = await tx
+        .select({ id: schema.catalogQueueItems.id, position: schema.catalogQueueItems.position })
+        .from(schema.catalogQueueItems)
+        .where(eq(schema.catalogQueueItems.queueId, queueId))
+        .orderBy(asc(schema.catalogQueueItems.position));
+      for (const u of planPositionCompaction(rows)) {
+        await tx.update(schema.catalogQueueItems).set({ position: u.position }).where(eq(schema.catalogQueueItems.id, u.id));
+      }
+      const queue = await tx.query.catalogQueues.findFirst({ where: eq(schema.catalogQueues.id, queueId) });
+      if (queue?.currentItemId && catalogRemoved.some((r) => r.id === queue.currentItemId)) {
+        const next = rows[0] ?? null;
+        await tx
+          .update(schema.catalogQueues)
+          .set({
+            currentItemId: next?.id ?? null,
+            playbackState: next ? queue.playbackState : "idle",
+            positionMs: 0,
+            positionUpdatedAt: new Date(),
+            playbackGeneration: queue.playbackGeneration + 1,
+          })
+          .where(eq(schema.catalogQueues.id, queueId));
+      }
+    }
+
+    return {
+      liveSessionIds,
+      removedQueueItems: removedQueue.length,
+      removedCatalogQueueItems: catalogRemoved.length,
+    };
+  });
+
+  try {
+    await publishSessionSnapshots(outcome.liveSessionIds);
+  } catch (err) {
+    console.warn("[zap admin] snapshot publish after archive failed", err);
+  }
+
+  return {
+    id: asset.id,
+    title: asset.title,
+    status: "archived",
+    affectedLiveSessions: outcome.liveSessionIds.length,
+    removedQueueItems: outcome.removedQueueItems,
+    removedCatalogQueueItems: outcome.removedCatalogQueueItems,
+  };
+}
+
+export type MediaUnarchiveResult = {
+  id: string;
+  title: string;
+  status: "ready" | "unavailable";
+};
+
+/** Restore an archived song to the catalogue (`ready` if it has audio, else `unavailable`). */
+export async function unarchiveMediaAsset(mediaAssetId: string): Promise<MediaUnarchiveResult | null> {
+  const asset = await db.query.mediaAssets.findFirst({ where: eq(schema.mediaAssets.id, mediaAssetId) });
+  if (!asset) return null;
+  if (asset.status !== "archived") {
+    const status: MediaUnarchiveResult["status"] = asset.storageKey ? "ready" : "unavailable";
+    return { id: asset.id, title: asset.title, status };
+  }
+
+  const nextStatus: MediaUnarchiveResult["status"] = asset.storageKey ? "ready" : "unavailable";
+  await db
+    .update(schema.mediaAssets)
+    .set({
+      status: nextStatus,
+      errorMessage: nextStatus === "unavailable" ? (asset.errorMessage ?? "Song not available") : null,
+    })
+    .where(eq(schema.mediaAssets.id, asset.id));
+
+  return { id: asset.id, title: asset.title, status: nextStatus };
+}
+
 export type AdminSongRow = {
   id: string;
   title: string;
@@ -173,7 +310,7 @@ export type AdminSongRow = {
   createdAt: string;
 };
 
-export const ADMIN_SONG_STATUSES = ["pending", "ready", "failed", "unavailable"] as const;
+export const ADMIN_SONG_STATUSES = ["pending", "ready", "failed", "unavailable", "archived"] as const;
 export type AdminSongStatus = (typeof ADMIN_SONG_STATUSES)[number];
 
 /** Every catalogue row (all statuses) for the admin songs table. */

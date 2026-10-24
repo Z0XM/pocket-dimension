@@ -1,11 +1,12 @@
 <script lang="ts">
   import { goto, invalidateAll } from "$app/navigation";
   import { page } from "$app/state";
+  import ArchiveRestoreIcon from "@lucide/svelte/icons/archive-restore";
   import SearchIcon from "@lucide/svelte/icons/search";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
-  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import SongDispositionDialog from "$lib/components/SongDispositionDialog.svelte";
   import ZapSelect from "$lib/components/ZapSelect.svelte";
-  import { deleteSongAsAdmin, SONG_DELETE_CONFIRM_BODY } from "$lib/admin-song-delete";
+  import { archiveSongAsAdmin, deleteSongAsAdmin, unarchiveSongAsAdmin } from "$lib/admin-song-delete";
   import type { AdminSongRow } from "$lib/server/admin/media";
   import { toast } from "$lib/toast.svelte";
   import type { PageData } from "./$types";
@@ -17,12 +18,14 @@
     { value: "unavailable", label: "Unavailable" },
     { value: "failed", label: "Failed" },
     { value: "pending", label: "Pending" },
+    { value: "archived", label: "Archived" },
   ];
   const statusClasses: Record<string, string> = {
     ready: "border-border text-muted-foreground",
     unavailable: "border-destructive/40 bg-destructive/10 text-destructive",
     failed: "border-destructive/40 bg-destructive/10 text-destructive",
     pending: "border-amber-500/40 bg-amber-500/10 text-amber-400",
+    archived: "border-border/80 bg-secondary/60 text-muted-foreground",
   };
 
   let q = $state("");
@@ -107,12 +110,38 @@
     return () => io.disconnect();
   });
 
+  async function confirmArchive() {
+    if (!target) return;
+    busy = true;
+    const outcome = await archiveSongAsAdmin(target.id);
+    busy = false;
+    confirmOpen = false;
+    if (outcome.ok) {
+      toast.success(outcome.message);
+      await invalidateAll();
+    } else {
+      toast.error(outcome.message);
+    }
+  }
+
   async function confirmDelete() {
     if (!target) return;
     busy = true;
     const outcome = await deleteSongAsAdmin(target.id);
     busy = false;
     confirmOpen = false;
+    if (outcome.ok) {
+      toast.success(outcome.message);
+      await invalidateAll();
+    } else {
+      toast.error(outcome.message);
+    }
+  }
+
+  async function unarchive(song: AdminSongRow) {
+    busy = true;
+    const outcome = await unarchiveSongAsAdmin(song.id);
+    busy = false;
     if (outcome.ok) {
       toast.success(outcome.message);
       await invalidateAll();
@@ -195,19 +224,33 @@
                   by {song.addedBy}{/if}
               </p>
             </button>
-            <button
-              type="button"
-              class="inline-flex size-8 shrink-0 items-center justify-center border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-40"
-              aria-label={`Delete ${song.title}`}
-              title="Delete song"
-              disabled={busy}
-              onclick={() => {
-                target = song;
-                confirmOpen = true;
-              }}
-            >
-              <Trash2Icon class="size-3.5 shrink-0" aria-hidden="true" />
-            </button>
+            <div class="flex shrink-0 items-center gap-1.5">
+              {#if song.status === "archived"}
+                <button
+                  type="button"
+                  class="inline-flex size-8 items-center justify-center border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
+                  aria-label={`Unarchive ${song.title}`}
+                  title="Unarchive song"
+                  disabled={busy}
+                  onclick={() => void unarchive(song)}
+                >
+                  <ArchiveRestoreIcon class="size-3.5 shrink-0" aria-hidden="true" />
+                </button>
+              {/if}
+              <button
+                type="button"
+                class="inline-flex size-8 items-center justify-center border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-40"
+                aria-label={`Remove ${song.title}`}
+                title="Archive or delete song"
+                disabled={busy}
+                onclick={() => {
+                  target = song;
+                  confirmOpen = true;
+                }}
+              >
+                <Trash2Icon class="size-3.5 shrink-0" aria-hidden="true" />
+              </button>
+            </div>
           </li>
         {/each}
       </ul>
@@ -221,12 +264,14 @@
   {/if}
 </div>
 
-<ConfirmDialog
+<SongDispositionDialog
   bind:open={confirmOpen}
-  title={target ? `Delete "${target.title}"?` : "Delete song?"}
-  body={SONG_DELETE_CONFIRM_BODY}
-  confirmLabel="Delete song"
-  danger
-  {busy}
-  onconfirm={confirmDelete}
+  title={target ? `Remove "${target.title}"?` : "Remove song?"}
+  body={target?.status === "archived"
+    ? "Delete permanently removes the catalogue row and storage object. This can't be undone."
+    : "Archive hides it from everyone except Admin → Songs (reversible). Delete permanently removes the catalogue row and storage object."}
+  busy={busy}
+  showArchive={target?.status !== "archived"}
+  onarchive={confirmArchive}
+  ondelete={confirmDelete}
 />

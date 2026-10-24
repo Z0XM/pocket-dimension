@@ -6,7 +6,8 @@ import { id, timestamps } from "./common";
 export const zapSchema = pgSchema("zap");
 
 /** `unavailable`: identity known (e.g. deleted/private YouTube item) but no audio source yet; backfill flips it to `ready`. */
-export const mediaAssetStatus = zapSchema.enum("media_asset_status", ["pending", "ready", "failed", "unavailable"]);
+/** `archived`: admin-hidden — excluded from all user-facing surfaces; only Admin → Songs lists it. */
+export const mediaAssetStatus = zapSchema.enum("media_asset_status", ["pending", "ready", "failed", "unavailable", "archived"]);
 export const mediaSourceType = zapSchema.enum("media_source_type", ["upload", "youtube", "url", "other"]);
 export const tagKind = zapSchema.enum("tag_kind", ["system", "custom"]);
 export const sessionStatus = zapSchema.enum("session_status", ["live", "ended"]);

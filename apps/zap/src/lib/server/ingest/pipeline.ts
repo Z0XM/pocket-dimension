@@ -171,7 +171,17 @@ export async function saveUnavailableAsset(input: {
   const titleHint = input.title?.trim() || null;
   const existing = await findReadyAsset(identityKey);
   if (existing) {
-    if (existing.status === "ready" && existing.storageKey) return existing;
+    if (existing.storageKey && (existing.status === "ready" || existing.status === "archived")) {
+      if (existing.status === "archived") {
+        const [restored] = await db
+          .update(schema.mediaAssets)
+          .set({ status: "ready", errorMessage: null })
+          .where(eq(schema.mediaAssets.id, existing.id))
+          .returning();
+        return restored ?? existing;
+      }
+      return existing;
+    }
     const [updated] = await db
       .update(schema.mediaAssets)
       .set({
@@ -276,8 +286,17 @@ async function ingestCatalogueVideoOnce(opts: IngestCatalogueVideoOpts): Promise
   };
 
   const existingAsset = await findReadyAsset(identityKey);
-  if (existingAsset?.status === "ready" && existingAsset.storageKey) {
-    const asset = await backfillMissingChannelMeta(existingAsset, opts.metaHints);
+  if (existingAsset?.storageKey && (existingAsset.status === "ready" || existingAsset.status === "archived")) {
+    let asset = existingAsset;
+    if (existingAsset.status === "archived") {
+      const [restored] = await db
+        .update(schema.mediaAssets)
+        .set({ status: "ready", errorMessage: null })
+        .where(eq(schema.mediaAssets.id, existingAsset.id))
+        .returning();
+      asset = restored ?? existingAsset;
+    }
+    asset = await backfillMissingChannelMeta(asset, opts.metaHints);
     await emit("done", 100, asset.title);
     return {
       status: "reused",

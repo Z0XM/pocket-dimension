@@ -65,16 +65,18 @@ async function loadItems(conn: Conn, queueId: string): Promise<CatalogQueueItem[
     .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.catalogQueueItems.mediaAssetId))
     .where(eq(schema.catalogQueueItems.queueId, queueId))
     .orderBy(asc(schema.catalogQueueItems.position), asc(schema.catalogQueueItems.createdAt));
-  return rows.map((r) => ({
-    id: r.id,
-    mediaAssetId: r.mediaAssetId,
-    position: r.position,
-    source: r.source,
-    title: r.title,
-    artists: r.artists,
-    durationMs: r.durationMs,
-    playable: r.status === "ready" && Boolean(r.storageKey),
-  }));
+  return rows
+    .filter((r) => r.status !== "archived")
+    .map((r) => ({
+      id: r.id,
+      mediaAssetId: r.mediaAssetId,
+      position: r.position,
+      source: r.source,
+      title: r.title,
+      artists: r.artists,
+      durationMs: r.durationMs,
+      playable: r.status === "ready" && Boolean(r.storageKey),
+    }));
 }
 
 async function loadDevices(userId: string): Promise<CatalogDevice[]> {
