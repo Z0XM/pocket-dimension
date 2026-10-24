@@ -186,13 +186,7 @@
       {@const isOn = !queryMode && selectedTagIds.includes(tag.id)}
       <button
         type="button"
-        class={`rounded-full border font-mono ${chipClass} ${
-          queryMode
-            ? "border-border text-muted-foreground hover:border-signal hover:text-signal"
-            : isOn
-              ? "border-signal bg-signal/15 text-signal"
-              : "border-border text-muted-foreground hover:border-signal/60"
-        }`}
+        class={`zap-tag-chip font-mono ${chipClass} ${isOn && !queryMode ? "zap-tag-chip-on" : ""}`}
         aria-pressed={isOn}
         onclick={() => toggleTag(tag.id)}
       >
@@ -202,7 +196,7 @@
     {#each extraSelected as tag (tag.id)}
       <button
         type="button"
-        class={`inline-flex items-center gap-1 rounded-full border border-signal bg-signal/15 font-mono text-signal ${chipClass}`}
+        class={`zap-tag-chip zap-tag-chip-on inline-flex items-center gap-1 font-mono ${chipClass}`}
         aria-pressed="true"
         aria-label={`Remove tag ${tag.name}`}
         title="Remove"
@@ -217,10 +211,8 @@
       <div class="relative" bind:this={moreRoot}>
         <button
           type="button"
-          class={`inline-flex items-center gap-1 rounded-full border border-dashed font-mono ${chipClass} ${
-            moreOpen || moreSelectedCount
-              ? "border-signal/60 text-signal"
-              : "border-border text-muted-foreground hover:border-signal/60 hover:text-signal"
+          class={`zap-tag-chip inline-flex items-center gap-1 border-dashed font-mono ${chipClass} ${
+            moreOpen || moreSelectedCount ? "zap-tag-chip-on border-dashed" : ""
           }`}
           bind:this={moreTrigger}
           aria-haspopup="listbox"

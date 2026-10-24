@@ -212,9 +212,54 @@ html[data-animations="off"] .zap-beat-bg {
   border-bottom: none;
 }
 
+@media (hover: hover) {
+  .zap-track:hover {
+    background: color-mix(in srgb, var(--signal) 7%, transparent);
+  }
+
+  .zap-track.is-current:hover {
+    background: color-mix(in srgb, var(--signal) 11%, transparent);
+  }
+}
+
 .zap-track.is-current {
   background: transparent;
   box-shadow: none;
+}
+
+/** Display / filter tag chips — subtle signal lift on hover (no glow). */
+.zap-tag-chip {
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-family: var(--zap-font-mono);
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease;
+}
+
+@media (hover: hover) {
+  .zap-tag-chip:hover {
+    border-color: color-mix(in srgb, var(--signal) 45%, var(--border));
+    color: var(--foreground);
+    background: color-mix(in srgb, var(--signal) 8%, transparent);
+  }
+}
+
+.zap-tag-chip-on {
+  border-color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 15%, transparent);
+  color: var(--signal);
+}
+
+@media (hover: hover) {
+  .zap-tag-chip-on:hover {
+    border-color: var(--signal);
+    color: var(--signal);
+    background: color-mix(in srgb, var(--signal) 22%, transparent);
+  }
 }
 
 .zap-track.is-current .zap-track-title {

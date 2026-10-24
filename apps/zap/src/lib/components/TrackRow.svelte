@@ -216,7 +216,7 @@
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-1 sm:max-w-[45%] sm:justify-end">
           {#each track.tags as tag}
-            <span class="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground">{tag.name}</span>
+            <span class="zap-tag-chip px-2 py-0.5 text-[10px]">{tag.name}</span>
           {/each}
           <button
             type="button"
