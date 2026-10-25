@@ -194,6 +194,11 @@
     return () => io.disconnect();
   });
 
+  function enqueueToast(mode: EnqueueMode, count = 1) {
+    const label = mode === "next" ? "Playing next" : mode === "queue" ? "Added to queue" : mode === "play" ? "Playing" : "Added to the end";
+    toast.success(count === 1 ? `${label}.` : `${label}: ${count} tracks.`);
+  }
+
   async function enqueue(mediaAssetId: string, mode: EnqueueMode) {
     if (!snapshot.session) return;
     queueBusy = true;
@@ -207,6 +212,7 @@
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Enqueue failed (${res.status})`);
       snapshot = body as SessionSnapshot;
+      enqueueToast(mode);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Enqueue failed");
     } finally {
@@ -243,7 +249,7 @@
       if (!res.ok) throw new Error(body?.message ?? `Enqueue failed (${res.status})`);
       snapshot = body;
       nowSubTab = "queue";
-      if (body.notice) toast.success(body.notice);
+      toast.success(body.notice ?? (mode === "replace" ? "Playing filtered tracks." : "Added filtered tracks to the queue."));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Enqueue failed");
     } finally {
@@ -266,7 +272,7 @@
       snapshot = body;
       replaceOpen = false;
       nowSubTab = "queue";
-      if (body.notice) toast.success(body.notice);
+      toast.success(body.notice ?? "Playing filtered tracks.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Enqueue failed");
     } finally {

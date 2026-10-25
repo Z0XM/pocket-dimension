@@ -3,11 +3,14 @@
   import PlayIcon from "@lucide/svelte/icons/play";
   import SkipBackIcon from "@lucide/svelte/icons/skip-back";
   import SkipForwardIcon from "@lucide/svelte/icons/skip-forward";
+  import Volume2Icon from "@lucide/svelte/icons/volume-2";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import SeekBar from "$lib/components/SeekBar.svelte";
   import { toast } from "$lib/toast.svelte";
   import { formatClock } from "$lib/catalog-queue";
   import { registerPlaybackAudio } from "$lib/playback-audio";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
+  import { untrack } from "svelte";
 
   let {
     snapshot = $bindable<SessionSnapshot>(),
@@ -21,6 +24,13 @@
   let appliedGen = $state(-1);
   let endConfirmOpen = $state(false);
   let scrubMs = $state<number | null>(null);
+  /** Optimistic seek target until the live estimate / audio catches up. */
+  let localPositionMs = $state<number | null>(null);
+  let pendingSeekMs = $state<number | null>(null);
+  let now = $state(Date.now());
+  /** Local volume while dragging; otherwise follow member snapshot. */
+  let volumeScrub = $state<number | null>(null);
+  let volumeBusy = $state(false);
 
   const session = $derived(snapshot.session);
   const current = $derived(snapshot.currentItem);
@@ -31,15 +41,27 @@
   const canEnd = $derived(snapshot.me?.role === "host");
   const myMember = $derived(snapshot.members.find((m) => m.userId === snapshot.me?.userId) ?? null);
   const outputEnabled = $derived(myMember?.outputEnabled ?? true);
-  const volume = $derived(myMember?.volume ?? 100);
+  const memberVolume = $derived(myMember?.volume ?? 100);
+  const displayVolume = $derived(volumeScrub ?? memberVolume);
   const durationMs = $derived(current?.durationMs ?? 0);
+  const playing = $derived(session?.playbackState === "playing" && Boolean(current));
 
-  function estimatedPositionMs(): number {
+  const positionMs = $derived.by(() => {
+    if (localPositionMs != null) return localPositionMs;
     if (!session) return 0;
     if (session.playbackState !== "playing") return session.positionMs;
     const base = new Date(session.positionUpdatedAt).getTime();
-    return Math.max(0, session.positionMs + (Date.now() - base));
-  }
+    const est = Math.max(0, session.positionMs + (now - base));
+    return durationMs > 0 ? Math.min(est, durationMs) : est;
+  });
+
+  $effect(() => {
+    if (!playing) return;
+    const id = window.setInterval(() => {
+      now = Date.now();
+    }, 500);
+    return () => window.clearInterval(id);
+  });
 
   function stopBrowserAudio() {
     if (!audioEl) return;
@@ -61,15 +83,21 @@
     const url = `/api/media/${current.mediaAssetId}/audio`;
     const needSrc = audioEl.dataset.assetId !== current.mediaAssetId;
     if (needSrc) {
+      pendingSeekMs = null;
+      localPositionMs = null;
       audioEl.src = url;
       audioEl.dataset.assetId = current.mediaAssetId;
       audioEl.load();
     }
-    audioEl.volume = Math.max(0, Math.min(1, volume / 100));
-    const posSec = estimatedPositionMs() / 1000;
+    audioEl.volume = Math.max(0, Math.min(1, displayVolume / 100));
+    const targetMs = pendingSeekMs ?? positionMs;
+    const posSec = targetMs / 1000;
     try {
       if (Math.abs(audioEl.currentTime - posSec) > 0.75) {
         audioEl.currentTime = posSec;
+      }
+      if (pendingSeekMs != null && Math.abs(audioEl.currentTime * 1000 - pendingSeekMs) <= 750) {
+        pendingSeekMs = null;
       }
     } catch {
       // ignore until metadata ready
@@ -95,13 +123,13 @@
   $effect(() => {
     if (!session) return;
     void outputEnabled;
-    void volume;
+    void displayVolume;
     void session.playbackGeneration;
     void session.playbackState;
     void current?.mediaAssetId;
     void audioEl;
     if (outputEnabled && session.playbackGeneration === appliedGen && audioEl?.dataset.assetId === current?.mediaAssetId) {
-      if (audioEl) audioEl.volume = Math.max(0, Math.min(1, volume / 100));
+      if (audioEl) audioEl.volume = Math.max(0, Math.min(1, displayVolume / 100));
       return;
     }
     if (!outputEnabled && session.playbackGeneration === appliedGen && !audioEl?.dataset.assetId) {
@@ -110,7 +138,30 @@
     void applyTransport();
   });
 
-  async function transport(action: "play" | "pause" | "skip" | "previous" | "seek" | "ended", positionMs?: number) {
+  $effect(() => {
+    const el = audioEl;
+    if (!el || !playing) return;
+    const onTime = () => {
+      const ms = Math.round(el.currentTime * 1000);
+      if (pendingSeekMs != null) {
+        if (Math.abs(ms - pendingSeekMs) > 750) return;
+        pendingSeekMs = null;
+      }
+      localPositionMs = ms;
+    };
+    el.addEventListener("timeupdate", onTime);
+    return () => el.removeEventListener("timeupdate", onTime);
+  });
+
+  // Drop stale local playhead when transport generation / track changes (unless we still owe a seek).
+  $effect(() => {
+    void session?.playbackGeneration;
+    void current?.mediaAssetId;
+    if (untrack(() => pendingSeekMs) != null) return;
+    localPositionMs = null;
+  });
+
+  async function transport(action: "play" | "pause" | "skip" | "previous" | "seek" | "ended", positionMsArg?: number) {
     if (!session) return;
     busy = true;
     try {
@@ -118,16 +169,34 @@
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ action, positionMs }),
+        body: JSON.stringify({ action, positionMs: positionMsArg }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Transport failed (${res.status})`);
       snapshot = body as SessionSnapshot;
+      if (action === "seek" && typeof positionMsArg === "number") {
+        // Keep optimistic thumb until estimate catches the seek.
+        now = Date.now();
+      } else if (action === "skip" || action === "previous" || action === "ended") {
+        localPositionMs = null;
+        pendingSeekMs = null;
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Transport failed");
+      if (action === "seek") {
+        localPositionMs = null;
+        pendingSeekMs = null;
+      }
     } finally {
       busy = false;
     }
+  }
+
+  function seekTo(ms: number) {
+    const clamped = Math.max(0, Math.round(ms));
+    localPositionMs = clamped;
+    pendingSeekMs = clamped;
+    void transport("seek", clamped);
   }
 
   $effect(() => {
@@ -157,14 +226,39 @@
     }
   }
 
-  function onSeekInput(e: Event) {
-    scrubMs = Number((e.currentTarget as HTMLInputElement).value) * 1000;
+  function onVolumeInput(e: Event) {
+    const next = Math.max(0, Math.min(100, Number((e.currentTarget as HTMLInputElement).value)));
+    volumeScrub = next;
+    if (audioEl) audioEl.volume = next / 100;
   }
 
-  function onSeekCommit(e: Event) {
-    const ms = Number((e.currentTarget as HTMLInputElement).value) * 1000;
-    scrubMs = null;
-    if (Number.isFinite(ms)) void transport("seek", ms);
+  async function onVolumeCommit(e: Event) {
+    if (!session || !snapshot.me?.userId) return;
+    const next = Math.max(0, Math.min(100, Math.round(Number((e.currentTarget as HTMLInputElement).value))));
+    volumeScrub = next;
+    if (audioEl) audioEl.volume = next / 100;
+    if (next === memberVolume) {
+      volumeScrub = null;
+      return;
+    }
+    volumeBusy = true;
+    try {
+      const res = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ memberUserId: snapshot.me.userId, volume: next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? "Volume update failed");
+      snapshot = body as SessionSnapshot;
+      volumeScrub = null;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Volume update failed");
+      volumeScrub = null;
+    } finally {
+      volumeBusy = false;
+    }
   }
 </script>
 
@@ -239,21 +333,37 @@
   </div>
 
   <div class="flex items-center gap-2">
-    <span class="w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(scrubMs ?? estimatedPositionMs())}</span>
-    <input
-      class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)] disabled:opacity-40"
-      type="range"
-      min="0"
-      max={Math.max(durationMs / 1000, 1)}
-      step="0.5"
-      value={(scrubMs ?? estimatedPositionMs()) / 1000}
+    <span class="w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(scrubMs ?? positionMs)}</span>
+    <SeekBar
+      class="h-1.5 w-full"
+      valueMs={positionMs}
+      {durationMs}
       disabled={!canSeek || !current || busy}
-      aria-label="Seek"
-      oninput={onSeekInput}
-      onchange={onSeekCommit}
+      onseek={seekTo}
+      onscrub={(ms) => (scrubMs = ms)}
     />
     <span class="w-9 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(durationMs)}</span>
   </div>
+
+  {#if session?.status === "live" && snapshot.me?.userId}
+    <label class="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+      <Volume2Icon class="size-3.5 shrink-0" aria-hidden="true" />
+      <span class="shrink-0">Your volume</span>
+      <input
+        class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)] disabled:opacity-40"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value={displayVolume}
+        disabled={volumeBusy || !outputEnabled}
+        aria-label="Your volume"
+        oninput={onVolumeInput}
+        onchange={(e) => void onVolumeCommit(e)}
+      />
+      <span class="w-7 shrink-0 text-right tabular-nums">{displayVolume}</span>
+    </label>
+  {/if}
 
   {#if !outputEnabled && session?.status === "live"}
     <p class="font-mono text-[11px] text-muted-foreground">
@@ -271,7 +381,6 @@
     {busy}
     onconfirm={endSession}
   />
-
 
   {#if !snapshot.me?.canAdd && snapshot.me?.role === "guest"}
     <p class="font-mono text-[11px] text-muted-foreground">You don’t have permission to add to the queue.</p>
