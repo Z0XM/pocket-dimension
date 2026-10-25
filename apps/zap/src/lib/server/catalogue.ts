@@ -344,13 +344,38 @@ export function serializeCatalogueAsset(asset: CatalogueAsset, tags: CatalogueTa
   };
 }
 
-/** System tags (seeded by migration 0055, managed by admins) plus this user's private custom tags. */
+/**
+ * System tags (seeded by migration 0055, managed by admins) plus this user's private custom tags.
+ * Ordered by most recent song↔tag assignment for this user (latest on top); never-used tags last, then name.
+ */
 export async function listAvailableTags(userId: string) {
-  return db
-    .select()
-    .from(schema.tags)
-    .where(or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, userId)))
-    .orderBy(asc(schema.tags.kind), asc(schema.tags.name));
+  const [tags, lastAssigned] = await Promise.all([
+    db
+      .select()
+      .from(schema.tags)
+      .where(or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, userId))),
+    db
+      .select({
+        tagId: schema.mediaAssetTags.tagId,
+        at: sql<string | Date>`max(${schema.mediaAssetTags.createdAt})`,
+      })
+      .from(schema.mediaAssetTags)
+      .where(eq(schema.mediaAssetTags.userId, userId))
+      .groupBy(schema.mediaAssetTags.tagId),
+  ]);
+
+  const atMs = (value: string | Date | null | undefined) => {
+    if (value == null) return 0;
+    const ms = value instanceof Date ? value.getTime() : new Date(value).getTime();
+    return Number.isFinite(ms) ? ms : 0;
+  };
+  const atByTag = new Map(lastAssigned.map((r) => [r.tagId, atMs(r.at)]));
+  return tags.sort((a, b) => {
+    const tb = atByTag.get(b.id) ?? 0;
+    const ta = atByTag.get(a.id) ?? 0;
+    if (tb !== ta) return tb - ta;
+    return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+  });
 }
 
 export function serializeTagOption(tag: CatalogueTag) {
