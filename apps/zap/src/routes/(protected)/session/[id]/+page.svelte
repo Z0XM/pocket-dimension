@@ -1,6 +1,9 @@
 <script lang="ts">
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import ListEndIcon from "@lucide/svelte/icons/list-end";
+  import PlayIcon from "@lucide/svelte/icons/play";
   import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import DiscordSinkPanel from "$lib/components/DiscordSinkPanel.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
   import PageHeader from "$lib/components/PageHeader.svelte";
@@ -9,6 +12,7 @@
   import { toast } from "$lib/toast.svelte";
   import SessionSetupPanel from "$lib/components/SessionSetupPanel.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
+  import type { CatalogueFilterInput } from "$lib/catalog-queue-client.svelte";
   import type { EnqueueMode } from "$lib/catalog-queue";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
   import type { PageData } from "./$types";
@@ -35,6 +39,8 @@
   let tagQuery = $state(data.catalogueTagQuery ?? "");
   let tagQueryError = $state<string | null>(data.catalogueTagQueryError ?? null);
   let queueBusy = $state(false);
+  let bulkBusy = $state(false);
+  let replaceOpen = $state(false);
   let discordSinkActive = $state(false);
   let catalogueFetchGen = 0;
   let playlists = $state(data.playlists ?? []);
@@ -50,6 +56,11 @@
     { value: "all", label: "All tracks" },
     ...playlists.map((p) => ({ value: `playlist:${p.id}`, label: `▸ ${p.name}` })),
   ]);
+  const filtering = $derived(Boolean(q.trim() || tagQuery.trim() || selectedTagIds.length));
+  const scopedPlaylistId = $derived(libraryScope.startsWith("playlist:") ? libraryScope.slice("playlist:".length) : null);
+  const scopeLabel = $derived(libraryScopeOptions.find((o) => o.value === libraryScope)?.label.replace(/^▸ /, "") ?? "Your library");
+  const canAddAll = $derived(canAdd && (filtering || Boolean(scopedPlaylistId)) && catalogue.length > 0 && !tagQueryError);
+  const queueLen = $derived(snapshot.queue?.length ?? 0);
 
   $effect(() => {
     const next = data.snapshot as SessionSnapshot;
@@ -202,6 +213,66 @@
       queueBusy = false;
     }
   }
+
+  function filterInput(): CatalogueFilterInput {
+    const tq = tagQuery.trim();
+    return {
+      scope: scopedPlaylistId ? "playlist" : libraryScope === "all" ? "all" : "yours",
+      playlistId: scopedPlaylistId,
+      q: q.trim(),
+      tagQuery: tq,
+      tagIds: tq ? [] : selectedTagIds,
+    };
+  }
+
+  async function addAllFiltered(mode: "replace" | "last") {
+    if (!snapshot.session || bulkBusy || !canAddAll) return;
+    if (mode === "replace" && queueLen > 0) {
+      replaceOpen = true;
+      return;
+    }
+    bulkBusy = true;
+    try {
+      const res = await fetch(`/api/sessions/${snapshot.session.id}/queue`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ action: "enqueueFiltered", filter: filterInput(), mode }),
+      });
+      const body = (await res.json().catch(() => ({}))) as SessionSnapshot & { message?: string; notice?: string };
+      if (!res.ok) throw new Error(body?.message ?? `Enqueue failed (${res.status})`);
+      snapshot = body;
+      nowSubTab = "queue";
+      if (body.notice) toast.success(body.notice);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Enqueue failed");
+    } finally {
+      bulkBusy = false;
+    }
+  }
+
+  async function confirmReplaceAll() {
+    if (!snapshot.session || bulkBusy) return;
+    bulkBusy = true;
+    try {
+      const res = await fetch(`/api/sessions/${snapshot.session.id}/queue`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ action: "enqueueFiltered", filter: filterInput(), mode: "replace" }),
+      });
+      const body = (await res.json().catch(() => ({}))) as SessionSnapshot & { message?: string; notice?: string };
+      if (!res.ok) throw new Error(body?.message ?? `Enqueue failed (${res.status})`);
+      snapshot = body;
+      replaceOpen = false;
+      nowSubTab = "queue";
+      if (body.notice) toast.success(body.notice);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Enqueue failed");
+    } finally {
+      bulkBusy = false;
+    }
+  }
 </script>
 
 <audio bind:this={audioEl} preload="auto" class="hidden"></audio>
@@ -305,6 +376,29 @@
               busy={catalogueLoading}
               onchange={() => void fetchCatalogue({ reset: true })}
             />
+            {#if canAddAll}
+              <div class="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                <span>Add all {filtering ? "filtered" : scopeLabel} tracks{catalogueHasMore ? "" : ` (${catalogue.length})`}:</span>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 rounded border border-signal/40 bg-signal/10 px-2 py-0.5 text-[11px] text-signal hover:bg-signal/20 disabled:opacity-40"
+                  disabled={bulkBusy || queueBusy}
+                  title="Replace the session queue with these tracks and play"
+                  onclick={() => void addAllFiltered("replace")}
+                >
+                  <PlayIcon class="size-3.5" aria-hidden="true" /> Play all
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-[11px] hover:text-signal disabled:opacity-40"
+                  disabled={bulkBusy || queueBusy}
+                  title="Append these tracks to the end of the session queue"
+                  onclick={() => void addAllFiltered("last")}
+                >
+                  <ListEndIcon class="size-3.5" aria-hidden="true" /> Add all to queue
+                </button>
+              </div>
+            {/if}
             {#if catalogueLoading && catalogue.length === 0}
               <TrackListSkeleton rows={5} compact />
             {:else}
@@ -382,3 +476,12 @@
   {/if}
   </div>
 </section>
+
+<ConfirmDialog
+  bind:open={replaceOpen}
+  title="Replace session queue?"
+  body={`The current queue of ${queueLen} song${queueLen === 1 ? "" : "s"} will be cleared, and these filtered tracks will start playing.`}
+  confirmLabel="Start this queue"
+  busy={bulkBusy}
+  onconfirm={confirmReplaceAll}
+/>
