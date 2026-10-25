@@ -9,8 +9,8 @@
   import { toast } from "$lib/toast.svelte";
   import { formatClock } from "$lib/catalog-queue";
   import { registerPlaybackAudio } from "$lib/playback-audio";
+  import { PLAYHEAD_SEEK_CATCHUP_MS, reconcilePlayhead, serverPlayheadMs } from "$lib/session-playhead";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
-  import { untrack } from "svelte";
 
   let {
     snapshot = $bindable<SessionSnapshot>(),
@@ -24,11 +24,12 @@
   let appliedGen = $state(-1);
   let endConfirmOpen = $state(false);
   let scrubMs = $state<number | null>(null);
-  /** Optimistic seek target until the live estimate / audio catches up. */
-  let localPositionMs = $state<number | null>(null);
+  /** Optimistic seek until live target catches up. */
   let pendingSeekMs = $state<number | null>(null);
-  let now = $state(Date.now());
-  /** Local volume while dragging; otherwise follow member snapshot. */
+  /** Smoothed UI playhead — advanced locally, reconciled to server/audio. */
+  let renderMs = $state(0);
+  let lastGen = $state(-1);
+  let lastAssetId = $state<string | null>(null);
   let volumeScrub = $state<number | null>(null);
   let volumeBusy = $state(false);
 
@@ -46,21 +47,67 @@
   const durationMs = $derived(current?.durationMs ?? 0);
   const playing = $derived(session?.playbackState === "playing" && Boolean(current));
 
-  const positionMs = $derived.by(() => {
-    if (localPositionMs != null) return localPositionMs;
-    if (!session) return 0;
-    if (session.playbackState !== "playing") return session.positionMs;
-    const base = new Date(session.positionUpdatedAt).getTime();
-    const est = Math.max(0, session.positionMs + (now - base));
-    return durationMs > 0 ? Math.min(est, durationMs) : est;
-  });
+  function audioPlayheadMs(): number | null {
+    const el = audioEl;
+    if (!el || !outputEnabled) return null;
+    if (el.paused || el.seeking) return null;
+    if (el.dataset.assetId !== current?.mediaAssetId) return null;
+    if (!Number.isFinite(el.currentTime)) return null;
+    return Math.max(0, Math.round(el.currentTime * 1000));
+  }
 
+  function authoritativeTargetMs(nowMs: number): number {
+    if (pendingSeekMs != null) return pendingSeekMs;
+    const fromAudio = audioPlayheadMs();
+    if (fromAudio != null) return durationMs > 0 ? Math.min(fromAudio, durationMs) : fromAudio;
+    return serverPlayheadMs(session, nowMs, durationMs);
+  }
+
+  // Smooth local advance + reconcile to audio/server anchors (SSE can be sparse).
   $effect(() => {
-    if (!playing) return;
-    const id = window.setInterval(() => {
-      now = Date.now();
-    }, 500);
-    return () => window.clearInterval(id);
+    const gen = session?.playbackGeneration ?? -1;
+    const assetId = current?.mediaAssetId ?? null;
+    const isPlaying = playing;
+    // Re-run when server anchor fields change so we can soft-correct.
+    void session?.positionMs;
+    void session?.positionUpdatedAt;
+    void session?.playbackState;
+    void outputEnabled;
+    void durationMs;
+
+    // Snap once when track/generation changes; later frames soft-correct toward live target.
+    let forceSnap = gen !== lastGen || assetId !== lastAssetId;
+    if (forceSnap) {
+      lastGen = gen;
+      lastAssetId = assetId;
+    }
+
+    const tick = () => {
+      const nowMs = Date.now();
+      let target = authoritativeTargetMs(nowMs);
+      if (pendingSeekMs != null) {
+        const live = audioPlayheadMs() ?? serverPlayheadMs(session, nowMs, durationMs);
+        if (Math.abs(live - pendingSeekMs) <= PLAYHEAD_SEEK_CATCHUP_MS) {
+          pendingSeekMs = null;
+          target = live;
+        } else {
+          target = pendingSeekMs;
+        }
+      }
+      renderMs = reconcilePlayhead(renderMs, target, forceSnap && pendingSeekMs == null);
+      forceSnap = false;
+    };
+
+    tick();
+    if (!isPlaying && pendingSeekMs == null) return;
+
+    let raf = 0;
+    const loop = () => {
+      tick();
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   });
 
   function stopBrowserAudio() {
@@ -84,19 +131,18 @@
     const needSrc = audioEl.dataset.assetId !== current.mediaAssetId;
     if (needSrc) {
       pendingSeekMs = null;
-      localPositionMs = null;
       audioEl.src = url;
       audioEl.dataset.assetId = current.mediaAssetId;
       audioEl.load();
     }
     audioEl.volume = Math.max(0, Math.min(1, displayVolume / 100));
-    const targetMs = pendingSeekMs ?? positionMs;
+    const targetMs = pendingSeekMs ?? renderMs;
     const posSec = targetMs / 1000;
     try {
       if (Math.abs(audioEl.currentTime - posSec) > 0.75) {
         audioEl.currentTime = posSec;
       }
-      if (pendingSeekMs != null && Math.abs(audioEl.currentTime * 1000 - pendingSeekMs) <= 750) {
+      if (pendingSeekMs != null && Math.abs(audioEl.currentTime * 1000 - pendingSeekMs) <= PLAYHEAD_SEEK_CATCHUP_MS) {
         pendingSeekMs = null;
       }
     } catch {
@@ -138,29 +184,6 @@
     void applyTransport();
   });
 
-  $effect(() => {
-    const el = audioEl;
-    if (!el || !playing) return;
-    const onTime = () => {
-      const ms = Math.round(el.currentTime * 1000);
-      if (pendingSeekMs != null) {
-        if (Math.abs(ms - pendingSeekMs) > 750) return;
-        pendingSeekMs = null;
-      }
-      localPositionMs = ms;
-    };
-    el.addEventListener("timeupdate", onTime);
-    return () => el.removeEventListener("timeupdate", onTime);
-  });
-
-  // Drop stale local playhead when transport generation / track changes (unless we still owe a seek).
-  $effect(() => {
-    void session?.playbackGeneration;
-    void current?.mediaAssetId;
-    if (untrack(() => pendingSeekMs) != null) return;
-    localPositionMs = null;
-  });
-
   async function transport(action: "play" | "pause" | "skip" | "previous" | "seek" | "ended", positionMsArg?: number) {
     if (!session) return;
     busy = true;
@@ -174,19 +197,12 @@
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Transport failed (${res.status})`);
       snapshot = body as SessionSnapshot;
-      if (action === "seek" && typeof positionMsArg === "number") {
-        // Keep optimistic thumb until estimate catches the seek.
-        now = Date.now();
-      } else if (action === "skip" || action === "previous" || action === "ended") {
-        localPositionMs = null;
+      if (action === "skip" || action === "previous" || action === "ended") {
         pendingSeekMs = null;
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Transport failed");
-      if (action === "seek") {
-        localPositionMs = null;
-        pendingSeekMs = null;
-      }
+      if (action === "seek") pendingSeekMs = null;
     } finally {
       busy = false;
     }
@@ -194,8 +210,8 @@
 
   function seekTo(ms: number) {
     const clamped = Math.max(0, Math.round(ms));
-    localPositionMs = clamped;
     pendingSeekMs = clamped;
+    renderMs = clamped;
     void transport("seek", clamped);
   }
 
@@ -333,10 +349,10 @@
   </div>
 
   <div class="flex items-center gap-2">
-    <span class="w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(scrubMs ?? positionMs)}</span>
+    <span class="w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(scrubMs ?? renderMs)}</span>
     <SeekBar
       class="h-1.5 w-full"
-      valueMs={positionMs}
+      valueMs={renderMs}
       {durationMs}
       disabled={!canSeek || !current || busy}
       onseek={seekTo}
