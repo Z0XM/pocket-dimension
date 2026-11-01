@@ -54,9 +54,9 @@ export type CardId = (typeof CARD_PRESETS)[number]["id"];
 export type AnimationStyleId = (typeof ANIMATION_STYLES)[number]["id"];
 export type AnimationLayer = "behind" | "top";
 
-/** Slider ranges — defaults match pre-control look. */
-export const MOTION_CARD_OPACITY = { min: 0.15, max: 1, step: 0.05, default: 0.4 } as const;
-export const MOTION_ANIM_OPACITY = { min: 0.1, max: 1, step: 0.05, default: 0.8 } as const;
+/** Slider ranges — defaults match current Theme → Motion baseline. */
+export const MOTION_CARD_OPACITY = { min: 0.15, max: 1, step: 0.05, default: 1 } as const;
+export const MOTION_ANIM_OPACITY = { min: 0.1, max: 1, step: 0.05, default: 0.4 } as const;
 /** 0 = instant per-frame; max aggregates peak-biased energy over this many ms. */
 export const MOTION_RESPONSE_MS = { min: 0, max: 2000, step: 50, default: 0 } as const;
 /** 0 = live analyser buffer only; max ≈ 5s scrolling history (scope / mirror). */
@@ -91,9 +91,9 @@ export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
   card: "ink",
   animations: true,
   animationStyle: "mirror",
-  cardOpacity: MOTION_CARD_OPACITY.default, // 40%
-  animationOpacity: MOTION_ANIM_OPACITY.default, // 80%
-  animationLayer: "behind",
+  cardOpacity: MOTION_CARD_OPACITY.default, // 100%
+  animationOpacity: MOTION_ANIM_OPACITY.default, // 40%
+  animationLayer: "top",
   responseWindowMs: MOTION_RESPONSE_MS.default, // Instant
   waveHistoryMs: MOTION_WAVE_HISTORY_MS.default, // Live
 };
@@ -136,11 +136,7 @@ function clampResponseMs(v: unknown): number {
 }
 
 function clampWaveHistoryMs(v: unknown): number {
-  return clamp(
-    typeof v === "number" ? v : MOTION_WAVE_HISTORY_MS.default,
-    MOTION_WAVE_HISTORY_MS.min,
-    MOTION_WAVE_HISTORY_MS.max
-  );
+  return clamp(typeof v === "number" ? v : MOTION_WAVE_HISTORY_MS.default, MOTION_WAVE_HISTORY_MS.min, MOTION_WAVE_HISTORY_MS.max);
 }
 
 export function readThemePrefs(): ZapThemePrefs {
@@ -154,14 +150,10 @@ export function readThemePrefs(): ZapThemePrefs {
       page: isPageId(parsed.page) ? parsed.page : DEFAULT_THEME_PREFS.page,
       card: isCardId(parsed.card) ? parsed.card : DEFAULT_THEME_PREFS.card,
       animations: typeof parsed.animations === "boolean" ? parsed.animations : DEFAULT_THEME_PREFS.animations,
-      animationStyle: isAnimationStyleId(parsed.animationStyle)
-        ? parsed.animationStyle
-        : DEFAULT_THEME_PREFS.animationStyle,
+      animationStyle: isAnimationStyleId(parsed.animationStyle) ? parsed.animationStyle : DEFAULT_THEME_PREFS.animationStyle,
       cardOpacity: clampCardOpacity(parsed.cardOpacity),
       animationOpacity: clampAnimOpacity(parsed.animationOpacity),
-      animationLayer: isAnimationLayer(parsed.animationLayer)
-        ? parsed.animationLayer
-        : DEFAULT_THEME_PREFS.animationLayer,
+      animationLayer: isAnimationLayer(parsed.animationLayer) ? parsed.animationLayer : DEFAULT_THEME_PREFS.animationLayer,
       responseWindowMs: clampResponseMs(parsed.responseWindowMs),
       waveHistoryMs: clampWaveHistoryMs(parsed.waveHistoryMs),
     };
@@ -188,19 +180,11 @@ function accentById(id: AccentId) {
 }
 
 function pageById(id: PageId) {
-  return (
-    PAGE_PRESETS.find((p) => p.id === id) ??
-    PAGE_PRESETS.find((p) => p.id === DEFAULT_THEME_PREFS.page) ??
-    PAGE_PRESETS[0]
-  );
+  return PAGE_PRESETS.find((p) => p.id === id) ?? PAGE_PRESETS.find((p) => p.id === DEFAULT_THEME_PREFS.page) ?? PAGE_PRESETS[0];
 }
 
 function cardById(id: CardId) {
-  return (
-    CARD_PRESETS.find((p) => p.id === id) ??
-    CARD_PRESETS.find((p) => p.id === DEFAULT_THEME_PREFS.card) ??
-    CARD_PRESETS[0]
-  );
+  return CARD_PRESETS.find((p) => p.id === id) ?? CARD_PRESETS.find((p) => p.id === DEFAULT_THEME_PREFS.card) ?? CARD_PRESETS[0];
 }
 
 function mixCard(solid: string, alpha: number) {
@@ -222,15 +206,12 @@ export function applyThemePrefs(prefs: ZapThemePrefs) {
   const animationsOn = prefs.animations !== false;
   const cardOpacity = clampCardOpacity(prefs.cardOpacity);
   const animOpacity = clampAnimOpacity(prefs.animationOpacity);
-  const layer = isAnimationLayer(prefs.animationLayer) ? prefs.animationLayer : "behind";
+  const layer = isAnimationLayer(prefs.animationLayer) ? prefs.animationLayer : DEFAULT_THEME_PREFS.animationLayer;
   const responseMs = clampResponseMs(prefs.responseWindowMs);
   const waveMs = clampWaveHistoryMs(prefs.waveHistoryMs);
 
   root.setAttribute("data-animations", animationsOn ? "on" : "off");
-  root.setAttribute(
-    "data-animation-style",
-    isAnimationStyleId(prefs.animationStyle) ? prefs.animationStyle : DEFAULT_THEME_PREFS.animationStyle
-  );
+  root.setAttribute("data-animation-style", isAnimationStyleId(prefs.animationStyle) ? prefs.animationStyle : DEFAULT_THEME_PREFS.animationStyle);
   root.setAttribute("data-animation-layer", layer);
   root.style.setProperty("--zap-anim-opacity", String(animOpacity));
   root.style.setProperty("--zap-response-ms", String(responseMs));
@@ -293,7 +274,5 @@ export function readResponseWindowMs(): number {
 
 export function readWaveHistoryMs(): number {
   if (typeof document === "undefined") return DEFAULT_THEME_PREFS.waveHistoryMs;
-  return clampWaveHistoryMs(
-    Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zap-wave-history-ms"))
-  );
+  return clampWaveHistoryMs(Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zap-wave-history-ms")));
 }

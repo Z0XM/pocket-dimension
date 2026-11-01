@@ -96,7 +96,7 @@ html[data-animations="off"] .zap-beat-bg {
   margin-inline: auto;
   width: 100%;
   max-width: 72rem;
-  padding-inline: 1.5rem;
+  padding-inline: 0.75rem;
   background: transparent;
 }
 
@@ -110,6 +110,10 @@ html[data-animations="off"] .zap-beat-bg {
 }
 
 @media (min-width: 640px) {
+  .zap-shell-main {
+    padding-inline: 1.5rem;
+  }
+
   .zap-shell-main.is-fill {
     padding-block: 1.5rem;
   }
@@ -184,6 +188,28 @@ html[data-animations="off"] .zap-beat-bg {
   box-shadow: none;
 }
 
+/* Shared dropdown / menu popovers — accent edge only (no box border). */
+.zap-dropdown {
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--signal);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: none;
+}
+
+.zap-dropdown.is-up {
+  border-bottom: 0;
+  border-top: 1px solid var(--signal);
+}
+
+.zap-dropdown [role="option"]:hover,
+.zap-dropdown [role="menuitem"]:hover,
+.zap-dropdown .zap-menu-item:hover {
+  background: color-mix(in srgb, #fff 78%, transparent);
+  color: #12100e;
+}
+
 .zap-track-host {
   border: 2px solid var(--border);
   border-radius: 0;
@@ -212,14 +238,106 @@ html[data-animations="off"] .zap-beat-bg {
   border-bottom: none;
 }
 
+/* Catalogue list: no host frame / row rules (toolbar already carries chrome). */
+.zap-catalogue .zap-track-host {
+  border: 0;
+  background: transparent;
+  scrollbar-width: none;
+}
+
+.zap-catalogue .zap-track-host::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.zap-catalogue .zap-track {
+  border-bottom: 0;
+  padding-block: 0.25rem;
+}
+
+@media (min-width: 640px) {
+  .zap-catalogue .zap-track {
+    padding-block: 0.375rem;
+  }
+}
+
+@media (hover: hover) {
+  .zap-track:hover {
+    background: color-mix(in srgb, var(--signal) 7%, transparent);
+  }
+
+  .zap-track.is-current:hover {
+    background: color-mix(in srgb, var(--signal) 11%, transparent);
+  }
+
+  /* Catalogue: no row wash — accent title, play border, and tags instead. */
+  .zap-catalogue .zap-track:hover,
+  .zap-catalogue .zap-track.is-current:hover {
+    background: transparent;
+  }
+
+  .zap-catalogue .zap-track:hover .zap-track-title {
+    color: var(--signal);
+  }
+
+  .zap-catalogue .zap-track:not(.is-current):hover .zap-track-play:not(:disabled),
+  .zap-catalogue .zap-track:not(.is-current) .zap-track-play:hover:not(:disabled) {
+    background: transparent;
+    border-color: var(--signal);
+    color: var(--signal);
+  }
+
+  .zap-catalogue .zap-track:hover .zap-tag-chip {
+    border-color: var(--signal);
+    color: var(--signal);
+    background: color-mix(in srgb, var(--signal) 12%, transparent);
+  }
+}
+
 .zap-track.is-current {
   background: transparent;
   box-shadow: none;
 }
 
+/** Display / filter tag chips — subtle signal lift on hover (no glow). */
+.zap-tag-chip {
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-family: var(--zap-font-mono);
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease;
+}
+
+@media (hover: hover) {
+  .zap-tag-chip:hover {
+    border-color: color-mix(in srgb, var(--signal) 45%, var(--border));
+    color: var(--foreground);
+    background: color-mix(in srgb, var(--signal) 8%, transparent);
+  }
+}
+
+.zap-tag-chip-on {
+  border-color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 15%, transparent);
+  color: var(--signal);
+}
+
+@media (hover: hover) {
+  .zap-tag-chip-on:hover {
+    border-color: var(--signal);
+    color: var(--signal);
+    background: color-mix(in srgb, var(--signal) 22%, transparent);
+  }
+}
+
 .zap-track.is-current .zap-track-title {
   color: var(--signal);
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .zap-track-title {
@@ -282,6 +400,69 @@ html[data-animations="off"] .zap-beat-bg {
   border-top: var(--frame-player-border);
   background: var(--background-mid);
   backdrop-filter: none;
+}
+
+/*
+ * Playback seek: signal fill from start → thumb (`--seek-pct` 0–100%), muted ahead.
+ * Volume / preference ranges keep plain `zap-seek` + accent-color only.
+ */
+input.zap-seek[type="range"] {
+  accent-color: var(--signal);
+}
+
+input.zap-seek.zap-seek--progress[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  background: linear-gradient(
+    to right,
+    var(--signal) 0%,
+    var(--signal) var(--seek-pct, 0%),
+    var(--border) var(--seek-pct, 0%),
+    var(--border) 100%
+  );
+}
+
+input.zap-seek.zap-seek--progress[type="range"]::-webkit-slider-runnable-track {
+  height: 100%;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+input.zap-seek.zap-seek--progress[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-top: -0.2rem;
+  border-radius: 9999px;
+  border: 2px solid var(--background-mid);
+  background: var(--signal);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+input.zap-seek.zap-seek--progress[type="range"]::-moz-range-track {
+  height: 0.375rem;
+  border: none;
+  border-radius: 9999px;
+  background: var(--border);
+}
+
+input.zap-seek.zap-seek--progress[type="range"]::-moz-range-progress {
+  height: 0.375rem;
+  border: none;
+  border-radius: 9999px;
+  background: var(--signal);
+}
+
+input.zap-seek.zap-seek--progress[type="range"]::-moz-range-thumb {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 9999px;
+  border: 2px solid var(--background-mid);
+  background: var(--signal);
+  box-shadow: none;
+  cursor: pointer;
 }
 
 ::selection {

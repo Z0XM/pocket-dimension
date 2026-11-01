@@ -16,6 +16,7 @@
 </script>
 
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import XIcon from "@lucide/svelte/icons/x";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
   import CustomTagInput from "$lib/components/CustomTagInput.svelte";
@@ -23,7 +24,7 @@
   import TagMultiSelect from "$lib/components/TagMultiSelect.svelte";
   import ZapSelect from "$lib/components/ZapSelect.svelte";
   import { withDraft } from "$lib/custom-tags";
-  import { describeImportCounts, readImportCounts, readNdjsonStream, xhrFormNdjson } from "$lib/ingest-client";
+  import { xhrFormNdjson } from "$lib/ingest-client";
   import { PLAYLIST_IMPORT_SORT_OPTIONS, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
 
   type TagOption = { id: string; name: string; kind: string };
@@ -135,40 +136,21 @@
       const res = await fetch("/api/ingest/url", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: ingestUrl.trim(),
           tagIds: ingestTagIds,
           customTags: withDraft(ingestCustomTags, ingestCustomDraft),
         }),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.message ?? `Import failed (${res.status})`);
-      }
-      let message: string | null = null;
-      await readNdjsonStream(res, (ev) => {
-        if (ev.type === "song") {
-          urlSongProgress = [
-            {
-              identityKey: typeof ev.identityKey === "string" ? ev.identityKey : "url",
-              title: typeof ev.title === "string" ? ev.title : ingestUrl,
-              phase: String(ev.phase ?? "downloading"),
-              percent: Number(ev.percent ?? 0),
-            },
-          ];
-        } else if (ev.type === "done") {
-          message = describeImportCounts("Link import done", readImportCounts(ev));
-        } else if (ev.type === "error") {
-          throw new Error(typeof ev.message === "string" ? ev.message : "Import failed");
-        }
-      });
-      if (!message) throw new Error("Import ended without a result");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 202) throw new Error(body?.message ?? `Import failed (${res.status})`);
       ingestUrl = "";
       ingestTagIds = [];
       ingestCustomTags = [];
       ingestCustomDraft = "";
-      finish(message);
+      finish("Import started — track progress under Running Jobs.");
+      void goto("/jobs");
     } catch (err) {
       ingestError = err instanceof Error ? err.message : "Import failed";
     } finally {
@@ -284,12 +266,12 @@
     if (ytSelected.length === 0 || addBusy || !config.ingestReady) return;
     ytPhase = "importing";
     ytError = null;
-    ytImportProgress = { total: 0, done: 0, remaining: 0, imported: 0, unavailable: 0, skipped: 0, failed: 0, songs: [] };
+    ytImportProgress = null;
     try {
       const res = await fetch("/api/youtube/import", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           playlistIds: ytSelected,
           tagIds: ytImportTagIds,
@@ -297,37 +279,14 @@
           sort: ytImportSort,
         }),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.message ?? `Import failed (${res.status})`);
-      }
-
-      let message: string | null = null;
-      await readNdjsonStream(res, (ev) => {
-        if (ev.type === "progress") {
-          ytImportProgress = {
-            ...readImportCounts(ev),
-            total: Number(ev.total ?? 0),
-            done: Number(ev.done ?? 0),
-            remaining: Number(ev.remaining ?? 0),
-            songs: Array.isArray(ev.songs) ? (ev.songs as SongProgressView[]) : [],
-          };
-        } else if (ev.type === "done") {
-          message = describeImportCounts("YouTube import done", readImportCounts(ev));
-          if (typeof ev.errorMessage === "string" && ev.errorMessage && Number(ev.failed ?? 0) > 0) {
-            message = `${message} ${ev.errorMessage}`;
-          }
-        } else if (ev.type === "error") {
-          throw new Error(typeof ev.message === "string" ? ev.message : "Import failed");
-        }
-      });
-
-      if (!message) throw new Error("Import ended without a result");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 202) throw new Error(body?.message ?? `Import failed (${res.status})`);
       ytSelected = [];
       ytImportTagIds = [];
       ytImportCustomTags = [];
       ytImportCustomDraft = "";
-      finish(message);
+      finish("YouTube import started — track progress under Running Jobs.");
+      void goto("/jobs");
     } catch (err) {
       ytError = err instanceof Error ? err.message : "Import failed";
     } finally {

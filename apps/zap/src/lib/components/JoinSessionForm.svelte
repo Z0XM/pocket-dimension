@@ -3,6 +3,7 @@
   import { page } from "$app/state";
   import DoorOpenIcon from "@lucide/svelte/icons/door-open";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
+  import { toast } from "$lib/toast.svelte";
 
   let {
     /** Full-width submit button (standalone page). */
@@ -14,10 +15,8 @@
   // Prefill from `?code=` when present (standalone /join deep-links).
   let code = $state(page.url.searchParams.get("code") ?? "");
   let loading = $state(false);
-  let error = $state<string | null>(null);
 
   async function join() {
-    error = null;
     loading = true;
     try {
       const res = await fetch("/api/sessions", {
@@ -32,7 +31,7 @@
       if (!id) throw new Error("No session id returned");
       await goto(`/session/${id}`);
     } catch (err) {
-      error = err instanceof Error ? err.message : "Join failed";
+      toast.error(err instanceof Error ? err.message : "Join failed");
     } finally {
       loading = false;
     }
@@ -67,9 +66,6 @@
       {loading ? "Joining…" : "Join"}
     </button>
   </div>
-  {#if error}
-    <p class="auth-error">{error}</p>
-  {/if}
   {#if loading}
     <BusyStatus label="Joining session…" detail="Looking up room…" />
   {/if}

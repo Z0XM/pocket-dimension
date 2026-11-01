@@ -10,8 +10,9 @@ export const GET: RequestHandler = async ({ locals, url }) => {
   const { scope, playlistId } = parseCatalogueScope(url.searchParams, "all");
   if (playlistId && !(await userCanViewPlaylist(playlistId, locals.user.id))) throw error(404, "Playlist not found");
   const q = url.searchParams.get("q") ?? "";
-  const tagIds = url.searchParams.getAll("tag").filter(Boolean);
-  const tagQuery = url.searchParams.get("tq") ?? "";
+  const untagged = url.searchParams.get("untagged") === "1";
+  const tagIds = untagged ? [] : url.searchParams.getAll("tag").filter(Boolean);
+  const tagQuery = untagged ? "" : (url.searchParams.get("tq") ?? "");
   const offset = Number(url.searchParams.get("offset") ?? "0");
   const limit = Number(url.searchParams.get("limit") ?? String(CATALOGUE_PAGE_SIZE));
 
@@ -20,6 +21,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
     scope,
     playlistId,
     q,
+    untagged,
     tagIds: tagQuery.trim() ? [] : tagIds,
     tagQuery,
     offset: Number.isFinite(offset) ? offset : 0,
@@ -30,6 +32,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
     scope,
     playlistId,
     q,
+    untagged,
     selectedTagIds: tagIds,
     tagQuery,
     tagQueryError: tagQueryError ?? null,

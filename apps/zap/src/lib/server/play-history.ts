@@ -1,5 +1,5 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, desc, eq, gte, ilike, lt, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, lt, ne, or, type SQL } from "drizzle-orm";
 import { songHref } from "$lib/history-time";
 
 export async function recordPlayEvent(opts: { userId: string; mediaAssetId: string; sessionId?: string | null }) {
@@ -81,6 +81,7 @@ export async function listPlayHistoryPage(input: PlayHistoryQuery): Promise<{
     .where(
       where(
         eq(schema.playEvents.userId, input.userId),
+        ne(schema.mediaAssets.status, "archived"),
         since ? gte(schema.playEvents.playedAt, since) : undefined,
         before ? lt(schema.playEvents.playedAt, before) : undefined,
         search

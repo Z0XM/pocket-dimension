@@ -2,6 +2,7 @@
   import Volume2Icon from "@lucide/svelte/icons/volume-2";
   import VolumeXIcon from "@lucide/svelte/icons/volume-x";
   import DiscordSinkPanel from "$lib/components/DiscordSinkPanel.svelte";
+  import { toast } from "$lib/toast.svelte";
   import type { SessionMemberPermissions, SessionSnapshot } from "$lib/server/sessions/types";
 
   let {
@@ -13,7 +14,6 @@
   } = $props();
 
   let busy = $state(false);
-  let error = $state<string | null>(null);
   let nameDraft = $state("");
 
   const session = $derived(snapshot.session);
@@ -37,7 +37,6 @@
   async function patch(body: Record<string, unknown>) {
     if (!session) return;
     busy = true;
-    error = null;
     try {
       const res = await fetch(`/api/sessions/${session.id}`, {
         method: "PATCH",
@@ -49,7 +48,7 @@
       if (!res.ok) throw new Error(data?.message ?? "Update failed");
       snapshot = data as SessionSnapshot;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Update failed";
+      toast.error(err instanceof Error ? err.message : "Update failed");
     } finally {
       busy = false;
     }
@@ -222,8 +221,5 @@
       </div>
     </div>
 
-    {#if error}
-      <p class="font-mono text-[11px] text-destructive">{error}</p>
-    {/if}
   </div>
 {/if}

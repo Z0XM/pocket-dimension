@@ -74,22 +74,27 @@ export async function buildSessionSnapshot(sessionId: string, viewerUserId?: str
       : [];
   const assetById = new Map(assets.map((a) => [a.id, a]));
 
-  const queue: SessionSnapshotQueueItem[] = queueRows.map((item) => {
-    const asset = assetById.get(item.mediaAssetId);
-    return {
-      id: item.id,
-      sessionId: item.sessionId,
-      position: item.position,
-      mediaAssetId: item.mediaAssetId,
-      title: asset?.title ?? "Unknown track",
-      artists: asset?.artists ?? null,
-      durationMs: asset?.durationMs ?? null,
-      playable: Boolean(asset?.storageKey && asset.status === "ready"),
-      addedByUserId: item.addedByUserId,
-      addedByDisplayName: names.get(item.addedByUserId) ?? "Listener",
-      createdAt: item.createdAt.toISOString(),
-    };
-  });
+  const queue: SessionSnapshotQueueItem[] = queueRows
+    .filter((item) => {
+      const asset = assetById.get(item.mediaAssetId);
+      return asset?.status !== "archived";
+    })
+    .map((item) => {
+      const asset = assetById.get(item.mediaAssetId);
+      return {
+        id: item.id,
+        sessionId: item.sessionId,
+        position: item.position,
+        mediaAssetId: item.mediaAssetId,
+        title: asset?.title ?? "Unknown track",
+        artists: asset?.artists ?? null,
+        durationMs: asset?.durationMs ?? null,
+        playable: Boolean(asset?.storageKey && asset.status === "ready"),
+        addedByUserId: item.addedByUserId,
+        addedByDisplayName: names.get(item.addedByUserId) ?? "Listener",
+        createdAt: item.createdAt.toISOString(),
+      };
+    });
 
   const members: SessionSnapshotMember[] = memberRows.map((m) => ({
     id: m.id,

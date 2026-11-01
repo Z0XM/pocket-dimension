@@ -9,6 +9,7 @@ export {
   enrichPlaylistsWithStatus,
   upsertPlaylistPref,
   loadPlaylistPrefs,
+  recordPlaylistImportCoverage,
   type PlaylistImportStatus,
   type PlaylistPreview,
   type EnrichedPlaylist,

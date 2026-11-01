@@ -23,6 +23,7 @@
   import { playlistRelationBadge } from "$lib/playlist-relation-label";
   import { PLAYLIST_TRACK_SORT_OPTIONS, type PlaylistTrackSort } from "$lib/playlist-sort";
   import { effectiveTagQuery, tagFilterKey, tagQueryProblem } from "$lib/tag-filter";
+  import { toast } from "$lib/toast.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -30,13 +31,10 @@
   let playlist = $state(data.playlist);
   let busy = $state(false);
   let busyLabel = $state("Working…");
-  let error = $state<string | null>(null);
   let editTagQuery = $state("");
   let editTagIds = $state<string[]>([]);
   let collabQuery = $state("");
   let renameValue = $state("");
-  let loadMsg = $state<string | null>(null);
-  let copyMsg = $state<string | null>(null);
   let deleteOpen = $state(false);
   let deleting = $state(false);
   let sortBusy = $state(false);
@@ -57,11 +55,9 @@
 
   async function runReplace(mediaAssetIds: string[]) {
     if (!queue) return;
-    error = null;
     replaceBusy = true;
     try {
       await queue.replaceTracks(mediaAssetIds, { play: true });
-      if (queue.error) error = queue.error;
     } finally {
       replaceBusy = false;
       replaceOpen = false;
@@ -88,13 +84,11 @@
 
   async function queuePlaylist(mode: "replace" | "last") {
     if (!queue) return;
-    error = null;
     if (mode === "replace") {
       await playPlaylistFrom();
       return;
     }
     await queue.enqueuePlaylist(playlist.id, mode);
-    if (queue.error) error = queue.error;
   }
 
   $effect(() => {
@@ -128,7 +122,6 @@
             : act === "sort"
               ? "Sorting…"
               : "Updating playlist…";
-    error = null;
     try {
       const res = await fetch(`/api/playlists/${playlist.id}`, {
         method: "POST",
@@ -140,7 +133,7 @@
       if (!res.ok) throw new Error(body?.message ?? "Action failed");
       playlist = body;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Action failed";
+      toast.error(err instanceof Error ? err.message : "Action failed");
     } finally {
       busy = false;
     }
@@ -209,7 +202,6 @@
   async function toggleVisibility() {
     busy = true;
     busyLabel = "Updating visibility…";
-    error = null;
     try {
       const res = await fetch(`/api/playlists/${playlist.id}`, {
         method: "PATCH",
@@ -221,7 +213,7 @@
       if (!res.ok) throw new Error(body?.message ?? "Update failed");
       playlist = body;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Update failed";
+      toast.error(err instanceof Error ? err.message : "Update failed");
     } finally {
       busy = false;
     }
@@ -232,7 +224,6 @@
     if (!name || !playlist.canRename || busy || name === playlist.name) return;
     busy = true;
     busyLabel = "Renaming…";
-    error = null;
     try {
       const res = await fetch(`/api/playlists/${playlist.id}`, {
         method: "PATCH",
@@ -245,7 +236,7 @@
       playlist = body;
       renameValue = body.name;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Rename failed";
+      toast.error(err instanceof Error ? err.message : "Rename failed");
     } finally {
       busy = false;
     }
@@ -255,19 +246,15 @@
     if (!playlist.shareCode) return;
     try {
       await navigator.clipboard.writeText(playlist.shareCode);
-      copyMsg = "Share code copied";
-      setTimeout(() => {
-        copyMsg = null;
-      }, 2000);
+      toast.success("Share code copied");
     } catch {
-      copyMsg = playlist.shareCode;
+      toast.info(playlist.shareCode);
     }
   }
 
   async function unfollow() {
     busy = true;
     busyLabel = "Unfollowing…";
-    error = null;
     try {
       const res = await fetch(`/api/playlists/${playlist.id}`, {
         method: "POST",
@@ -279,7 +266,7 @@
       if (!res.ok) throw new Error(body?.message ?? "Unfollow failed");
       await goto("/playlists", { invalidateAll: true });
     } catch (err) {
-      error = err instanceof Error ? err.message : "Unfollow failed";
+      toast.error(err instanceof Error ? err.message : "Unfollow failed");
     } finally {
       busy = false;
     }
@@ -287,7 +274,6 @@
 
   async function deletePlaylist() {
     deleting = true;
-    error = null;
     try {
       const res = await fetch(`/api/playlists/${playlist.id}`, { method: "DELETE", credentials: "same-origin" });
       const body = await res.json().catch(() => ({}));
@@ -296,7 +282,7 @@
       await goto("/playlists", { invalidateAll: true });
     } catch (err) {
       deleteOpen = false;
-      error = err instanceof Error ? err.message : "Delete failed";
+      toast.error(err instanceof Error ? err.message : "Delete failed");
     } finally {
       deleting = false;
     }
@@ -305,13 +291,11 @@
   async function loadIntoSession() {
     const sessionId = data.primaryLive?.id;
     if (!sessionId) {
-      error = "No live session — resume or start one first.";
+      toast.info("No live session — resume or start one first.");
       return;
     }
     busy = true;
     busyLabel = "Loading into session…";
-    error = null;
-    loadMsg = null;
     try {
       const res = await fetch(`/api/playlists/${playlist.id}/load`, {
         method: "POST",
@@ -321,10 +305,10 @@
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? "Load failed");
-      loadMsg = "Loaded into session queue.";
+      toast.success("Loaded into session queue.");
       window.location.href = `/session/${sessionId}`;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Load failed";
+      toast.error(err instanceof Error ? err.message : "Load failed");
     } finally {
       busy = false;
     }
@@ -445,16 +429,6 @@
   {#if busy}
     <BusyStatus label={busyLabel} />
   {/if}
-  {#if error}
-    <p class="auth-error">{error}</p>
-  {/if}
-  {#if loadMsg}
-    <p class="text-sm text-signal">{loadMsg}</p>
-  {/if}
-  {#if copyMsg}
-    <p class="text-sm text-signal">{copyMsg}</p>
-  {/if}
-
   {#if playlist.canRename}
     <form
       class="flex flex-col gap-2 rounded-lg border border-border/70 bg-card p-4 sm:flex-row sm:items-end"

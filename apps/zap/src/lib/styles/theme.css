@@ -3,7 +3,7 @@
  */
 
 :root {
-  --zap-font-sans: "Archivo Variable", sans-serif;
+  --zap-font-sans: "Figtree Variable", sans-serif;
   --zap-font-display: "Archivo Variable", sans-serif;
   --zap-font-mono: "Archivo Variable", sans-serif;
   /* Defaults match DEFAULT_THEME_PREFS: coral + dark-purple + ink */
@@ -28,7 +28,8 @@
   --popover: #0f0f0f;
   --popover-foreground: #f3efe9;
   --destructive: #ffb09d;
-  --destructive-foreground: #ffb09d;
+  /* Ink on coral — must contrast with --destructive (was identical → invisible Delete labels). */
+  --destructive-foreground: #1a0d08;
   --signal: #ff6b4a;
   --graph: #f3efe9;
   --glow-a: #ff6b4a;

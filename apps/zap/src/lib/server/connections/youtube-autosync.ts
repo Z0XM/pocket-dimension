@@ -47,6 +47,7 @@ export async function runYouTubeAutoSyncForUser(userId: string): Promise<{
           skipExisting: true,
           sort: "playlist",
         });
+        // importConnectedPlaylists already records coverage; keep title + clear error if needed.
         await upsertPlaylistPref({
           userId,
           youtubePlaylistId: pref.youtubePlaylistId,

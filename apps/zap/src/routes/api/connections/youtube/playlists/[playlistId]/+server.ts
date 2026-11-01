@@ -30,11 +30,17 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
   const playlistId = params.playlistId?.trim();
   if (!playlistId) throw error(400, "playlistId required");
 
-  const body = (await request.json().catch(() => ({}))) as { autoSync?: boolean; title?: string };
-  if (typeof body.autoSync !== "boolean") throw error(400, "autoSync boolean required");
+  const body = (await request.json().catch(() => ({}))) as {
+    autoSync?: boolean;
+    hidden?: boolean;
+    title?: string;
+  };
+  const hasAutoSync = typeof body.autoSync === "boolean";
+  const hasHidden = typeof body.hidden === "boolean";
+  if (!hasAutoSync && !hasHidden) throw error(400, "autoSync or hidden boolean required");
 
   let title = typeof body.title === "string" ? body.title : null;
-  if (!title) {
+  if (!title && hasAutoSync) {
     const playlists = await listYouTubePlaylists(locals.user.id).catch(() => []);
     title = playlists.find((p) => p.id === playlistId)?.title ?? null;
   }
@@ -42,23 +48,40 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
   const pref = await upsertPlaylistPref({
     userId: locals.user.id,
     youtubePlaylistId: playlistId,
-    title,
-    autoSync: body.autoSync,
+    ...(title ? { title } : {}),
+    ...(hasAutoSync ? { autoSync: body.autoSync } : {}),
+    ...(hasHidden ? { hidden: body.hidden } : {}),
   });
 
-  await logConnectionActivity({
-    userId: locals.user.id,
-    provider: "youtube",
-    kind: body.autoSync ? "auto_sync_on" : "auto_sync_off",
-    summary: body.autoSync
-      ? `Enabled auto-sync for “${title ?? playlistId}”`
-      : `Disabled auto-sync for “${title ?? playlistId}”`,
-    meta: { playlistId },
-  });
+  if (hasAutoSync) {
+    await logConnectionActivity({
+      userId: locals.user.id,
+      provider: "youtube",
+      kind: body.autoSync ? "auto_sync_on" : "auto_sync_off",
+      summary: body.autoSync
+        ? `Enabled auto-sync for “${pref.title ?? playlistId}”`
+        : `Disabled auto-sync for “${pref.title ?? playlistId}”`,
+      meta: { playlistId },
+    });
+  }
+  if (hasHidden) {
+    await logConnectionActivity({
+      userId: locals.user.id,
+      provider: "youtube",
+      kind: body.hidden ? "playlist_hidden" : "playlist_unhidden",
+      summary: body.hidden
+        ? `Hid “${pref.title ?? playlistId}” from the playlist list`
+        : `Unhid “${pref.title ?? playlistId}”`,
+      meta: { playlistId },
+    });
+  }
 
   return json({
     playlistId,
     autoSync: pref.autoSync,
+    hidden: pref.hidden,
+    importStatus: pref.importStatus,
+    alreadyImported: pref.alreadyImported,
     title: pref.title,
     lastSyncedAt: pref.lastSyncedAt?.toISOString() ?? null,
   });

@@ -10,6 +10,7 @@
   import XIcon from "@lucide/svelte/icons/x";
   import { formatClock, moveItem } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
+  import SeekBar from "$lib/components/SeekBar.svelte";
 
   let {
     queue,
@@ -43,16 +44,6 @@
   let dragFrom = $state<number | null>(null);
   let dragOver = $state<number | null>(null);
   let listEl = $state<HTMLUListElement | null>(null);
-
-  function onSeekInput(e: Event) {
-    scrubMs = Number((e.currentTarget as HTMLInputElement).value) * 1000;
-  }
-
-  function onSeekCommit(e: Event) {
-    const ms = Number((e.currentTarget as HTMLInputElement).value) * 1000;
-    scrubMs = null;
-    if (Number.isFinite(ms)) void queue.seek(ms);
-  }
 
   function startReorder(e: PointerEvent, index: number) {
     if (e.button !== 0) return;
@@ -184,17 +175,12 @@
     </div>
     <div class="flex items-center gap-2">
       <span class="w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(scrubMs ?? queue.positionMs)}</span>
-      <input
-        class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)] disabled:opacity-40"
-        type="range"
-        min="0"
-        max={Math.max(durationMs / 1000, 1)}
-        step="0.5"
-        value={(scrubMs ?? queue.positionMs) / 1000}
+      <SeekBar
+        valueMs={queue.positionMs}
+        {durationMs}
         disabled={!current}
-        aria-label="Seek"
-        oninput={onSeekInput}
-        onchange={onSeekCommit}
+        onseek={(ms) => void queue.seek(ms)}
+        onscrub={(ms) => (scrubMs = ms)}
       />
       <span class="w-9 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(durationMs)}</span>
     </div>

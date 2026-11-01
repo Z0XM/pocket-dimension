@@ -68,10 +68,11 @@ export async function listSavedQueues(userId: string, limit = 30): Promise<Saved
           where: inArray(schema.mediaAssets.id, assetIds),
         })
       : [];
-  const titleById = new Map(assets.map((a) => [a.id, a.title]));
+  const titleById = new Map(assets.filter((a) => a.status !== "archived").map((a) => [a.id, a.title]));
+  const visibleAssetIds = new Set(titleById.keys());
 
   return queues.map((q) => {
-    const qItems = items.filter((i) => i.savedQueueId === q.id);
+    const qItems = items.filter((i) => i.savedQueueId === q.id && visibleAssetIds.has(i.mediaAssetId));
     return {
       id: q.id,
       name: q.name,

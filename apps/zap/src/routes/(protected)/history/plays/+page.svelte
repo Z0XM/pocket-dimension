@@ -5,6 +5,7 @@
   import { page } from "$app/state";
   import ZapSelect from "$lib/components/ZapSelect.svelte";
   import { getCatalogQueue } from "$lib/catalog-queue-client.svelte";
+  import { toast } from "$lib/toast.svelte";
   import { HISTORY_TIME_RANGE_OPTIONS } from "$lib/history-time";
   import type { PlayHistoryEntry } from "$lib/server/play-history";
   import type { PageData } from "./$types";
@@ -19,8 +20,6 @@
   let entries = $state<PlayHistoryEntry[]>([]);
   let nextBefore = $state<string | null>(null);
   let loadingMore = $state(false);
-  let listError = $state<string | null>(null);
-  let playError = $state<string | null>(null);
   let playingId = $state<string | null>(null);
   let scrollRoot = $state<HTMLDivElement | null>(null);
   let sentinel = $state<HTMLDivElement | null>(null);
@@ -33,8 +32,6 @@
     range = data.filters.range;
     entries = [...data.entries];
     nextBefore = data.nextBefore;
-    listError = null;
-    playError = null;
     scrollRoot?.scrollTo({ top: 0 });
   });
 
@@ -53,7 +50,6 @@
     const gen = ++fetchGen;
     const before = nextBefore;
     loadingMore = true;
-    listError = null;
     try {
       const params = new URLSearchParams();
       params.set("before", before);
@@ -71,7 +67,7 @@
       nextBefore = body.nextBefore;
     } catch (err) {
       if (gen !== fetchGen) return;
-      listError = err instanceof Error ? err.message : "Failed to load plays";
+      toast.error(err instanceof Error ? err.message : "Failed to load plays");
     } finally {
       if (gen === fetchGen) loadingMore = false;
     }
@@ -113,9 +109,8 @@
   async function playEntry(entry: PlayHistoryEntry) {
     if (!queue || !entry.playable || playingId) return;
     playingId = entry.id;
-    playError = null;
     await queue.playNow(entry.mediaAssetId);
-    if (queue.error) playError = queue.error;
+    // queue client already toasts failures
     playingId = null;
   }
 </script>
@@ -147,13 +142,6 @@
       Search
     </button>
   </form>
-
-  {#if listError}
-    <p class="auth-error mb-0 shrink-0 p-2">{listError}</p>
-  {/if}
-  {#if playError}
-    <p class="auth-error mb-0 shrink-0 p-2">{playError}</p>
-  {/if}
 
   {#if entries.length === 0}
     <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">

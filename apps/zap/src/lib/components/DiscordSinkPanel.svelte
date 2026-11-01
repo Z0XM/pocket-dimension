@@ -3,6 +3,7 @@
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
   import UnplugIcon from "@lucide/svelte/icons/unplug";
   import ZapSelect from "$lib/components/ZapSelect.svelte";
+  import { toast } from "$lib/toast.svelte";
 
   let {
     sessionId,
@@ -41,7 +42,6 @@
   let guildId = $state("");
   let channelId = $state("");
   let busy = $state(false);
-  let error = $state<string | null>(null);
   let loaded = $state(false);
 
   const channelLabel = $derived(sink?.channelName ?? sink?.channelId ?? "voice");
@@ -74,7 +74,6 @@
 
   async function loadGuilds() {
     busy = true;
-    error = null;
     try {
       const res = await fetch("/api/discord/guilds", { credentials: "same-origin" });
       const body = await res.json().catch(() => ({}));
@@ -82,7 +81,7 @@
       guilds = body.guilds ?? [];
       inviteUrl = body.inviteUrl ?? inviteUrl;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to list guilds";
+      toast.error(err instanceof Error ? err.message : "Failed to list guilds");
     } finally {
       busy = false;
     }
@@ -94,14 +93,13 @@
     channels = [];
     if (!id) return;
     busy = true;
-    error = null;
     try {
       const res = await fetch(`/api/discord/guilds/${id}/channels`, { credentials: "same-origin" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message ?? `Failed (${res.status})`);
       channels = body.channels ?? [];
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to list channels";
+      toast.error(err instanceof Error ? err.message : "Failed to list channels");
     } finally {
       busy = false;
     }
@@ -110,7 +108,6 @@
   async function attach() {
     if (!guildId || !channelId) return;
     busy = true;
-    error = null;
     try {
       const res = await fetch(`/api/sessions/${sessionId}/discord`, {
         method: "POST",
@@ -122,7 +119,7 @@
       if (!res.ok) throw new Error(body?.message ?? `Attach failed (${res.status})`);
       await refresh();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Attach failed";
+      toast.error(err instanceof Error ? err.message : "Attach failed");
     } finally {
       busy = false;
     }
@@ -130,7 +127,6 @@
 
   async function reconnect() {
     busy = true;
-    error = null;
     try {
       const res = await fetch(`/api/sessions/${sessionId}/discord`, {
         method: "POST",
@@ -142,7 +138,7 @@
       if (!res.ok) throw new Error(body?.message ?? `Reconnect failed (${res.status})`);
       await refresh();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Reconnect failed";
+      toast.error(err instanceof Error ? err.message : "Reconnect failed");
     } finally {
       busy = false;
     }
@@ -150,7 +146,6 @@
 
   async function detach() {
     busy = true;
-    error = null;
     try {
       const res = await fetch(`/api/sessions/${sessionId}/discord`, {
         method: "DELETE",
@@ -161,7 +156,7 @@
       sink = null;
       syncActive();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Detach failed";
+      toast.error(err instanceof Error ? err.message : "Detach failed");
     } finally {
       busy = false;
     }
@@ -174,14 +169,13 @@
 
     const ac = new AbortController();
     loaded = false;
-    error = null;
 
     void (async () => {
       try {
         await refresh(ac.signal);
       } catch (err) {
         if (ac.signal.aborted) return;
-        error = err instanceof Error ? err.message : "Failed to load Discord status";
+        toast.error(err instanceof Error ? err.message : "Failed to load Discord status");
       } finally {
         if (!ac.signal.aborted) loaded = true;
       }
@@ -235,9 +229,6 @@
           {busy ? "Reconnecting…" : "Reconnect"}
         </button>
       {/if}
-      {#if error}
-        <p class="basis-full auth-error !mt-0">{error}</p>
-      {/if}
     </div>
   {/if}
 {:else if loaded}
@@ -265,9 +256,8 @@
             class="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-signal disabled:opacity-40"
             disabled={busy}
             onclick={() => {
-              error = null;
-              void refresh().catch((err) => {
-                error = err instanceof Error ? err.message : "Refresh failed";
+                        void refresh().catch((err) => {
+                toast.error(err instanceof Error ? err.message : "Refresh failed");
               });
             }}
           >
@@ -358,9 +348,6 @@
       {/if}
     {/if}
 
-    {#if error}
-      <p class="auth-error">{error}</p>
-    {/if}
   </div>
 {:else if variant === "full"}
   <div class="rounded-lg border border-border/70 bg-card px-4 py-3 font-mono text-[11px] text-muted-foreground">Loading Discord sink…</div>

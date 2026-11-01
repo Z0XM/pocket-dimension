@@ -7,7 +7,7 @@ import { mapPool, youtubeIngestConcurrency } from "$lib/server/ingest/map-pool";
 import { hasCatalogueAsset, ingestCatalogueVideo, type IngestItemResult, type SyncRunResult } from "$lib/server/ingest/pipeline";
 import type { SongProgress } from "$lib/server/ingest/progress";
 import { setUserLibraryOrder } from "$lib/server/library-order";
-import { libraryYoutubeIdentityKeys } from "$lib/server/connections/youtube-status";
+import { libraryYoutubeIdentityKeys, recordPlaylistImportCoverage } from "$lib/server/connections/youtube-status";
 import { listYouTubePlaylistItems, listYouTubePlaylists, type ZapYouTubePlaylistItem } from "./api";
 import { parsePlaylistImportSort, sortPlaylistItemsForImport, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
 
@@ -53,6 +53,8 @@ export async function importConnectedPlaylists(
     sort?: PlaylistImportSort | string;
     /** Skip videos already in the user's library (additive sync / re-import). */
     skipExisting?: boolean;
+    /** Fired as each playlist entry finishes (skip / ingest), before ordered finalization. */
+    onItemResult?: (result: IngestItemResult, position: number) => void | Promise<void>;
   }
 ): Promise<SyncRunResult & { playlists: string[] }> {
   const uniqueIds = [...new Set(playlistIds.map((id) => id.trim()).filter(Boolean))];
@@ -136,7 +138,7 @@ export async function importConnectedPlaylists(
     });
 
     const knownPlaylistsPromise = listYouTubePlaylists(userId).catch(() => []);
-    const entryLists = await Promise.all(
+    const entryLists: ZapYouTubePlaylistItem[][] = await Promise.all(
       uniqueIds.map((playlistId) =>
         listYouTubePlaylistItems(userId, playlistId, {
           onPage: async ({ pageSize }) => {
@@ -167,9 +169,12 @@ export async function importConnectedPlaylists(
     const alreadyInLibrary = opts?.skipExisting ? await libraryYoutubeIdentityKeys(userId, allVideoIds) : new Set<string>();
 
     const work: WorkItem[] = [];
+    const seenVideoIds = new Set<string>();
     for (const entries of entryLists) {
       const sorted = sortPlaylistItemsForImport(entries, sort);
       for (const entry of sorted) {
+        if (seenVideoIds.has(entry.videoId)) continue;
+        seenVideoIds.add(entry.videoId);
         if (opts?.skipExisting && alreadyInLibrary.has(`youtube:${entry.videoId}`)) {
           work.push({ kind: "skip", entry, reason: "Already in library" });
         } else if (isOverDurationCap(entry.durationMs)) {
@@ -269,6 +274,11 @@ export async function importConnectedPlaylists(
         });
       }
       await publish({ currentTitle: job.entry.title });
+      try {
+        await opts?.onItemResult?.(result, items.length - 1);
+      } catch (err) {
+        console.warn("[zap youtube import onItemResult]", err);
+      }
       // Drop finished songs from the active list shortly so the UI stays focused on in-flight work
       activeSongs.delete(identityKey);
       return result;
@@ -312,6 +322,32 @@ export async function importConnectedPlaylists(
       })
       .where(eq(schema.syncRuns.id, run.id));
 
+    // Persist per-playlist coverage so Connections stops showing stale "Not imported".
+    try {
+      const postImportKeys = await libraryYoutubeIdentityKeys(
+        userId,
+        entryLists.flatMap((entries) => entries.map((e) => e.videoId))
+      );
+      for (let i = 0; i < uniqueIds.length; i++) {
+        const entries = entryLists[i] ?? [];
+        const alreadyImported = entries.filter((e) => postImportKeys.has(`youtube:${e.videoId}`)).length;
+        await recordPlaylistImportCoverage({
+          userId,
+          youtubePlaylistId: uniqueIds[i]!,
+          title: playlistTitles[i] ?? null,
+          total: entries.length,
+          alreadyImported,
+          synced: true,
+          lastSyncError: null,
+        });
+      }
+    } catch (err) {
+      console.warn("[zap youtube import status prefs]", err);
+    }
+
+    // Drain queued progress writes before the NDJSON controller closes.
+    await progressGate;
+
     return {
       syncRunId: run.id,
       imported: summary.imported,
@@ -324,6 +360,7 @@ export async function importConnectedPlaylists(
       playlists: uniqueIds,
     };
   } catch (err) {
+    await progressGate.catch(() => {});
     const message = err instanceof Error ? err.message : "Playlist import failed";
     const summary = summarizeIngestItems(items);
     await db

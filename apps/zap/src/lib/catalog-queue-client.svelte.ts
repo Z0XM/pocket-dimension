@@ -7,6 +7,7 @@ import {
   type CatalogQueueSnapshot,
   type EnqueueMode,
 } from "$lib/catalog-queue";
+import { toast } from "$lib/toast.svelte";
 
 const CONTEXT_KEY = Symbol("zap-catalog-queue");
 const DEVICE_STORAGE_KEY = "zap.deviceId";
@@ -17,6 +18,7 @@ export type CatalogueFilterInput = {
   q?: string;
   tagQuery?: string;
   tagIds?: string[];
+  untagged?: boolean;
 };
 
 type CommandResult = (CatalogQueueSnapshot & { notice?: string }) | null;
@@ -44,6 +46,11 @@ export class CatalogQueueClient {
   now = $state(Date.now());
   /** Playhead from this device's audio element while it is the one producing sound. */
   localPositionMs = $state<number | null>(null);
+  /**
+   * Optimistic seek target. While set, ignore stale `timeupdate` positions that haven't
+   * caught up yet (avoids the thumb flashing back on mouse-up).
+   */
+  pendingSeekMs = $state<number | null>(null);
 
   queue = $derived(this.snapshot?.queue ?? null);
   items = $derived<CatalogQueueItem[]>(this.snapshot?.items ?? []);
@@ -111,9 +118,7 @@ export class CatalogQueueClient {
   }
 
   private flash(message: string) {
-    this.notice = message;
-    if (this.noticeTimer) clearTimeout(this.noticeTimer);
-    this.noticeTimer = setTimeout(() => (this.notice = null), 4000);
+    toast.success(message);
   }
 
   private async send(url: string, init: RequestInit): Promise<CommandResult> {
@@ -132,6 +137,7 @@ export class CatalogQueueClient {
       return body as CommandResult;
     } catch (err) {
       this.error = err instanceof Error ? err.message : "Request failed";
+      toast.error(this.error);
       return null;
     } finally {
       this.pending--;
@@ -190,8 +196,23 @@ export class CatalogQueueClient {
 
   seek(positionMs: number) {
     const ms = Math.max(0, Math.round(positionMs));
-    if (this.localPositionMs != null) this.localPositionMs = ms;
+    this.localPositionMs = ms;
+    this.pendingSeekMs = ms;
     return this.command({ action: "seek", positionMs: ms });
+  }
+
+  /** Apply audio element position; no-ops while a seek is still catching up. */
+  noteAudioPosition(positionMs: number) {
+    const ms = Math.max(0, Math.round(positionMs));
+    if (this.pendingSeekMs != null) {
+      if (Math.abs(ms - this.pendingSeekMs) > 750) return;
+      this.pendingSeekMs = null;
+    }
+    this.localPositionMs = ms;
+  }
+
+  clearPendingSeek() {
+    this.pendingSeekMs = null;
   }
 
   next() {

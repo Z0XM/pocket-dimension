@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import ZapSelect from "$lib/components/ZapSelect.svelte";
+  import { toast } from "$lib/toast.svelte";
   import { HISTORY_TIME_RANGE_OPTIONS } from "$lib/history-time";
   import type { LibraryActivityEntry } from "$lib/server/activity";
   import type { PageData } from "./$types";
@@ -16,7 +17,6 @@
   let entries = $state<LibraryActivityEntry[]>([]);
   let nextBefore = $state<string | null>(null);
   let loadingMore = $state(false);
-  let listError = $state<string | null>(null);
   let scrollRoot = $state<HTMLDivElement | null>(null);
   let sentinel = $state<HTMLDivElement | null>(null);
   let fetchGen = 0;
@@ -28,7 +28,6 @@
     range = data.filters.range;
     entries = [...data.entries];
     nextBefore = data.nextBefore;
-    listError = null;
     scrollRoot?.scrollTo({ top: 0 });
   });
 
@@ -47,7 +46,6 @@
     const gen = ++fetchGen;
     const before = nextBefore;
     loadingMore = true;
-    listError = null;
     try {
       const params = new URLSearchParams();
       params.set("before", before);
@@ -65,7 +63,7 @@
       nextBefore = body.nextBefore;
     } catch (err) {
       if (gen !== fetchGen) return;
-      listError = err instanceof Error ? err.message : "Failed to load uploads";
+      toast.error(err instanceof Error ? err.message : "Failed to load uploads");
     } finally {
       if (gen === fetchGen) loadingMore = false;
     }
@@ -139,10 +137,6 @@
       Search
     </button>
   </form>
-
-  {#if listError}
-    <p class="auth-error mb-0 shrink-0 p-2">{listError}</p>
-  {/if}
 
   {#if entries.length === 0}
     <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">

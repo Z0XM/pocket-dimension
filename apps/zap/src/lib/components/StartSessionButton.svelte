@@ -1,6 +1,7 @@
 <script lang="ts">
   import PlayIcon from "@lucide/svelte/icons/play";
   import BusyStatus from "$lib/components/BusyStatus.svelte";
+  import { toast } from "$lib/toast.svelte";
 
   let {
     label = "Start session",
@@ -26,7 +27,6 @@
   } = $props();
 
   let busy = $state(false);
-  let error = $state<string | null>(null);
   let liveId = $state<string | null>(null);
   let liveTitle = $state<string | null>(null);
   let liveRole = $state<"host" | "guest" | null>(null);
@@ -89,11 +89,10 @@
       return;
     }
     if (!canStart) {
-      error = "Guests can’t start sessions — join or resume instead.";
+      toast.info("Guests can’t start sessions — join or resume instead.");
       return;
     }
     busy = true;
-    error = null;
     try {
       const name = showNameOption ? sessionName.trim() || defaultName.trim() || undefined : undefined;
       const res = await fetch("/api/sessions", {
@@ -112,7 +111,7 @@
       if (!id) throw new Error("No session id returned");
       window.location.href = `/session/${id}`;
     } catch (err) {
-      error = err instanceof Error ? err.message : "Could not start session";
+      toast.error(err instanceof Error ? err.message : "Could not start session");
       busy = false;
     }
   }
@@ -222,8 +221,5 @@
   {/if}
   {#if busy}
     <BusyStatus label="Starting session…" />
-  {/if}
-  {#if error}
-    <span class="max-w-xs font-mono text-[10px] text-destructive">{error}</span>
   {/if}
 </span>

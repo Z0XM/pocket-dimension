@@ -5,7 +5,9 @@
   import CatalogQueueDock from "$lib/components/CatalogQueueDock.svelte";
   import PageSkeleton from "$lib/components/PageSkeleton.svelte";
   import SettingsMenu from "$lib/components/SettingsMenu.svelte";
+  import Toaster from "$lib/components/Toaster.svelte";
   import WaveBars from "$lib/components/WaveBars.svelte";
+  import icon from "$lib/assets/icon.svg";
   import type { LayoutData } from "../$types";
   import { navigating, page } from "$app/state";
   import { goto } from "$app/navigation";
@@ -14,6 +16,29 @@
 
   const catalogQueue = new CatalogQueueClient();
   setCatalogQueue(catalogQueue);
+
+  let runningImportJobs = $state(data.runningImportJobs ?? 0);
+
+  $effect(() => {
+    runningImportJobs = data.runningImportJobs ?? 0;
+  });
+
+  $effect(() => {
+    if (!data.user?.id) return;
+    const tick = async () => {
+      try {
+        const res = await fetch("/api/jobs/summary", { credentials: "same-origin" });
+        if (!res.ok) return;
+        const body = await res.json();
+        runningImportJobs = Number(body.runningCount ?? 0);
+      } catch {
+        // ignore
+      }
+    };
+    void tick();
+    const id = setInterval(() => void tick(), 4000);
+    return () => clearInterval(id);
+  });
 
   const path = $derived(page.url.pathname);
   const navTo = $derived(navigating.to?.url.pathname ?? null);
@@ -27,7 +52,9 @@
 
   const themeActive = $derived(path === "/theme" || path.startsWith("/theme/"));
   const connectionsActive = $derived(path === "/connections" || path.startsWith("/connections/"));
+  const jobsActive = $derived(path === "/jobs" || path.startsWith("/jobs/"));
   const joinActive = $derived(path === "/join" || path.startsWith("/join/"));
+  const showRunningJobsNav = $derived(runningImportJobs > 0 || jobsActive);
 
   /** Pin the shell so page headers stay put and list panes scroll (Catalogue-style). */
   const fillViewport = $derived(
@@ -38,6 +65,7 @@
       sessionActive ||
       themeActive ||
       connectionsActive ||
+      jobsActive ||
       homeActive ||
       joinActive) &&
       !isNavigating
@@ -67,7 +95,9 @@
                     ? "Loading theme"
                     : skeletonPath.startsWith("/connections")
                       ? "Loading connections"
-                      : "Loading"
+                      : skeletonPath.startsWith("/jobs")
+                        ? "Loading jobs"
+                        : "Loading"
   );
 
   async function signOut() {
@@ -111,6 +141,15 @@
       class={`zap-nav-link ${sessionActive ? "zap-nav-link-active" : ""} ${rail ? "block w-full px-2" : ""}`}
       aria-current={sessionActive ? "page" : undefined}>Sessions</a
     >
+    {#if showRunningJobsNav}
+      <a
+        href="/jobs"
+        class={`zap-nav-link ${jobsActive ? "zap-nav-link-active" : ""} ${rail ? "block w-full px-2" : ""}`}
+        aria-current={jobsActive ? "page" : undefined}
+        >Running Jobs{#if runningImportJobs > 0}
+          <span class="ml-1 tabular-nums text-signal">({runningImportJobs})</span>{/if}</a
+      >
+    {/if}
   </nav>
 {/snippet}
 
@@ -118,6 +157,7 @@
   <BeatReactiveBackground queue={catalogQueue} />
   <aside class="zap-shell-rail relative z-10" aria-label="App rail">
     <a href="/home" class="flex items-center gap-2 px-2" aria-label="Zap home" aria-current={homeActive ? "page" : undefined}>
+      <img src={icon} alt="" class="size-8 rounded-md" width="32" height="32" />
       <span class="text-lg font-semibold tracking-tight text-foreground">Zap</span>
       <WaveBars />
     </a>
@@ -133,14 +173,29 @@
         <div class="zap-nav-progress" aria-hidden="true"></div>
         <span class="sr-only" role="status" aria-live="polite">Loading page…</span>
       {/if}
-      <div class="zap-shell-top-inner mx-auto flex max-w-5xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="zap-shell-top-inner mx-auto flex max-w-5xl items-center justify-between gap-3 px-3 py-4 sm:px-6">
         <a href="/home" class="zap-shell-brand flex items-center gap-3" aria-label="Zap home" aria-current={homeActive ? "page" : undefined}>
+          <img src={icon} alt="" class="size-9 rounded-lg" width="36" height="36" />
           <span class="text-xl font-semibold tracking-tight text-foreground">Zap</span>
           <WaveBars />
         </a>
-        <div class="zap-shell-nav-links flex flex-wrap items-center gap-2 sm:gap-3">
+        <div class="zap-shell-nav-links hidden flex-wrap items-center gap-2 sm:flex sm:gap-3">
           {@render primaryNav(false)}
           <SettingsMenu username={data.user?.username ?? data.user?.email} isAdmin={data.zapAdmin} onSignOut={signOut} />
+        </div>
+        <div class="sm:hidden">
+          <SettingsMenu
+            includePrimary
+            username={data.user?.username ?? data.user?.email}
+            isAdmin={data.zapAdmin}
+            onSignOut={signOut}
+            {catalogueActive}
+            {playlistsActive}
+            {sessionActive}
+            {jobsActive}
+            {runningImportJobs}
+            showRunningJobs={showRunningJobsNav}
+          />
         </div>
       </div>
     </header>
@@ -155,3 +210,4 @@
 </div>
 
 <CatalogQueueDock queue={catalogQueue} />
+<Toaster />

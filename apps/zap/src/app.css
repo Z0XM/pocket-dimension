@@ -3,13 +3,14 @@
 @plugin "@tailwindcss/typography";
 @import "tw-animate-css";
 @import "@fontsource-variable/archivo";
+@import "@fontsource-variable/figtree";
 @import "./lib/styles/theme.css";
 @import "./lib/styles/design-chrome.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Archivo Variable", sans-serif;
+  --font-sans: "Figtree Variable", sans-serif;
   --font-mono: "Archivo Variable", sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -99,6 +100,10 @@
     @apply w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-signal focus:outline-none focus:ring-0 disabled:opacity-50;
   }
 
+  .zap-underline-field {
+    @apply w-full rounded-none border-0 border-b border-border bg-transparent px-0 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-signal focus:outline-none focus:ring-0 disabled:opacity-50;
+  }
+
   .auth-btn {
     @apply rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50;
   }
@@ -156,7 +161,7 @@
   }
 
   .zap-menu-item {
-    @apply flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs text-muted-foreground transition hover:bg-signal/10 hover:text-signal;
+    @apply flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs text-muted-foreground transition;
   }
 
   .zap-busy {

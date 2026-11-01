@@ -6,7 +6,8 @@ import { id, timestamps } from "./common";
 export const zapSchema = pgSchema("zap");
 
 /** `unavailable`: identity known (e.g. deleted/private YouTube item) but no audio source yet; backfill flips it to `ready`. */
-export const mediaAssetStatus = zapSchema.enum("media_asset_status", ["pending", "ready", "failed", "unavailable"]);
+/** `archived`: admin-hidden — excluded from all user-facing surfaces; only Admin → Songs lists it. */
+export const mediaAssetStatus = zapSchema.enum("media_asset_status", ["pending", "ready", "failed", "unavailable", "archived"]);
 export const mediaSourceType = zapSchema.enum("media_source_type", ["upload", "youtube", "url", "other"]);
 export const tagKind = zapSchema.enum("tag_kind", ["system", "custom"]);
 export const sessionStatus = zapSchema.enum("session_status", ["live", "ended"]);
@@ -624,8 +625,14 @@ export const zapSettings = zapSchema.table("settings", {
 
 export const connectionProvider = zapSchema.enum("connection_provider", ["discord", "spotify", "youtube"]);
 
+export const youtubePlaylistImportStatus = zapSchema.enum("youtube_playlist_import_status", [
+  "fully_imported",
+  "partially_imported",
+  "not_imported",
+]);
+
 /**
- * Per-user YouTube playlist prefs (auto-sync) + cached titles for Connections UI.
+ * Per-user YouTube playlist prefs (auto-sync, hide, cached import status) for Connections UI.
  * Additive sync only — never removes catalogue rows when YT drops a video.
  */
 export const youtubePlaylistPrefs = zapSchema.table(
@@ -637,6 +644,11 @@ export const youtubePlaylistPrefs = zapSchema.table(
     youtubePlaylistId: text("youtube_playlist_id").notNull(),
     title: text("title"),
     autoSync: boolean("auto_sync").default(false).notNull(),
+    /** Soft-hide from default Connections playlist views. */
+    hidden: boolean("hidden").default(false).notNull(),
+    /** Last known library coverage (updated on preview / import / auto-sync). */
+    importStatus: youtubePlaylistImportStatus("import_status").default("not_imported").notNull(),
+    alreadyImported: integer("already_imported").default(0).notNull(),
     lastSyncedAt: timestamp("last_synced_at"),
     lastSyncError: text("last_sync_error"),
     createdAt: timestamps.createdAt,
@@ -667,5 +679,79 @@ export const connectionActivity = zapSchema.table(
   },
   (table) => [
     index("connection_activity_user_provider_idx").on(table.userId, table.provider, table.createdAt),
+  ]
+);
+
+/** Background catalogue imports (Add song / Connections YouTube) — survive reload. */
+export const importJobKind = zapSchema.enum("import_job_kind", ["url", "youtube_playlist", "upload"]);
+export const importJobStatus = zapSchema.enum("import_job_status", ["queued", "running", "completed", "failed"]);
+export const importJobItemStatus = zapSchema.enum("import_job_item_status", [
+  "pending",
+  "running",
+  "imported",
+  "reused",
+  "skipped",
+  "unavailable",
+  "failed",
+]);
+
+export const importJobs = zapSchema.table(
+  "import_jobs",
+  {
+    id,
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => auth.user.id, { onDelete: "cascade" }),
+    kind: importJobKind("kind").notNull(),
+    status: importJobStatus("status").default("queued").notNull(),
+    label: text("label").notNull(),
+    /** JSON: url / playlistIds / tagIds / sort / skipExisting / etc. */
+    sourceJson: text("source_json"),
+    total: integer("total").default(0).notNull(),
+    done: integer("done").default(0).notNull(),
+    importedCount: integer("imported_count").default(0).notNull(),
+    skippedCount: integer("skipped_count").default(0).notNull(),
+    failedCount: integer("failed_count").default(0).notNull(),
+    unavailableCount: integer("unavailable_count").default(0).notNull(),
+    currentTitle: text("current_title"),
+    errorMessage: text("error_message"),
+    syncRunId: uuid("sync_run_id").references(() => syncRuns.id, { onDelete: "set null" }),
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamp("updated_at")
+      .$default(() => sql`now()`)
+      .$onUpdate(() => sql`now()`)
+      .notNull(),
+    finishedAt: timestamp("finished_at"),
+  },
+  (table) => [
+    index("import_jobs_user_status_idx").on(table.userId, table.status),
+    index("import_jobs_user_created_idx").on(table.userId, table.createdAt),
+  ]
+);
+
+export const importJobItems = zapSchema.table(
+  "import_job_items",
+  {
+    id,
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => importJobs.id, { onDelete: "cascade" }),
+    identityKey: text("identity_key").notNull(),
+    title: text("title"),
+    status: importJobItemStatus("status").default("pending").notNull(),
+    reason: text("reason"),
+    sourceUrl: text("source_url"),
+    mediaAssetId: uuid("media_asset_id").references(() => mediaAssets.id, { onDelete: "set null" }),
+    position: integer("position").default(0).notNull(),
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamp("updated_at")
+      .$default(() => sql`now()`)
+      .$onUpdate(() => sql`now()`)
+      .notNull(),
+  },
+  (table) => [
+    index("import_job_items_job_id_idx").on(table.jobId),
+    index("import_job_items_job_status_idx").on(table.jobId, table.status),
+    uniqueIndex("import_job_items_job_identity_unique").on(table.jobId, table.identityKey),
   ]
 );

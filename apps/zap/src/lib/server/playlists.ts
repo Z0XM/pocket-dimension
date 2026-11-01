@@ -1,5 +1,5 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { dedupeIds, isPermutation } from "$lib/catalog-queue";
 import { parsePlaylistTrackSort, sortPlaylistTracks, type PlaylistTrackSort } from "$lib/playlist-sort";
 import { evaluateUserTagQuery } from "$lib/server/catalogue";
@@ -211,7 +211,14 @@ export async function listPlaylistAssetIds(playlistId: string, userId: string): 
     where: eq(schema.playlistItems.playlistId, playlistId),
     orderBy: [asc(schema.playlistItems.position)],
   });
-  return items.map((i) => i.mediaAssetId);
+  if (items.length === 0) return [];
+  const ids = items.map((i) => i.mediaAssetId);
+  const visible = await db
+    .select({ id: schema.mediaAssets.id })
+    .from(schema.mediaAssets)
+    .where(and(inArray(schema.mediaAssets.id, ids), ne(schema.mediaAssets.status, "archived")));
+  const visibleIds = new Set(visible.map((r) => r.id));
+  return ids.filter((id) => visibleIds.has(id));
 }
 
 export async function createPlaylist(opts: {
@@ -311,8 +318,20 @@ export async function listPlaylistsForUser(userId: string): Promise<PlaylistSumm
       all.map((p) => p.id)
     ),
   });
+  const assetIdsForCount = [...new Set(items.map((i) => i.mediaAssetId))];
+  const visibleAssets =
+    assetIdsForCount.length > 0
+      ? await db
+          .select({ id: schema.mediaAssets.id })
+          .from(schema.mediaAssets)
+          .where(and(inArray(schema.mediaAssets.id, assetIdsForCount), ne(schema.mediaAssets.status, "archived")))
+      : [];
+  const visibleAssetIds = new Set(visibleAssets.map((a) => a.id));
   const countBy = new Map<string, number>();
-  for (const i of items) countBy.set(i.playlistId, (countBy.get(i.playlistId) ?? 0) + 1);
+  for (const i of items) {
+    if (!visibleAssetIds.has(i.mediaAssetId)) continue;
+    countBy.set(i.playlistId, (countBy.get(i.playlistId) ?? 0) + 1);
+  }
 
   return all.map((p) => {
     const isMember = memberSet.has(p.id);
@@ -450,15 +469,20 @@ export async function getPlaylistDetail(playlistId: string, userId: string): Pro
   const isFollower = await userFollowsPlaylist(playlistId, userId);
   const canEdit = await userCanEdit(playlistId, userId);
 
+  const visibleItems = items.filter((i) => {
+    const a = assetById.get(i.mediaAssetId);
+    return a?.status !== "archived";
+  });
+
   return {
     ...toSummaryFields(playlist, {
       userId,
-      trackCount: items.length,
+      trackCount: visibleItems.length,
       isMember,
       isFollower,
       canEdit,
     }),
-    items: items.map((i) => {
+    items: visibleItems.map((i) => {
       const a = assetById.get(i.mediaAssetId);
       return {
         id: i.id,
@@ -471,10 +495,12 @@ export async function getPlaylistDetail(playlistId: string, userId: string): Pro
         addedAt: i.createdAt.toISOString(),
       };
     }),
-    exclusions: exclusions.map((e) => ({
-      mediaAssetId: e.mediaAssetId,
-      title: assetById.get(e.mediaAssetId)?.title ?? "Unknown",
-    })),
+    exclusions: exclusions
+      .filter((e) => assetById.get(e.mediaAssetId)?.status !== "archived")
+      .map((e) => ({
+        mediaAssetId: e.mediaAssetId,
+        title: assetById.get(e.mediaAssetId)?.title ?? "Unknown",
+      })),
     collaborators: members.map((m) => ({
       userId: m.userId,
       role: m.role,
@@ -873,12 +899,12 @@ export async function lookupPlaylistByShareCode(userId: string, rawCode: string)
   if (playlist.kind !== "standard") throw new PlaylistError("Only standard playlists can be link sources");
   if (!(await userCanView(playlist.id, userId))) throw new PlaylistError("Playlist not found", 404);
 
-  const trackCount = await db.$count(schema.playlistItems, eq(schema.playlistItems.playlistId, playlist.id));
+  const trackIds = await listPlaylistAssetIds(playlist.id, userId);
   const isMember = await userIsPlaylistMember(playlist.id, userId);
   const isFollower = await userFollowsPlaylist(playlist.id, userId);
   return toSummaryFields(playlist, {
     userId,
-    trackCount,
+    trackCount: trackIds.length,
     isMember,
     isFollower,
     canEdit: false,

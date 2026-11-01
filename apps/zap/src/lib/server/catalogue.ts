@@ -1,5 +1,5 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import type { CatalogueScope } from "$lib/catalogue-scope";
 import { MAX_CUSTOM_TAG_LENGTH, parseCustomTagNames, slugifyTag } from "$lib/custom-tags";
 import { rankTopTagIds } from "$lib/tag-filter";
@@ -9,8 +9,8 @@ export { slugifyTag };
 
 export { parseCatalogueScope, type CatalogueScope } from "$lib/catalogue-scope";
 
-/** Statuses listed in browse / search. `unavailable` rows show with a "not available" badge and are not playable. */
-export const CATALOGUE_VISIBLE_STATUSES = ["ready", "unavailable"] as const;
+/** Statuses listed in browse / search. Unavailable songs stay out of the catalogue UI (admin still lists them). */
+export const CATALOGUE_VISIBLE_STATUSES = ["ready"] as const;
 
 export function isCatalogueVisibleStatus(status: string): boolean {
   return (CATALOGUE_VISIBLE_STATUSES as readonly string[]).includes(status);
@@ -20,7 +20,7 @@ const catalogueVisible = () => inArray(schema.mediaAssets.status, [...CATALOGUE_
 
 export const CATALOGUE_PAGE_SIZE = 25;
 
-export type CatalogueOrder = "title" | "library";
+export type CatalogueOrder = "recent" | "title" | "library";
 
 export type CatalogueQuery = {
   userId: string;
@@ -28,14 +28,20 @@ export type CatalogueQuery = {
   scope?: CatalogueScope;
   /** Required when `scope` is `playlist`; the caller must have checked view access. */
   playlistId?: string | null;
-  /** Tag ids that must ALL be present (AND). Ignored when `tagQuery` is set. */
+  /** Tag ids that must ALL be present (AND). Ignored when `tagQuery` or `untagged` is set. */
   tagIds?: string[];
   /**
    * Nested boolean tag filter, e.g. `love and (soft not upbeat)`.
    * Supports AND / OR / NOT and parentheses. Tag leaves match name or slug.
    */
   tagQuery?: string;
-  /** `library` uses per-user sort keys (playlist import order). Default title. */
+  /** When true, only assets with no tags for this user (mutually exclusive with tagIds / tagQuery). */
+  untagged?: boolean;
+  /**
+   * List sort. Default `recent` (newest `media_assets.created_at` first).
+   * `library` uses per-user sort keys (newest import batch first).
+   * `title` is A–Z. Playlist scope always uses playlist position.
+   */
   order?: CatalogueOrder;
   /** 0-based page offset in items (not pages). */
   offset?: number;
@@ -59,8 +65,9 @@ export type CatalogueTag = typeof schema.tags.$inferSelect;
 export async function listCatalogue(input: CatalogueQuery, options: ListOptions = {}): Promise<CatalogueListResult> {
   const scope = input.scope ?? "all";
   const q = input.q?.trim() ?? "";
-  const tagIds = input.tagIds?.filter(Boolean) ?? [];
-  const tagQueryRaw = input.tagQuery?.trim() ?? "";
+  const untagged = Boolean(input.untagged);
+  const tagQueryRaw = untagged ? "" : (input.tagQuery?.trim() ?? "");
+  const tagIds = untagged || tagQueryRaw ? [] : (input.tagIds?.filter(Boolean) ?? []);
   const limit = Math.min(Math.max(input.limit ?? CATALOGUE_PAGE_SIZE, 1), options.maxLimit ?? 100);
   const offset = Math.max(input.offset ?? 0, 0);
 
@@ -76,6 +83,8 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
   let assetIds: string[] | null = null;
   let tagQueryError: string | null = null;
   let tagQueryAst: TagQueryNode | null = null;
+  /** Apply NOT EXISTS tag filter in SQL when the scope is not already narrowed to an id list. */
+  let untaggedSql = false;
 
   if (scope === "yours") {
     const tagged = await db
@@ -94,7 +103,21 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
     if (assetIds.length === 0) return empty;
   }
 
-  if (tagQueryRaw) {
+  if (untagged) {
+    // "Your library" is defined as tagged tracks — untagged ∩ yours is always empty.
+    if (scope === "yours") return empty;
+    if (assetIds) {
+      const tagged = await db
+        .selectDistinct({ mediaAssetId: schema.mediaAssetTags.mediaAssetId })
+        .from(schema.mediaAssetTags)
+        .where(and(eq(schema.mediaAssetTags.userId, input.userId), inArray(schema.mediaAssetTags.mediaAssetId, assetIds)));
+      const taggedSet = new Set(tagged.map((row) => row.mediaAssetId));
+      assetIds = assetIds.filter((id) => !taggedSet.has(id));
+      if (assetIds.length === 0) return empty;
+    } else {
+      untaggedSql = true;
+    }
+  } else if (tagQueryRaw) {
     const parsed = parseTagQuery(tagQueryRaw);
     if (!parsed.ok) {
       return { ...empty, tagQueryError: parsed.error };
@@ -131,12 +154,22 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
   if (assetIds) {
     conditions.push(inArray(schema.mediaAssets.id, assetIds));
   }
+  if (untaggedSql) {
+    conditions.push(
+      sql`not exists (
+        select 1 from ${schema.mediaAssetTags}
+        where ${schema.mediaAssetTags.mediaAssetId} = ${schema.mediaAssets.id}
+          and ${schema.mediaAssetTags.userId} = ${input.userId}
+      )`
+    );
+  }
   if (q) {
     const pattern = `%${q}%`;
     conditions.push(or(ilike(schema.mediaAssets.title, pattern), ilike(schema.mediaAssets.artists, pattern))!);
   }
 
-  const useLibraryOrder = (input.order ?? "title") === "library" || scope === "yours";
+  const order = input.order ?? "recent";
+  const useLibraryOrder = order === "library";
 
   let assets: CatalogueAsset[];
   let hasMore: boolean;
@@ -156,7 +189,7 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
     hasMore = joined.length > limit;
     assets = (hasMore ? joined.slice(0, limit) : joined).map((r) => r.asset);
   } else if (useLibraryOrder) {
-    // Prefer durable per-user sort keys; untitled/unkeyed rows fall back after keyed ones.
+    // Higher sortKey = more recently imported batch → newest first.
     const joined = await db
       .select({
         asset: schema.mediaAssets,
@@ -168,17 +201,28 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
         and(eq(schema.userLibraryEntries.mediaAssetId, schema.mediaAssets.id), eq(schema.userLibraryEntries.userId, input.userId))
       )
       .where(and(...conditions))
-      .orderBy(sql`${schema.userLibraryEntries.sortKey} asc nulls last`, asc(schema.mediaAssets.title), asc(schema.mediaAssets.id))
+      .orderBy(sql`${schema.userLibraryEntries.sortKey} desc nulls last`, desc(schema.mediaAssets.createdAt), desc(schema.mediaAssets.id))
       .limit(limit + 1)
       .offset(offset);
     hasMore = joined.length > limit;
     assets = (hasMore ? joined.slice(0, limit) : joined).map((r) => r.asset);
-  } else {
+  } else if (order === "title") {
     const rows = await db
       .select()
       .from(schema.mediaAssets)
       .where(and(...conditions))
       .orderBy(asc(schema.mediaAssets.title), asc(schema.mediaAssets.id))
+      .limit(limit + 1)
+      .offset(offset);
+    hasMore = rows.length > limit;
+    assets = hasMore ? rows.slice(0, limit) : rows;
+  } else {
+    // Default `recent`: most recently added catalogue assets on top.
+    const rows = await db
+      .select()
+      .from(schema.mediaAssets)
+      .where(and(...conditions))
+      .orderBy(desc(schema.mediaAssets.createdAt), desc(schema.mediaAssets.id))
       .limit(limit + 1)
       .offset(offset);
     hasMore = rows.length > limit;
@@ -296,13 +340,38 @@ export function serializeCatalogueAsset(asset: CatalogueAsset, tags: CatalogueTa
   };
 }
 
-/** System tags (seeded by migration 0055, managed by admins) plus this user's private custom tags. */
+/**
+ * System tags (seeded by migration 0055, managed by admins) plus this user's private custom tags.
+ * Ordered by most recent song↔tag assignment for this user (latest on top); never-used tags last, then name.
+ */
 export async function listAvailableTags(userId: string) {
-  return db
-    .select()
-    .from(schema.tags)
-    .where(or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, userId)))
-    .orderBy(asc(schema.tags.kind), asc(schema.tags.name));
+  const [tags, lastAssigned] = await Promise.all([
+    db
+      .select()
+      .from(schema.tags)
+      .where(or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, userId))),
+    db
+      .select({
+        tagId: schema.mediaAssetTags.tagId,
+        at: sql<string | Date>`max(${schema.mediaAssetTags.createdAt})`,
+      })
+      .from(schema.mediaAssetTags)
+      .where(eq(schema.mediaAssetTags.userId, userId))
+      .groupBy(schema.mediaAssetTags.tagId),
+  ]);
+
+  const atMs = (value: string | Date | null | undefined) => {
+    if (value == null) return 0;
+    const ms = value instanceof Date ? value.getTime() : new Date(value).getTime();
+    return Number.isFinite(ms) ? ms : 0;
+  };
+  const atByTag = new Map(lastAssigned.map((r) => [r.tagId, atMs(r.at)]));
+  return tags.sort((a, b) => {
+    const tb = atByTag.get(b.id) ?? 0;
+    const ta = atByTag.get(a.id) ?? 0;
+    if (tb !== ta) return tb - ta;
+    return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+  });
 }
 
 export function serializeTagOption(tag: CatalogueTag) {
