@@ -7,12 +7,14 @@
   import PlayIcon from "@lucide/svelte/icons/play";
   import TagsIcon from "@lucide/svelte/icons/tags";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
+  import { onMount } from "svelte";
   import EditTagsDialog from "$lib/components/EditTagsDialog.svelte";
   import SeekBar from "$lib/components/SeekBar.svelte";
   import SongDispositionDialog from "$lib/components/SongDispositionDialog.svelte";
   import { archiveSongAsAdmin, deleteSongAsAdmin } from "$lib/admin-song-delete";
   import { formatClock, type EnqueueMode } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
+  import { readCatalogueTagDisplay, ZAP_THEME_EVENT, type CatalogueTagDisplay } from "$lib/theme-prefs";
   import { toast } from "$lib/toast.svelte";
 
   export type TrackItem = {
@@ -63,12 +65,22 @@
   let disposing = $state(false);
   let editTagsOpen = $state(false);
   let scrubMs = $state<number | null>(null);
+  let tagDisplay = $state<CatalogueTagDisplay>("icons");
 
   let menuOpen = $state(false);
   let menuOpenUp = $state(false);
   let menuBtn = $state<HTMLButtonElement | null>(null);
   let menuEl = $state<HTMLDivElement | null>(null);
   let menuStyle = $state("");
+
+  onMount(() => {
+    tagDisplay = readCatalogueTagDisplay();
+    const sync = () => {
+      tagDisplay = readCatalogueTagDisplay();
+    };
+    window.addEventListener(ZAP_THEME_EVENT, sync);
+    return () => window.removeEventListener(ZAP_THEME_EVENT, sync);
+  });
 
   const unavailable = $derived(track.available === false);
   const isCurrent = $derived(Boolean(queue?.currentItem && queue.currentItem.mediaAssetId === track.id));
@@ -168,6 +180,26 @@
   });
 </script>
 
+{#snippet tagMark(tag: TrackItem["tags"][number], where: "desktop" | "mobile")}
+  {@const hide = where === "desktop" ? "hidden sm:inline-flex" : "inline-flex"}
+  {@const hidePlain = where === "desktop" ? "hidden sm:inline" : "inline"}
+  {@const chipPad = where === "desktop" ? "px-2 py-0.5 text-[10px]" : "px-1.5 py-0 text-[9px]"}
+  {#if tagDisplay === "icons"}
+    {#if tag.icon}
+      <span class={`${hidePlain} text-base leading-none`} title={tag.name} aria-label={tag.name}>{tag.icon}</span>
+    {:else}
+      <span class={`zap-tag-chip ${hide} ${chipPad}`} title={tag.name} aria-label={tag.name}>{tag.name}</span>
+    {/if}
+  {:else if tagDisplay === "both"}
+    <span class={`zap-tag-chip ${hide} items-center gap-1 ${chipPad}`} title={tag.name} aria-label={tag.name}>
+      {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
+      {tag.name}
+    </span>
+  {:else}
+    <span class={`zap-tag-chip ${hide} ${chipPad}`} title={tag.name} aria-label={tag.name}>{tag.name}</span>
+  {/if}
+{/snippet}
+
 <li class={`zap-track group flex flex-col gap-2 py-1 sm:gap-3 sm:py-1.5 ${isCurrent ? "is-current" : ""}`}>
   <div class="flex items-start gap-2 sm:items-center sm:gap-4">
     <button
@@ -222,11 +254,7 @@
         </div>
         <div class="flex shrink-0 flex-wrap items-center justify-end gap-0.5 sm:max-w-[45%] sm:gap-1">
           {#each track.tags as tag}
-            {#if tag.icon}
-              <span class="hidden text-base leading-none sm:inline" title={tag.name} aria-label={tag.name}>{tag.icon}</span>
-            {:else}
-              <span class="zap-tag-chip hidden px-2 py-0.5 text-[10px] sm:inline-flex" title={tag.name} aria-label={tag.name}>{tag.name}</span>
-            {/if}
+            {@render tagMark(tag, "desktop")}
           {/each}
           <button
             type="button"
@@ -268,11 +296,7 @@
       {#if track.tags.length}
         <div class="flex flex-wrap items-center gap-0.5 sm:hidden">
           {#each track.tags as tag}
-            {#if tag.icon}
-              <span class="text-base leading-none" title={tag.name} aria-label={tag.name}>{tag.icon}</span>
-            {:else}
-              <span class="zap-tag-chip px-1.5 py-0 text-[9px]" title={tag.name} aria-label={tag.name}>{tag.name}</span>
-            {/if}
+            {@render tagMark(tag, "mobile")}
           {/each}
         </div>
       {/if}

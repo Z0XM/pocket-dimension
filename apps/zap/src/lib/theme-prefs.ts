@@ -54,6 +54,17 @@ export type CardId = (typeof CARD_PRESETS)[number]["id"];
 export type AnimationStyleId = (typeof ANIMATION_STYLES)[number]["id"];
 export type AnimationLayer = "behind" | "top";
 
+/** How tags appear on catalogue / track rows. */
+export const CATALOGUE_TAG_DISPLAYS = [
+  { id: "text", label: "Text badges", blurb: "Name only, in a chip" },
+  { id: "icons", label: "Icons only", blurb: "Glyph when set; plain, no chip" },
+  { id: "both", label: "Icon + text", blurb: "Icon and name together in a chip" },
+] as const;
+
+export type CatalogueTagDisplay = (typeof CATALOGUE_TAG_DISPLAYS)[number]["id"];
+
+export const ZAP_THEME_EVENT = "zap:theme";
+
 /** Slider ranges — defaults match current Theme → Motion baseline. */
 export const MOTION_CARD_OPACITY = { min: 0.15, max: 1, step: 0.05, default: 1 } as const;
 export const MOTION_ANIM_OPACITY = { min: 0.1, max: 1, step: 0.05, default: 0.4 } as const;
@@ -83,6 +94,8 @@ export type ZapThemePrefs = {
   responseWindowMs: number;
   /** Oscilloscope / mirrored-wave history window in ms (0–5000). 0 = live buffer only. */
   waveHistoryMs: number;
+  /** Catalogue / track-row tag presentation. */
+  catalogueTagDisplay: CatalogueTagDisplay;
 };
 
 export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
@@ -96,6 +109,7 @@ export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
   animationLayer: "top",
   responseWindowMs: MOTION_RESPONSE_MS.default, // Instant
   waveHistoryMs: MOTION_WAVE_HISTORY_MS.default, // Live
+  catalogueTagDisplay: "icons",
 };
 
 export function isAccentId(v: unknown): v is AccentId {
@@ -116,6 +130,10 @@ export function isAnimationStyleId(v: unknown): v is AnimationStyleId {
 
 export function isAnimationLayer(v: unknown): v is AnimationLayer {
   return v === "behind" || v === "top";
+}
+
+export function isCatalogueTagDisplay(v: unknown): v is CatalogueTagDisplay {
+  return CATALOGUE_TAG_DISPLAYS.some((p) => p.id === v);
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -156,6 +174,9 @@ export function readThemePrefs(): ZapThemePrefs {
       animationLayer: isAnimationLayer(parsed.animationLayer) ? parsed.animationLayer : DEFAULT_THEME_PREFS.animationLayer,
       responseWindowMs: clampResponseMs(parsed.responseWindowMs),
       waveHistoryMs: clampWaveHistoryMs(parsed.waveHistoryMs),
+      catalogueTagDisplay: isCatalogueTagDisplay(parsed.catalogueTagDisplay)
+        ? parsed.catalogueTagDisplay
+        : DEFAULT_THEME_PREFS.catalogueTagDisplay,
     };
     // Migrate removed styles (wave/noise/bars/bloom/vortex/…) back to radial.
     if (parsed.animationStyle !== prefs.animationStyle) {
@@ -213,6 +234,10 @@ export function applyThemePrefs(prefs: ZapThemePrefs) {
   root.setAttribute("data-animations", animationsOn ? "on" : "off");
   root.setAttribute("data-animation-style", isAnimationStyleId(prefs.animationStyle) ? prefs.animationStyle : DEFAULT_THEME_PREFS.animationStyle);
   root.setAttribute("data-animation-layer", layer);
+  root.setAttribute(
+    "data-catalogue-tags",
+    isCatalogueTagDisplay(prefs.catalogueTagDisplay) ? prefs.catalogueTagDisplay : DEFAULT_THEME_PREFS.catalogueTagDisplay
+  );
   root.style.setProperty("--zap-anim-opacity", String(animOpacity));
   root.style.setProperty("--zap-response-ms", String(responseMs));
   root.style.setProperty("--zap-wave-history-ms", String(waveMs));
@@ -252,6 +277,18 @@ export function applyThemePrefs(prefs: ZapThemePrefs) {
 export function persistAndApplyTheme(prefs: ZapThemePrefs) {
   writeThemePrefs(prefs);
   applyThemePrefs(prefs);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(ZAP_THEME_EVENT));
+  }
+}
+
+/** Active catalogue tag display mode (DOM attribute, then storage). */
+export function readCatalogueTagDisplay(): CatalogueTagDisplay {
+  if (typeof document !== "undefined") {
+    const v = document.documentElement.getAttribute("data-catalogue-tags");
+    if (isCatalogueTagDisplay(v)) return v;
+  }
+  return readThemePrefs().catalogueTagDisplay;
 }
 
 /** True when the master animations switch is on (DOM attribute). */

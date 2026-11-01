@@ -3,11 +3,13 @@
   import LayoutPanelTopIcon from "@lucide/svelte/icons/layout-panel-top";
   import PaletteIcon from "@lucide/svelte/icons/palette";
   import SparklesIcon from "@lucide/svelte/icons/sparkles";
+  import TagsIcon from "@lucide/svelte/icons/tags";
   import { onMount } from "svelte";
   import {
     ACCENT_PRESETS,
     ANIMATION_STYLES,
     CARD_PRESETS,
+    CATALOGUE_TAG_DISPLAYS,
     DEFAULT_THEME_PREFS,
     MOTION_ANIM_OPACITY,
     MOTION_CARD_OPACITY,
@@ -20,6 +22,7 @@
     type AnimationLayer,
     type AnimationStyleId,
     type CardId,
+    type CatalogueTagDisplay,
     type PageId,
     type ZapThemePrefs,
   } from "$lib/theme-prefs";
@@ -59,6 +62,10 @@
 
   function setLayer(layer: AnimationLayer) {
     patch({ animationLayer: layer });
+  }
+
+  function setCatalogueTagDisplay(id: CatalogueTagDisplay) {
+    patch({ catalogueTagDisplay: id });
   }
 
   function onCardOpacity(e: Event) {
@@ -153,6 +160,46 @@
         >
           <span class="size-8 border border-white/15" style={`background:${preset.value}`} aria-hidden="true"></span>
           <span class="text-center font-mono text-[8px] leading-tight text-muted-foreground">{preset.label}</span>
+        </button>
+      {/each}
+    </div>
+  </section>
+
+  <section class="space-y-3">
+    <h2 class="flex items-center gap-2 font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
+      <TagsIcon class="size-3.5 shrink-0 text-signal" aria-hidden="true" />
+      Catalogue tags
+    </h2>
+    <p class="text-sm text-muted-foreground">How tags appear on catalogue tracks (and other track rows).</p>
+    <div class="grid gap-2 sm:grid-cols-3" role="listbox" aria-label="Catalogue tag display">
+      {#each CATALOGUE_TAG_DISPLAYS as opt (opt.id)}
+        <button
+          type="button"
+          role="option"
+          aria-selected={prefs.catalogueTagDisplay === opt.id}
+          class={`border px-3 py-2.5 text-left ${
+            prefs.catalogueTagDisplay === opt.id ? "border-signal bg-signal/10" : "border-border hover:border-signal/40"
+          }`}
+          onclick={() => setCatalogueTagDisplay(opt.id)}
+        >
+          <span class="block text-sm text-foreground">{opt.label}</span>
+          <span class="mt-0.5 block font-mono text-[10px] text-muted-foreground">{opt.blurb}</span>
+          <span class="mt-2 flex flex-wrap items-center gap-1" aria-hidden="true">
+            {#if opt.id === "text"}
+              <span class="zap-tag-chip px-2 py-0.5 text-[10px]">chill</span>
+              <span class="zap-tag-chip px-2 py-0.5 text-[10px]">lofi</span>
+            {:else if opt.id === "icons"}
+              <span class="text-base leading-none">😌</span>
+              <span class="text-base leading-none">🎧</span>
+            {:else}
+              <span class="zap-tag-chip inline-flex items-center gap-1 px-2 py-0.5 text-[10px]">
+                <span class="text-sm leading-none">😌</span> chill
+              </span>
+              <span class="zap-tag-chip inline-flex items-center gap-1 px-2 py-0.5 text-[10px]">
+                <span class="text-sm leading-none">🎧</span> lofi
+              </span>
+            {/if}
+          </span>
         </button>
       {/each}
     </div>
