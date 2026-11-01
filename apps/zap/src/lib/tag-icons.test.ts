@@ -37,4 +37,32 @@ describe("tag-icons", () => {
     const empty = filterTagIconCategories("zzznomatchzzz");
     expect(empty).toEqual([]);
   });
+
+  test("anime, classic, eyes, and song languages are searchable", () => {
+    expect(filterTagIconCategories("anime").flatMap((c) => c.icons).length).toBeGreaterThan(0);
+    expect(filterTagIconCategories("classic").flatMap((c) => c.icons).length).toBeGreaterThan(0);
+    expect(filterTagIconCategories("eyes").some((c) => c.icons.some((i) => i.glyph === "👀"))).toBe(true);
+
+    for (const lang of [
+      "english",
+      "hindi",
+      "spanish",
+      "french",
+      "korean",
+      "japanese",
+      "tamil",
+      "telugu",
+      "malayalam",
+      "malyalam",
+      "punjabi",
+      "marathi",
+      "chinese",
+      "portuguese",
+      "arabic",
+    ]) {
+      const hits = filterTagIconCategories(lang);
+      expect(hits.length, lang).toBeGreaterThan(0);
+    }
+  });
 });
+
