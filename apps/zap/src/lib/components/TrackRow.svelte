@@ -268,13 +268,11 @@
       {#if track.tags.length}
         <div class="flex flex-wrap items-center gap-0.5 sm:hidden">
           {#each track.tags as tag}
-            <span
-              class={`zap-tag-chip inline-flex items-center justify-center ${tag.icon ? "min-w-5 px-1 py-0 text-sm leading-none" : "px-1.5 py-0 text-[9px]"}`}
-              title={tag.name}
-              aria-label={tag.name}
-            >
-              {tag.icon ?? tag.name}
-            </span>
+            {#if tag.icon}
+              <span class="text-base leading-none" title={tag.name} aria-label={tag.name}>{tag.icon}</span>
+            {:else}
+              <span class="zap-tag-chip px-1.5 py-0 text-[9px]" title={tag.name} aria-label={tag.name}>{tag.name}</span>
+            {/if}
           {/each}
         </div>
       {/if}
