@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { untrack } from "svelte";
   import { enhance } from "$app/forms";
   import PlusIcon from "@lucide/svelte/icons/plus";
   import XIcon from "@lucide/svelte/icons/x";
@@ -17,9 +16,7 @@
   let iconForm = $state<HTMLFormElement | null>(null);
   let confirmOpen = $state(false);
   let target = $state<SystemTagRow | null>(null);
-
-  /** Tag selected in the Icons & emojis subsection. */
-  let iconTagId = $state("");
+  let iconEdit = $state<SystemTagRow | null>(null);
   let editIcon = $state<string | null>(null);
 
   let tags = $state<SystemTagRow[]>([]);
@@ -39,17 +36,19 @@
     scrollRoot?.scrollTo({ top: 0 });
   });
 
-  const iconTag = $derived(tags.find((t) => t.id === iconTagId) ?? null);
-
-  $effect(() => {
-    // Only re-sync when the selected tag id changes — not when tags/icons refresh.
-    const id = iconTagId;
-    editIcon = untrack(() => tags.find((t) => t.id === id)?.icon ?? null);
-  });
-
   function askDelete(tag: SystemTagRow) {
     target = tag;
     confirmOpen = true;
+  }
+
+  function openIconEdit(tag: SystemTagRow) {
+    iconEdit = tag;
+    editIcon = tag.icon;
+  }
+
+  function closeIconEdit() {
+    iconEdit = null;
+    editIcon = null;
   }
 
   async function loadMore() {
@@ -105,7 +104,7 @@
       : ""
   );
 
-  const iconDirty = $derived(Boolean(iconTag) && (editIcon ?? null) !== (iconTag?.icon ?? null));
+  const iconDirty = $derived(Boolean(iconEdit) && (editIcon ?? null) !== (iconEdit?.icon ?? null));
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col gap-4">
@@ -134,8 +133,8 @@
     <div>
       <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Add system tag</h2>
       <p class="mt-1 text-sm text-muted-foreground">
-        System tags show in everyone’s tag picker. Custom tags stay private to the person who made them and aren’t managed here. Attach icons
-        in the Icons & emojis section below.
+        System tags show in everyone’s tag picker. Custom tags stay private to the person who made them and aren’t managed here. Click the
+        icon slot on a tag to attach an emoji.
       </p>
     </div>
     <div class="flex flex-col gap-2 sm:flex-row">
@@ -149,94 +148,55 @@
 
   <div class="flex min-h-0 flex-1 flex-col gap-3">
     <h2 class="shrink-0 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">System tags ({total})</h2>
-
     {#if tags.length === 0}
       <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">No system tags.</p>
     {:else}
-      <div class="flex min-h-0 flex-1 flex-col gap-3">
-        <div class="flex min-h-0 flex-1 flex-col gap-2">
-          <h3 class="shrink-0 font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">Text tags</h3>
-          <div
-            bind:this={scrollRoot}
-            class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain p-3"
-            role="region"
-            aria-label="System text tags"
-          >
-            <ul class="flex flex-wrap gap-2">
-              {#each tags as tag (tag.id)}
-                <li>
-                  <span
-                    class="inline-flex max-w-full items-center gap-1 border border-signal/40 bg-signal/10 py-1 pr-1 pl-2.5 font-mono text-[11px] text-signal"
-                    title={`${tag.songCount} song(s) · ${tag.userCount} user(s)${tag.customTwins ? ` · ${tag.customTwins} private twin(s)` : ""}${tag.icon ? ` · ${tag.icon}` : ""}`}
-                  >
-                    {#if tag.icon}
-                      <span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>
-                    {/if}
-                    <span class="truncate">{tag.name}</span>
-                    {#if tag.songCount > 0}
-                      <span class="font-mono text-[10px] text-signal/70 tabular-nums">{tag.songCount}</span>
-                    {/if}
-                    <button
-                      type="button"
-                      class="inline-flex size-5 shrink-0 items-center justify-center text-signal/70 hover:bg-signal/20 hover:text-signal disabled:opacity-40"
-                      aria-label={`Remove ${tag.name}`}
-                      title="Remove tag"
-                      disabled={busy}
-                      onclick={() => askDelete(tag)}
-                    >
-                      <XIcon class="size-3" aria-hidden="true" />
-                    </button>
-                  </span>
-                </li>
-              {/each}
-            </ul>
-            <div bind:this={sentinel} class="h-8" aria-hidden="true"></div>
-            {#if loadingMore}
-              <p class="px-1 pb-1 font-mono text-[10px] text-muted-foreground">Loading more…</p>
-            {:else if !hasMore}
-              <p class="px-1 pb-1 font-mono text-[10px] text-muted-foreground">End of tags</p>
-            {/if}
-          </div>
-        </div>
-
-        <section class="max-h-[38vh] shrink-0 overflow-y-auto rounded-lg border border-border/60 bg-card/60 p-3" aria-label="Icons and emojis">
-          <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-            <div>
-              <h3 class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">Icons & emojis</h3>
-              <p class="mt-0.5 text-xs text-muted-foreground">
-                Optional. Catalogue uses the icon alone; filters show icon + name.
-              </p>
-            </div>
-            {#if iconTag}
-              <button
-                type="button"
-                class="auth-btn h-8 px-3 text-xs disabled:opacity-40"
-                disabled={busy || !iconDirty}
-                onclick={() => iconForm?.requestSubmit()}
+      <div bind:this={scrollRoot} class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" role="region" aria-label="System tags">
+        <ul class="flex flex-wrap gap-2">
+          {#each tags as tag (tag.id)}
+            <li>
+              <span
+                class="inline-flex max-w-full items-center gap-1 border border-signal/40 bg-signal/10 py-1 pr-1 pl-1.5 font-mono text-[11px] text-signal"
+                title={`${tag.songCount} song(s) · ${tag.userCount} user(s)${tag.customTwins ? ` · ${tag.customTwins} private twin(s)` : ""}`}
               >
-                Save icon
-              </button>
-            {/if}
-          </div>
-
-          <label class="mb-2 flex flex-col gap-1 sm:max-w-xs">
-            <span class="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">Tag</span>
-            <select class="auth-field" bind:value={iconTagId} disabled={busy || tags.length === 0}>
-              <option value="">Select a text tag…</option>
-              {#each tags as tag (tag.id)}
-                <option value={tag.id}>{tag.icon ? `${tag.icon} ` : ""}{tag.name}</option>
-              {/each}
-            </select>
-          </label>
-
-          {#if iconTag}
-            <TagIconPicker bind:value={editIcon} name="editIcon" disabled={busy} compact />
-          {:else}
-            <p class="rounded border border-dashed border-border/60 px-3 py-3 text-center text-xs text-muted-foreground">
-              Pick a text tag to attach or clear an icon.
-            </p>
-          {/if}
-        </section>
+                <button
+                  type="button"
+                  class="inline-flex size-6 shrink-0 items-center justify-center rounded border border-signal/30 bg-background/50 text-base leading-none hover:bg-signal/20 disabled:opacity-40"
+                  aria-label={tag.icon ? `Change icon for ${tag.name}` : `Add icon for ${tag.name}`}
+                  title={tag.icon ? "Change icon" : "Add icon"}
+                  disabled={busy}
+                  onclick={() => openIconEdit(tag)}
+                >
+                  {#if tag.icon}
+                    <span aria-hidden="true">{tag.icon}</span>
+                  {:else}
+                    <span class="size-3 rounded-sm border border-dashed border-signal/45" aria-hidden="true"></span>
+                  {/if}
+                </button>
+                <span class="truncate pl-0.5">{tag.name}</span>
+                {#if tag.songCount > 0}
+                  <span class="font-mono text-[10px] text-signal/70 tabular-nums">{tag.songCount}</span>
+                {/if}
+                <button
+                  type="button"
+                  class="inline-flex size-5 shrink-0 items-center justify-center text-signal/70 hover:bg-signal/20 hover:text-signal disabled:opacity-40"
+                  aria-label={`Remove ${tag.name}`}
+                  title="Remove tag"
+                  disabled={busy}
+                  onclick={() => askDelete(tag)}
+                >
+                  <XIcon class="size-3" aria-hidden="true" />
+                </button>
+              </span>
+            </li>
+          {/each}
+        </ul>
+        <div bind:this={sentinel} class="h-8" aria-hidden="true"></div>
+        {#if loadingMore}
+          <p class="px-1 pb-1 font-mono text-[10px] text-muted-foreground">Loading more…</p>
+        {:else if !hasMore}
+          <p class="px-1 pb-1 font-mono text-[10px] text-muted-foreground">End of tags</p>
+        {/if}
       </div>
     {/if}
   </div>
@@ -275,7 +235,7 @@
   bind:this={iconForm}
   use:enhance={() => {
     busy = true;
-    const savingId = iconTagId;
+    const savingId = iconEdit?.id ?? "";
     const savingIcon = editIcon;
     return async ({ result, update }) => {
       await update();
@@ -288,14 +248,53 @@
       if (result.type === "success") {
         const data = result.data as { ok?: string } | undefined;
         if (data?.ok) toast.success(data.ok);
-        tags = tags.map((t) => (t.id === savingId ? { ...t, icon: savingIcon } : t));
+        if (savingId) tags = tags.map((t) => (t.id === savingId ? { ...t, icon: savingIcon } : t));
+        closeIconEdit();
       }
     };
   }}
 >
-  <input type="hidden" name="tagId" value={iconTagId} />
+  <input type="hidden" name="tagId" value={iconEdit?.id ?? ""} />
   <input type="hidden" name="icon" value={editIcon ?? ""} />
 </form>
+
+{#if iconEdit}
+  <div
+    class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+    role="presentation"
+    onclick={(e) => {
+      if (e.target === e.currentTarget && !busy) closeIconEdit();
+    }}
+  >
+    <div
+      class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card p-4 shadow-xl"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Icon for ${iconEdit.name}`}
+    >
+      <div class="mb-3 flex items-start justify-between gap-2">
+        <div>
+          <h3 class="font-mono text-sm text-foreground">Icon for “{iconEdit.name}”</h3>
+          <p class="mt-0.5 text-xs text-muted-foreground">Pick from the system set. Catalogue shows the icon; filters show icon + name.</p>
+        </div>
+        <button
+          type="button"
+          class="inline-flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary"
+          aria-label="Close"
+          disabled={busy}
+          onclick={closeIconEdit}
+        >
+          <XIcon class="size-3.5" aria-hidden="true" />
+        </button>
+      </div>
+      <TagIconPicker bind:value={editIcon} name="editIcon" disabled={busy} compact />
+      <div class="mt-4 flex flex-wrap justify-end gap-2">
+        <button type="button" class="auth-btn-secondary" disabled={busy} onclick={closeIconEdit}>Cancel</button>
+        <button type="button" class="auth-btn" disabled={busy || !iconDirty} onclick={() => iconForm?.requestSubmit()}>Save icon</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <ConfirmDialog
   bind:open={confirmOpen}
