@@ -222,13 +222,11 @@
         </div>
         <div class="flex shrink-0 flex-wrap items-center justify-end gap-0.5 sm:max-w-[45%] sm:gap-1">
           {#each track.tags as tag}
-            <span
-              class={`zap-tag-chip hidden items-center justify-center text-[10px] sm:inline-flex ${tag.icon ? "min-w-6 px-1.5 py-0.5 text-sm leading-none" : "px-2 py-0.5"}`}
-              title={tag.name}
-              aria-label={tag.name}
-            >
-              {tag.icon ?? tag.name}
-            </span>
+            {#if tag.icon}
+              <span class="hidden text-base leading-none sm:inline" title={tag.name} aria-label={tag.name}>{tag.icon}</span>
+            {:else}
+              <span class="zap-tag-chip hidden px-2 py-0.5 text-[10px] sm:inline-flex" title={tag.name} aria-label={tag.name}>{tag.name}</span>
+            {/if}
           {/each}
           <button
             type="button"
