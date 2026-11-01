@@ -523,6 +523,7 @@ export async function listSpaceTransactions(accountId: string, spaceId: string) 
       type: schema.financeTransactions.type,
       merchant: schema.financeTransactions.merchant,
       notes: schema.financeTransactions.notes,
+      sortOrder: schema.financeTransactions.sortOrder,
     })
     .from(schema.financeSpaceTransactions)
     .innerJoin(schema.financeTransactions, eq(schema.financeTransactions.id, schema.financeSpaceTransactions.transactionId))
@@ -1361,6 +1362,7 @@ export async function listTransactions(accountId: string, query: TransactionsQue
         type: schema.financeTransactions.type,
         merchant: schema.financeTransactions.merchant,
         notes: schema.financeTransactions.notes,
+        sortOrder: schema.financeTransactions.sortOrder,
         createdAt: schema.financeTransactions.createdAt,
       })
       .from(schema.financeTransactions)

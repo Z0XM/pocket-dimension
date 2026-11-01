@@ -7,7 +7,14 @@
   import Check from "@lucide/svelte/icons/check";
   import X from "@lucide/svelte/icons/x";
   import Calculator from "@lucide/svelte/icons/calculator";
+  import Download from "@lucide/svelte/icons/download";
   import { formatMoney } from "$lib/finance/money";
+  import {
+    DEFAULT_EXPORT_COLUMNS,
+    EXPORT_COLUMNS,
+    normalizeExportColumns,
+    type ExportColumnId,
+  } from "$lib/finance/export-columns";
   import { buildSummarySelection, formatMonthKeyShort, summarySelectionToDateRange, type SummaryPeriod } from "$lib/finance/summary";
   import { serializeMultiFilterParam } from "$lib/finance/filter-params";
   import { infiniteScroll } from "$lib/actions/infinite-scroll";
@@ -51,6 +58,10 @@
   } | null>(null);
   let calculateModeActive = $state(false);
   let calculateSelectionIds = $state<string[]>([]);
+  let exportPickerOpen = $state(false);
+  let exportBusy = $state(false);
+  let exportColumns = $state<ExportColumnId[]>([...DEFAULT_EXPORT_COLUMNS]);
+  let exportError = $state<string | null>(null);
 
   $effect(() => {
     rows = [...data.transactions];
@@ -193,6 +204,11 @@
       const target = event.target;
       if (target instanceof HTMLElement && target.closest("input, textarea, select")) return;
 
+      if (event.key === "Escape" && exportPickerOpen) {
+        exportPickerOpen = false;
+        return;
+      }
+
       if (event.key === "Escape" && calculateModeActive) {
         exitCalculateMode();
         return;
@@ -207,6 +223,70 @@
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
+
+  $effect(() => {
+    if (!exportPickerOpen) return;
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".export-picker")) return;
+      exportPickerOpen = false;
+    }
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  });
+
+  const exportColumnOptions = $derived(
+    EXPORT_COLUMNS.filter((col) => data.selectedSpaceId || !col.spaceOnly)
+  );
+
+  function toggleExportColumn(id: ExportColumnId) {
+    const def = EXPORT_COLUMNS.find((col) => col.id === id);
+    if (def?.required && exportColumns.includes(id)) return;
+    if (exportColumns.includes(id)) {
+      exportColumns = exportColumns.filter((col) => col !== id);
+      return;
+    }
+    exportColumns = normalizeExportColumns([...exportColumns, id], {
+      includeSpaceBalance: Boolean(data.selectedSpaceId),
+    });
+  }
+
+  async function downloadExcel() {
+    if (exportBusy) return;
+    exportBusy = true;
+    exportError = null;
+    try {
+      const columns = normalizeExportColumns(exportColumns, {
+        includeSpaceBalance: Boolean(data.selectedSpaceId),
+      });
+      const params = transactionQueryParams(0);
+      params.delete("pageIndex");
+      params.delete("pageSize");
+      params.set("format", "xls");
+      params.set("columns", columns.join(","));
+      const response = await fetch(`/api/accounts/${data.account.id}/transactions/export?${params}`);
+      if (!response.ok) {
+        exportError = "Download failed";
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      anchor.href = url;
+      anchor.download = match?.[1] ?? "transactions.xls";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      exportPickerOpen = false;
+    } catch {
+      exportError = "Download failed";
+    } finally {
+      exportBusy = false;
+    }
+  }
 
   function appUrl(
     updates: {
@@ -967,6 +1047,51 @@
           value={searchInput}
           oninput={(e) => handleSearchInput(e.currentTarget.value)}
         />
+        <div class="export-picker">
+          <button
+            type="button"
+            class="calc-mode-btn"
+            class:active={exportPickerOpen}
+            aria-pressed={exportPickerOpen}
+            aria-expanded={exportPickerOpen}
+            aria-label="Download Excel"
+            title="Download Excel"
+            onclick={() => {
+              exportColumns = normalizeExportColumns(exportColumns, {
+                includeSpaceBalance: Boolean(data.selectedSpaceId),
+              });
+              exportPickerOpen = !exportPickerOpen;
+            }}
+          >
+            <Download size={18} strokeWidth={1.6} aria-hidden="true" />
+          </button>
+          {#if exportPickerOpen}
+            <div class="export-menu" role="dialog" aria-label="Excel columns">
+              <p class="export-menu-title">Columns</p>
+              <ul class="export-cols">
+                {#each exportColumnOptions as col (col.id)}
+                  <li>
+                    <label class="export-col">
+                      <input
+                        type="checkbox"
+                        checked={exportColumns.includes(col.id)}
+                        disabled={Boolean(col.required && exportColumns.includes(col.id))}
+                        onchange={() => toggleExportColumn(col.id)}
+                      />
+                      <span>{col.label}{col.required ? " *" : ""}</span>
+                    </label>
+                  </li>
+                {/each}
+              </ul>
+              {#if exportError}
+                <p class="export-error">{exportError}</p>
+              {/if}
+              <button type="button" class="export-go" disabled={exportBusy || exportColumns.length === 0} onclick={() => void downloadExcel()}>
+                {exportBusy ? "Preparing…" : "Download Excel"}
+              </button>
+            </div>
+          {/if}
+        </div>
         <button
           type="button"
           class="calc-mode-btn"
@@ -1465,6 +1590,77 @@
     gap: 0.45rem;
     flex: none;
     margin-left: 0;
+  }
+
+  .export-picker {
+    position: relative;
+  }
+
+  .export-menu {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    z-index: 40;
+    min-width: 14rem;
+    padding: 0.7rem 0.75rem 0.75rem;
+    background: var(--page);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 2px 5px 3px 2px;
+    box-shadow:
+      3px 3px 0 0 var(--shadow-paper),
+      3px 3px 0 1.5px color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+
+  .export-menu-title {
+    margin: 0 0 0.45rem;
+    font-family: var(--hand);
+    font-size: 1rem;
+    color: var(--ink-muted);
+  }
+
+  .export-cols {
+    list-style: none;
+    margin: 0 0 0.65rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .export-col {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--hand);
+    font-size: 0.98rem;
+    cursor: pointer;
+  }
+
+  .export-col input {
+    accent-color: var(--brand);
+  }
+
+  .export-error {
+    margin: 0 0 0.45rem;
+    color: var(--danger);
+    font-family: var(--hand);
+    font-size: 0.9rem;
+  }
+
+  .export-go {
+    width: 100%;
+    border: 1.5px solid color-mix(in srgb, var(--ink) 30%, transparent);
+    background: color-mix(in srgb, var(--yellow) 55%, transparent);
+    font-family: var(--hand);
+    font-size: 1rem;
+    padding: 0.35rem 0.55rem;
+    border-radius: 2px 4px 3px 2px;
+    cursor: pointer;
+  }
+
+  .export-go:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 
   .tx-page .topbar,

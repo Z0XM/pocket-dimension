@@ -12,8 +12,9 @@ export type SummarySelection = {
 };
 
 export function parseSummaryPeriod(value: string | null): SummaryPeriod {
-  if (value === "year" || value === "all") return value;
-  return "month";
+  if (value === "month" || value === "year" || value === "all") return value;
+  // Default (missing / unknown) is All so ledgers open unscoped.
+  return "all";
 }
 
 export function currentMonthKey(now = new Date()): string {
