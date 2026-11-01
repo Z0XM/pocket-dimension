@@ -114,7 +114,7 @@ export const actions: Actions = {
     return {
       tagOk: true,
       mediaAssetId,
-      tags: tags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
+      tags: tags.map((t) => ({ id: t.id, name: t.name, kind: t.kind, icon: t.icon ?? null })),
     };
   },
 };

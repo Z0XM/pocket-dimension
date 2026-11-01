@@ -3,6 +3,7 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
   import XIcon from "@lucide/svelte/icons/x";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import TagIconPicker from "$lib/components/TagIconPicker.svelte";
   import { toast } from "$lib/toast.svelte";
   import type { SystemTagRow } from "$lib/server/admin/tags";
   import type { PageData } from "./$types";
@@ -10,10 +11,14 @@
   let { data }: { data: PageData } = $props();
 
   let name = $state("");
+  let createIcon = $state<string | null>(null);
   let busy = $state(false);
   let deleteForm = $state<HTMLFormElement | null>(null);
+  let iconForm = $state<HTMLFormElement | null>(null);
   let confirmOpen = $state(false);
   let target = $state<SystemTagRow | null>(null);
+  let iconEdit = $state<SystemTagRow | null>(null);
+  let editIcon = $state<string | null>(null);
 
   let tags = $state<SystemTagRow[]>([]);
   let nextOffset = $state(0);
@@ -35,6 +40,16 @@
   function askDelete(tag: SystemTagRow) {
     target = tag;
     confirmOpen = true;
+  }
+
+  function openIconEdit(tag: SystemTagRow) {
+    iconEdit = tag;
+    editIcon = tag.icon;
+  }
+
+  function closeIconEdit() {
+    iconEdit = null;
+    editIcon = null;
   }
 
   async function loadMore() {
@@ -110,6 +125,7 @@
           const data = result.data as { ok?: string } | undefined;
           if (data?.ok) toast.success(data.ok);
           name = "";
+          createIcon = null;
         }
       };
     }}
@@ -117,16 +133,19 @@
     <div>
       <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Add system tag</h2>
       <p class="mt-1 text-sm text-muted-foreground">
-        System tags show in everyone’s tag picker. Custom tags stay private to the person who made them and aren’t managed here.
+        System tags show in everyone’s tag picker. Attach a colorful icon from the set below. Custom tags stay private to the person who
+        made them and aren’t managed here.
       </p>
     </div>
     <div class="flex flex-col gap-2 sm:flex-row">
       <input class="auth-field sm:max-w-xs" name="name" placeholder="e.g. chill" maxlength="64" autocomplete="off" bind:value={name} />
       <button type="submit" class="auth-btn inline-flex w-fit items-center gap-1.5" disabled={!name.trim() || busy}>
         <PlusIcon class="size-3.5" aria-hidden="true" />
+        {#if createIcon}<span class="text-base leading-none" aria-hidden="true">{createIcon}</span>{/if}
         Add tag
       </button>
     </div>
+    <TagIconPicker bind:value={createIcon} disabled={busy} />
   </form>
 
   <div class="flex min-h-0 flex-1 flex-col gap-3">
@@ -142,6 +161,16 @@
                 class="inline-flex max-w-full items-center gap-1 border border-signal/40 bg-signal/10 py-1 pr-1 pl-2.5 font-mono text-[11px] text-signal"
                 title={`${tag.songCount} song(s) · ${tag.userCount} user(s)${tag.customTwins ? ` · ${tag.customTwins} private twin(s)` : ""}`}
               >
+                <button
+                  type="button"
+                  class="inline-flex size-6 shrink-0 items-center justify-center rounded border border-signal/30 bg-background/40 text-base leading-none hover:bg-signal/20 disabled:opacity-40"
+                  aria-label={`Change icon for ${tag.name}`}
+                  title="Change icon"
+                  disabled={busy}
+                  onclick={() => openIconEdit(tag)}
+                >
+                  {tag.icon ?? "＋"}
+                </button>
                 <span class="truncate">{tag.name}</span>
                 {#if tag.songCount > 0}
                   <span class="font-mono text-[10px] text-signal/70 tabular-nums">{tag.songCount}</span>
@@ -196,6 +225,68 @@
 >
   <input type="hidden" name="tagId" value={target?.id ?? ""} />
 </form>
+
+<form
+  method="POST"
+  action="?/setIcon"
+  class="hidden"
+  bind:this={iconForm}
+  use:enhance={() => {
+    busy = true;
+    return async ({ result, update }) => {
+      await update();
+      busy = false;
+      if (result.type === "failure") {
+        const data = result.data as { error?: string } | undefined;
+        toast.error(data?.error ?? "Could not update icon");
+        return;
+      }
+      if (result.type === "success") {
+        const data = result.data as { ok?: string } | undefined;
+        if (data?.ok) toast.success(data.ok);
+        if (iconEdit) {
+          tags = tags.map((t) => (t.id === iconEdit!.id ? { ...t, icon: editIcon } : t));
+        }
+        closeIconEdit();
+      }
+    };
+  }}
+>
+  <input type="hidden" name="tagId" value={iconEdit?.id ?? ""} />
+  <input type="hidden" name="icon" value={editIcon ?? ""} />
+</form>
+
+{#if iconEdit}
+  <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" role="presentation">
+    <div
+      class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card p-4 shadow-xl"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Icon for ${iconEdit.name}`}
+    >
+      <div class="mb-3 flex items-start justify-between gap-2">
+        <div>
+          <h3 class="font-mono text-sm text-foreground">Icon for “{iconEdit.name}”</h3>
+          <p class="mt-0.5 text-xs text-muted-foreground">Pick from the system set. Catalogue shows the icon; filters show icon + name.</p>
+        </div>
+        <button
+          type="button"
+          class="inline-flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary"
+          aria-label="Close"
+          disabled={busy}
+          onclick={closeIconEdit}
+        >
+          <XIcon class="size-3.5" aria-hidden="true" />
+        </button>
+      </div>
+      <TagIconPicker bind:value={editIcon} name="editIcon" disabled={busy} compact />
+      <div class="mt-4 flex flex-wrap justify-end gap-2">
+        <button type="button" class="auth-btn-secondary" disabled={busy} onclick={closeIconEdit}>Cancel</button>
+        <button type="button" class="auth-btn" disabled={busy} onclick={() => iconForm?.requestSubmit()}>Save icon</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <ConfirmDialog
   bind:open={confirmOpen}

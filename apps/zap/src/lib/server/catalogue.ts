@@ -322,7 +322,10 @@ export async function evaluateUserTagQuery(
   return evaluateTagQuery(ast, { universe, tagsByAsset: tagsByAssetIds, tagNameToId });
 }
 
-export function serializeCatalogueAsset(asset: CatalogueAsset, tags: CatalogueTag[] | { id: string; name: string; kind: string }[]) {
+export function serializeCatalogueAsset(
+  asset: CatalogueAsset,
+  tags: CatalogueTag[] | { id: string; name: string; kind: string; icon?: string | null }[]
+) {
   return {
     id: asset.id,
     title: asset.title,
@@ -336,7 +339,12 @@ export function serializeCatalogueAsset(asset: CatalogueAsset, tags: CatalogueTa
     available: asset.status !== "unavailable",
     unavailableReason: asset.status === "unavailable" ? (asset.errorMessage ?? "Song not available") : null,
     externalUrl: asset.externalUrl,
-    tags: tags.map((t) => ({ id: t.id, name: t.name, kind: t.kind })),
+    tags: tags.map((t) => ({
+      id: t.id,
+      name: t.name,
+      kind: t.kind,
+      icon: "icon" in t ? (t.icon ?? null) : null,
+    })),
   };
 }
 
@@ -375,7 +383,7 @@ export async function listAvailableTags(userId: string) {
 }
 
 export function serializeTagOption(tag: CatalogueTag) {
-  return { id: tag.id, name: tag.name, kind: tag.kind, slug: tag.slug };
+  return { id: tag.id, name: tag.name, kind: tag.kind, slug: tag.slug, icon: tag.icon ?? null };
 }
 
 /** Per-tag usage: how many tracks this user tagged with it, and how many tag links it has catalogue-wide. */

@@ -29,10 +29,10 @@
     available?: boolean;
     unavailableReason?: string | null;
     externalUrl?: string | null;
-    tags: { id: string; name: string; kind: string }[];
+    tags: { id: string; name: string; kind: string; icon?: string | null }[];
   };
 
-  type TagOption = { id: string; name: string; kind: string };
+  type TagOption = { id: string; name: string; kind: string; icon?: string | null };
   type PlaylistOption = { id: string; name: string };
 
   let {
@@ -222,7 +222,13 @@
         </div>
         <div class="flex shrink-0 flex-wrap items-center justify-end gap-0.5 sm:max-w-[45%] sm:gap-1">
           {#each track.tags as tag}
-            <span class="zap-tag-chip hidden px-2 py-0.5 text-[10px] sm:inline-flex">{tag.name}</span>
+            <span
+              class={`zap-tag-chip hidden items-center justify-center text-[10px] sm:inline-flex ${tag.icon ? "min-w-6 px-1.5 py-0.5 text-sm leading-none" : "px-2 py-0.5"}`}
+              title={tag.name}
+              aria-label={tag.name}
+            >
+              {tag.icon ?? tag.name}
+            </span>
           {/each}
           <button
             type="button"
@@ -264,7 +270,13 @@
       {#if track.tags.length}
         <div class="flex flex-wrap items-center gap-0.5 sm:hidden">
           {#each track.tags as tag}
-            <span class="zap-tag-chip px-1.5 py-0 text-[9px]">{tag.name}</span>
+            <span
+              class={`zap-tag-chip inline-flex items-center justify-center ${tag.icon ? "min-w-5 px-1 py-0 text-sm leading-none" : "px-1.5 py-0 text-[9px]"}`}
+              title={tag.name}
+              aria-label={tag.name}
+            >
+              {tag.icon ?? tag.name}
+            </span>
           {/each}
         </div>
       {/if}

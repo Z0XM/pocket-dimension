@@ -131,8 +131,9 @@
     </div>
 
     <div class="flex min-w-0 flex-1 items-center justify-end gap-1.5 pl-[3.5rem] sm:gap-2 sm:pl-[4.5rem]">
-      <div class="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
-        <span class="hidden w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums sm:inline"
+      <!-- Seek stays desktop/tablet — too cramped on phone dock -->
+      <div class="hidden min-w-0 flex-1 items-center gap-1.5 sm:flex sm:gap-2">
+        <span class="w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums"
           >{formatClock(scrubMs ?? queue.positionMs)}</span
         >
         <SeekBar
@@ -143,7 +144,7 @@
           onseek={(ms) => void queue.seek(ms)}
           onscrub={(ms) => (scrubMs = ms)}
         />
-        <span class="hidden w-9 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums sm:inline"
+        <span class="w-9 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums"
           >{formatClock(durationMs)}</span
         >
       </div>

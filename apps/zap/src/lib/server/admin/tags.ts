@@ -1,11 +1,13 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { MAX_CUSTOM_TAG_LENGTH, slugifyTag } from "$lib/custom-tags";
+import { normalizeTagIcon } from "$lib/tag-icons";
 
 export type SystemTagRow = {
   id: string;
   name: string;
   slug: string;
+  icon: string | null;
   /** Songs tagged with it across all users. */
   songCount: number;
   /** Users who applied it at least once. */
@@ -82,6 +84,7 @@ export async function listSystemTagsForAdmin(input: { limit?: number; offset?: n
     id: tag.id,
     name: tag.name,
     slug: tag.slug,
+    icon: tag.icon ?? null,
     songCount: usageByTag.get(tag.id)?.songCount ?? 0,
     userCount: usageByTag.get(tag.id)?.userCount ?? 0,
     customTwins: twinsBySlug.get(tag.slug) ?? 0,
@@ -91,19 +94,43 @@ export async function listSystemTagsForAdmin(input: { limit?: number; offset?: n
   return { tags: rows, hasMore, nextOffset: offset + rows.length, total: total ?? 0 };
 }
 
-export async function createSystemTag(rawName: string) {
+export async function createSystemTag(rawName: string, rawIcon?: unknown) {
   const name = rawName.trim().replace(/\s+/g, " ").slice(0, MAX_CUSTOM_TAG_LENGTH);
   const slug = slugifyTag(name);
   if (!slug) throw new TagAdminError("Tag name needs at least one letter or number.");
+  const icon = normalizeTagIcon(rawIcon);
+  if (rawIcon != null && String(rawIcon).trim() && !icon) {
+    throw new TagAdminError("Pick an icon from the system set.");
+  }
 
   const existing = await db.query.tags.findFirst({
     where: and(eq(schema.tags.kind, "system"), eq(schema.tags.slug, slug)),
   });
   if (existing) throw new TagAdminError(`System tag "${existing.name}" already exists.`, 409);
 
-  const [inserted] = await db.insert(schema.tags).values({ name, slug, kind: "system", ownerUserId: null }).onConflictDoNothing().returning();
+  const [inserted] = await db
+    .insert(schema.tags)
+    .values({ name, slug, kind: "system", ownerUserId: null, icon })
+    .onConflictDoNothing()
+    .returning();
   if (!inserted) throw new TagAdminError("System tag already exists.", 409);
   return inserted;
+}
+
+/** Set or clear the system icon on a system tag. */
+export async function setSystemTagIcon(tagId: string, rawIcon: unknown) {
+  const icon = normalizeTagIcon(rawIcon);
+  if (rawIcon != null && String(rawIcon).trim() && !icon) {
+    throw new TagAdminError("Pick an icon from the system set.");
+  }
+
+  const [updated] = await db
+    .update(schema.tags)
+    .set({ icon })
+    .where(and(eq(schema.tags.id, tagId), eq(schema.tags.kind, "system")))
+    .returning();
+  if (!updated) throw new TagAdminError("System tag not found.", 404);
+  return updated;
 }
 
 /** Deletes a system tag; `media_asset_tags` links cascade, so it disappears from every user's songs. */

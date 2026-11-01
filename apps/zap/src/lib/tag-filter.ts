@@ -1,7 +1,7 @@
 import { collectTagNames, parseTagQuery, type TagQueryNode } from "./tag-query";
 
 /** Tag option as shown in pickers. `slug` is what chip selections serialize to in a tag query. */
-export type TagFilterTag = { id: string; name: string; kind: string; slug?: string };
+export type TagFilterTag = { id: string; name: string; kind: string; slug?: string; icon?: string | null };
 
 export const TOP_TAG_LIMIT = 6;
 

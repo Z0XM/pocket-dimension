@@ -6,8 +6,8 @@
   import { enhance } from "$app/forms";
   import { toast } from "$lib/toast.svelte";
 
-  type TagOption = { id: string; name: string; kind: string };
-  type SavedTag = { id: string; name: string; kind: string };
+  type TagOption = { id: string; name: string; kind: string; icon?: string | null };
+  type SavedTag = { id: string; name: string; kind: string; icon?: string | null };
 
   let {
     open = $bindable(false),
@@ -203,6 +203,7 @@
                 keepSearchFocus();
               }}
             >
+              {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
               {tag.name}
               <XIcon class="size-2.5" aria-hidden="true" />
             </button>
@@ -263,6 +264,7 @@
                 <CheckIcon class="size-3" aria-hidden="true" />
               {/if}
             </span>
+            {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
             <span class="min-w-0 flex-1 truncate">{tag.name}</span>
             <span class="text-[10px] uppercase opacity-60">{tag.kind}</span>
           </div>

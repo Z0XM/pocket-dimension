@@ -218,10 +218,11 @@
       {@const isOn = !queryMode && !untagged && selectedTagIds.includes(tag.id)}
       <button
         type="button"
-        class={`zap-tag-chip font-mono ${chipClass} ${isOn ? "zap-tag-chip-on" : ""}`}
+        class={`zap-tag-chip inline-flex items-center gap-1 font-mono ${chipClass} ${isOn ? "zap-tag-chip-on" : ""}`}
         aria-pressed={isOn}
         onclick={() => toggleTag(tag.id)}
       >
+        {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
         {tag.name}
       </button>
     {/each}
@@ -234,6 +235,7 @@
         title="Remove"
         onclick={() => toggleTag(tag.id)}
       >
+        {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
         {tag.name}
         <XIcon class="size-3" aria-hidden="true" />
       </button>
@@ -316,6 +318,7 @@
                     <CheckIcon class="size-3" />
                   {/if}
                 </span>
+                {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
                 <span class="min-w-0 flex-1 truncate">{tag.name}</span>
                 <span class="text-[10px] uppercase opacity-60">{tag.kind}</span>
               </button>

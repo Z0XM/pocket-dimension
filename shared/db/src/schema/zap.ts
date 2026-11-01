@@ -66,6 +66,8 @@ export const tags = zapSchema.table(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     kind: tagKind("kind").notNull(),
+    /** Optional emoji/glyph from the Zap system icon set (admin-assigned on system tags). */
+    icon: text("icon"),
     ownerUserId: uuid("owner_user_id").references(() => auth.user.id, { onDelete: "cascade" }),
     createdAt: timestamps.createdAt,
   },

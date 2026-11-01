@@ -27,7 +27,7 @@
   import { xhrFormNdjson } from "$lib/ingest-client";
   import { PLAYLIST_IMPORT_SORT_OPTIONS, type PlaylistImportSort } from "$lib/youtube-playlist-sort";
 
-  type TagOption = { id: string; name: string; kind: string };
+  type TagOption = { id: string; name: string; kind: string; icon?: string | null };
   type YtPhase = "idle" | "linking" | "loading" | "importing" | "disconnecting";
 
   let {
