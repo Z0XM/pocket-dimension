@@ -68,6 +68,10 @@
     patch({ catalogueTagDisplay: id });
   }
 
+  function setMonochromeIcons(on: boolean) {
+    patch({ monochromeIcons: on });
+  }
+
   function onCardOpacity(e: Event) {
     patch({ cardOpacity: Number((e.currentTarget as HTMLInputElement).value) });
   }
@@ -189,20 +193,38 @@
               <span class="zap-tag-chip px-2 py-0.5 text-[10px]">chill</span>
               <span class="zap-tag-chip px-2 py-0.5 text-[10px]">lofi</span>
             {:else if opt.id === "icons"}
-              <span class="text-base leading-none">😌</span>
-              <span class="text-base leading-none">🎧</span>
+              <span class="zap-tag-icon text-base">😌</span>
+              <span class="zap-tag-icon text-base">🎧</span>
             {:else}
               <span class="zap-tag-chip inline-flex items-center gap-1 px-2 py-0.5 text-[10px]">
-                <span class="text-sm leading-none">😌</span> chill
+                <span class="zap-tag-icon text-sm">😌</span> chill
               </span>
               <span class="zap-tag-chip inline-flex items-center gap-1 px-2 py-0.5 text-[10px]">
-                <span class="text-sm leading-none">🎧</span> lofi
+                <span class="zap-tag-icon text-sm">🎧</span> lofi
               </span>
             {/if}
           </span>
         </button>
       {/each}
     </div>
+    <label class="flex items-center justify-between gap-4 border border-border/70 bg-card p-3">
+      <span class="min-w-0">
+        <span class="block text-sm text-foreground">Monochrome icons</span>
+        <span class="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+          Always show tag icons in grayscale (filters, catalogue, chips).
+        </span>
+      </span>
+      <button
+        type="button"
+        class="zap-toggle shrink-0"
+        role="switch"
+        aria-checked={prefs.monochromeIcons}
+        aria-label="Monochrome icons"
+        onclick={() => setMonochromeIcons(!prefs.monochromeIcons)}
+      >
+        <span class="zap-toggle-thumb"></span>
+      </button>
+    </label>
   </section>
 
   <section class="space-y-3">

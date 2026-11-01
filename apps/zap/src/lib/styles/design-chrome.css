@@ -300,6 +300,18 @@ html[data-animations="off"] .zap-beat-bg {
   box-shadow: none;
 }
 
+/** Tag emoji / glyph — grayscale when Theme → Monochrome icons is on. */
+.zap-tag-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+html[data-monochrome-icons="on"] .zap-tag-icon {
+  filter: grayscale(1) contrast(1.05);
+}
+
 /** Display / filter tag chips — subtle signal lift on hover (no glow). */
 .zap-tag-chip {
   border: 1px solid var(--border);

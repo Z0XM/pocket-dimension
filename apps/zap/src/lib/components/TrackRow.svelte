@@ -186,13 +186,13 @@
   {@const chipPad = where === "desktop" ? "px-2 py-0.5 text-[10px]" : "px-1.5 py-0 text-[9px]"}
   {#if tagDisplay === "icons"}
     {#if tag.icon}
-      <span class={`${hidePlain} text-base leading-none`} title={tag.name} aria-label={tag.name}>{tag.icon}</span>
+      <span class={`zap-tag-icon ${hidePlain} text-base`} title={tag.name} aria-label={tag.name}>{tag.icon}</span>
     {:else}
       <span class={`zap-tag-chip ${hide} ${chipPad}`} title={tag.name} aria-label={tag.name}>{tag.name}</span>
     {/if}
   {:else if tagDisplay === "both"}
     <span class={`zap-tag-chip ${hide} items-center gap-1 ${chipPad}`} title={tag.name} aria-label={tag.name}>
-      {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
+      {#if tag.icon}<span class="zap-tag-icon text-sm" aria-hidden="true">{tag.icon}</span>{/if}
       {tag.name}
     </span>
   {:else}

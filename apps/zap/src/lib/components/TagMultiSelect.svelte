@@ -174,7 +174,7 @@
       {:else}
         {#each selectedTags as tag}
           <span class="inline-flex items-center gap-1 rounded-full border border-signal/40 bg-signal/10 px-2 py-0.5 font-mono text-[10px] text-signal">
-            {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
+            {#if tag.icon}<span class="zap-tag-icon text-sm" aria-hidden="true">{tag.icon}</span>{/if}
             {tag.name}
           </span>
         {/each}
@@ -227,7 +227,7 @@
                 <CheckIcon class="size-3" />
               {/if}
             </span>
-            {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
+            {#if tag.icon}<span class="zap-tag-icon text-sm" aria-hidden="true">{tag.icon}</span>{/if}
             <span class="min-w-0 flex-1 truncate">{tag.name}</span>
             <span class="text-[10px] uppercase opacity-60">{tag.kind}</span>
           </button>

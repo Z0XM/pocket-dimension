@@ -203,7 +203,7 @@
                 keepSearchFocus();
               }}
             >
-              {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
+              {#if tag.icon}<span class="zap-tag-icon text-sm" aria-hidden="true">{tag.icon}</span>{/if}
               {tag.name}
               <XIcon class="size-2.5" aria-hidden="true" />
             </button>
@@ -264,7 +264,7 @@
                 <CheckIcon class="size-3" aria-hidden="true" />
               {/if}
             </span>
-            {#if tag.icon}<span class="text-sm leading-none" aria-hidden="true">{tag.icon}</span>{/if}
+            {#if tag.icon}<span class="zap-tag-icon text-sm" aria-hidden="true">{tag.icon}</span>{/if}
             <span class="min-w-0 flex-1 truncate">{tag.name}</span>
             <span class="text-[10px] uppercase opacity-60">{tag.kind}</span>
           </div>

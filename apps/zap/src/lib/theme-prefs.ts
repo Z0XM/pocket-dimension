@@ -96,6 +96,8 @@ export type ZapThemePrefs = {
   waveHistoryMs: number;
   /** Catalogue / track-row tag presentation. */
   catalogueTagDisplay: CatalogueTagDisplay;
+  /** Force tag icons/emoji to grayscale everywhere they’re shown. */
+  monochromeIcons: boolean;
 };
 
 export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
@@ -109,7 +111,8 @@ export const DEFAULT_THEME_PREFS: ZapThemePrefs = {
   animationLayer: "top",
   responseWindowMs: MOTION_RESPONSE_MS.default, // Instant
   waveHistoryMs: MOTION_WAVE_HISTORY_MS.default, // Live
-  catalogueTagDisplay: "icons",
+  catalogueTagDisplay: "text",
+  monochromeIcons: false,
 };
 
 export function isAccentId(v: unknown): v is AccentId {
@@ -177,6 +180,7 @@ export function readThemePrefs(): ZapThemePrefs {
       catalogueTagDisplay: isCatalogueTagDisplay(parsed.catalogueTagDisplay)
         ? parsed.catalogueTagDisplay
         : DEFAULT_THEME_PREFS.catalogueTagDisplay,
+      monochromeIcons: typeof parsed.monochromeIcons === "boolean" ? parsed.monochromeIcons : DEFAULT_THEME_PREFS.monochromeIcons,
     };
     // Migrate removed styles (wave/noise/bars/bloom/vortex/…) back to radial.
     if (parsed.animationStyle !== prefs.animationStyle) {
@@ -238,6 +242,7 @@ export function applyThemePrefs(prefs: ZapThemePrefs) {
     "data-catalogue-tags",
     isCatalogueTagDisplay(prefs.catalogueTagDisplay) ? prefs.catalogueTagDisplay : DEFAULT_THEME_PREFS.catalogueTagDisplay
   );
+  root.setAttribute("data-monochrome-icons", prefs.monochromeIcons ? "on" : "off");
   root.style.setProperty("--zap-anim-opacity", String(animOpacity));
   root.style.setProperty("--zap-response-ms", String(responseMs));
   root.style.setProperty("--zap-wave-history-ms", String(waveMs));
@@ -289,6 +294,16 @@ export function readCatalogueTagDisplay(): CatalogueTagDisplay {
     if (isCatalogueTagDisplay(v)) return v;
   }
   return readThemePrefs().catalogueTagDisplay;
+}
+
+/** Whether tag icons should render grayscale. */
+export function readMonochromeIcons(): boolean {
+  if (typeof document !== "undefined") {
+    const v = document.documentElement.getAttribute("data-monochrome-icons");
+    if (v === "on") return true;
+    if (v === "off") return false;
+  }
+  return readThemePrefs().monochromeIcons;
 }
 
 /** True when the master animations switch is on (DOM attribute). */
