@@ -15,7 +15,7 @@ export const EXPORT_COLUMNS: readonly ExportColumnDef[] = [
   { id: "date", label: "Date", required: true },
   { id: "merchant", label: "Merchant", required: true },
   { id: "amount", label: "Amount", required: true },
-  { id: "balance", label: "Balance", required: true },
+  { id: "balance", label: "Balance" },
   { id: "tags", label: "Tags" },
   { id: "notes", label: "Notes" },
   { id: "space", label: "Space" },

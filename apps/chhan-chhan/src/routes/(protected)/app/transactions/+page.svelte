@@ -1138,12 +1138,15 @@
             </th>
             <th class="right">Amount</th>
             <th class="right">Balance</th>
+            {#if data.selectedSpaceId}
+              <th class="right">Space bal</th>
+            {/if}
           </tr>
         </thead>
         <tbody>
           {#if rows.length === 0}
             <tr>
-              <td colspan="5" class="dim empty-row">
+              <td colspan={data.selectedSpaceId ? 6 : 5} class="dim empty-row">
                 {#if data.searchQuery?.trim()}
                   No transactions match “{data.searchQuery}”.
                 {:else if data.selectedSpaceId}
@@ -1333,6 +1336,15 @@
                     <span class="dim">—</span>
                   {/if}
                 </td>
+                {#if data.selectedSpaceId}
+                  <td class="right mono space-balance-cell">
+                    {#if t.spaceBalanceMinor != null}
+                      {formatMoney(t.spaceBalanceMinor, data.account.currencyCode)}
+                    {:else}
+                      <span class="dim">—</span>
+                    {/if}
+                  </td>
+                {/if}
               </tr>
             {/each}
           {/if}
@@ -1603,11 +1615,14 @@
     z-index: 40;
     min-width: 14rem;
     padding: 0.7rem 0.75rem 0.75rem;
-    background: var(--page);
+    /* Solid opaque — --page is unset on this route and was rendering transparent. */
+    background: var(--surface-raised);
+    background-color: var(--surface-raised);
+    opacity: 1;
     border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
     border-radius: 2px 5px 3px 2px;
     box-shadow:
-      3px 3px 0 0 var(--shadow-paper),
+      3px 3px 0 0 var(--shadow-paper, #e8e0d0),
       3px 3px 0 1.5px color-mix(in srgb, var(--ink) 18%, transparent);
   }
 
@@ -2660,7 +2675,8 @@
       grid-template-areas:
         "date amount"
         "merchant merchant"
-        "tags balance";
+        "tags balance"
+        "spacebal spacebal";
       gap: 0.3rem 0.75rem;
       padding: 0.75rem 0.7rem;
       border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
@@ -2713,6 +2729,19 @@
 
     .tx-page .table-sheet tbody td.balance-cell::before {
       content: "bal ";
+      color: var(--ink-soft);
+      font-size: 0.75rem;
+    }
+
+    .tx-page .table-sheet tbody td.space-balance-cell {
+      grid-area: spacebal;
+      text-align: right;
+      font-size: 0.82rem;
+      justify-self: end;
+    }
+
+    .tx-page .table-sheet tbody td.space-balance-cell::before {
+      content: "space bal ";
       color: var(--ink-soft);
       font-size: 0.75rem;
     }
