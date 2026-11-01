@@ -28,9 +28,7 @@
   } = $props();
 
   const current = $derived(queue.currentItem);
-  const nextItem = $derived(
-    queue.currentIndex >= 0 && queue.currentIndex + 1 < queue.items.length ? queue.items[queue.currentIndex + 1]! : null
-  );
+  const nextItem = $derived(queue.currentIndex >= 0 && queue.currentIndex + 1 < queue.items.length ? queue.items[queue.currentIndex + 1]! : null);
   const durationMs = $derived(current?.durationMs ?? 0);
 
   let scrubMs = $state<number | null>(null);
@@ -88,79 +86,83 @@
   </button>
 
   <div class="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3">
-    <div class="min-w-0 flex-1 basis-[30%] sm:basis-[28%]">
+    <div class="min-w-0 flex-1 pr-[3.5rem] sm:pr-[4.5rem]">
       <p class="truncate text-sm font-medium text-foreground" title={current?.title}>{current?.title ?? "Queue finished"}</p>
       <p class="truncate font-mono text-[10px] text-muted-foreground">{current?.artists ?? "—"}</p>
     </div>
 
-    <div class="flex shrink-0 items-center gap-1">
-      <button
-        type="button"
-        class="inline-flex size-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
-        aria-label="Previous"
-        title="Previous"
-        disabled={queue.items.length === 0}
-        onclick={() => void queue.previous()}
-      >
-        <SkipBackIcon class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        class="inline-flex size-9 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
-        aria-label={queue.playing ? "Pause" : "Play"}
-        title={queue.playing ? "Pause" : "Play"}
-        disabled={queue.items.length === 0}
-        onclick={() => void queue.togglePlay()}
-      >
-        {#if queue.playing}
-          <PauseIcon class="size-4" />
-        {:else}
-          <PlayIcon class="size-4" />
-        {/if}
-      </button>
-      <button
-        type="button"
-        class="inline-flex size-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
-        aria-label="Next"
-        title="Next"
-        disabled={!current}
-        onclick={() => void queue.next()}
-      >
-        <SkipForwardIcon class="size-3.5" />
-      </button>
+    <div class="pointer-events-none absolute inset-y-0 left-1/2 z-[1] flex -translate-x-1/2 items-center">
+      <div class="pointer-events-auto flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          class="inline-flex size-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
+          aria-label="Previous"
+          title="Previous"
+          disabled={queue.items.length === 0}
+          onclick={() => void queue.previous()}
+        >
+          <SkipBackIcon class="size-3.5" />
+        </button>
+        <button
+          type="button"
+          class="inline-flex size-9 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
+          aria-label={queue.playing ? "Pause" : "Play"}
+          title={queue.playing ? "Pause" : "Play"}
+          disabled={queue.items.length === 0}
+          onclick={() => void queue.togglePlay()}
+        >
+          {#if queue.playing}
+            <PauseIcon class="size-4" />
+          {:else}
+            <PlayIcon class="size-4" />
+          {/if}
+        </button>
+        <button
+          type="button"
+          class="inline-flex size-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
+          aria-label="Next"
+          title="Next"
+          disabled={!current}
+          onclick={() => void queue.next()}
+        >
+          <SkipForwardIcon class="size-3.5" />
+        </button>
+      </div>
     </div>
 
-    <div class="flex min-w-0 flex-[1.2] items-center gap-1.5 sm:flex-[1.4] sm:gap-2">
-      <span class="hidden w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums sm:inline"
-        >{formatClock(scrubMs ?? queue.positionMs)}</span
-      >
-      <SeekBar
-        class="h-1.5 w-full min-w-[4rem]"
-        valueMs={queue.positionMs}
-        {durationMs}
-        disabled={!current}
-        onseek={(ms) => void queue.seek(ms)}
-        onscrub={(ms) => (scrubMs = ms)}
-      />
-      <span class="hidden w-9 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums sm:inline"
-        >{formatClock(durationMs)}</span
-      >
-    </div>
+    <div class="flex min-w-0 flex-1 items-center justify-end gap-1.5 pl-[3.5rem] sm:gap-2 sm:pl-[4.5rem]">
+      <div class="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+        <span class="hidden w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums sm:inline"
+          >{formatClock(scrubMs ?? queue.positionMs)}</span
+        >
+        <SeekBar
+          class="h-1.5 w-full min-w-[4rem]"
+          valueMs={queue.positionMs}
+          {durationMs}
+          disabled={!current}
+          onseek={(ms) => void queue.seek(ms)}
+          onscrub={(ms) => (scrubMs = ms)}
+        />
+        <span class="hidden w-9 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums sm:inline"
+          >{formatClock(durationMs)}</span
+        >
+      </div>
 
-    <div class="hidden min-w-0 max-w-[11rem] flex-1 basis-[20%] md:block">
-      <p class="font-mono text-[9px] tracking-[0.16em] text-muted-foreground uppercase">Up next</p>
-      <p class="truncate text-xs text-foreground" title={nextItem?.title}>{nextItem?.title ?? "—"}</p>
-    </div>
+      <div class="hidden min-w-0 max-w-[11rem] md:block">
+        <p class="font-mono text-[9px] tracking-[0.16em] text-muted-foreground uppercase">Up next</p>
+        <p class="truncate text-xs text-foreground" title={nextItem?.title}>{nextItem?.title ?? "—"}</p>
+      </div>
 
-    <button
-      type="button"
-      class="inline-flex size-8 shrink-0 items-center justify-center rounded border border-border text-muted-foreground hover:border-signal/50 hover:bg-signal/10 hover:text-signal"
-      aria-label="Maximize queue"
-      title="Maximize queue"
-      onclick={onmaximize}
-    >
-      <Maximize2Icon class="size-3.5" aria-hidden="true" />
-    </button>
+      <button
+        type="button"
+        class="inline-flex size-8 shrink-0 items-center justify-center rounded border border-border text-muted-foreground hover:border-signal/50 hover:bg-signal/10 hover:text-signal"
+        aria-label="Maximize queue"
+        title="Maximize queue"
+        onclick={onmaximize}
+      >
+        <Maximize2Icon class="size-3.5" aria-hidden="true" />
+      </button>
+    </div>
   </div>
 </div>
 
