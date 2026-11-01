@@ -37,9 +37,7 @@
   const filteredOptions = $derived.by(() => {
     const needle = filter.trim().toLowerCase();
     if (!needle) return availableTags;
-    return availableTags.filter(
-      (t) => t.name.toLowerCase().includes(needle) || t.kind.toLowerCase().includes(needle)
-    );
+    return availableTags.filter((t) => t.name.toLowerCase().includes(needle) || t.kind.toLowerCase().includes(needle));
   });
 
   const selectedTags = $derived(availableTags.filter((t) => selected.includes(t.id)));
@@ -213,10 +211,7 @@
       {/if}
 
       <div class="relative shrink-0">
-        <SearchIcon
-          class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
-        />
+        <SearchIcon class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         <input
           bind:this={filterEl}
           class="auth-field w-full pl-8 font-mono text-xs"
@@ -251,7 +246,7 @@
             tabindex="-1"
             aria-selected={isOn}
             class={`flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left font-mono text-xs transition ${
-              isHi ? "bg-signal/15 text-signal" : isOn ? "text-signal hover:bg-signal/10" : "text-muted-foreground hover:bg-signal/10"
+              isHi ? "bg-white/80 text-[#12100e]" : isOn ? "text-signal" : "text-muted-foreground"
             }`}
             onmousedown={(e) => {
               // Keep the search input focused when picking with the mouse.

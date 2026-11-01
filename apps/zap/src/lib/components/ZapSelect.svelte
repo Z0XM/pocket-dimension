@@ -10,12 +10,15 @@
     value = $bindable(""),
     placeholder = "Select…",
     disabled = false,
+    /** `field` = auth input chrome; `plain` = label + chevron only. */
+    variant = "field",
     onChange,
   }: {
     options: Option[];
     value?: string;
     placeholder?: string;
     disabled?: boolean;
+    variant?: "field" | "plain";
     onChange?: (value: string) => void;
   } = $props();
 
@@ -68,27 +71,31 @@
   });
 </script>
 
-<div class="zap-select relative w-full" bind:this={rootEl}>
+<div class={`zap-select relative ${variant === "plain" ? "inline-flex w-auto max-w-full align-bottom" : "w-full"}`} bind:this={rootEl}>
   <button
     type="button"
-    class="auth-field flex w-full items-center justify-between gap-2 text-left"
+    class={variant === "plain"
+      ? "inline-flex max-w-full items-center gap-1 text-left font-mono text-[11px] leading-none text-muted-foreground hover:text-signal disabled:opacity-40"
+      : "auth-field flex w-full items-center justify-between gap-2 text-left"}
     bind:this={triggerEl}
     {disabled}
     aria-haspopup="listbox"
     aria-expanded={open}
     onclick={toggleOpen}
   >
-    <span class={`min-w-0 truncate ${selected ? "text-foreground" : "text-muted-foreground"}`}>
+    <span class={`min-w-0 truncate ${selected || variant === "plain" ? "text-inherit" : "text-muted-foreground"}`}>
       {selected?.label ?? placeholder}
     </span>
-    <ChevronDownIcon class={`size-4 shrink-0 text-muted-foreground transition ${open ? "rotate-180" : ""}`} />
+    <ChevronDownIcon
+      class={`shrink-0 transition ${variant === "plain" ? "size-3 text-muted-foreground" : "size-4 text-muted-foreground"} ${open ? "rotate-180" : ""}`}
+    />
   </button>
 
   {#if open}
     <div
-      class={`absolute z-50 w-full overflow-y-auto overscroll-contain rounded border border-border bg-popover shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_12%,transparent)] ${
-        placement.openUp ? "bottom-full mb-1" : "top-full mt-1"
-      }`}
+      class={`zap-dropdown absolute z-50 overflow-y-auto overscroll-contain ${
+        variant === "plain" ? "min-w-[12rem] w-max max-w-[min(18rem,calc(100vw-2rem))]" : "w-full"
+      } ${placement.openUp ? "is-up bottom-full mb-1" : "top-full mt-1"}`}
       style={`max-height: ${placement.maxHeightPx}px`}
       role="listbox"
     >
@@ -96,15 +103,15 @@
         type="button"
         role="option"
         aria-selected={!value}
-        class={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-xs transition hover:bg-signal/10 ${!value ? "text-signal" : "text-muted-foreground"}`}
+        class={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-xs transition ${!value ? "text-signal" : "text-muted-foreground"}`}
         onclick={() => pick("")}
       >
-        <span class={`flex size-4 items-center justify-center rounded border ${!value ? "border-signal bg-signal/20" : "border-border"}`}>
+        <span class={`flex size-4 shrink-0 items-center justify-center rounded border ${!value ? "border-signal bg-signal/20" : "border-border"}`}>
           {#if !value}
             <CheckIcon class="size-3" />
           {/if}
         </span>
-        <span class="flex-1 truncate">{placeholder}</span>
+        <span class="min-w-0 flex-1 truncate">{placeholder}</span>
       </button>
       {#each options as opt}
         {@const isOn = value === opt.value}
@@ -112,15 +119,15 @@
           type="button"
           role="option"
           aria-selected={isOn}
-          class={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-xs transition hover:bg-signal/10 ${isOn ? "text-signal" : "text-muted-foreground"}`}
+          class={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-xs transition ${isOn ? "text-signal" : "text-muted-foreground"}`}
           onclick={() => pick(opt.value)}
         >
-          <span class={`flex size-4 items-center justify-center rounded border ${isOn ? "border-signal bg-signal/20" : "border-border"}`}>
+          <span class={`flex size-4 shrink-0 items-center justify-center rounded border ${isOn ? "border-signal bg-signal/20" : "border-border"}`}>
             {#if isOn}
               <CheckIcon class="size-3" />
             {/if}
           </span>
-          <span class="flex-1 truncate">{opt.label}</span>
+          <span class="min-w-0 flex-1 truncate">{opt.label}</span>
         </button>
       {:else}
         <p class="px-3 py-2 text-xs text-muted-foreground">No options.</p>

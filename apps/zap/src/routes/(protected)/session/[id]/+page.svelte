@@ -58,7 +58,7 @@
   ]);
   const filtering = $derived(Boolean(q.trim() || tagQuery.trim() || selectedTagIds.length));
   const scopedPlaylistId = $derived(libraryScope.startsWith("playlist:") ? libraryScope.slice("playlist:".length) : null);
-  const scopeLabel = $derived(libraryScopeOptions.find((o) => o.value === libraryScope)?.label.replace(/^▸ /, "") ?? "Your library");
+  const scopeLabel = $derived(libraryScopeOptions.find((o) => o.value === libraryScope)?.label.replace(/^▸ /, "") ?? "Your Library");
   const canAddAll = $derived(canAdd && (filtering || Boolean(scopedPlaylistId)) && catalogue.length > 0 && !tagQueryError);
   const queueLen = $derived(snapshot.queue?.length ?? 0);
 
@@ -320,166 +320,167 @@
   </PageHeader>
 
   <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
+    {#if tab === "setup" && sessionLive && canSetup}
+      <SessionSetupPanel bind:snapshot bind:discordSinkActive />
+    {:else}
+      {#if sessionLive}
+        {#key sessionRouteId}
+          <DiscordSinkPanel sessionId={sessionRouteId} canManage={canSetup} variant="banner" bind:active={discordSinkActive} />
+        {/key}
+      {/if}
 
-  {#if tab === "setup" && sessionLive && canSetup}
-    <SessionSetupPanel bind:snapshot bind:discordSinkActive />
-  {:else}
-    {#if sessionLive}
-      {#key sessionRouteId}
-        <DiscordSinkPanel
-          sessionId={sessionRouteId}
-          canManage={canSetup}
-          variant="banner"
-          bind:active={discordSinkActive}
-        />
-      {/key}
-    {/if}
+      <SessionPlayer bind:snapshot bind:audioEl />
 
-    <SessionPlayer bind:snapshot bind:audioEl />
-
-    {#if sessionLive}
-      <div class="space-y-4">
-        <div class="flex gap-1 border-b border-border/60" role="tablist" aria-label="Now playing panels">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={nowSubTab === "queue"}
-            class={`border-b-2 px-3 py-2 font-mono text-[11px] tracking-[0.12em] uppercase ${
-              nowSubTab === "queue" ? "border-signal text-signal" : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-            onclick={() => (nowSubTab = "queue")}
-          >
-            Queue
-          </button>
-          {#if canAdd}
+      {#if sessionLive}
+        <div class="space-y-4">
+          <div class="flex gap-1 border-b border-border/60" role="tablist" aria-label="Now playing panels">
             <button
               type="button"
               role="tab"
-              aria-selected={nowSubTab === "library"}
+              aria-selected={nowSubTab === "queue"}
               class={`border-b-2 px-3 py-2 font-mono text-[11px] tracking-[0.12em] uppercase ${
-                nowSubTab === "library" ? "border-signal text-signal" : "border-transparent text-muted-foreground hover:text-foreground"
+                nowSubTab === "queue" ? "border-signal text-signal" : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
-              onclick={() => (nowSubTab = "library")}
+              onclick={() => (nowSubTab = "queue")}
             >
-              Add from library
+              Queue
             </button>
+            {#if canAdd}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={nowSubTab === "library"}
+                class={`border-b-2 px-3 py-2 font-mono text-[11px] tracking-[0.12em] uppercase ${
+                  nowSubTab === "library" ? "border-signal text-signal" : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+                onclick={() => (nowSubTab = "library")}
+              >
+                Add from library
+              </button>
+            {/if}
+          </div>
+
+          {#if nowSubTab === "library" && canAdd}
+            <div class="space-y-3" role="tabpanel" aria-label="Add from library">
+              <CatalogueFilters
+                compact
+                collapsible
+                bind:libraryScope
+                {libraryScopeOptions}
+                bind:q
+                bind:tagQuery
+                bind:selectedTagIds
+                availableTags={data.availableTags}
+                topTagIds={data.topTagIds}
+                {tagQueryError}
+                busy={catalogueLoading}
+                onchange={() => void fetchCatalogue({ reset: true })}
+              />
+              {#if canAddAll}
+                <div class="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                  <span>Add all {filtering ? "filtered" : scopeLabel} tracks{catalogueHasMore ? "" : ` (${catalogue.length})`}:</span>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded border border-signal/40 bg-signal/10 px-2 py-0.5 text-[11px] text-signal hover:bg-signal/20 disabled:opacity-40"
+                    disabled={bulkBusy || queueBusy}
+                    title="Replace the session queue with these tracks and play"
+                    onclick={() => void addAllFiltered("replace")}
+                  >
+                    <PlayIcon class="size-3.5" aria-hidden="true" /> Play all
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-[11px] hover:text-signal disabled:opacity-40"
+                    disabled={bulkBusy || queueBusy}
+                    title="Append these tracks to the end of the session queue"
+                    onclick={() => void addAllFiltered("last")}
+                  >
+                    <ListEndIcon class="size-3.5" aria-hidden="true" /> Add all to queue
+                  </button>
+                </div>
+              {/if}
+              {#if catalogueLoading && catalogue.length === 0}
+                <TrackListSkeleton rows={5} compact />
+              {:else}
+                <ListBusyOverlay busy={catalogueLoading && catalogue.length > 0} label="Updating…">
+                  <ul
+                    bind:this={catalogueScrollRoot}
+                    class="max-h-[min(32rem,70vh)] min-h-[8rem] divide-y divide-border/50 overflow-y-auto rounded-lg border border-border/70 bg-card"
+                  >
+                    {#if catalogue.length === 0}
+                      <li class="px-4 py-8 text-center text-sm text-muted-foreground">No tracks.</li>
+                    {:else}
+                      {#each catalogue as track (track.id)}
+                        <li class="flex items-center justify-between gap-2 px-3 py-2">
+                          <div class="min-w-0">
+                            <p class="truncate text-sm font-medium {track.available === false ? 'text-muted-foreground' : ''}">{track.title}</p>
+                            <p class="truncate font-mono text-[10px] text-muted-foreground">
+                              {track.artists ?? "Unknown"}{#if track.available === false}
+                                · <span class="text-destructive">Song not available</span>{/if}
+                            </p>
+                          </div>
+                          <div class="flex shrink-0 gap-0.5">
+                            <button
+                              type="button"
+                              class="rounded border border-signal/40 px-1.5 py-1 font-mono text-[9px] text-signal hover:bg-signal/10 disabled:opacity-40"
+                              disabled={!track.playable || queueBusy}
+                              title="Play next"
+                              onclick={() => void enqueue(track.id, "next")}
+                            >
+                              Next
+                            </button>
+                            <button
+                              type="button"
+                              class="rounded border border-border px-1.5 py-1 font-mono text-[9px] text-muted-foreground hover:bg-secondary disabled:opacity-40"
+                              disabled={!track.playable || queueBusy}
+                              title="Play last"
+                              onclick={() => void enqueue(track.id, "last")}
+                            >
+                              Last
+                            </button>
+                            <button
+                              type="button"
+                              class="rounded border border-border px-1.5 py-1 font-mono text-[9px] text-muted-foreground hover:bg-secondary disabled:opacity-40"
+                              disabled={!track.playable || queueBusy}
+                              title="Add to queue"
+                              onclick={() => void enqueue(track.id, "queue")}
+                            >
+                              Add
+                            </button>
+                          </div>
+                        </li>
+                      {/each}
+                      <li bind:this={catalogueSentinel} class="h-4 list-none" aria-hidden="true"></li>
+                      {#if catalogueLoadingMore}
+                        <li class="px-4 py-2 text-center font-mono text-[10px] text-muted-foreground">Loading more…</li>
+                      {:else if !catalogueHasMore}
+                        <li class="px-4 py-2 text-center font-mono text-[10px] text-muted-foreground">End of list</li>
+                      {/if}
+                    {/if}
+                  </ul>
+                </ListBusyOverlay>
+              {/if}
+            </div>
+          {:else}
+            <div role="tabpanel" aria-label="Queue">
+              <SessionQueueList
+                bind:snapshot
+                busy={queueBusy}
+                showHeading={false}
+                onerror={(m) => {
+                  if (m) toast.error(m);
+                }}
+              />
+            </div>
           {/if}
         </div>
-
-        {#if nowSubTab === "library" && canAdd}
-          <div class="space-y-3" role="tabpanel" aria-label="Add from library">
-            <CatalogueFilters
-              compact
-              collapsible
-              bind:libraryScope
-              {libraryScopeOptions}
-              bind:q
-              bind:tagQuery
-              bind:selectedTagIds
-              availableTags={data.availableTags}
-              topTagIds={data.topTagIds}
-              {tagQueryError}
-              busy={catalogueLoading}
-              onchange={() => void fetchCatalogue({ reset: true })}
-            />
-            {#if canAddAll}
-              <div class="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                <span>Add all {filtering ? "filtered" : scopeLabel} tracks{catalogueHasMore ? "" : ` (${catalogue.length})`}:</span>
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-1 rounded border border-signal/40 bg-signal/10 px-2 py-0.5 text-[11px] text-signal hover:bg-signal/20 disabled:opacity-40"
-                  disabled={bulkBusy || queueBusy}
-                  title="Replace the session queue with these tracks and play"
-                  onclick={() => void addAllFiltered("replace")}
-                >
-                  <PlayIcon class="size-3.5" aria-hidden="true" /> Play all
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-[11px] hover:text-signal disabled:opacity-40"
-                  disabled={bulkBusy || queueBusy}
-                  title="Append these tracks to the end of the session queue"
-                  onclick={() => void addAllFiltered("last")}
-                >
-                  <ListEndIcon class="size-3.5" aria-hidden="true" /> Add all to queue
-                </button>
-              </div>
-            {/if}
-            {#if catalogueLoading && catalogue.length === 0}
-              <TrackListSkeleton rows={5} compact />
-            {:else}
-              <ListBusyOverlay busy={catalogueLoading && catalogue.length > 0} label="Updating…">
-                <ul
-                  bind:this={catalogueScrollRoot}
-                  class="max-h-[min(32rem,70vh)] min-h-[8rem] divide-y divide-border/50 overflow-y-auto rounded-lg border border-border/70 bg-card"
-                >
-                  {#if catalogue.length === 0}
-                    <li class="px-4 py-8 text-center text-sm text-muted-foreground">No tracks.</li>
-                  {:else}
-                    {#each catalogue as track (track.id)}
-                      <li class="flex items-center justify-between gap-2 px-3 py-2">
-                        <div class="min-w-0">
-                          <p class="truncate text-sm font-medium {track.available === false ? 'text-muted-foreground' : ''}">{track.title}</p>
-                          <p class="truncate font-mono text-[10px] text-muted-foreground">
-                            {track.artists ?? "Unknown"}{#if track.available === false}
-                              · <span class="text-destructive">Song not available</span>{/if}
-                          </p>
-                        </div>
-                        <div class="flex shrink-0 gap-0.5">
-                          <button
-                            type="button"
-                            class="rounded border border-signal/40 px-1.5 py-1 font-mono text-[9px] text-signal hover:bg-signal/10 disabled:opacity-40"
-                            disabled={!track.playable || queueBusy}
-                            title="Play next"
-                            onclick={() => void enqueue(track.id, "next")}
-                          >
-                            Next
-                          </button>
-                          <button
-                            type="button"
-                            class="rounded border border-border px-1.5 py-1 font-mono text-[9px] text-muted-foreground hover:bg-secondary disabled:opacity-40"
-                            disabled={!track.playable || queueBusy}
-                            title="Play last"
-                            onclick={() => void enqueue(track.id, "last")}
-                          >
-                            Last
-                          </button>
-                          <button
-                            type="button"
-                            class="rounded border border-border px-1.5 py-1 font-mono text-[9px] text-muted-foreground hover:bg-secondary disabled:opacity-40"
-                            disabled={!track.playable || queueBusy}
-                            title="Add to queue"
-                            onclick={() => void enqueue(track.id, "queue")}
-                          >
-                            Add
-                          </button>
-                        </div>
-                      </li>
-                    {/each}
-                    <li bind:this={catalogueSentinel} class="h-4 list-none" aria-hidden="true"></li>
-                    {#if catalogueLoadingMore}
-                      <li class="px-4 py-2 text-center font-mono text-[10px] text-muted-foreground">Loading more…</li>
-                    {:else if !catalogueHasMore}
-                      <li class="px-4 py-2 text-center font-mono text-[10px] text-muted-foreground">End of list</li>
-                    {/if}
-                  {/if}
-                </ul>
-              </ListBusyOverlay>
-            {/if}
-          </div>
-        {:else}
-          <div role="tabpanel" aria-label="Queue">
-            <SessionQueueList bind:snapshot busy={queueBusy} showHeading={false} onerror={(m) => { if (m) toast.error(m); }} />
-          </div>
-        {/if}
-      </div>
-    {:else}
-      <p class="text-sm text-muted-foreground">
-        This session is over.
-        <button type="button" class="text-signal hover:underline" onclick={() => goto("/session?stay=1")}>Back to sessions</button>
-      </p>
+      {:else}
+        <p class="text-sm text-muted-foreground">
+          This session is over.
+          <button type="button" class="text-signal hover:underline" onclick={() => goto("/session?stay=1")}>Back to sessions</button>
+        </p>
+      {/if}
     {/if}
-  {/if}
   </div>
 </section>
 

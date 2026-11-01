@@ -42,9 +42,7 @@
   const extraSelected = $derived(
     queryMode || untagged ? [] : selectedTagIds.filter((id) => !visibleIds.includes(id) && tagById.has(id)).map((id) => tagById.get(id)!)
   );
-  const moreSelectedCount = $derived(
-    queryMode ? 0 : (untagged ? 1 : 0) + moreTags.filter((t) => selectedTagIds.includes(t.id)).length
-  );
+  const moreSelectedCount = $derived(queryMode ? 0 : (untagged ? 1 : 0) + moreTags.filter((t) => selectedTagIds.includes(t.id)).length);
 
   let tagQueryInput = $state<HTMLInputElement | null>(null);
   let typingTimer: ReturnType<typeof setTimeout> | null = null;
@@ -189,7 +187,7 @@
 {#snippet queryField(extraClass: string)}
   <input
     id={`${fieldId}-tag-query`}
-    class={`auth-field font-mono text-sm ${extraClass}`}
+    class={`zap-underline-field font-mono text-sm ${extraClass}`}
     type="search"
     placeholder="love and (soft not upbeat)"
     title={queryMode ? "Nested filter active — chips insert tag names." : "Optional. Chips AND together when this is empty."}
@@ -265,8 +263,8 @@
 
       {#if moreOpen}
         <div
-          class={`absolute left-0 z-50 flex w-56 flex-col overflow-hidden rounded border border-border bg-popover shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_12%,transparent)] ${
-            morePlacement.openUp ? "bottom-full mb-1" : "top-full mt-1"
+          class={`zap-dropdown absolute left-0 z-50 flex w-56 flex-col overflow-hidden ${
+            morePlacement.openUp ? "is-up bottom-full mb-1" : "top-full mt-1"
           }`}
           style={`max-height: ${morePlacement.maxHeightPx}px`}
         >
@@ -285,7 +283,7 @@
               type="button"
               role="option"
               aria-selected={!queryMode && untagged}
-              class={`flex w-full items-center gap-2 border-b border-border/50 px-3 py-1.5 text-left font-mono text-xs transition hover:bg-signal/10 ${
+              class={`flex w-full items-center gap-2 border-b border-border/50 px-3 py-1.5 text-left font-mono text-xs transition ${
                 !queryMode && untagged ? "text-signal" : "text-muted-foreground"
               }`}
               onclick={toggleUntagged}
@@ -308,7 +306,7 @@
                 type="button"
                 role="option"
                 aria-selected={isOn}
-                class={`flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs transition hover:bg-signal/10 ${isOn ? "text-signal" : "text-muted-foreground"}`}
+                class={`flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs transition ${isOn ? "text-signal" : "text-muted-foreground"}`}
                 onclick={() => toggleTag(tag.id)}
               >
                 <span

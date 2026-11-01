@@ -65,6 +65,7 @@
   let scrubMs = $state<number | null>(null);
 
   let menuOpen = $state(false);
+  let menuOpenUp = $state(false);
   let menuBtn = $state<HTMLButtonElement | null>(null);
   let menuEl = $state<HTMLDivElement | null>(null);
   let menuStyle = $state("");
@@ -142,8 +143,8 @@
     if (!menuBtn) return;
     const rect = menuBtn.getBoundingClientRect();
     const right = Math.max(8, window.innerWidth - rect.right);
-    const openUp = window.innerHeight - rect.bottom < 260 && rect.top > window.innerHeight - rect.bottom;
-    menuStyle = openUp ? `right:${right}px;bottom:${window.innerHeight - rect.top + 4}px` : `right:${right}px;top:${rect.bottom + 4}px`;
+    menuOpenUp = window.innerHeight - rect.bottom < 260 && rect.top > window.innerHeight - rect.bottom;
+    menuStyle = menuOpenUp ? `right:${right}px;bottom:${window.innerHeight - rect.top + 4}px` : `right:${right}px;top:${rect.bottom + 4}px`;
     menuOpen = true;
   }
 
@@ -165,37 +166,42 @@
       window.removeEventListener("scroll", close, true);
     };
   });
-
 </script>
 
-<li class={`zap-track flex flex-col gap-3 px-4 py-3 ${isCurrent ? "is-current" : ""}`}>
-  <div class="flex items-start gap-3 sm:items-center sm:gap-4">
+<li class={`zap-track group flex flex-col gap-2 py-1 sm:gap-3 sm:py-1.5 ${isCurrent ? "is-current" : ""}`}>
+  <div class="flex items-start gap-2 sm:items-center sm:gap-4">
     <button
       type="button"
-      class="zap-track-play flex size-10 shrink-0 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
+      class="zap-track-play flex size-8 shrink-0 items-center justify-center rounded border-2 border-border bg-transparent text-muted-foreground transition-[border-color,color,background] disabled:opacity-40 sm:size-10 {isCurrent
+        ? ''
+        : 'group-hover:border-signal group-hover:text-signal'}"
       disabled={!track.playable || !queue || (queue.pending > 0 && !isCurrent)}
       title={unavailable ? "Song not available" : isCurrent ? undefined : queue?.active ? "Play next (insert after current and skip to it)" : "Play"}
       aria-label={unavailable ? "Song not available" : isPlaying ? "Pause" : "Play"}
       onclick={togglePlay}
     >
       {#if isPlaying}
-        <PauseIcon class="size-4" />
+        <PauseIcon class="size-3.5 sm:size-4" />
       {:else}
-        <PlayIcon class="size-4" />
+        <PlayIcon class="size-3.5 sm:size-4" />
       {/if}
     </button>
 
-    <div class="min-w-0 flex-1 space-y-2">
-      <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+    <div class="min-w-0 flex-1 space-y-1 sm:space-y-2">
+      <div class="flex items-center justify-between gap-2 sm:gap-3">
         <div class="min-w-0 flex-1">
           <p
-            class="zap-track-title truncate font-medium {isCurrent ? 'text-signal' : unavailable ? 'text-muted-foreground' : 'text-foreground'}"
+            class="zap-track-title truncate text-sm font-normal sm:text-base {isCurrent
+              ? 'text-signal'
+              : unavailable
+                ? 'text-muted-foreground'
+                : 'text-foreground group-hover:text-signal'}"
             title={track.title}
           >
             {track.title}
           </p>
-          <p class="truncate font-mono text-xs text-muted-foreground">
-            {track.artists ?? "Unknown"} · {formatClock(track.durationMs)} · {track.sourceType}
+          <p class="truncate font-mono text-[10px] text-muted-foreground sm:text-xs">
+            {track.artists ?? "Unknown"} · {formatClock(track.durationMs)}
           </p>
           {#if unavailable}
             <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px]">
@@ -214,51 +220,58 @@
             </p>
           {/if}
         </div>
-        <div class="flex shrink-0 flex-wrap items-center gap-1 sm:max-w-[45%] sm:justify-end">
+        <div class="flex shrink-0 flex-wrap items-center justify-end gap-0.5 sm:max-w-[45%] sm:gap-1">
           {#each track.tags as tag}
-            <span class="zap-tag-chip px-2 py-0.5 text-[10px]">{tag.name}</span>
+            <span class="zap-tag-chip hidden px-2 py-0.5 text-[10px] sm:inline-flex">{tag.name}</span>
           {/each}
           <button
             type="button"
-            class="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 font-mono text-[10px] text-signal hover:bg-signal/10"
+            class="inline-flex size-5 shrink-0 items-center justify-center rounded text-signal hover:bg-white/80 hover:text-[#12100e] sm:size-6"
+            aria-label={`Edit tags for ${track.title}`}
+            title="Edit tags"
             onclick={() => (editTagsOpen = true)}
           >
-            <TagsIcon class="size-3" aria-hidden="true" />
-            Edit tags
+            <TagsIcon class="size-3 sm:size-3.5" aria-hidden="true" />
           </button>
           {#if canDelete}
             <button
               type="button"
-              class="inline-flex size-6 shrink-0 items-center justify-center rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-40"
+              class="inline-flex size-5 shrink-0 items-center justify-center rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-40 sm:size-6"
               aria-label={`Delete ${track.title}`}
               title="Delete song"
               disabled={disposing}
               onclick={() => (deleteOpen = true)}
             >
-              <Trash2Icon class="size-3.5 shrink-0" aria-hidden="true" />
+              <Trash2Icon class="size-3 shrink-0 sm:size-3.5" aria-hidden="true" />
             </button>
           {/if}
           {#if queue && track.playable}
             <button
               type="button"
               bind:this={menuBtn}
-              class="inline-flex size-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-signal/10 hover:text-signal"
+              class="inline-flex size-5 items-center justify-center rounded border border-border text-muted-foreground hover:bg-signal/10 hover:text-signal sm:size-6"
               aria-label={`More actions for ${track.title}`}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               onclick={toggleMenu}
             >
-              <EllipsisVerticalIcon class="size-3.5" />
+              <EllipsisVerticalIcon class="size-3 sm:size-3.5" />
             </button>
           {/if}
         </div>
       </div>
 
+      {#if track.tags.length}
+        <div class="flex flex-wrap items-center gap-0.5 sm:hidden">
+          {#each track.tags as tag}
+            <span class="zap-tag-chip px-1.5 py-0 text-[9px]">{tag.name}</span>
+          {/each}
+        </div>
+      {/if}
+
       {#if isCurrent && queue}
         <div class="flex items-center gap-2">
-          <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums"
-            >{formatClock(scrubMs ?? queue.positionMs)}</span
-          >
+          <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(scrubMs ?? queue.positionMs)}</span>
           <SeekBar
             valueMs={queue.positionMs}
             {durationMs}
@@ -273,12 +286,7 @@
   </div>
 
   {#if menuOpen}
-    <div
-      bind:this={menuEl}
-      class="fixed z-50 w-52 overflow-hidden rounded border border-border bg-popover py-1 shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_12%,transparent)]"
-      style={menuStyle}
-      role="menu"
-    >
+    <div bind:this={menuEl} class={`zap-dropdown fixed z-50 w-52 overflow-hidden py-1 ${menuOpenUp ? "is-up" : ""}`} style={menuStyle} role="menu">
       <button type="button" role="menuitem" class="zap-menu-item" onclick={() => void enqueue("next")}>
         <ListStartIcon class="size-3.5" /> Play next
       </button>

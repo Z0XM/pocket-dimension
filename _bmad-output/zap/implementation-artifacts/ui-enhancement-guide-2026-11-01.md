@@ -1,0 +1,269 @@
+# Zap · UI enhancement guide
+
+**App:** `apps/zap`  
+**Captured:** 2026-11-01 → 2026-11-02 (session pass — catalogue chrome, filters, search, dropdowns, shell nav, theme defaults, track rows, queue dock defaults)  
+**Purpose:** Durable log of UI/UX decisions so we can later distill a Zap design philosophy / DESIGN.md. Prefer facts + rationale over polish.
+
+---
+
+## How to use this doc later
+
+1. Treat **Changes** as the source of truth for what shipped in this pass.
+2. Treat **Emerging principles** as hypotheses — promote into a locked DESIGN.md only after they survive more surfaces (playlists, session, history, admin).
+3. Prefer shared primitives (`.zap-dropdown`, `.zap-underline-field`, `ZapSelect` variants) over one-off class stacks when extending the look.
+
+---
+
+## Changes (this pass)
+
+### 1. Theme motion defaults
+
+| Control | Before | After |
+| --- | --- | --- |
+| Card opacity | 40% | **100%** |
+| Animation opacity | 80% | **40%** |
+| Animation layer | Behind UI | **On top** |
+
+- **Where:** `apps/zap/src/lib/theme-prefs.ts` (`MOTION_*` defaults + `DEFAULT_THEME_PREFS`).
+- **Note:** Existing `localStorage` (`zap.theme.prefs`) keeps prior user choices; defaults apply to fresh sessions only.
+- **Intent:** Solid cards, quieter visualizer, visualizer over chrome when animations are on.
+
+---
+
+### 2. Catalogue filters chrome — strip the card shell
+
+- **Removed** the catalogue `zap-filters-panel` wrapper (`rounded-lg border … bg-card p-3`).
+- Scope, search, tag filters, and add sit **directly in the page flex flow** (no boxed filter card).
+- Playlist-match / bulk-add rows kept as plain text rows (no card-internal `border-t` dividers).
+- **Where:** `apps/zap/src/routes/(protected)/catalogue/+page.svelte`.
+- **Intent:** Less nested “panel in a panel”; catalogue already has track-host chrome — filters should feel like page controls, not a second card.
+
+---
+
+### 3. Shell nav — compact menu on small screens
+
+- **`sm+`:** Horizontal primary links (Catalogue / Playlists / Sessions [+ Running Jobs]) + settings gear.
+- **`< sm`:** Single **menu** trigger (`SettingsMenu` with `includePrimary`) holding primary routes + settings (Connections, History, Admin, Theme, Log out).
+- Header stays a **single row** (brand left, control right) instead of stacking brand above links.
+- **Where:** `apps/zap/src/routes/(protected)/+layout.svelte`, `SettingsMenu.svelte`.
+- **Intent:** Small viewports get one affordance; don’t fight for horizontal space with uppercase nav labels.
+
+---
+
+### 4. Catalogue toolbar layout (scope · filters · search)
+
+**Structure (collapsible / catalogue mode):**
+
+1. **Row A** — plain text controls: library scope select + “Filters” toggle (bottom-aligned).
+2. **Row B** — underline search + add action.
+3. Filters UI opens in a **popover**, not an inline expanding block.
+
+**Scope select (`ZapSelect` `variant="plain"`):**
+
+- Trigger = **selected label + chevron only** (no `auth-field` box).
+- Label casing: **“Your Library”**.
+- Styling: `font-mono text-[11px] text-muted-foreground leading-none`.
+- List: roomy options (`px-3 py-2`, `text-xs`, min width ~12rem) — compacted once, then restored to non-compact.
+- List chrome: `.zap-dropdown` (accent edge only).
+
+**Filters toggle:**
+
+- Same visual language as scope: plain mono label + chevron (no bordered icon button, no sliders icon).
+- Opens a **popover** (`role="dialog"`) with `TagQueryEditor` (`layout="stack"`, `compact`).
+- Click-outside / Escape closes; outside scope excludes only the Filters **trigger + panel** so opening the scope select closes Filters and can open its own menu.
+- Mobile: panel uses `left-0 right-0` against the **full toolbar row** so it doesn’t overflow the viewport; `sm+` can cap width (`sm:w-[min(100%,28rem)]`).
+- Dropped persisting `filtersOpen` in `localStorage` (popup open-state is ephemeral).
+
+**Where:** `CatalogueFilters.svelte`, catalogue `+page.svelte`.
+
+**Intent:** Meta controls (scope / filters) read as quiet captions; search is the primary field. Filters are on-demand, not always consuming vertical space.
+
+---
+
+### 5. Search + tag query — underline fields
+
+- Catalogue search uses **`.zap-underline-field`**: transparent fill, no side/top border, **bottom border only**; focus → accent (`--signal`).
+- Magnifier icon: **white** (not muted gray) so it reads as chrome, not placeholder.
+- Tag query input in `TagQueryEditor` also uses **`.zap-underline-field`** (same grammar as catalogue search).
+- **Where:** `app.css` (`.zap-underline-field`), `CatalogueFilters.svelte`, `TagQueryEditor.svelte`.
+- **Intent:** Text entry is a writing line, not another boxed control.
+
+---
+
+### 6. Shared dropdown language (app-wide)
+
+Introduced **`.zap-dropdown`** in `design-chrome.css` and applied across Zap menus:
+
+| Surface | Component / location |
+| --- | --- |
+| Scope / selects | `ZapSelect` listbox |
+| Settings / mobile app menu | `SettingsMenu` |
+| Catalogue filters popover | `CatalogueFilters` |
+| Tag multi-select picker | `TagMultiSelect` |
+| Tag “More” menu | `TagQueryEditor` |
+| Track overflow menu | `TrackRow` |
+
+**Chrome rules:**
+
+- **No full box border / radius / glow ring.**
+- **Single accent edge:** bottom border `1px solid var(--signal)`; when menu opens upward, use top edge (`.is-up`).
+- **Hover:** soft white wash — `color-mix(in srgb, #fff 78%, transparent)` with dark text `#12100e` (not washed accent `bg-signal/10`). Keyboard highlight in tag pickers follows the same white/80 idea.
+
+**Intent:** Dropdowns feel like temporary sheets clipped by a signal underline, not floating cards. Hover should flash “paper” (soft white), not tint the whole row coral.
+
+---
+
+### 7. Catalogue track list — no table / row borders
+
+- Catalogue `.zap-track-host`: no outer frame border; transparent background (not a card well).
+- Catalogue `.zap-track` rows: no bottom rules.
+- Removed Tailwind `divide-y` / suggestion list bottom border on catalogue lists.
+- **Scrollbar hidden** on catalogue host (`scrollbar-width: none` + webkit hide); list still scrolls.
+- Scoped under `.zap-catalogue` so playlists / history / admin hosts keep framed lists for now.
+- **Where:** `design-chrome.css`, `catalogue/+page.svelte`.
+- **Intent:** After de-carding the filter shell, the list shouldn’t sit in another heavy box with hairlines between every title.
+
+---
+
+### 8. Catalogue track row density + actions
+
+- **Horizontal padding:** removed (`px-4` gone) so rows align with toolbar edges.
+- **Vertical padding:** tightened to **`py-1.5` / `0.375rem`** (tried zero — too tight; restored smaller pad).
+- **Tags column:** `sm:items-center` so chips + actions sit vertically centered with the title block.
+- **Edit tags:** icon-only ghost button (no label, no border); `aria-label` / `title` kept.
+- **Metadata line:** artist · duration only — **no source** (`youtube` / etc.).
+- **Delete:** removed from catalogue `TrackRow` usages; admins delete via admin panel.
+- **Where:** `TrackRow.svelte`, `design-chrome.css` (catalogue overrides).
+- **Intent:** Denser reading list; actions stay quiet; catalogue isn’t an admin console.
+
+---
+
+### 9. Catalogue row hover — accent elements, not wash
+
+- **No row background** wash on catalogue hover (overrides global `.zap-track:hover` fill).
+- On hover (non-selected rows):
+  - **Title** → signal
+  - **Play control** → accent **border + icon color** only (transparent fill; no solid/signal fill on hover)
+  - **Tag chips** → signal border / text / light fill
+- **Selected / current row:** play button already has filled accent bg — **do not** re-style play on row hover when `.is-current`.
+- **Where:** `design-chrome.css` (`.zap-catalogue …`), `TrackRow.svelte` (`group` / `group-hover` where needed).
+- **Intent:** Hover points at what you’d interact with (title, play, tags), not a whole-row tint.
+
+---
+
+### 10. Catalogue data policy (list contents)
+
+- Browse / search only returns **`ready`** assets — **`unavailable`** songs are hidden from catalogue UI (`CATALOGUE_VISIBLE_STATUSES = ["ready"]`). Admin songs page still lists them.
+- **Where:** `apps/zap/src/lib/server/catalogue.ts`.
+- **Intent:** Catalogue is for playable music; broken/private sources don’t clutter the shelf.
+
+---
+
+### 11. Queue dock default
+
+- Catalog queue **defaults to docked** at the bottom footer (`docked = true`).
+- `localStorage` `zap.queue.docked`: missing key → docked; `"0"` / `"1"` still honor an explicit user choice.
+- **Where:** `CatalogQueueDock.svelte`.
+- **Intent:** Primary listening chrome lives in the footer unless the user undocks.
+
+---
+
+## Key files
+
+| Area | Path |
+| --- | --- |
+| Theme defaults | `apps/zap/src/lib/theme-prefs.ts` |
+| Shared dropdown + catalogue track CSS | `apps/zap/src/lib/styles/design-chrome.css` |
+| Underline input | `apps/zap/src/app.css` (`.zap-underline-field`) |
+| Catalogue filters UI | `apps/zap/src/lib/components/CatalogueFilters.svelte` |
+| Tag query field | `apps/zap/src/lib/components/TagQueryEditor.svelte` |
+| Select primitive | `apps/zap/src/lib/components/ZapSelect.svelte` |
+| Settings / mobile menu | `apps/zap/src/lib/components/SettingsMenu.svelte` |
+| Track row | `apps/zap/src/lib/components/TrackRow.svelte` |
+| Queue dock default | `apps/zap/src/lib/components/CatalogQueueDock.svelte` |
+| Shell layout | `apps/zap/src/routes/(protected)/+layout.svelte` |
+| Catalogue page | `apps/zap/src/routes/(protected)/catalogue/+page.svelte` |
+| Catalogue visibility | `apps/zap/src/lib/server/catalogue.ts` |
+
+---
+
+## Emerging principles (draft — not locked)
+
+Use these as candidates when writing a formal Zap design philosophy:
+
+1. **De-card secondary chrome**  
+   Page-level filter/tooling shouldn’t sit in a second `bg-card` frame when the content list already has (or used to have) frame chrome — prefer bare page flow.
+
+2. **Quiet meta, loud primary**  
+   Scope / Filters read as small muted mono captions; search (and primary CTAs like Add) carry the weight.
+
+3. **Text + chevron over icon buttons for toggles**  
+   Disclosure controls match each other (scope ↔ filters): label, chevron, optional count — no boxed icon-only toggles unless density demands it. Row-level actions can be **ghost icons** (edit tags).
+
+4. **Popovers for optional complexity**  
+   Tag query stays out of the permanent layout; open on demand; don’t persist open state across reloads.
+
+5. **One dropdown grammar**  
+   All menus share accent-edge + soft-white hover. Don’t invent a second floating-card language per feature.
+
+6. **Responsive: collapse chrome, don’t shrink type into oblivion**  
+   Primary nav collapses to a menu on small screens; filter popovers span the toolbar width instead of overflowing from a mid-row anchor.
+
+7. **Underline = inputting; edge = temporary menu**  
+   Underline fields for persistent text entry (search + tag query); accent bottom/top edge for ephemeral lists/menus.
+
+8. **Motion defaults favor readability**  
+   Opaque cards + quieter / on-top animation: beat visuals shouldn’t punch through UI at the expense of reading track titles.
+
+9. **Exclusive popovers**  
+   Opening one overlay (scope select) should dismiss another (filters) via correct outside-click scoping — don’t nest hit-targets so competing menus deadlock.
+
+10. **Casing as product voice**  
+    Title-case product labels where they act as proper names (“Your Library”), keep uppercase for section stamps / nav where the system already shouts (CATALOGUE title, shell links).
+
+11. **Hover the affordance, not the slab**  
+    List hover should light title / play chrome / tags — not a full-row background wash. Don’t restyle controls that are already in a filled selected state.
+
+12. **Catalogue is a listener shelf**  
+    Hide unplayable / admin-only concerns (unavailable rows, delete) from the main catalogue; keep density high and metadata lean (no source type in the subtitle).
+
+13. **Dock-first listening**  
+    Queue defaults to the bottom dock; floating is an escape hatch, not the first impression.
+
+---
+
+## Explicit non-goals (this pass)
+
+- Did not redesign auth screens, playlists page chrome, or admin list frames.
+- Did not change boxed `auth-field` globally — underline is opt-in (catalogue search + tag query).
+- Did not retarget field-variant `ZapSelect` triggers (admin/history still use boxed triggers); plain variant is the catalogue/toolbar pattern.
+- Did not wire a full `_bmad-output/zap` product SoR / FEATURE-REGISTRY — this guide is an implementation artifact only.
+- Devices dock default left unchanged (still undocked unless stored).
+
+---
+
+## Follow-ups / open questions
+
+- [ ] Apply underline search + plain scope patterns to **session “add from library”** collapsible filters for parity.
+- [ ] Decide whether **field** `ZapSelect` (boxed) should eventually lose the boxed trigger in denser toolbars.
+- [ ] Soft-white hover at 78% — validate on light-ish card fills and on-top animation layer; tweak if contrast fails.
+- [ ] Promote “Emerging principles” → locked `DESIGN.md` once playlists / history toolbars get the same pass.
+- [ ] Optional: extract `.zap-plain-disclosure` shared class for scope + Filters triggers to avoid drift.
+- [ ] Align `TrackListSkeleton` with borderless / no-horizontal-pad catalogue list.
+- [ ] Consider same hover grammar (title / chips, no wash) on playlist track lists.
+
+---
+
+## Changelog summary (one screen)
+
+- Theme defaults: card 100% · anim 40% · layer on top  
+- Catalogue filters: no card shell; plain scope + Filters; filters in popover; mobile-safe width  
+- Search + tag query: underline fields; white search icon  
+- Dropdowns: shared accent-edge + soft-white hover  
+- Shell: hamburger/app menu on small screens  
+- Interaction: Filters closes when opening scope select  
+- Catalogue list: no host frame / row borders; hidden scrollbar  
+- Track rows: tighter pad; ghost edit-tags; no source; no delete; centered tags  
+- Row hover: accent title / play border / tags — no wash; skip play restyle when selected  
+- Data: hide unavailable from catalogue  
+- Queue: default docked at bottom  

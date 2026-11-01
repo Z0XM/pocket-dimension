@@ -173,15 +173,29 @@
         <div class="zap-nav-progress" aria-hidden="true"></div>
         <span class="sr-only" role="status" aria-live="polite">Loading page…</span>
       {/if}
-      <div class="zap-shell-top-inner mx-auto flex max-w-5xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="zap-shell-top-inner mx-auto flex max-w-5xl items-center justify-between gap-3 px-3 py-4 sm:px-6">
         <a href="/home" class="zap-shell-brand flex items-center gap-3" aria-label="Zap home" aria-current={homeActive ? "page" : undefined}>
           <img src={icon} alt="" class="size-9 rounded-lg" width="36" height="36" />
           <span class="text-xl font-semibold tracking-tight text-foreground">Zap</span>
           <WaveBars />
         </a>
-        <div class="zap-shell-nav-links flex flex-wrap items-center gap-2 sm:gap-3">
+        <div class="zap-shell-nav-links hidden flex-wrap items-center gap-2 sm:flex sm:gap-3">
           {@render primaryNav(false)}
           <SettingsMenu username={data.user?.username ?? data.user?.email} isAdmin={data.zapAdmin} onSignOut={signOut} />
+        </div>
+        <div class="sm:hidden">
+          <SettingsMenu
+            includePrimary
+            username={data.user?.username ?? data.user?.email}
+            isAdmin={data.zapAdmin}
+            onSignOut={signOut}
+            {catalogueActive}
+            {playlistsActive}
+            {sessionActive}
+            {jobsActive}
+            {runningImportJobs}
+            showRunningJobs={showRunningJobsNav}
+          />
         </div>
       </div>
     </header>

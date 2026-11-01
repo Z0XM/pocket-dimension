@@ -209,7 +209,7 @@ export function subscribeTabAudioLeader(onChange: (isLeader: boolean) => void): 
     onChange(true);
     return () => {};
   }
-  if (typeof navigator !== "undefined" && navigator.locks?.request) {
+  if (typeof navigator !== "undefined" && typeof navigator.locks?.request === "function") {
     return subscribeWebLocksLeader(onChange);
   }
   return subscribeBroadcastLeader(onChange);

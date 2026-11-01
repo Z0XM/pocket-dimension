@@ -35,9 +35,7 @@
   const filteredOptions = $derived.by(() => {
     const needle = filter.trim().toLowerCase();
     if (!needle) return options;
-    return options.filter(
-      (t) => t.name.toLowerCase().includes(needle) || t.kind.toLowerCase().includes(needle)
-    );
+    return options.filter((t) => t.name.toLowerCase().includes(needle) || t.kind.toLowerCase().includes(needle));
   });
 
   function toggle(id: string) {
@@ -187,9 +185,7 @@
   {#if open}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class={`absolute z-50 flex w-full flex-col overflow-hidden rounded border border-border bg-popover shadow-[0_0_0_1px_color-mix(in_srgb,var(--signal)_12%,transparent)] ${
-        placement.openUp ? "bottom-full mb-1" : "top-full mt-1"
-      }`}
+      class={`zap-dropdown absolute z-50 flex w-full flex-col overflow-hidden ${placement.openUp ? "is-up bottom-full mb-1" : "top-full mt-1"}`}
       style={`max-height: ${placement.maxHeightPx}px`}
       role="presentation"
       onkeydown={onPickerKeydown}
@@ -206,13 +202,7 @@
         onclick={(e) => e.stopPropagation()}
         onkeydown={onPickerKeydown}
       />
-      <div
-        bind:this={listEl}
-        class="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-        role="listbox"
-        aria-multiselectable="true"
-        aria-label="Tags"
-      >
+      <div bind:this={listEl} class="min-h-0 flex-1 overflow-y-auto overscroll-contain" role="listbox" aria-multiselectable="true" aria-label="Tags">
         {#each filteredOptions as tag, index (tag.id)}
           {@const isOn = selected.includes(tag.id)}
           {@const isHi = index === highlightIndex}
@@ -223,7 +213,7 @@
             role="option"
             aria-selected={isOn}
             class={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-xs transition ${
-              isHi ? "bg-signal/15 text-signal" : isOn ? "text-signal hover:bg-signal/10" : "text-muted-foreground hover:bg-signal/10"
+              isHi ? "bg-white/80 text-[#12100e]" : isOn ? "text-signal" : "text-muted-foreground"
             }`}
             onclick={() => {
               highlightIndex = index;

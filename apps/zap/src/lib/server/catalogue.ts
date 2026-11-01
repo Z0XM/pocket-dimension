@@ -9,8 +9,8 @@ export { slugifyTag };
 
 export { parseCatalogueScope, type CatalogueScope } from "$lib/catalogue-scope";
 
-/** Statuses listed in browse / search. `unavailable` rows show with a "not available" badge and are not playable. */
-export const CATALOGUE_VISIBLE_STATUSES = ["ready", "unavailable"] as const;
+/** Statuses listed in browse / search. Unavailable songs stay out of the catalogue UI (admin still lists them). */
+export const CATALOGUE_VISIBLE_STATUSES = ["ready"] as const;
 
 export function isCatalogueVisibleStatus(status: string): boolean {
   return (CATALOGUE_VISIBLE_STATUSES as readonly string[]).includes(status);
@@ -201,11 +201,7 @@ export async function listCatalogue(input: CatalogueQuery, options: ListOptions 
         and(eq(schema.userLibraryEntries.mediaAssetId, schema.mediaAssets.id), eq(schema.userLibraryEntries.userId, input.userId))
       )
       .where(and(...conditions))
-      .orderBy(
-        sql`${schema.userLibraryEntries.sortKey} desc nulls last`,
-        desc(schema.mediaAssets.createdAt),
-        desc(schema.mediaAssets.id)
-      )
+      .orderBy(sql`${schema.userLibraryEntries.sortKey} desc nulls last`, desc(schema.mediaAssets.createdAt), desc(schema.mediaAssets.id))
       .limit(limit + 1)
       .offset(offset);
     hasMore = joined.length > limit;

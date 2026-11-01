@@ -27,7 +27,8 @@
   let isAudioLeader = $state(false);
   let appliedKey = "";
   let pendingSeekSec: number | null = null;
-  let docked = $state(false);
+  /** Default docked at the footer; localStorage only overrides after the user changes it. */
+  let docked = $state(true);
   let devicesDocked = $state(false);
   /** When true, exiting fullscreen restores the footer dock instead of a floating panel/icon. */
   let restoreDockOnExitFull = $state(false);
@@ -45,20 +46,16 @@
   const showQueue = $derived(queue.active && !hideCatalogFloats);
   const showDevices = $derived(!hideCatalogFloats && (queue.active || queue.onlineDevices.length > 1));
   const localNote = $derived(
-    !queue.thisDevice
-      ? null
-      : !deviceOutput
-        ? "This device is remote-only."
-        : !isAudioLeader
-          ? "Audio is playing in another Zap tab."
-          : null
+    !queue.thisDevice ? null : !deviceOutput ? "This device is remote-only." : !isAudioLeader ? "Audio is playing in another Zap tab." : null
   );
 
-  function readFlag(key: string): boolean {
+  function readFlag(key: string, defaultValue = false): boolean {
     try {
-      return localStorage.getItem(key) === "1";
+      const raw = localStorage.getItem(key);
+      if (raw === null) return defaultValue;
+      return raw === "1";
     } catch {
-      return false;
+      return defaultValue;
     }
   }
 
@@ -152,7 +149,7 @@
   const devicesDropInset = $derived(showQueue && docked ? DOCK_BAR_H : 0);
 
   onMount(() => {
-    docked = readFlag(DOCK_KEY);
+    docked = readFlag(DOCK_KEY, true);
     devicesDocked = readFlag(DEVICES_DOCK_KEY);
     queue.connect();
     const stopLeader = subscribeTabAudioLeader((leader) => {
@@ -197,10 +194,12 @@
     // Server moved the playhead (seek / track change). Keep optimistic seek position until
     // timeupdate confirms; otherwise clear local and follow the snapshot estimate.
     const pending = untrack(() => queue.pendingSeekMs);
-    const targetMs = pending ?? untrack(() => {
-      queue.localPositionMs = null;
-      return queue.positionMs;
-    });
+    const targetMs =
+      pending ??
+      untrack(() => {
+        queue.localPositionMs = null;
+        return queue.positionMs;
+      });
     const target = targetMs / 1000;
     queue.localPositionMs = targetMs;
     if (el.readyState >= 1) {
@@ -274,14 +273,7 @@
 <audio bind:this={audioEl} preload="auto" class="hidden" onloadedmetadata={onLoadedMetadata} ontimeupdate={onTimeUpdate} onended={onEnded}></audio>
 
 {#if showQueue && docked}
-  <CatalogQueueDockBar
-    {queue}
-    {audioBlocked}
-    {localNote}
-    onunlock={unlock}
-    onmaximize={maximizeFromDock}
-    onundock={undockToMini}
-  />
+  <CatalogQueueDockBar {queue} {audioBlocked} {localNote} onunlock={unlock} onmaximize={maximizeFromDock} onundock={undockToMini} />
 {:else if showQueue}
   {#key floatEpoch}
     <FloatingPanel
@@ -307,12 +299,7 @@
 {/if}
 
 {#if showDevices && devicesDocked}
-  <CatalogDevicesDock
-    {queue}
-    queueDocked={showQueue && docked}
-    onmaximize={maximizeDevicesFromDock}
-    onundock={undockDevicesToMini}
-  />
+  <CatalogDevicesDock {queue} queueDocked={showQueue && docked} onmaximize={maximizeDevicesFromDock} onundock={undockDevicesToMini} />
 {:else if showDevices}
   {#key devicesFloatEpoch}
     <FloatingPanel
@@ -338,4 +325,3 @@
     </FloatingPanel>
   {/key}
 {/if}
-
