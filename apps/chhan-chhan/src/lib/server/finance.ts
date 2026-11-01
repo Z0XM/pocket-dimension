@@ -20,6 +20,7 @@ import {
   sumPocketMinorByKind,
 } from "$lib/finance/space-settlement";
 import { buildSummarySearchFilterSql, buildTransactionSearchCondition } from "$lib/finance/transaction-search";
+import { computeSpaceRunningBalances } from "$lib/finance/space-balance";
 import { currentMonthKey, readRowYear, type SummarySelection } from "$lib/finance/summary";
 import { isBalanceSnapshotNewer } from "$lib/server/balance";
 import { db, schema } from "@pocket-dimension/db";
@@ -523,6 +524,7 @@ export async function listSpaceTransactions(accountId: string, spaceId: string) 
       type: schema.financeTransactions.type,
       merchant: schema.financeTransactions.merchant,
       notes: schema.financeTransactions.notes,
+      sortOrder: schema.financeTransactions.sortOrder,
     })
     .from(schema.financeSpaceTransactions)
     .innerJoin(schema.financeTransactions, eq(schema.financeTransactions.id, schema.financeSpaceTransactions.transactionId))
@@ -1361,6 +1363,7 @@ export async function listTransactions(accountId: string, query: TransactionsQue
         type: schema.financeTransactions.type,
         merchant: schema.financeTransactions.merchant,
         notes: schema.financeTransactions.notes,
+        sortOrder: schema.financeTransactions.sortOrder,
         createdAt: schema.financeTransactions.createdAt,
       })
       .from(schema.financeTransactions)
@@ -1374,14 +1377,22 @@ export async function listTransactions(accountId: string, query: TransactionsQue
   const total = Number(totalRows[0]?.total ?? 0);
   const loaded = offset + rows.length;
   const transactionIds = rows.map((row) => row.id);
-  const tagsByTransaction = await loadTagsForTransactions(transactionIds);
-  const spacesByTransaction = await loadSpacesForTransactions(transactionIds);
+  const [tagsByTransaction, spacesByTransaction, spaceBalances] = await Promise.all([
+    loadTagsForTransactions(transactionIds),
+    loadSpacesForTransactions(transactionIds),
+    query.spaceId
+      ? listSpaceTransactions(accountId, query.spaceId).then((spaceRows) =>
+          computeSpaceRunningBalances(spaceRows ?? [])
+        )
+      : Promise.resolve(null),
+  ]);
 
   return {
     rows: rows.map((row) => ({
       ...row,
       tags: tagsByTransaction.get(row.id) ?? [],
       spaces: spacesByTransaction.get(row.id) ?? [],
+      spaceBalanceMinor: spaceBalances?.get(row.id) ?? null,
     })),
     total,
     hasMore: loaded < total,

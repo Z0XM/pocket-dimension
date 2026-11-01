@@ -15,6 +15,7 @@
     sumOpenMinor,
     weightedSplitShares,
   } from "$lib/finance/space-settlement";
+  import SettlementGraph from "$lib/components/settlement-graph.svelte";
   import ArrowLeftRight from "@lucide/svelte/icons/arrow-left-right";
   import Plus from "@lucide/svelte/icons/plus";
   import type { PageData } from "./$types";
@@ -76,15 +77,18 @@
   let deletingItemId = $state<string | null>(null);
   let deletingPaymentId = $state<string | null>(null);
 
-  type SpaceTabId = "transactions" | "settlements" | "event-payments" | "events" | "people";
+  type SpaceTabId = "transactions" | "settlements" | "graphs" | "event-payments" | "events" | "people";
   const SPACE_TABS = [
     { id: "transactions" as const, label: "Transactions", tone: "yellow" },
     { id: "settlements" as const, label: "Settlements", tone: "green" },
+    { id: "graphs" as const, label: "Graphs", tone: "blue" },
     { id: "event-payments" as const, label: "Event Payments", tone: "orange" },
     { id: "events" as const, label: "Events", tone: "blue" },
     { id: "people" as const, label: "People", tone: "yellow" },
   ];
   let activeTab = $state<SpaceTabId>("transactions");
+  type GraphSubTab = "settlement" | "people";
+  let graphSubTab = $state<GraphSubTab>("settlement");
 
   type TxnGroupMode = "flat" | "settlements" | "events";
   const TXN_GROUP_MODES: Array<{ id: TxnGroupMode; label: string }> = [
@@ -725,13 +729,14 @@
 
   {#snippet txnRow(txn: Txn)}
     {@const rem = remainderById.get(txn.id)}
-    <tr>
+    {@const settled = (rem?.remainderMinor ?? 0) <= 0}
+    <tr class:settled-row={settled}>
       <td class="mono dim">{txn.occurredOn}</td>
       <td class="merchant">{txn.merchant ?? "—"}</td>
       <td class="right mono amt {typeClass(txn.type)}">
         {formatMoney(txn.amountMinor, data.account.currencyCode)}
       </td>
-      <td class="right mono amt {typeClass(txn.type)}" class:rem-open={(rem?.remainderMinor ?? 0) > 0}>
+      <td class="right mono amt {typeClass(txn.type)}" class:rem-open={!settled}>
         {formatSignedMoney(signedOpenMinor(txn.type, rem?.remainderMinor ?? 0), data.account.currencyCode)}
       </td>
       <td class="right">
@@ -835,7 +840,11 @@
         </button>
       {/each}
     </div>
-    <div class="notebook-sheet" class:fill-table={activeTab === "transactions"} data-tone={activeTab}>
+    <div
+      class="notebook-sheet"
+      class:fill-table={activeTab === "transactions" || activeTab === "settlements" || activeTab === "graphs"}
+      data-tone={activeTab}
+    >
       {#if activeTab === "transactions"}
         <section class="sheet-panel" id="space-panel-transactions" role="tabpanel" aria-labelledby="space-tab-transactions">
           <div class="txn-toolbar">
@@ -966,7 +975,7 @@
           {/if}
         </section>
       {:else if activeTab === "settlements"}
-        <section class="sheet-panel" id="space-panel-settlements" role="tabpanel" aria-labelledby="space-tab-settlements">
+        <section class="sheet-panel settle-panel" id="space-panel-settlements" role="tabpanel" aria-labelledby="space-tab-settlements">
           <p class="panel-copy dim">Link incoming with outgoing — pick one or many on each side.</p>
           {#if transactions.length < 2}
             <p class="dim empty">Need at least two transactions to allocate.</p>
@@ -1095,7 +1104,7 @@
               {/if}
             </form>
           {/if}
-          <div class="alloc-scroll">
+          <div class="alloc-scroll settle-records">
             <h3>Settlements</h3>
             {#if settlementBatches.length === 0}
               <p class="dim empty">None yet.</p>
@@ -1145,6 +1154,39 @@
               </ul>
             {/if}
           </div>
+        </section>
+      {:else if activeTab === "graphs"}
+        <section class="sheet-panel graphs-panel" id="space-panel-graphs" role="tabpanel" aria-labelledby="space-tab-graphs">
+          <div class="txn-toolbar">
+            <p class="panel-copy dim">See how payments settled other payments — base view for now.</p>
+            <div class="split-modes txn-group-modes" role="radiogroup" aria-label="Graph type">
+              <button
+                type="button"
+                class="split-mode"
+                class:active={graphSubTab === "settlement"}
+                role="radio"
+                aria-checked={graphSubTab === "settlement"}
+                onclick={() => (graphSubTab = "settlement")}
+              >
+                Settlement graph
+              </button>
+              <button
+                type="button"
+                class="split-mode"
+                class:active={graphSubTab === "people"}
+                role="radio"
+                aria-checked={graphSubTab === "people"}
+                onclick={() => (graphSubTab = "people")}
+              >
+                People graph
+              </button>
+            </div>
+          </div>
+          {#if graphSubTab === "settlement"}
+            <SettlementGraph transactions={transactions} edges={allocations} currencyCode={data.account.currencyCode} />
+          {:else}
+            <p class="dim empty">People graph comes later.</p>
+          {/if}
         </section>
       {:else if activeTab === "event-payments"}
         <section class="sheet-panel" id="space-panel-event-payments" role="tabpanel" aria-labelledby="space-tab-event-payments">
@@ -2011,6 +2053,29 @@
     overflow: auto;
     display: flex;
     flex-direction: column;
+  }
+
+  .notebook-sheet.fill-table .sheet-panel.settle-panel,
+  .notebook-sheet.fill-table .sheet-panel.graphs-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .notebook-sheet.fill-table .alloc-scroll.settle-records {
+    flex: 1 1 auto;
+    min-height: 12rem;
+    max-height: none;
+    overflow: auto;
+  }
+
+  tr.settled-row {
+    opacity: 0.55;
+    color: color-mix(in srgb, var(--ink) 72%, transparent);
+  }
+
+  tr.settled-row .merchant,
+  tr.settled-row .amt {
+    color: inherit;
   }
 
   .merchant {
