@@ -23,9 +23,9 @@ export const actions: Actions = {
     requireZapAdmin(locals);
     const form = await request.formData();
     const name = String(form.get("name") ?? "");
-    const icon = form.get("icon");
     try {
-      const tag = await createSystemTag(name, icon);
+      // Text tags only here — icons are attached in the Icons & emojis subsection.
+      const tag = await createSystemTag(name);
       return { ok: `Added system tag "${tag.name}".` };
     } catch (err) {
       if (err instanceof TagAdminError) return fail(err.status, { error: err.message, name });
