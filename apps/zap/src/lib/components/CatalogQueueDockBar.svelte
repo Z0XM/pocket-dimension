@@ -10,6 +10,7 @@
   import SkipForwardIcon from "@lucide/svelte/icons/skip-forward";
   import { formatClock } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
+  import MarqueeText from "$lib/components/MarqueeText.svelte";
   import SeekBar from "$lib/components/SeekBar.svelte";
   import { DOCK_BAR_H, DROP_ZONE_PX, inDropZone } from "$lib/floating-panel";
 
@@ -225,8 +226,9 @@
   {/if}
 
   <div class="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 sm:gap-3">
-    <div class="min-w-0 flex-1">
-      <p class="truncate text-sm font-medium text-foreground" title={current?.title}>{current?.title ?? "Queue finished"}</p>
+    <!-- Optimistic width cap so the title never runs under centered/right transport. -->
+    <div class="min-w-0 flex-1 overflow-hidden pr-1 sm:max-w-[min(42%,16rem)] sm:flex-none md:max-w-[min(38%,18rem)]">
+      <MarqueeText class="text-sm font-medium text-foreground" text={current?.title ?? "Queue finished"} title={current?.title ?? "Queue finished"} />
       <p class="truncate font-mono text-[10px] text-muted-foreground">{current?.artists ?? "—"}</p>
     </div>
 

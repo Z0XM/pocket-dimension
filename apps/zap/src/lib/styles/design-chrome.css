@@ -580,6 +580,55 @@ html[data-animations="off"] .zap-float-panel.zap-float-full-out {
   backdrop-filter: none;
 }
 
+/* Dock title: clipped viewport + optional left→right auto-scroll when overflowing. */
+.zap-marquee {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.zap-marquee-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.zap-marquee-text.is-scrolling {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  padding-right: 1.25rem;
+  animation: zap-marquee-scroll var(--zap-marquee-duration, 9s) ease-in-out infinite;
+}
+
+@keyframes zap-marquee-scroll {
+  0%,
+  12% {
+    transform: translateX(0);
+  }
+  48%,
+  62% {
+    transform: translateX(calc(-1 * var(--zap-marquee-distance, 0px)));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+html[data-animations="off"] .zap-marquee-text.is-scrolling {
+  animation: none !important;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 0;
+  transform: none;
+}
+
 /*
  * Ranges (seek / volume / prefs): rectangular track + vertical-rect thumb.
  * Playback seek (`zap-seek--progress`): signal fill via `--seek-pct` 0–100%.
