@@ -42,8 +42,95 @@
   let undockWillLeave = $state(false);
   let undockStart: { x: number; y: number } | null = null;
 
-  /** Swipe-up-to-maximize (mobile locked dock). */
-  let swipeStart: { x: number; y: number; t: number } | null = null;
+  /** Whole dock is the swipe surface when locked (buttons excluded). */
+  let dockEl: HTMLDivElement | null = $state(null);
+  let swipeActive = false;
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let swipeFired = false;
+
+  function isInteractiveTarget(target: EventTarget | null) {
+    return Boolean((target as HTMLElement | null)?.closest?.("button, input, a, [data-no-swipe]"));
+  }
+
+  function pointFromEvent(e: TouchEvent | PointerEvent): { x: number; y: number } | null {
+    if ("touches" in e) {
+      const t = e.touches[0] ?? e.changedTouches[0];
+      return t ? { x: t.clientX, y: t.clientY } : null;
+    }
+    if ("clientX" in e) return { x: e.clientX, y: e.clientY };
+    return null;
+  }
+
+  function beginSwipe(e: TouchEvent | PointerEvent) {
+    if (!locked) return;
+    if (isInteractiveTarget(e.target)) return;
+    const p = pointFromEvent(e);
+    if (!p) return;
+    swipeActive = true;
+    swipeFired = false;
+    swipeStartX = p.x;
+    swipeStartY = p.y;
+  }
+
+  function moveSwipe(e: TouchEvent | PointerEvent) {
+    if (!locked || !swipeActive || swipeFired) return;
+    const p = pointFromEvent(e);
+    if (!p) return;
+    const dx = p.x - swipeStartX;
+    const dy = p.y - swipeStartY;
+    // Commit as soon as the upward swipe clears the threshold (don't wait for release).
+    if (dy < -28 && Math.abs(dy) > Math.abs(dx)) {
+      swipeFired = true;
+      swipeActive = false;
+      if (e.cancelable) e.preventDefault();
+      onmaximize();
+    }
+  }
+
+  function endSwipe() {
+    swipeActive = false;
+    swipeFired = false;
+  }
+
+  // touchmove must be non-passive so preventDefault can keep the gesture.
+  $effect(() => {
+    const el = dockEl;
+    if (!el || !locked) return;
+
+    const onStart = (e: TouchEvent) => beginSwipe(e);
+    const onMove = (e: TouchEvent) => {
+      if (!swipeActive) return;
+      if (e.cancelable) e.preventDefault();
+      moveSwipe(e);
+    };
+    const onEnd = () => endSwipe();
+
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  });
+
+  function onDockPointerDown(e: PointerEvent) {
+    if (!locked) return;
+    // Touch path is owned by non-passive listeners above.
+    if (e.pointerType === "touch") return;
+    if (e.button !== 0) return;
+    beginSwipe(e);
+    if (swipeActive) (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function onDockPointerMove(e: PointerEvent) {
+    if (e.pointerType === "touch") return;
+    moveSwipe(e);
+  }
 
   function startUndock(e: PointerEvent) {
     if (locked || e.button !== 0) return;
@@ -67,32 +154,6 @@
     undockDragging = false;
     undockWillLeave = false;
     if (leave) onundock();
-  }
-
-  function onDockPointerDown(e: PointerEvent) {
-    if (!locked || e.button !== 0) return;
-    if ((e.target as HTMLElement).closest("button, input, a, [data-no-swipe]")) return;
-    swipeStart = { x: e.clientX, y: e.clientY, t: Date.now() };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }
-
-  function onDockPointerUp(e: PointerEvent) {
-    if (!locked || !swipeStart) {
-      swipeStart = null;
-      return;
-    }
-    const dx = e.clientX - swipeStart.x;
-    const dy = e.clientY - swipeStart.y;
-    const dt = Date.now() - swipeStart.t;
-    swipeStart = null;
-    // Swipe up: enough vertical travel, mostly vertical, not too slow.
-    if (dy < -48 && Math.abs(dy) > Math.abs(dx) * 1.2 && dt < 800) {
-      onmaximize();
-    }
-  }
-
-  function onDockPointerCancel() {
-    swipeStart = null;
   }
 </script>
 
@@ -134,15 +195,17 @@
 {/snippet}
 
 <div
+  bind:this={dockEl}
   class={`zap-queue-dock fixed inset-x-0 bottom-0 z-[42] flex border-t border-signal/40 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] ${
     undockDragging && undockWillLeave ? "opacity-70" : ""
-  } ${locked ? "touch-pan-y" : ""}`}
-  style={`height:${DOCK_BAR_H}px`}
+  }`}
+  style={`height:${DOCK_BAR_H}px;${locked ? "touch-action:none;-webkit-user-select:none;user-select:none;" : ""}`}
   role="region"
   aria-label={locked ? "Docked queue player. Swipe up to maximize." : "Docked queue player"}
   onpointerdown={onDockPointerDown}
-  onpointerup={onDockPointerUp}
-  onpointercancel={onDockPointerCancel}
+  onpointermove={onDockPointerMove}
+  onpointerup={endSwipe}
+  onpointercancel={endSwipe}
 >
   {#if !locked}
     <button
@@ -161,8 +224,7 @@
     </button>
   {/if}
 
-  <div class="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 sm:gap-3" data-no-swipe>
-    <!-- Title: takes remaining space; on mobile transport sits on the right -->
+  <div class="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 sm:gap-3">
     <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-medium text-foreground" title={current?.title}>{current?.title ?? "Queue finished"}</p>
       <p class="truncate font-mono text-[10px] text-muted-foreground">{current?.artists ?? "—"}</p>
@@ -224,8 +286,7 @@
         <p class="truncate text-xs text-foreground" title={nextItem?.title}>{nextItem?.title ?? "—"}</p>
       </div>
 
-      <!-- Mobile-only transport on the right -->
-      <div class="flex items-center gap-0.5 sm:hidden">
+      <div class="flex items-center gap-0.5 sm:hidden" data-no-swipe>
         {@render transport()}
       </div>
 
