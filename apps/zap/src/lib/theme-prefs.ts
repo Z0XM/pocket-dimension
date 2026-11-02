@@ -17,24 +17,29 @@ export const ACCENT_PRESETS = [
 /**
  * Page grounds — near-black neutrals plus dark tints matching each accent
  * (same depth family as dark purple `#100a16`).
- * `card` is the paired surface (header / dock / chips) — no separate picker.
  */
 export const PAGE_PRESETS = [
-  { id: "dark-black", label: "Dark black", value: "#050505", card: "#0f0f0f" },
-  { id: "black", label: "Black", value: "#0a0a0a", card: "#141414" },
-  { id: "dark-coral", label: "Dark coral", value: "#160a08", card: "#1e100c" },
-  { id: "dark-red", label: "Dark red", value: "#160808", card: "#1e0e0e" },
-  { id: "dark-purple", label: "Dark purple", value: "#100a16", card: "#18121e" },
-  { id: "dark-pink", label: "Dark pink", value: "#160a10", card: "#1e1018" },
-  { id: "dark-cream", label: "Dark cream", value: "#12100e", card: "#1a1814" },
-  { id: "dark-yellow", label: "Dark yellow", value: "#161208", card: "#1e1a0e" },
-  { id: "dark-green", label: "Dark green", value: "#08140e", card: "#0e1a14" },
-  { id: "dark-blue", label: "Dark blue", value: "#0a0e16", card: "#10141e" },
+  { id: "dark-black", label: "Dark black", value: "#050505" },
+  { id: "black", label: "Black", value: "#0a0a0a" },
+  { id: "dark-coral", label: "Dark coral", value: "#160a08" },
+  { id: "dark-red", label: "Dark red", value: "#160808" },
+  { id: "dark-purple", label: "Dark purple", value: "#100a16" },
+  { id: "dark-pink", label: "Dark pink", value: "#160a10" },
+  { id: "dark-cream", label: "Dark cream", value: "#12100e" },
+  { id: "dark-yellow", label: "Dark yellow", value: "#161208" },
+  { id: "dark-green", label: "Dark green", value: "#08140e" },
+  { id: "dark-blue", label: "Dark blue", value: "#0a0e16" },
 ] as const;
 
-/** @deprecated Kept for reading old localStorage `card` ids; apply uses page.card. */
+/**
+ * Shared chrome surface for header, queue dock, floating panels, play tiles, etc.
+ * Fixed (not page-tinted) so the bar stays the same across page backgrounds.
+ */
+export const DEFAULT_CARD_SURFACE = "#0f0f0f";
+
+/** @deprecated Kept for reading old localStorage `card` ids; display uses DEFAULT_CARD_SURFACE. */
 export const CARD_PRESETS = [
-  { id: "ink", label: "Ink", value: "#0f0f0f" },
+  { id: "ink", label: "Ink", value: DEFAULT_CARD_SURFACE },
   { id: "charcoal", label: "Charcoal", value: "#111111" },
   { id: "slate", label: "Slate", value: "#161616" },
   { id: "steel", label: "Steel", value: "#1c1c1c" },
