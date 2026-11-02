@@ -304,7 +304,7 @@ Introduced **`.zap-dropdown`** in `design-chrome.css` and applied across Zap men
 **Issues noted (apply on every queue surface):**
 
 1. Songs need **accent color on hover** (title / tags) — not a row wash.
-2. Show **tags** on each queued track (Theme display prefs).
+2. Show **tags** on each queued track (Theme display prefs) **only when the queue float is maximized** — right of title on the same row (catalogue layout). Dock / floating panel / icon: no tags.
 3. **Shuffle** + **loop** (off → all → one) in the personal catalogue queue.
 4. **Prev / next** use `.zap-transport-btn` so hover tints the icon.
 

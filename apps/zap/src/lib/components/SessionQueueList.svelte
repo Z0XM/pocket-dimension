@@ -198,8 +198,12 @@
                 <span class="block truncate font-mono text-[10px] text-muted-foreground"
                   >{item.artists ?? "Unknown"} · {item.addedByDisplayName}</span
                 >
-                <QueueTagMarks tags={item.tags ?? []} />
               </span>
+              {#if (item.tags?.length ?? 0) > 0}
+                <span class="hidden max-w-[45%] shrink-0 flex-wrap items-center justify-end gap-0.5 sm:flex">
+                  <QueueTagMarks tags={item.tags ?? []} />
+                </span>
+              {/if}
               <span class="shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(item.durationMs)}</span>
             </button>
             {#if canRemove}
@@ -234,10 +238,12 @@
                 onclick={() => void playItem(item)}
               >
                 <span class="w-6 shrink-0 text-right font-mono text-[10px] tabular-nums">{index + 1}</span>
-                <span class="min-w-0 flex-1">
-                  <span class="zap-track-title block truncate text-[13px]">{item.title}</span>
-                  <QueueTagMarks tags={item.tags ?? []} />
-                </span>
+                <span class="zap-track-title min-w-0 flex-1 truncate text-[13px]">{item.title}</span>
+                {#if (item.tags?.length ?? 0) > 0}
+                  <span class="hidden max-w-[40%] shrink-0 flex-wrap items-center justify-end gap-0.5 sm:flex">
+                    <QueueTagMarks tags={item.tags ?? []} />
+                  </span>
+                {/if}
               </button>
               {#if canRemove}
                 <button

@@ -291,8 +291,8 @@
       {#snippet icon()}
         <ListMusicIcon class="size-5" />
       {/snippet}
-      {#snippet children()}
-        <CatalogQueuePanel {queue} {audioBlocked} {localNote} onunlock={unlock} />
+      {#snippet children({ mode })}
+        <CatalogQueuePanel {queue} {audioBlocked} {localNote} showTags={mode === "full"} onunlock={unlock} />
       {/snippet}
     </FloatingPanel>
   {/key}

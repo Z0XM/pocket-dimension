@@ -20,6 +20,8 @@
     queue,
     audioBlocked = false,
     localNote = null,
+    /** Only show tags when the floating queue is maximized (fullscreen). */
+    showTags = false,
     onunlock,
   }: {
     queue: CatalogQueueClient;
@@ -27,6 +29,7 @@
     audioBlocked?: boolean;
     /** Why this device is silent (remote-only, session open…). */
     localNote?: string | null;
+    showTags?: boolean;
     onunlock?: () => void;
   } = $props();
 
@@ -294,8 +297,12 @@
           <span class="min-w-0 flex-1">
             <span class={`zap-track-title block truncate text-[13px] ${isCurrent ? "text-signal" : "text-foreground"}`}>{item.title}</span>
             <span class="block truncate font-mono text-[10px] text-muted-foreground">{item.artists ?? "Unknown"}</span>
-            <QueueTagMarks tags={item.tags ?? []} />
           </span>
+          {#if showTags && (item.tags?.length ?? 0) > 0}
+            <span class="hidden max-w-[45%] shrink-0 flex-wrap items-center justify-end gap-0.5 sm:flex">
+              <QueueTagMarks tags={item.tags ?? []} />
+            </span>
+          {/if}
           <span class="shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(item.durationMs)}</span>
         </button>
         <button
@@ -340,10 +347,12 @@
                 onclick={() => void queue.jump(item.id)}
               >
                 <span class="w-6 shrink-0 text-right font-mono text-[10px] tabular-nums">{index + 1}</span>
-                <span class="min-w-0 flex-1">
-                  <span class="zap-track-title block truncate text-[13px]">{item.title}</span>
-                  <QueueTagMarks tags={item.tags ?? []} />
-                </span>
+                <span class="zap-track-title min-w-0 flex-1 truncate text-[13px]">{item.title}</span>
+                {#if showTags && (item.tags?.length ?? 0) > 0}
+                  <span class="hidden max-w-[40%] shrink-0 flex-wrap items-center justify-end gap-0.5 sm:flex">
+                    <QueueTagMarks tags={item.tags ?? []} />
+                  </span>
+                {/if}
               </button>
               <button
                 type="button"
