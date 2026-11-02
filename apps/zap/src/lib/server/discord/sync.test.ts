@@ -35,6 +35,7 @@ function baseSnapshot(overrides: Partial<SessionSnapshot["session"]> & { playabl
       artists: null,
       durationMs: 60000,
       playable,
+      tags: [],
       addedByUserId: "u1",
       addedByDisplayName: "Host",
       createdAt: new Date().toISOString(),

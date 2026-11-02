@@ -43,10 +43,6 @@
   let devicesFloatOpenAs = $state<FloatingMode | null>(null);
   let devicesFloatEpoch = $state(0);
 
-  /** Footer player visible (including mobile lock). False while the maximized float is open. */
-  const showDockBar = $derived(showQueue && docked);
-  const showQueueFloat = $derived(showQueue && !docked);
-
   /** Session / join routes own their chrome; hide catalog floating queue + devices there. */
   const path = $derived(page.url.pathname);
   const hideCatalogFloats = $derived(path.startsWith("/session") || path.startsWith("/join"));
@@ -54,6 +50,9 @@
   const outputHere = $derived(deviceOutput && isAudioLeader && !hideCatalogFloats);
   const showQueue = $derived(queue.active && !hideCatalogFloats);
   const showDevices = $derived(!hideCatalogFloats && (queue.active || queue.onlineDevices.length > 1));
+  /** Footer player visible (including mobile lock). False while the maximized float is open. */
+  const showDockBar = $derived(showQueue && docked);
+  const showQueueFloat = $derived(showQueue && !docked);
   const localNote = $derived(
     !queue.thisDevice ? null : !deviceOutput ? "This device is remote-only." : !isAudioLeader ? "Audio is playing in another Zap tab." : null
   );
