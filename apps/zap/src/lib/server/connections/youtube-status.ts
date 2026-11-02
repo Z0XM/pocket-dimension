@@ -90,14 +90,14 @@ export async function upsertPlaylistPref(opts: {
   hidden?: boolean;
   importStatus?: PlaylistImportStatus;
   alreadyImported?: number;
+  zapPlaylistId?: string | null;
+  syncMode?: "additive" | "exact";
+  syncInterval?: "off" | "hourly" | "every_6_hours" | "daily";
   lastSyncedAt?: Date | null;
   lastSyncError?: string | null;
 }) {
   const existing = await db.query.youtubePlaylistPrefs.findFirst({
-    where: and(
-      eq(schema.youtubePlaylistPrefs.userId, opts.userId),
-      eq(schema.youtubePlaylistPrefs.youtubePlaylistId, opts.youtubePlaylistId)
-    ),
+    where: and(eq(schema.youtubePlaylistPrefs.userId, opts.userId), eq(schema.youtubePlaylistPrefs.youtubePlaylistId, opts.youtubePlaylistId)),
   });
   if (existing) {
     const [row] = await db
@@ -108,15 +108,13 @@ export async function upsertPlaylistPref(opts: {
         ...(opts.hidden !== undefined ? { hidden: opts.hidden } : {}),
         ...(opts.importStatus !== undefined ? { importStatus: opts.importStatus } : {}),
         ...(opts.alreadyImported !== undefined ? { alreadyImported: opts.alreadyImported } : {}),
+        ...(opts.zapPlaylistId !== undefined ? { zapPlaylistId: opts.zapPlaylistId } : {}),
+        ...(opts.syncMode !== undefined ? { syncMode: opts.syncMode } : {}),
+        ...(opts.syncInterval !== undefined ? { syncInterval: opts.syncInterval } : {}),
         ...(opts.lastSyncedAt !== undefined ? { lastSyncedAt: opts.lastSyncedAt } : {}),
         ...(opts.lastSyncError !== undefined ? { lastSyncError: opts.lastSyncError } : {}),
       })
-      .where(
-        and(
-          eq(schema.youtubePlaylistPrefs.userId, opts.userId),
-          eq(schema.youtubePlaylistPrefs.youtubePlaylistId, opts.youtubePlaylistId)
-        )
-      )
+      .where(and(eq(schema.youtubePlaylistPrefs.userId, opts.userId), eq(schema.youtubePlaylistPrefs.youtubePlaylistId, opts.youtubePlaylistId)))
       .returning();
     return row!;
   }
@@ -130,6 +128,9 @@ export async function upsertPlaylistPref(opts: {
       hidden: opts.hidden ?? false,
       importStatus: opts.importStatus ?? "not_imported",
       alreadyImported: opts.alreadyImported ?? 0,
+      zapPlaylistId: opts.zapPlaylistId ?? null,
+      syncMode: opts.syncMode ?? "additive",
+      syncInterval: opts.syncInterval ?? "off",
       lastSyncedAt: opts.lastSyncedAt ?? null,
       lastSyncError: opts.lastSyncError ?? null,
     })
@@ -167,6 +168,9 @@ export type EnrichedPlaylist = ZapYouTubePlaylist & {
   alreadyImported: number;
   autoSync: boolean;
   hidden: boolean;
+  zapPlaylistId: string | null;
+  syncMode: "additive" | "exact";
+  syncInterval: "off" | "hourly" | "every_6_hours" | "daily";
   lastSyncedAt: string | null;
   lastSyncError: string | null;
 };
@@ -180,12 +184,16 @@ export async function enrichPlaylistsWithStatus(userId: string, playlists: ZapYo
   return playlists.map((p) => {
     const pref = prefs.get(p.id);
     const importStatus = (pref?.importStatus as PlaylistImportStatus | undefined) ?? "not_imported";
+    const syncInterval = (pref?.syncInterval as EnrichedPlaylist["syncInterval"] | undefined) ?? "off";
     return {
       ...p,
       importStatus,
       alreadyImported: pref?.alreadyImported ?? 0,
-      autoSync: pref?.autoSync ?? false,
+      autoSync: pref?.autoSync ?? syncInterval !== "off",
       hidden: pref?.hidden ?? false,
+      zapPlaylistId: pref?.zapPlaylistId ?? null,
+      syncMode: (pref?.syncMode as EnrichedPlaylist["syncMode"] | undefined) ?? "additive",
+      syncInterval,
       lastSyncedAt: pref?.lastSyncedAt?.toISOString() ?? null,
       lastSyncError: pref?.lastSyncError ?? null,
     };

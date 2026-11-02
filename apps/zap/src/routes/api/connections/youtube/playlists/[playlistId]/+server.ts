@@ -1,7 +1,7 @@
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { getYoutubeLinkStatus, listYouTubePlaylists } from "$lib/server/youtube";
-import { upsertPlaylistPref } from "$lib/server/connections";
+import { parseSyncInterval, parseSyncMode, syncIntervalToAutoSync, upsertPlaylistPref } from "$lib/server/connections";
 import { previewYouTubePlaylist } from "$lib/server/connections/youtube-playlists";
 import { logConnectionActivity } from "$lib/server/connections/activity";
 
@@ -34,34 +34,63 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
     autoSync?: boolean;
     hidden?: boolean;
     title?: string;
+    syncMode?: string;
+    syncInterval?: string;
   };
   const hasAutoSync = typeof body.autoSync === "boolean";
   const hasHidden = typeof body.hidden === "boolean";
-  if (!hasAutoSync && !hasHidden) throw error(400, "autoSync or hidden boolean required");
+  const syncMode = body.syncMode !== undefined ? parseSyncMode(body.syncMode) : undefined;
+  const parsedInterval = body.syncInterval !== undefined ? parseSyncInterval(body.syncInterval) : undefined;
+  if (body.syncMode !== undefined && !syncMode) throw error(400, "syncMode must be additive or exact");
+  if (body.syncInterval !== undefined && !parsedInterval) throw error(400, "invalid syncInterval");
+  if (!hasAutoSync && !hasHidden && syncMode === undefined && parsedInterval === undefined) {
+    throw error(400, "autoSync, hidden, syncMode, or syncInterval required");
+  }
 
   let title = typeof body.title === "string" ? body.title : null;
-  if (!title && hasAutoSync) {
+  if (!title && (hasAutoSync || parsedInterval !== undefined)) {
     const playlists = await listYouTubePlaylists(locals.user.id).catch(() => []);
     title = playlists.find((p) => p.id === playlistId)?.title ?? null;
+  }
+
+  // Interval drives autoSync; flipping autoSync alone maps to hourly/off for legacy toggles.
+  let nextInterval = parsedInterval;
+  let nextAutoSync = hasAutoSync ? body.autoSync : undefined;
+  if (parsedInterval) {
+    nextAutoSync = syncIntervalToAutoSync(parsedInterval);
+  } else if (hasAutoSync) {
+    nextInterval = body.autoSync ? "hourly" : "off";
+    nextAutoSync = body.autoSync;
   }
 
   const pref = await upsertPlaylistPref({
     userId: locals.user.id,
     youtubePlaylistId: playlistId,
     ...(title ? { title } : {}),
-    ...(hasAutoSync ? { autoSync: body.autoSync } : {}),
+    ...(nextAutoSync !== undefined ? { autoSync: nextAutoSync } : {}),
     ...(hasHidden ? { hidden: body.hidden } : {}),
+    ...(syncMode ? { syncMode } : {}),
+    ...(nextInterval ? { syncInterval: nextInterval } : {}),
   });
 
-  if (hasAutoSync) {
+  if (nextAutoSync !== undefined) {
     await logConnectionActivity({
       userId: locals.user.id,
       provider: "youtube",
-      kind: body.autoSync ? "auto_sync_on" : "auto_sync_off",
-      summary: body.autoSync
-        ? `Enabled auto-sync for “${pref.title ?? playlistId}”`
+      kind: nextAutoSync ? "auto_sync_on" : "auto_sync_off",
+      summary: nextAutoSync
+        ? `Enabled auto-sync (${pref.syncInterval}) for “${pref.title ?? playlistId}”`
         : `Disabled auto-sync for “${pref.title ?? playlistId}”`,
-      meta: { playlistId },
+      meta: { playlistId, syncInterval: pref.syncInterval },
+    });
+  }
+  if (syncMode) {
+    await logConnectionActivity({
+      userId: locals.user.id,
+      provider: "youtube",
+      kind: "sync_mode",
+      summary: `Set sync mode to ${syncMode} for “${pref.title ?? playlistId}”`,
+      meta: { playlistId, syncMode },
     });
   }
   if (hasHidden) {
@@ -69,9 +98,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
       userId: locals.user.id,
       provider: "youtube",
       kind: body.hidden ? "playlist_hidden" : "playlist_unhidden",
-      summary: body.hidden
-        ? `Hid “${pref.title ?? playlistId}” from the playlist list`
-        : `Unhid “${pref.title ?? playlistId}”`,
+      summary: body.hidden ? `Hid “${pref.title ?? playlistId}” from the playlist list` : `Unhid “${pref.title ?? playlistId}”`,
       meta: { playlistId },
     });
   }
@@ -82,6 +109,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
     hidden: pref.hidden,
     importStatus: pref.importStatus,
     alreadyImported: pref.alreadyImported,
+    zapPlaylistId: pref.zapPlaylistId,
+    syncMode: pref.syncMode,
+    syncInterval: pref.syncInterval,
     title: pref.title,
     lastSyncedAt: pref.lastSyncedAt?.toISOString() ?? null,
   });

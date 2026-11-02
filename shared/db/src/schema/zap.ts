@@ -631,15 +631,17 @@ export const zapSettings = zapSchema.table("settings", {
 
 export const connectionProvider = zapSchema.enum("connection_provider", ["discord", "spotify", "youtube"]);
 
-export const youtubePlaylistImportStatus = zapSchema.enum("youtube_playlist_import_status", [
-  "fully_imported",
-  "partially_imported",
-  "not_imported",
-]);
+export const youtubePlaylistImportStatus = zapSchema.enum("youtube_playlist_import_status", ["fully_imported", "partially_imported", "not_imported"]);
+
+/** How a connected YouTube playlist mirrors into its Zap playlist. */
+export const youtubePlaylistSyncMode = zapSchema.enum("youtube_playlist_sync_mode", ["additive", "exact"]);
+
+/** Auto-sync cadence for a connected YouTube → Zap playlist mirror. `off` disables auto-sync. */
+export const youtubePlaylistSyncInterval = zapSchema.enum("youtube_playlist_sync_interval", ["off", "hourly", "every_6_hours", "daily"]);
 
 /**
- * Per-user YouTube playlist prefs (auto-sync, hide, cached import status) for Connections UI.
- * Additive sync only — never removes catalogue rows when YT drops a video.
+ * Per-user YouTube playlist prefs (mirror Zap playlist, sync mode/interval, hide, import status).
+ * Catalogue imports stay additive; Exact mode may remove tracks from the linked Zap playlist only.
  */
 export const youtubePlaylistPrefs = zapSchema.table(
   "youtube_playlist_prefs",
@@ -655,6 +657,12 @@ export const youtubePlaylistPrefs = zapSchema.table(
     /** Last known library coverage (updated on preview / import / auto-sync). */
     importStatus: youtubePlaylistImportStatus("import_status").default("not_imported").notNull(),
     alreadyImported: integer("already_imported").default(0).notNull(),
+    /** Linked Zap freehand playlist that mirrors this YouTube playlist 1:1. */
+    zapPlaylistId: uuid("zap_playlist_id").references(() => playlists.id, { onDelete: "set null" }),
+    /** Additive = only add new YT tracks; Exact = also remove Zap tracks gone from YT. */
+    syncMode: youtubePlaylistSyncMode("sync_mode").default("additive").notNull(),
+    /** When not `off`, auto-applies mirror sync on this cadence (`auto_sync` stays in sync). */
+    syncInterval: youtubePlaylistSyncInterval("sync_interval").default("off").notNull(),
     lastSyncedAt: timestamp("last_synced_at"),
     lastSyncError: text("last_sync_error"),
     createdAt: timestamps.createdAt,
@@ -666,6 +674,7 @@ export const youtubePlaylistPrefs = zapSchema.table(
   (table) => [
     primaryKey({ columns: [table.userId, table.youtubePlaylistId] }),
     index("youtube_playlist_prefs_user_autosync_idx").on(table.userId, table.autoSync),
+    index("youtube_playlist_prefs_zap_playlist_id_idx").on(table.zapPlaylistId),
   ]
 );
 
@@ -683,9 +692,7 @@ export const connectionActivity = zapSchema.table(
     metaJson: text("meta_json"),
     createdAt: timestamps.createdAt,
   },
-  (table) => [
-    index("connection_activity_user_provider_idx").on(table.userId, table.provider, table.createdAt),
-  ]
+  (table) => [index("connection_activity_user_provider_idx").on(table.userId, table.provider, table.createdAt)]
 );
 
 /** Background catalogue imports (Add song / Connections YouTube) — survive reload. */

@@ -17,7 +17,15 @@ export const load: PageServerLoad = async ({ locals }) => {
     getYoutubeLinkStatus(userId),
   ]);
 
-  let connectedPlaylists: { id: string; title: string; itemCount: number | null; importStatus?: string | null }[] = [];
+  let connectedPlaylists: {
+    id: string;
+    title: string;
+    itemCount: number | null;
+    importStatus?: string | null;
+    zapPlaylistId?: string | null;
+    syncMode?: string | null;
+    syncInterval?: string | null;
+  }[] = [];
   if (ytStatus.linked) {
     try {
       const rows = await listEnrichedYouTubePlaylists(userId);
@@ -26,6 +34,9 @@ export const load: PageServerLoad = async ({ locals }) => {
         title: r.title,
         itemCount: r.itemCount ?? null,
         importStatus: r.importStatus ?? null,
+        zapPlaylistId: r.zapPlaylistId ?? null,
+        syncMode: r.syncMode ?? null,
+        syncInterval: r.syncInterval ?? null,
       }));
     } catch {
       connectedPlaylists = [];

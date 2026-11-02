@@ -2,15 +2,7 @@ import { ensureCustomTags } from "$lib/server/catalogue";
 import { ingestCatalogueVideo, ingestPublicUrl, type IngestItemResult } from "$lib/server/ingest/pipeline";
 import { importConnectedPlaylists } from "$lib/server/youtube/import-playlists";
 import { clearJobLiveSongs, setJobLiveSongs } from "./live-progress";
-import {
-  completeJob,
-  getImportJobItem,
-  markItemStatus,
-  markJobRunning,
-  recordIngestResult,
-  recountJobFailures,
-  updateJobProgress,
-} from "./store";
+import { completeJob, getImportJobItem, markItemStatus, markJobRunning, recordIngestResult, recountJobFailures, updateJobProgress } from "./store";
 
 const runningLocal = new Set<string>();
 
@@ -126,6 +118,18 @@ export async function runImportJob(jobId: string): Promise<void> {
       // Ensure final set is persisted (idempotent upserts).
       await persistResults(jobId, result.items);
       clearJobLiveSongs(jobId);
+
+      const mirrorZapPlaylistId = typeof source.mirrorZapPlaylistId === "string" ? source.mirrorZapPlaylistId : null;
+      const mirrorSyncMode = source.mirrorSyncMode === "additive" || source.mirrorSyncMode === "exact" ? source.mirrorSyncMode : "exact";
+      if (mirrorZapPlaylistId && playlistIds[0]) {
+        try {
+          const { finalizeMirrorAfterImport } = await import("$lib/server/connections/youtube-mirror");
+          await finalizeMirrorAfterImport(userId, playlistIds[0], mirrorZapPlaylistId, mirrorSyncMode);
+        } catch (err) {
+          console.warn("[zap import-jobs] mirror finalize failed", jobId, err);
+        }
+      }
+
       await completeJob(jobId, {
         status: "completed",
         syncRunId: result.syncRunId,

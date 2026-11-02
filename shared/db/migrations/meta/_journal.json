@@ -470,6 +470,13 @@
       "when": 1793700000000,
       "tag": "0066_zap_catalog_queue_shuffle_loop",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1793800000000,
+      "tag": "0067_zap_yt_playlist_mirror",
+      "breakpoints": true
     }
   ]
 }

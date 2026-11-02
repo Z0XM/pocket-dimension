@@ -4,12 +4,12 @@
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import UserMinusIcon from "@lucide/svelte/icons/user-minus";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import ConnectedPlaylistsPanel from "$lib/components/connections/ConnectedPlaylistsPanel.svelte";
   import CreateCustomPlaylistDialog from "$lib/components/CreateCustomPlaylistDialog.svelte";
   import CreateLinkedPlaylistDialog from "$lib/components/CreateLinkedPlaylistDialog.svelte";
   import FollowPlaylistDialog from "$lib/components/FollowPlaylistDialog.svelte";
   import PageHeader from "$lib/components/PageHeader.svelte";
   import QueueTagMarks from "$lib/components/QueueTagMarks.svelte";
-  import { youtubePlaylistHref } from "$lib/history-time";
   import { playlistRelationBadge } from "$lib/playlist-relation-label";
   import {
     PLAYLIST_SECTIONS,
@@ -18,13 +18,21 @@
     tagsFromPlaylistQuery,
     type PlaylistSectionId,
   } from "$lib/playlist-sections";
+  import { page } from "$app/state";
   import { toast } from "$lib/toast.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
 
+  function sectionFromQuery(raw: string | null): PlaylistSectionId {
+    if (raw === "custom" || raw === "following" || raw === "linked" || raw === "saved" || raw === "connected" || raw === "all") {
+      return raw;
+    }
+    return "all";
+  }
+
   let playlists = $state(data.playlists ?? []);
-  let section = $state<PlaylistSectionId>("all");
+  let section = $state<PlaylistSectionId>(sectionFromQuery(page.url.searchParams.get("section")));
   let searchBySection = $state<Record<PlaylistSectionId, string>>({
     all: "",
     custom: "",
@@ -45,6 +53,10 @@
   const sectionPlaylists = $derived(filterByNameSearch(filterPlaylistsBySection(playlists, section), searchQ));
   const sectionSaved = $derived(filterByNameSearch(data.savedQueues ?? [], searchQ));
   const sectionConnected = $derived(filterByNameSearch(data.connectedPlaylists ?? [], searchQ));
+  /** All + Connected: no Create. Connected uses Connect on each YouTube playlist instead. */
+  const showCreate = $derived(section !== "all" && section !== "connected");
+  /** Connected panel has its own search. */
+  const showSectionSearch = $derived(section !== "connected");
 
   $effect(() => {
     playlists = data.playlists ?? [];
@@ -55,6 +67,7 @@
   }
 
   function onCreate() {
+    if (section === "all" || section === "connected") return;
     if (section === "following") {
       followOpen = true;
       return;
@@ -65,10 +78,6 @@
     }
     if (section === "saved") {
       toast.info("Save a queue from a live session — use Save for later there.");
-      return;
-    }
-    if (section === "connected") {
-      window.location.href = "/connections";
       return;
     }
     createCustomOpen = true;
@@ -153,26 +162,32 @@
     {/each}
   </div>
 
-  <div class="flex shrink-0 items-end gap-2 pt-3">
-    <label class="relative min-w-0 flex-1">
-      <span class="sr-only">Search {section} playlists</span>
-      <SearchIcon class="pointer-events-none absolute top-1/2 left-0 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-      <input
-        class="zap-underline-field w-full pl-5"
-        value={searchQ}
-        oninput={(e) => setSearch((e.currentTarget as HTMLInputElement).value)}
-        placeholder="Search playlists…"
-      />
-    </label>
-    <button
-      type="button"
-      class="inline-flex shrink-0 items-center gap-1.5 rounded bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
-      onclick={onCreate}
-    >
-      <PlusIcon class="size-3.5" aria-hidden="true" />
-      Create
-    </button>
-  </div>
+  {#if showSectionSearch || showCreate}
+    <div class="flex shrink-0 items-end gap-2 pt-3">
+      {#if showSectionSearch}
+        <label class="relative min-w-0 flex-1">
+          <span class="sr-only">Search {section} playlists</span>
+          <SearchIcon class="pointer-events-none absolute top-1/2 left-0 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <input
+            class="zap-underline-field w-full pl-5"
+            value={searchQ}
+            oninput={(e) => setSearch((e.currentTarget as HTMLInputElement).value)}
+            placeholder="Search playlists…"
+          />
+        </label>
+      {/if}
+      {#if showCreate}
+        <button
+          type="button"
+          class="inline-flex shrink-0 items-center gap-1.5 rounded bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
+          onclick={onCreate}
+        >
+          <PlusIcon class="size-3.5" aria-hidden="true" />
+          Create
+        </button>
+      {/if}
+    </div>
+  {/if}
 
   <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pt-3">
     {#if section === "saved"}
@@ -205,28 +220,7 @@
         </ul>
       {/if}
     {:else if section === "connected"}
-      {#if !data.youtubeLinked}
-        <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
-          Connect YouTube in <a class="text-signal underline" href="/connections">Connections</a> to see playlists here.
-        </p>
-      {:else if sectionConnected.length === 0}
-        <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
-          {searchQ.trim() ? "No connected playlists match." : "No connected playlists found."}
-        </p>
-      {:else}
-        <ul class="zap-track-host">
-          {#each sectionConnected as pl (pl.id)}
-            <li class="flex items-center gap-2 px-3 py-2">
-              <a href={youtubePlaylistHref(pl.id)} class="min-w-0 flex-1 text-sm hover:text-signal" target="_blank" rel="noreferrer">
-                <span class="font-medium">{pl.title}</span>
-                <span class="ml-2 font-mono text-[10px] text-muted-foreground">
-                  {pl.itemCount != null ? `${pl.itemCount} · ` : ""}{pl.importStatus?.replaceAll("_", " ") ?? "youtube"}
-                </span>
-              </a>
-            </li>
-          {/each}
-        </ul>
-      {/if}
+      <ConnectedPlaylistsPanel linked={data.youtubeLinked} showHide={false} showFilters={true} compact={true} />
     {:else if sectionPlaylists.length === 0}
       <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
         {searchQ.trim()
@@ -310,7 +304,12 @@
           <ul class="zap-track-host">
             {#each sectionConnected as pl (pl.id)}
               <li class="px-3 py-2 text-sm">
-                <a href={youtubePlaylistHref(pl.id)} class="hover:text-signal" target="_blank" rel="noreferrer">{pl.title}</a>
+                {#if pl.zapPlaylistId}
+                  <a href={`/playlists/${pl.zapPlaylistId}`} class="hover:text-signal">{pl.title}</a>
+                {:else}
+                  <a href="/playlists?section=connected" class="hover:text-signal">{pl.title}</a>
+                  <span class="ml-2 font-mono text-[10px] text-muted-foreground">not mirrored yet</span>
+                {/if}
               </li>
             {/each}
           </ul>

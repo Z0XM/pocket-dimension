@@ -1,20 +1,17 @@
 import { db, schema } from "@pocket-dimension/db";
 import { and, eq } from "drizzle-orm";
-import { importConnectedPlaylists } from "$lib/server/youtube/import-playlists";
 import { isStorageConfigured } from "$lib/server/storage";
 import { resolveYtDlpBin } from "$lib/server/ingest";
 import { logConnectionActivity } from "./activity";
+import { applyMirrorSync, intervalDue, type YoutubeSyncInterval, type YoutubeSyncMode } from "./youtube-mirror";
 import { upsertPlaylistPref } from "./youtube-status";
-
-/** Min gap between auto-sync runs for the same playlist (avoid hammering on every navigation). */
-export const YOUTUBE_AUTOSYNC_COOLDOWN_MS = 15 * 60 * 1000;
 
 const inFlight = new Set<string>();
 
 export async function runYouTubeAutoSyncForUser(userId: string): Promise<{
   ran: number;
   skipped: number;
-  results: Array<{ playlistId: string; imported: number; unavailable: number; skipped: number; error?: string }>;
+  results: Array<{ playlistId: string; added: number; removed: number; imported: number; error?: string }>;
 }> {
   if (inFlight.has(userId)) {
     return { ran: 0, skipped: 0, results: [] };
@@ -31,59 +28,64 @@ export async function runYouTubeAutoSyncForUser(userId: string): Promise<{
     if (prefs.length === 0) return { ran: 0, skipped: 0, results: [] };
 
     const now = Date.now();
-    const results: Array<{ playlistId: string; imported: number; unavailable: number; skipped: number; error?: string }> = [];
+    const results: Array<{ playlistId: string; added: number; removed: number; imported: number; error?: string }> = [];
     let ran = 0;
     let skipped = 0;
 
     for (const pref of prefs) {
-      if (pref.lastSyncedAt && now - pref.lastSyncedAt.getTime() < YOUTUBE_AUTOSYNC_COOLDOWN_MS) {
+      const interval = (pref.syncInterval as YoutubeSyncInterval | undefined) ?? "off";
+      // Legacy rows may have autoSync=true with interval still `off` — treat as hourly.
+      const effectiveInterval: YoutubeSyncInterval = interval === "off" && pref.autoSync ? "hourly" : interval;
+      if (effectiveInterval === "off" || !pref.zapPlaylistId) {
+        skipped += 1;
+        continue;
+      }
+      if (!intervalDue(pref.lastSyncedAt, effectiveInterval, now)) {
         skipped += 1;
         continue;
       }
 
       try {
-        // Single crawl inside import (skipExisting) — do not list+preview then list again.
-        const result = await importConnectedPlaylists(userId, [pref.youtubePlaylistId], undefined, {
-          skipExisting: true,
-          sort: "playlist",
+        const mode = (pref.syncMode as YoutubeSyncMode | undefined) ?? "additive";
+        const result = await applyMirrorSync(userId, pref.youtubePlaylistId, {
+          mode,
+          asyncImport: false,
         });
-        // importConnectedPlaylists already records coverage; keep title + clear error if needed.
-        await upsertPlaylistPref({
-          userId,
-          youtubePlaylistId: pref.youtubePlaylistId,
-          title: pref.title,
-          lastSyncedAt: new Date(),
-          lastSyncError: null,
-        });
-        if (result.imported === 0 && result.failed === 0) {
+        if (result.added === 0 && result.removed === 0 && result.imported === 0) {
           skipped += 1;
           results.push({
             playlistId: pref.youtubePlaylistId,
+            added: 0,
+            removed: 0,
             imported: 0,
-            unavailable: result.unavailable,
-            skipped: result.skipped,
           });
           continue;
         }
+        const bits = [
+          result.added ? `+${result.added}` : null,
+          result.removed ? `−${result.removed}` : null,
+          result.imported ? `downloaded ${result.imported}` : null,
+        ].filter(Boolean);
         await logConnectionActivity({
           userId,
           provider: "youtube",
           kind: "auto_sync",
-          summary: `Auto-synced “${pref.title ?? pref.youtubePlaylistId}”: +${result.imported} track${result.imported === 1 ? "" : "s"}`,
+          summary: `Auto-synced “${pref.title ?? pref.youtubePlaylistId}” (${mode}): ${bits.join(", ") || "no changes"}`,
           meta: {
             playlistId: pref.youtubePlaylistId,
+            zapPlaylistId: result.zapPlaylistId,
+            mode,
+            added: result.added,
+            removed: result.removed,
             imported: result.imported,
-            unavailable: result.unavailable,
-            skipped: result.skipped,
-            failed: result.failed,
           },
         });
         ran += 1;
         results.push({
           playlistId: pref.youtubePlaylistId,
+          added: result.added,
+          removed: result.removed,
           imported: result.imported,
-          unavailable: result.unavailable,
-          skipped: result.skipped,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Auto-sync failed";
@@ -100,7 +102,7 @@ export async function runYouTubeAutoSyncForUser(userId: string): Promise<{
           summary: `Auto-sync failed for “${pref.title ?? pref.youtubePlaylistId}”: ${message}`,
           meta: { playlistId: pref.youtubePlaylistId },
         });
-        results.push({ playlistId: pref.youtubePlaylistId, imported: 0, unavailable: 0, skipped: 0, error: message });
+        results.push({ playlistId: pref.youtubePlaylistId, added: 0, removed: 0, imported: 0, error: message });
         ran += 1;
       }
     }
@@ -110,3 +112,6 @@ export async function runYouTubeAutoSyncForUser(userId: string): Promise<{
     inFlight.delete(userId);
   }
 }
+
+/** @deprecated Prefer interval-based due checks via {@link intervalDue}. */
+export const YOUTUBE_AUTOSYNC_COOLDOWN_MS = 60 * 60 * 1000;

@@ -16,6 +16,9 @@ export type ImportJobSource = {
   sort?: string;
   skipExisting?: boolean;
   title?: string;
+  /** When set, remaps this Zap playlist after a YouTube playlist import finishes. */
+  mirrorZapPlaylistId?: string;
+  mirrorSyncMode?: "additive" | "exact";
 };
 
 /** Per-song progress row for the Running Jobs UI (matches SongProgressList). */
@@ -148,10 +151,7 @@ export async function getImportJob(jobId: string, userId: string) {
 
 export async function countRunningImportJobs(userId: string): Promise<number> {
   try {
-    return await db.$count(
-      schema.importJobs,
-      and(eq(schema.importJobs.userId, userId), inArray(schema.importJobs.status, ["queued", "running"]))
-    );
+    return await db.$count(schema.importJobs, and(eq(schema.importJobs.userId, userId), inArray(schema.importJobs.status, ["queued", "running"])));
   } catch (err) {
     console.warn("[zap import-jobs] count failed (apply migration 0062?)", err);
     return 0;
@@ -328,11 +328,7 @@ function itemStatusFromResult(result: IngestItemResult): ImportJobItemStatus {
   return "failed";
 }
 
-export async function recordIngestResult(
-  jobId: string,
-  result: IngestItemResult,
-  opts?: { sourceUrl?: string | null; position?: number }
-) {
+export async function recordIngestResult(jobId: string, result: IngestItemResult, opts?: { sourceUrl?: string | null; position?: number }) {
   const identityKey = result.identityKey ?? "unknown";
   const status = itemStatusFromResult(result);
   const title = "title" in result ? (result.title ?? null) : null;
@@ -402,10 +398,7 @@ export async function markItemStatus(
 }
 
 export async function recountJobFailures(jobId: string) {
-  const failed = await db.$count(
-    schema.importJobItems,
-    and(eq(schema.importJobItems.jobId, jobId), eq(schema.importJobItems.status, "failed"))
-  );
+  const failed = await db.$count(schema.importJobItems, and(eq(schema.importJobItems.jobId, jobId), eq(schema.importJobItems.status, "failed")));
   await db
     .update(schema.importJobs)
     .set({ failedCount: failed, updatedAt: sql`now()` })

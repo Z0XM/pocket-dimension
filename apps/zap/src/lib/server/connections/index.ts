@@ -15,6 +15,21 @@ export {
   type EnrichedPlaylist,
 } from "./youtube-status";
 export { runYouTubeAutoSyncForUser, YOUTUBE_AUTOSYNC_COOLDOWN_MS } from "./youtube-autosync";
+export {
+  applyMirrorSync,
+  buildMirrorPreview,
+  connectYoutubePlaylist,
+  finalizeMirrorAfterImport,
+  intervalDue,
+  parseSyncInterval,
+  parseSyncMode,
+  syncIntervalToAutoSync,
+  SYNC_INTERVAL_MS,
+  type MirrorSyncPreview,
+  type MirrorTrackChange,
+  type YoutubeSyncInterval,
+  type YoutubeSyncMode,
+} from "./youtube-mirror";
 
 export async function listConnectionsSummary(userId: string) {
   const [discordCap, yt, discordLive] = await Promise.all([
