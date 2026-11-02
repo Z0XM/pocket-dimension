@@ -30,6 +30,11 @@
   /** Default docked at the footer; localStorage only overrides after the user changes it. */
   let docked = $state(true);
   let devicesDocked = $state(false);
+  /**
+   * Below Tailwind `sm` (640px): queue stays locked in the footer — no undock grip,
+   * swipe-up maximizes. Floating mini/panel is desktop-only.
+   */
+  let mobileLocked = $state(false);
   /** When true, exiting fullscreen restores the footer dock instead of a floating panel/icon. */
   let restoreDockOnExitFull = $state(false);
   let restoreDevicesDockOnExitFull = $state(false);
@@ -37,6 +42,10 @@
   let floatEpoch = $state(0);
   let devicesFloatOpenAs = $state<FloatingMode | null>(null);
   let devicesFloatEpoch = $state(0);
+
+  /** Footer player visible (including mobile lock). False while the maximized float is open. */
+  const showDockBar = $derived(showQueue && docked);
+  const showQueueFloat = $derived(showQueue && !docked);
 
   /** Session / join routes own their chrome; hide catalog floating queue + devices there. */
   const path = $derived(page.url.pathname);
@@ -94,6 +103,7 @@
   }
 
   function undockToMini() {
+    if (mobileLocked) return;
     restoreDockOnExitFull = false;
     writeFloatMode(FLOAT_KEY, "icon");
     floatOpenAs = "icon";
@@ -107,6 +117,15 @@
     floatOpenAs = "full";
     floatEpoch++;
     setDocked(false);
+  }
+
+  function applyMobileLock(locked: boolean) {
+    mobileLocked = locked;
+    if (locked) {
+      // Always pin the footer player on small screens; fullscreen still works via swipe-up.
+      restoreDockOnExitFull = true;
+      setDocked(true);
+    }
   }
 
   /** FloatingPanel calls this when leaving fullscreen; re-dock if we maximized from the footer. */
@@ -146,16 +165,21 @@
   }
 
   /** Queue footer lifts the Devices corner drop target when both can be visible. */
-  const devicesDropInset = $derived(showQueue && docked ? DOCK_BAR_H : 0);
+  const devicesDropInset = $derived(showDockBar ? DOCK_BAR_H : 0);
 
   onMount(() => {
     docked = readFlag(DOCK_KEY, true);
     devicesDocked = readFlag(DEVICES_DOCK_KEY);
+    const mq = window.matchMedia("(max-width: 639px)");
+    const syncLock = () => applyMobileLock(mq.matches);
+    syncLock();
+    mq.addEventListener("change", syncLock);
     queue.connect();
     const stopLeader = subscribeTabAudioLeader((leader) => {
       isAudioLeader = leader;
     });
     return () => {
+      mq.removeEventListener("change", syncLock);
       stopLeader();
       queue.disconnect();
     };
@@ -272,9 +296,17 @@
 
 <audio bind:this={audioEl} preload="auto" class="hidden" onloadedmetadata={onLoadedMetadata} ontimeupdate={onTimeUpdate} onended={onEnded}></audio>
 
-{#if showQueue && docked}
-  <CatalogQueueDockBar {queue} {audioBlocked} {localNote} onunlock={unlock} onmaximize={maximizeFromDock} onundock={undockToMini} />
-{:else if showQueue}
+{#if showDockBar}
+  <CatalogQueueDockBar
+    {queue}
+    {audioBlocked}
+    {localNote}
+    locked={mobileLocked}
+    onunlock={unlock}
+    onmaximize={maximizeFromDock}
+    onundock={undockToMini}
+  />
+{:else if showQueueFloat}
   {#key floatEpoch}
     <FloatingPanel
       id="queue"
@@ -299,7 +331,7 @@
 {/if}
 
 {#if showDevices && devicesDocked}
-  <CatalogDevicesDock {queue} queueDocked={showQueue && docked} onmaximize={maximizeDevicesFromDock} onundock={undockDevicesToMini} />
+  <CatalogDevicesDock {queue} queueDocked={showDockBar} onmaximize={maximizeDevicesFromDock} onundock={undockDevicesToMini} />
 {:else if showDevices}
   {#key devicesFloatEpoch}
     <FloatingPanel

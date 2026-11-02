@@ -17,6 +17,8 @@
     queue,
     audioBlocked = false,
     localNote = null,
+    /** When true (small screens), dock stays locked — no undock grip / maximize button; swipe up maximizes. */
+    locked = false,
     onunlock,
     onmaximize,
     onundock,
@@ -24,9 +26,10 @@
     queue: CatalogQueueClient;
     audioBlocked?: boolean;
     localNote?: string | null;
+    locked?: boolean;
     onunlock?: () => void;
     onmaximize: () => void;
-    /** Drag the left handle out of the footer to return to the floating mini window. */
+    /** Drag the left handle out of the footer to return to the floating mini window (desktop). */
     onundock: () => void;
   } = $props();
 
@@ -39,8 +42,11 @@
   let undockWillLeave = $state(false);
   let undockStart: { x: number; y: number } | null = null;
 
+  /** Swipe-up-to-maximize (mobile locked dock). */
+  let swipeStart: { x: number; y: number; t: number } | null = null;
+
   function startUndock(e: PointerEvent) {
-    if (e.button !== 0) return;
+    if (locked || e.button !== 0) return;
     undockStart = { x: e.clientX, y: e.clientY };
     undockDragging = true;
     undockWillLeave = false;
@@ -52,7 +58,6 @@
     if (!undockStart) return;
     if (Math.hypot(e.clientX - undockStart.x, e.clientY - undockStart.y) < 6) return;
     const vp = { w: window.innerWidth, h: window.innerHeight };
-    // Leave the footer band → ready to restore the floating mini window.
     undockWillLeave = !inDropZone(e.clientY, vp) || e.clientY < vp.h - DROP_ZONE_PX - 8;
   }
 
@@ -63,76 +68,113 @@
     undockWillLeave = false;
     if (leave) onundock();
   }
+
+  function onDockPointerDown(e: PointerEvent) {
+    if (!locked || e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("button, input, a, [data-no-swipe]")) return;
+    swipeStart = { x: e.clientX, y: e.clientY, t: Date.now() };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function onDockPointerUp(e: PointerEvent) {
+    if (!locked || !swipeStart) {
+      swipeStart = null;
+      return;
+    }
+    const dx = e.clientX - swipeStart.x;
+    const dy = e.clientY - swipeStart.y;
+    const dt = Date.now() - swipeStart.t;
+    swipeStart = null;
+    // Swipe up: enough vertical travel, mostly vertical, not too slow.
+    if (dy < -48 && Math.abs(dy) > Math.abs(dx) * 1.2 && dt < 800) {
+      onmaximize();
+    }
+  }
+
+  function onDockPointerCancel() {
+    swipeStart = null;
+  }
 </script>
+
+{#snippet transport()}
+  <button
+    type="button"
+    class="zap-transport-btn size-8 disabled:opacity-40"
+    aria-label="Previous"
+    title="Previous"
+    disabled={queue.items.length === 0}
+    onclick={() => void queue.previous()}
+  >
+    <SkipBackIcon class="size-3.5" />
+  </button>
+  <button
+    type="button"
+    class={`zap-transport-play size-9 disabled:opacity-40 ${queue.playing ? "is-active" : ""}`}
+    aria-label={queue.playing ? "Pause" : "Play"}
+    title={queue.playing ? "Pause" : "Play"}
+    disabled={queue.items.length === 0}
+    onclick={() => void queue.togglePlay()}
+  >
+    {#if queue.playing}
+      <PauseIcon class="size-4" />
+    {:else}
+      <PlayIcon class="size-4" />
+    {/if}
+  </button>
+  <button
+    type="button"
+    class="zap-transport-btn size-8 disabled:opacity-40"
+    aria-label="Next"
+    title="Next"
+    disabled={!current}
+    onclick={() => void queue.next()}
+  >
+    <SkipForwardIcon class="size-3.5" />
+  </button>
+{/snippet}
 
 <div
   class={`zap-queue-dock fixed inset-x-0 bottom-0 z-[42] flex border-t border-signal/40 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] ${
     undockDragging && undockWillLeave ? "opacity-70" : ""
-  }`}
+  } ${locked ? "touch-pan-y" : ""}`}
   style={`height:${DOCK_BAR_H}px`}
   role="region"
-  aria-label="Docked queue player"
+  aria-label={locked ? "Docked queue player. Swipe up to maximize." : "Docked queue player"}
+  onpointerdown={onDockPointerDown}
+  onpointerup={onDockPointerUp}
+  onpointercancel={onDockPointerCancel}
 >
-  <button
-    type="button"
-    class={`inline-flex h-full w-9 shrink-0 touch-none items-center justify-center border-r border-border/60 text-muted-foreground hover:bg-signal/10 hover:text-signal ${
-      undockDragging ? "cursor-grabbing" : "cursor-grab"
-    }`}
-    aria-label="Drag out to undock queue"
-    title="Drag out to undock"
-    onpointerdown={startUndock}
-    onpointermove={moveUndock}
-    onpointerup={endUndock}
-    onpointercancel={endUndock}
-  >
-    <GripVerticalIcon class="size-4" aria-hidden="true" />
-  </button>
+  {#if !locked}
+    <button
+      type="button"
+      class={`inline-flex h-full w-9 shrink-0 touch-none items-center justify-center border-r border-border/60 text-muted-foreground hover:bg-signal/10 hover:text-signal ${
+        undockDragging ? "cursor-grabbing" : "cursor-grab"
+      }`}
+      aria-label="Drag out to undock queue"
+      title="Drag out to undock"
+      onpointerdown={startUndock}
+      onpointermove={moveUndock}
+      onpointerup={endUndock}
+      onpointercancel={endUndock}
+    >
+      <GripVerticalIcon class="size-4" aria-hidden="true" />
+    </button>
+  {/if}
 
-  <div class="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3">
-    <div class="min-w-0 flex-1 pr-[3.5rem] sm:pr-[4.5rem]">
+  <div class="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 sm:gap-3" data-no-swipe>
+    <!-- Title: takes remaining space; on mobile transport sits on the right -->
+    <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-medium text-foreground" title={current?.title}>{current?.title ?? "Queue finished"}</p>
       <p class="truncate font-mono text-[10px] text-muted-foreground">{current?.artists ?? "—"}</p>
     </div>
 
-    <div class="pointer-events-none absolute inset-y-0 left-1/2 z-[1] flex -translate-x-1/2 items-center">
+    <!-- Desktop: centered transport + shuffle/loop -->
+    <div class="pointer-events-none absolute inset-y-0 left-1/2 z-[1] hidden -translate-x-1/2 items-center sm:flex">
       <div class="pointer-events-auto flex shrink-0 items-center gap-1">
+        {@render transport()}
         <button
           type="button"
-          class="zap-transport-btn size-8 disabled:opacity-40"
-          aria-label="Previous"
-          title="Previous"
-          disabled={queue.items.length === 0}
-          onclick={() => void queue.previous()}
-        >
-          <SkipBackIcon class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          class={`zap-transport-play size-9 disabled:opacity-40 ${queue.playing ? "is-active" : ""}`}
-          aria-label={queue.playing ? "Pause" : "Play"}
-          title={queue.playing ? "Pause" : "Play"}
-          disabled={queue.items.length === 0}
-          onclick={() => void queue.togglePlay()}
-        >
-          {#if queue.playing}
-            <PauseIcon class="size-4" />
-          {:else}
-            <PlayIcon class="size-4" />
-          {/if}
-        </button>
-        <button
-          type="button"
-          class="zap-transport-btn size-8 disabled:opacity-40"
-          aria-label="Next"
-          title="Next"
-          disabled={!current}
-          onclick={() => void queue.next()}
-        >
-          <SkipForwardIcon class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          class={`zap-transport-btn hidden size-8 disabled:opacity-40 sm:inline-flex ${queue.shuffle ? "text-signal" : ""}`}
+          class={`zap-transport-btn size-8 disabled:opacity-40 ${queue.shuffle ? "text-signal" : ""}`}
           aria-label={queue.shuffle ? "Shuffle on" : "Shuffle off"}
           aria-pressed={queue.shuffle}
           title={queue.shuffle ? "Shuffle on" : "Shuffle off"}
@@ -143,7 +185,7 @@
         </button>
         <button
           type="button"
-          class={`zap-transport-btn hidden size-8 disabled:opacity-40 sm:inline-flex ${queue.loop !== "off" ? "text-signal" : ""}`}
+          class={`zap-transport-btn size-8 disabled:opacity-40 ${queue.loop !== "off" ? "text-signal" : ""}`}
           aria-label={queue.loop === "one" ? "Loop one" : queue.loop === "all" ? "Loop all" : "Loop off"}
           title={queue.loop === "one" ? "Loop one" : queue.loop === "all" ? "Loop all" : "Loop off"}
           disabled={queue.items.length === 0}
@@ -158,8 +200,8 @@
       </div>
     </div>
 
-    <div class="flex min-w-0 flex-1 items-center justify-end gap-1.5 pl-[3.5rem] sm:gap-2 sm:pl-[4.5rem]">
-      <!-- Seek stays desktop/tablet — too cramped on phone dock -->
+    <!-- Mobile: transport on the right. Desktop: seek + up next + maximize -->
+    <div class="flex shrink-0 items-center justify-end gap-1 sm:min-w-0 sm:flex-1 sm:gap-2 sm:pl-[4.5rem]">
       <div class="hidden min-w-0 flex-1 items-center gap-1.5 sm:flex sm:gap-2">
         <span class="w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums"
           >{formatClock(scrubMs ?? queue.positionMs)}</span
@@ -182,15 +224,22 @@
         <p class="truncate text-xs text-foreground" title={nextItem?.title}>{nextItem?.title ?? "—"}</p>
       </div>
 
-      <button
-        type="button"
-        class="inline-flex size-8 shrink-0 items-center justify-center rounded border border-border text-muted-foreground hover:border-signal/50 hover:bg-signal/10 hover:text-signal"
-        aria-label="Maximize queue"
-        title="Maximize queue"
-        onclick={onmaximize}
-      >
-        <Maximize2Icon class="size-3.5" aria-hidden="true" />
-      </button>
+      <!-- Mobile-only transport on the right -->
+      <div class="flex items-center gap-0.5 sm:hidden">
+        {@render transport()}
+      </div>
+
+      {#if !locked}
+        <button
+          type="button"
+          class="zap-transport-btn hidden size-8 shrink-0 sm:inline-flex"
+          aria-label="Maximize queue"
+          title="Maximize queue"
+          onclick={onmaximize}
+        >
+          <Maximize2Icon class="size-3.5" aria-hidden="true" />
+        </button>
+      {/if}
     </div>
   </div>
 </div>
