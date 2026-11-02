@@ -1,7 +1,7 @@
 # Zap · UI enhancement guide
 
 **App:** `apps/zap`  
-**Captured:** 2026-11-01 → 2026-11-02 (session pass — catalogue chrome, filters, search, dropdowns, shell nav, theme defaults, track rows, queue dock defaults; then tags/icons, seek, header/dock ink, play tiles, Theme simplify)  
+**Captured:** 2026-11-01 → 2026-11-02 (session pass — catalogue chrome, filters, search, dropdowns, shell nav, theme defaults, track rows, queue dock defaults; then tags/icons, seek, header/dock ink, play tiles, Theme simplify; then Play all / Save toolbar simplify)  
 **Purpose:** Durable log of UI/UX decisions so we can later distill a Zap design philosophy / DESIGN.md. Prefer facts + rationale over polish.  
 **Philosophy SoR (store):** `/cursor/stores/self/docs/zap-design-system-v1.md` — Prism Pulse + **Catalogue & shell — shipped philosophy**.
 
@@ -262,6 +262,26 @@ Introduced **`.zap-dropdown`** in `design-chrome.css` and applied across Zap men
 - New prefs: Catalogue tags + Monochrome icons.
 - **Where:** `theme-prefs.ts`, `ThemePrefsPanel.svelte`.
 
+### 19. Play all + Save as playlist — one meta row (consistency / less redundancy / simpler UX)
+
+**Intent:** Stop splitting bulk actions into a second caption strip under the toolbar. Match Filters’ quiet mono disclosure language. One control for “play this shelf,” with complexity only when filters make insert position ambiguous.
+
+| Before | After |
+| --- | --- |
+| Play all + Add all on a helper row under search (only when filtering or playlist-scoped) | **Play all** always on the scope/Filters row above search |
+| Separate **Add all to queue** button | Removed — unfiltered Play all appends (`last`); filtered menu covers next / last / replace / shuffle |
+| Save as playlist on its own “No playlist uses these tags” row | Quiet caption on the same meta row as Filters / Play all |
+| Replace needed a ConfirmDialog after choosing Play all | Filtered menu’s **Replace current queue** is the confirm (shown only if a queue is active) |
+
+**Behavior:**
+
+- **No search/tag filters:** click Play all → `enqueueFiltered(…, "last")` (whole current scope).
+- **Filters active:** `.zap-dropdown` menu — Replace (if `queue.active`) · Play next · Play last · Shuffle in queue (`shuffle` = Fisher–Yates then append).
+- Exclusive with Filters popover (opening one closes the other).
+- API: `BulkEnqueueMode` adds `"shuffle"`; client `enqueueFiltered` accepts it.
+
+**Where:** `catalogue/+page.svelte` (`toolbarExtras`), `CatalogueFilters.svelte` (`toolbarExtras` snippet), `catalog-queue.ts` (`shuffleIds`), `api/catalog-queue/+server.ts`.
+
 ---
 
 ## Emerging principles (draft — not locked)
@@ -325,6 +345,15 @@ Use these as candidates when writing a formal Zap design philosophy:
 19. **Collapse seek before transport on small screens**  
     Dock hides seek + clocks below `sm`; keep play controls usable.
 
+20. **One meta grammar for catalogue tooling**  
+    Scope, Filters, Play all, and Save as playlist share the quiet mono caption row above search. Don’t invent a second bulk-action strip with boxed buttons.
+
+21. **Complexity only when the choice matters**  
+    Unfiltered Play all has a single default (append). Filtered Play all opens a menu because insert/replace/shuffle is a real choice. Drop redundant twins (Play all + Add all).
+
+22. **Consistency over novelty for disclosures**  
+    Play all’s filtered menu uses the same `.zap-dropdown` + exclusive-popover rules as Filters — not a new dialog chrome.
+
 ---
 
 ## Explicit non-goals (this pass)
@@ -336,12 +365,14 @@ Use these as candidates when writing a formal Zap design philosophy:
 - Devices dock default left unchanged (still undocked unless stored).
 - Did not restyle session now-playing glass to match catalogue ink header (session still follows Prism Pulse mock glass).
 - Did not add custom user-uploaded tag icons — system emoji catalog only.
+- Did not change session “Add from library” Play all / Add all strip yet (catalogue-only simplify).
 
 ---
 
 ## Follow-ups / open questions
 
 - [ ] Apply underline search + plain scope patterns to **session “add from library”** collapsible filters for parity.
+- [ ] Port catalogue Play all meta-row + filtered menu (drop Add all) to **session add-from-library** for consistency.
 - [ ] Decide whether **field** `ZapSelect` (boxed) should eventually lose the boxed trigger in denser toolbars.
 - [ ] Soft-white hover at 78% — validate on light-ish card fills and on-top animation layer; tweak if contrast fails.
 - [ ] Promote “Emerging principles” → locked `DESIGN.md` once playlists / history toolbars get the same pass (store philosophy already updated in `zap-design-system-v1.md`).
@@ -368,4 +399,6 @@ Use these as candidates when writing a formal Zap design philosophy:
 - Tags: system icons on tags; Theme catalogue display text/icons/both (default text); optional monochrome; icons-only = no chip  
 - Seek: rectangular track + vertical thumb; dock seek hidden `< sm`  
 - Header: flush edges + signal under-glow; shared ink with dock / play tiles  
-- Theme: drop Cards picker + gray pages; accent-tinted dark page backgrounds; fixed ink chrome 
+- Theme: drop Cards picker + gray pages; accent-tinted dark page backgrounds; fixed ink chrome  
+- Play all + Save as playlist on Filters row; always-on Play all; drop Add all; filtered menu (replace / next / last / shuffle)  
+- Goal: consistency with Filters, less redundancy, simpler default path
