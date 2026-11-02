@@ -73,7 +73,7 @@
       <label class="flex items-center gap-2 pl-6 font-mono text-[10px] text-muted-foreground">
         Vol
         <input
-          class="zap-seek h-1 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)]"
+          class="zap-seek h-1 w-full cursor-pointer appearance-none bg-border"
           type="range"
           min="0"
           max="100"

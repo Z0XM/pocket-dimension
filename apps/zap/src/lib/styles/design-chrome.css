@@ -415,16 +415,54 @@ html[data-monochrome-icons="on"] .zap-tag-icon {
 }
 
 /*
- * Playback seek: signal fill from start → thumb (`--seek-pct` 0–100%), muted ahead.
- * Volume / preference ranges keep plain `zap-seek` + accent-color only.
+ * Ranges (seek / volume / prefs): rectangular track + vertical-rect thumb.
+ * Playback seek (`zap-seek--progress`): signal fill via `--seek-pct` 0–100%.
  */
 input.zap-seek[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
   accent-color: var(--signal);
+  border-radius: 0;
+  background: var(--border);
+}
+
+input.zap-seek[type="range"]::-webkit-slider-runnable-track {
+  height: 100%;
+  border-radius: 0;
+  background: transparent;
+}
+
+input.zap-seek[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.28rem;
+  height: 0.85rem;
+  margin-top: -0.25rem;
+  border-radius: 0;
+  border: 1px solid var(--background-mid);
+  background: var(--signal);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+input.zap-seek[type="range"]::-moz-range-track {
+  height: 0.375rem;
+  border: none;
+  border-radius: 0;
+  background: var(--border);
+}
+
+input.zap-seek[type="range"]::-moz-range-thumb {
+  width: 0.28rem;
+  height: 0.85rem;
+  border-radius: 0;
+  border: 1px solid var(--background-mid);
+  background: var(--signal);
+  box-shadow: none;
+  cursor: pointer;
 }
 
 input.zap-seek.zap-seek--progress[type="range"] {
-  appearance: none;
-  -webkit-appearance: none;
   background: linear-gradient(
     to right,
     var(--signal) 0%,
@@ -434,47 +472,11 @@ input.zap-seek.zap-seek--progress[type="range"] {
   );
 }
 
-input.zap-seek.zap-seek--progress[type="range"]::-webkit-slider-runnable-track {
-  height: 100%;
-  border-radius: 9999px;
-  background: transparent;
-}
-
-input.zap-seek.zap-seek--progress[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-top: -0.2rem;
-  border-radius: 9999px;
-  border: 2px solid var(--background-mid);
-  background: var(--signal);
-  box-shadow: none;
-  cursor: pointer;
-}
-
-input.zap-seek.zap-seek--progress[type="range"]::-moz-range-track {
-  height: 0.375rem;
-  border: none;
-  border-radius: 9999px;
-  background: var(--border);
-}
-
 input.zap-seek.zap-seek--progress[type="range"]::-moz-range-progress {
   height: 0.375rem;
   border: none;
-  border-radius: 9999px;
+  border-radius: 0;
   background: var(--signal);
-}
-
-input.zap-seek.zap-seek--progress[type="range"]::-moz-range-thumb {
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 9999px;
-  border: 2px solid var(--background-mid);
-  background: var(--signal);
-  box-shadow: none;
-  cursor: pointer;
 }
 
 ::selection {

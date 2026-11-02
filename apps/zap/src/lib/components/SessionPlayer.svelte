@@ -366,7 +366,7 @@
       <Volume2Icon class="size-3.5 shrink-0" aria-hidden="true" />
       <span class="shrink-0">Your volume</span>
       <input
-        class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)] disabled:opacity-40"
+        class="zap-seek h-1.5 w-full cursor-pointer appearance-none bg-border disabled:opacity-40"
         type="range"
         min="0"
         max="100"

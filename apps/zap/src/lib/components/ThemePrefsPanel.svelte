@@ -282,7 +282,7 @@
             >
           </span>
           <input
-            class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)]"
+            class="zap-seek h-1.5 w-full cursor-pointer appearance-none bg-border"
             type="range"
             min={MOTION_CARD_OPACITY.min}
             max={MOTION_CARD_OPACITY.max}
@@ -303,7 +303,7 @@
             >
           </span>
           <input
-            class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)]"
+            class="zap-seek h-1.5 w-full cursor-pointer appearance-none bg-border"
             type="range"
             min={MOTION_ANIM_OPACITY.min}
             max={MOTION_ANIM_OPACITY.max}
@@ -352,7 +352,7 @@
             </span>
           </span>
           <input
-            class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)]"
+            class="zap-seek h-1.5 w-full cursor-pointer appearance-none bg-border"
             type="range"
             min={MOTION_RESPONSE_MS.min}
             max={MOTION_RESPONSE_MS.max}
@@ -375,7 +375,7 @@
             </span>
           </span>
           <input
-            class="zap-seek h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)]"
+            class="zap-seek h-1.5 w-full cursor-pointer appearance-none bg-border"
             type="range"
             min={MOTION_WAVE_HISTORY_MS.min}
             max={MOTION_WAVE_HISTORY_MS.max}
