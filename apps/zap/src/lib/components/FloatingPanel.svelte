@@ -23,6 +23,7 @@
     type Rect,
     type Viewport,
   } from "$lib/floating-panel";
+  import { animationsEnabled } from "$lib/theme-prefs";
 
   let {
     id,
@@ -74,12 +75,29 @@
   let iconPos = $state<Point>({ x: -999, y: -999 });
   let panel = $state<Rect | null>(null);
   let ready = $state(false);
+  /** Enter/exit motion for fullscreen (maximize / minimize). */
+  let fullMotion = $state<"in" | "out" | null>(null);
 
   type Drag = { kind: "icon" | "panel" | "resize"; startX: number; startY: number; origin: Rect; moved: boolean };
   let drag: Drag | null = null;
   let dragging = $state(false);
   let overDrop = $state(false);
   let suppressClick = false;
+  let pendingMode: FloatingMode | null = null;
+  let motionTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearMotionTimer() {
+    if (motionTimer != null) {
+      clearTimeout(motionTimer);
+      motionTimer = null;
+    }
+  }
+
+  function motionAllowed() {
+    if (!animationsEnabled()) return false;
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+    return true;
+  }
 
   function viewport(): Viewport {
     return { w: window.innerWidth, h: window.innerHeight };
@@ -113,15 +131,24 @@
     if ((mode === "panel" || mode === "full") && !panel) {
       panel = panelRectNearIcon(iconPos, defaultPanelSize(vp), vp);
     }
+    if (mode === "full" && motionAllowed()) {
+      fullMotion = "in";
+      motionTimer = setTimeout(() => {
+        if (fullMotion === "in") fullMotion = null;
+      }, 320);
+    }
     ready = true;
     persist();
     const onResize = () => reclamp();
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    return () => {
+      clearMotionTimer();
+      window.removeEventListener("resize", onResize);
+    };
   });
 
   $effect(() => {
-    if (mode !== "full") return;
+    if (mode !== "full" || fullMotion === "out") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMode("panel");
     };
@@ -129,9 +156,61 @@
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  function setMode(next: FloatingMode) {
+  function finishFullExit() {
+    clearMotionTimer();
+    fullMotion = null;
+    const next = pendingMode ?? "panel";
+    pendingMode = null;
     // Maximize-from-dock: parent re-docks instead of collapsing to a floating panel/icon.
-    if (mode === "full" && next !== "full" && onExitFull?.()) return;
+    if (onExitFull?.()) return;
+    if (next === "panel" && !panel) panel = panelRectNearIcon(iconPos, defaultPanelSize(viewport()), viewport());
+    mode = next;
+    persist();
+  }
+
+  function onFullMotionEnd(e: AnimationEvent) {
+    if (e.target !== e.currentTarget) return;
+    if (fullMotion === "in") {
+      clearMotionTimer();
+      fullMotion = null;
+      return;
+    }
+    if (fullMotion === "out") finishFullExit();
+  }
+
+  function setMode(next: FloatingMode) {
+    if (mode === next || fullMotion === "out") return;
+
+    if (mode !== "full" && next === "full") {
+      if (!panel) panel = panelRectNearIcon(iconPos, defaultPanelSize(viewport()), viewport());
+      mode = "full";
+      if (motionAllowed()) {
+        fullMotion = "in";
+        clearMotionTimer();
+        motionTimer = setTimeout(() => {
+          if (fullMotion === "in") fullMotion = null;
+        }, 320);
+      } else {
+        fullMotion = null;
+      }
+      persist();
+      return;
+    }
+
+    if (mode === "full" && next !== "full") {
+      pendingMode = next;
+      if (!motionAllowed()) {
+        finishFullExit();
+        return;
+      }
+      fullMotion = "out";
+      clearMotionTimer();
+      motionTimer = setTimeout(() => {
+        if (fullMotion === "out") finishFullExit();
+      }, 280);
+      return;
+    }
+
     if (next === "panel" && !panel) panel = panelRectNearIcon(iconPos, defaultPanelSize(viewport()), viewport());
     mode = next;
     persist();
@@ -251,10 +330,11 @@
     <div
       class={`zap-float-panel fixed flex flex-col overflow-hidden border border-signal/30 bg-popover/95 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur ${
         mode === "full" ? "inset-0 z-[60] rounded-none border-0 shadow-none" : "z-[41] rounded-lg"
-      }`}
+      } ${mode === "full" && fullMotion === "in" ? "zap-float-full-in" : ""} ${mode === "full" && fullMotion === "out" ? "zap-float-full-out" : ""}`}
       style={mode === "panel" && panel ? `left:${panel.x}px;top:${panel.y}px;width:${panel.w}px;height:${panel.h}px` : undefined}
       role="dialog"
       aria-label={title}
+      onanimationend={mode === "full" ? onFullMotionEnd : undefined}
     >
       <div
         class={`flex shrink-0 items-center gap-2 border-b border-border/60 px-2 py-1.5 select-none ${mode === "panel" ? "cursor-grab touch-none" : ""}`}

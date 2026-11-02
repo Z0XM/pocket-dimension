@@ -533,6 +533,45 @@ html[data-monochrome-icons="on"] .zap-tag-icon {
   backdrop-filter: none !important;
 }
 
+/* Fullscreen queue / float: maximize rises from the dock, minimize sinks back. */
+@keyframes zap-float-full-in {
+  from {
+    opacity: 0.35;
+    transform: translateY(18%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes zap-float-full-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0.2;
+    transform: translateY(22%);
+  }
+}
+
+.zap-float-panel.zap-float-full-in {
+  animation: zap-float-full-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: bottom center;
+}
+
+.zap-float-panel.zap-float-full-out {
+  animation: zap-float-full-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+  transform-origin: bottom center;
+  pointer-events: none;
+}
+
+html[data-animations="off"] .zap-float-panel.zap-float-full-in,
+html[data-animations="off"] .zap-float-panel.zap-float-full-out {
+  animation: none !important;
+}
+
 .zap-queue-dock {
   border-radius: 0;
   border-color: var(--border);
