@@ -1,7 +1,7 @@
 import { error, json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { isUuid } from "$lib/admin-access";
-import { MAX_BULK_ENQUEUE, isEnqueueMode, type CatalogQueueSnapshot } from "$lib/catalog-queue";
+import { MAX_BULK_ENQUEUE, isEnqueueMode, shuffleIds, type CatalogQueueSnapshot } from "$lib/catalog-queue";
 import {
   CatalogQueueError,
   buildCatalogQueueSnapshot,
@@ -54,9 +54,12 @@ function stringIds(value: unknown, max: number): string[] {
 
 async function addBulk(userId: string, ids: string[], mode: string | undefined, truncated: boolean) {
   if (ids.length === 0) throw new CatalogQueueError("No playable tracks match");
+  const ordered = mode === "shuffle" ? shuffleIds(ids) : ids;
+  const enqueueMode = mode === "shuffle" ? "last" : isEnqueueMode(mode) ? mode : "last";
   const snapshot: CatalogQueueSnapshot =
-    mode === "replace" ? await replaceQueue(userId, ids, { play: true }) : await enqueueTracks(userId, ids, isEnqueueMode(mode) ? mode : "last");
-  const notice = `${mode === "replace" ? "Playing" : "Queued"} ${ids.length} track${ids.length === 1 ? "" : "s"}${
+    mode === "replace" ? await replaceQueue(userId, ordered, { play: true }) : await enqueueTracks(userId, ordered, enqueueMode);
+  const verb = mode === "replace" ? "Playing" : mode === "shuffle" ? "Shuffled" : "Queued";
+  const notice = `${verb} ${ordered.length} track${ordered.length === 1 ? "" : "s"}${
     truncated ? ` (first ${MAX_BULK_ENQUEUE})` : ""
   }.`;
   return { ...snapshot, notice };

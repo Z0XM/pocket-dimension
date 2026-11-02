@@ -13,6 +13,7 @@ import {
   moveItem,
   neighbourId,
   runTrackDisplayTitle,
+  shuffleIds,
   spliceIds,
 } from "./catalog-queue";
 
@@ -129,6 +130,14 @@ describe("misc", () => {
   test("isEnqueueMode", () => {
     expect(isEnqueueMode("next")).toBe(true);
     expect(isEnqueueMode("replace")).toBe(false);
+  });
+
+  test("shuffleIds returns a permutation", () => {
+    const ids = ["a", "b", "c", "d", "e", "f", "g", "h"];
+    const once = shuffleIds(ids);
+    expect(once).toHaveLength(ids.length);
+    expect([...once].sort()).toEqual([...ids].sort());
+    expect(ids).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
   });
 
   test("formatClock", () => {

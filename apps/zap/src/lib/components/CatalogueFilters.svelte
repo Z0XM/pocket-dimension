@@ -21,6 +21,8 @@
     compact = false,
     collapsible = false,
     busy = false,
+    /** Scope / Filters row extras (Play all, Save as playlist) — only when `collapsible`. */
+    toolbarExtras,
     actions,
     onchange,
   }: {
@@ -45,7 +47,9 @@
     collapsible?: boolean;
     /** Refetch in flight — subtle signal on filters */
     busy?: boolean;
-    /** Rendered at the end of the toolbar row (only used when `collapsible`). */
+    /** Rendered after Filters on the meta row (only used when `collapsible`). */
+    toolbarExtras?: Snippet;
+    /** Rendered at the end of the search row (only used when `collapsible`). */
     actions?: Snippet;
     onchange?: () => void;
   } = $props();
@@ -151,6 +155,8 @@
         {/if}
         <ChevronDownIcon class={`size-3 shrink-0 text-muted-foreground transition ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
+
+      {@render toolbarExtras?.()}
 
       {#if open}
         <div

@@ -5,6 +5,7 @@ import {
   type CatalogQueueItem,
   type CatalogQueueRunTrack,
   type CatalogQueueSnapshot,
+  type BulkEnqueueMode,
   type EnqueueMode,
 } from "$lib/catalog-queue";
 import { toast } from "$lib/toast.svelte";
@@ -167,11 +168,11 @@ export class CatalogQueueClient {
     return res;
   }
 
-  enqueueFiltered(filter: CatalogueFilterInput, mode: EnqueueMode | "replace") {
+  enqueueFiltered(filter: CatalogueFilterInput, mode: BulkEnqueueMode) {
     return this.command({ action: "enqueueFiltered", filter, mode });
   }
 
-  enqueuePlaylist(playlistId: string, mode: EnqueueMode | "replace") {
+  enqueuePlaylist(playlistId: string, mode: BulkEnqueueMode) {
     return this.command({ action: "enqueuePlaylist", playlistId, mode });
   }
 

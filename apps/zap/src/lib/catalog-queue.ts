@@ -161,6 +161,25 @@ export function dedupeIds(ids: string[]): string[] {
   return out;
 }
 
+/** Fisher–Yates shuffle; returns a new array (does not mutate `ids`). */
+export function shuffleIds<T>(ids: readonly T[]): T[] {
+  const out = [...ids];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = out[i]!;
+    out[i] = out[j]!;
+    out[j] = tmp;
+  }
+  return out;
+}
+
+/** Bulk catalogue “Play all” modes beyond single-track enqueue. */
+export type BulkEnqueueMode = EnqueueMode | "replace" | "shuffle";
+
+export function isBulkEnqueueMode(value: unknown): value is BulkEnqueueMode {
+  return value === "replace" || value === "shuffle" || isEnqueueMode(value);
+}
+
 const DEVICE_ID_RE = /^[A-Za-z0-9-]{8,64}$/;
 
 export function isValidDeviceId(value: unknown): value is string {
