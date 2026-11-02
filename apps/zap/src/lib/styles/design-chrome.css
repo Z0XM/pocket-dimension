@@ -377,14 +377,27 @@ html[data-monochrome-icons="on"] .zap-tag-icon {
     box-shadow 160ms ease;
 }
 
-.zap-track.is-current .zap-track-play,
 .zap-track-play:hover:not(:disabled) {
+  background: var(--card);
+  color: var(--signal);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, #000 40%, transparent),
+    0 2px 6px color-mix(in srgb, #000 22%, transparent);
+  transform: none;
+}
+
+.zap-track.is-current .zap-track-play {
   background: var(--signal);
   color: var(--primary-foreground);
   box-shadow:
     0 2px 8px color-mix(in srgb, var(--signal) 35%, transparent),
     0 1px 2px color-mix(in srgb, #000 30%, transparent);
   transform: none;
+}
+
+.zap-track.is-current .zap-track-play:hover:not(:disabled) {
+  background: var(--signal);
+  color: var(--primary-foreground);
 }
 
 .zap-section-label {
@@ -417,7 +430,7 @@ html[data-monochrome-icons="on"] .zap-tag-icon {
   border-radius: 0 !important;
   border-color: var(--border) !important;
   border-top: var(--frame-player-border) !important;
-  background: var(--background-mid) !important;
+  background: var(--card) !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
 }
@@ -426,7 +439,7 @@ html[data-monochrome-icons="on"] .zap-tag-icon {
   border-radius: 0;
   border-color: var(--border);
   border-top: var(--frame-player-border);
-  background: var(--background-mid);
+  background: var(--card);
   backdrop-filter: none;
 }
 
