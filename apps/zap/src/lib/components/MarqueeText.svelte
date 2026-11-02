@@ -69,7 +69,7 @@
     bind:this={measureEl}
     class="zap-marquee-text"
     class:is-scrolling={overflowing}
-    style={overflowing ? `--zap-marquee-distance:${distance}px` : undefined}
+    style={overflowing ? `--zap-marquee-distance:${distance}px;--zap-marquee-duration:${durationSec}s` : undefined}
   >
     {text}
   </span>
