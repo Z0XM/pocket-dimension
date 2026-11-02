@@ -5,10 +5,12 @@ import { MAX_BULK_ENQUEUE, isEnqueueMode, shuffleIds, type CatalogQueueSnapshot 
 import {
   CatalogQueueError,
   buildCatalogQueueSnapshot,
+  cycleLoop,
   enqueueTracks,
   removeItem,
   reorderQueue,
   replaceQueue,
+  setShuffle,
   stopQueue,
   transport,
   type TransportAction,
@@ -39,6 +41,8 @@ type Body = {
   positionMs?: number;
   generation?: number;
   play?: boolean;
+  shuffle?: boolean;
+  enabled?: boolean;
 };
 
 function requireVerifiedUser(locals: App.Locals) {
@@ -130,6 +134,12 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     }
 
     if (action === "stop") return json(await stopQueue(user.id));
+
+    if (action === "setShuffle") {
+      return json(await setShuffle(user.id, Boolean(body.shuffle ?? body.enabled)));
+    }
+
+    if (action === "cycleLoop") return json(await cycleLoop(user.id));
 
     if ((TRANSPORT_ACTIONS as readonly string[]).includes(action)) {
       return json(

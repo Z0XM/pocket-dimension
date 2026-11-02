@@ -12,6 +12,13 @@ export const MAX_BULK_ENQUEUE = 500;
 /** “Previous” restarts the current track instead when it has played longer than this. */
 export const PREVIOUS_RESTART_THRESHOLD_MS = 3000;
 
+export type CatalogQueueTag = {
+  id: string;
+  name: string;
+  kind: string;
+  icon: string | null;
+};
+
 export type CatalogQueueItem = {
   id: string;
   mediaAssetId: string;
@@ -21,7 +28,21 @@ export type CatalogQueueItem = {
   artists: string | null;
   durationMs: number | null;
   playable: boolean;
+  tags: CatalogQueueTag[];
 };
+
+export type CatalogLoopMode = "off" | "all" | "one";
+export const CATALOG_LOOP_MODES: readonly CatalogLoopMode[] = ["off", "all", "one"];
+
+export function isCatalogLoopMode(value: unknown): value is CatalogLoopMode {
+  return typeof value === "string" && (CATALOG_LOOP_MODES as readonly string[]).includes(value);
+}
+
+export function nextCatalogLoopMode(current: CatalogLoopMode): CatalogLoopMode {
+  if (current === "off") return "all";
+  if (current === "all") return "one";
+  return "off";
+}
 
 export type CatalogQueueState = {
   id: string;
@@ -30,9 +51,30 @@ export type CatalogQueueState = {
   positionMs: number;
   positionUpdatedAt: string;
   playbackGeneration: number;
+  shuffle: boolean;
+  loop: CatalogLoopMode;
   createdAt: string;
   updatedAt: string;
 };
+
+/** Next track id for catalogue transport given shuffle/loop prefs. */
+export function pickNextQueueItemId(
+  rows: { id: string }[],
+  currentId: string | null,
+  opts: { shuffle: boolean; loop: CatalogLoopMode }
+): string | null {
+  if (rows.length === 0) return null;
+  if (opts.loop === "one" && currentId && rows.some((r) => r.id === currentId)) return currentId;
+  if (!opts.shuffle) {
+    const idx = currentId ? rows.findIndex((r) => r.id === currentId) : -1;
+    const next = idx >= 0 ? rows[idx + 1] : rows[0];
+    if (next) return next.id;
+    return opts.loop === "all" ? rows[0]!.id : null;
+  }
+  const others = rows.filter((r) => r.id !== currentId);
+  if (others.length === 0) return opts.loop === "all" && currentId ? currentId : null;
+  return others[Math.floor(Math.random() * others.length)]!.id;
+}
 
 export type CatalogDevice = {
   deviceId: string;

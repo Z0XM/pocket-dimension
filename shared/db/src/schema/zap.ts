@@ -532,6 +532,10 @@ export const catalogQueues = zapSchema.table(
       .$default(() => sql`now()`)
       .notNull(),
     playbackGeneration: integer("playback_generation").default(0).notNull(),
+    /** When true, next/ended picks a random other track (see transport). */
+    shuffleEnabled: boolean("shuffle_enabled").default(false).notNull(),
+    /** `off` | `all` | `one` — wrap queue or repeat current track. */
+    loopMode: text("loop_mode").default("off").notNull(),
     createdAt: timestamps.createdAt,
     updatedAt: timestamp("updated_at")
       .$default(() => sql`now()`)

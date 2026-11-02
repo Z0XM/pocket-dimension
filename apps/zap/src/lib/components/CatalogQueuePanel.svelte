@@ -3,13 +3,17 @@
   import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import RepeatIcon from "@lucide/svelte/icons/repeat";
+  import Repeat1Icon from "@lucide/svelte/icons/repeat-1";
   import SaveIcon from "@lucide/svelte/icons/save";
+  import ShuffleIcon from "@lucide/svelte/icons/shuffle";
   import SkipBackIcon from "@lucide/svelte/icons/skip-back";
   import SkipForwardIcon from "@lucide/svelte/icons/skip-forward";
   import SquareIcon from "@lucide/svelte/icons/square";
   import XIcon from "@lucide/svelte/icons/x";
   import { formatClock, moveItem } from "$lib/catalog-queue";
   import type { CatalogQueueClient } from "$lib/catalog-queue-client.svelte";
+  import QueueTagMarks from "$lib/components/QueueTagMarks.svelte";
   import SeekBar from "$lib/components/SeekBar.svelte";
 
   let {
@@ -122,7 +126,7 @@
     <div class="flex items-center gap-1.5">
       <button
         type="button"
-        class="inline-flex size-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
+        class="zap-transport-btn size-8 disabled:opacity-40"
         aria-label="Previous"
         title="Previous"
         disabled={queue.items.length === 0}
@@ -132,7 +136,7 @@
       </button>
       <button
         type="button"
-        class="inline-flex size-9 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
+        class={`zap-transport-play size-9 disabled:opacity-40 ${queue.playing ? "is-active" : ""}`}
         aria-label={queue.playing ? "Pause" : "Play"}
         title={queue.playing ? "Pause" : "Play"}
         disabled={queue.items.length === 0}
@@ -146,7 +150,7 @@
       </button>
       <button
         type="button"
-        class="inline-flex size-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
+        class="zap-transport-btn size-8 disabled:opacity-40"
         aria-label="Next"
         title="Next"
         disabled={!current}
@@ -154,10 +158,35 @@
       >
         <SkipForwardIcon class="size-3.5" />
       </button>
+      <button
+        type="button"
+        class={`zap-transport-btn size-8 disabled:opacity-40 ${queue.shuffle ? "text-signal" : ""}`}
+        aria-label={queue.shuffle ? "Shuffle on" : "Shuffle off"}
+        aria-pressed={queue.shuffle}
+        title={queue.shuffle ? "Shuffle on" : "Shuffle off"}
+        disabled={queue.items.length < 2}
+        onclick={() => void queue.setShuffle(!queue.shuffle)}
+      >
+        <ShuffleIcon class="size-3.5" />
+      </button>
+      <button
+        type="button"
+        class={`zap-transport-btn size-8 disabled:opacity-40 ${queue.loop !== "off" ? "text-signal" : ""}`}
+        aria-label={queue.loop === "one" ? "Loop one" : queue.loop === "all" ? "Loop all" : "Loop off"}
+        title={queue.loop === "one" ? "Loop one" : queue.loop === "all" ? "Loop all" : "Loop off"}
+        disabled={queue.items.length === 0}
+        onclick={() => void queue.cycleLoop()}
+      >
+        {#if queue.loop === "one"}
+          <Repeat1Icon class="size-3.5" />
+        {:else}
+          <RepeatIcon class="size-3.5" />
+        {/if}
+      </button>
       <span class="ml-auto flex items-center gap-1">
         <button
           type="button"
-          class="inline-flex h-7 items-center gap-1 rounded border border-border px-2 font-mono text-[10px] text-muted-foreground hover:text-signal"
+          class="zap-meta-disclosure h-7 gap-1 px-1"
           title="Save this queue as a freehand playlist"
           onclick={openSave}
         >
@@ -165,7 +194,7 @@
         </button>
         <button
           type="button"
-          class="inline-flex h-7 items-center gap-1 rounded border border-destructive/40 px-2 font-mono text-[10px] text-destructive hover:bg-destructive/10"
+          class="inline-flex h-7 items-center gap-1 px-1 font-mono text-[10px] text-destructive hover:underline"
           title="Stop and move this queue to History"
           onclick={() => void queue.stop()}
         >
@@ -221,13 +250,13 @@
     {/if}
   </div>
 
-  <ul bind:this={listEl} class="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1" aria-label="Queue">
+  <ul bind:this={listEl} class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain py-1" aria-label="Queue">
     {#each activeItems as item (item.id)}
       {@const index = queue.items.findIndex((i) => i.id === item.id)}
       {@const isCurrent = item.id === queue.queue?.currentItemId}
       <li
         data-qi={index}
-        class={`group flex items-center gap-1 px-1.5 ${dragFrom === index ? "opacity-40" : ""} ${
+        class={`zap-queue-row zap-track group flex items-center gap-1 px-1.5 ${isCurrent ? "is-current" : ""} ${dragFrom === index ? "opacity-40" : ""} ${
           dragOver === index && dragFrom != null && dragFrom !== index
             ? dragFrom < index
               ? "border-b-2 border-signal"
@@ -237,7 +266,7 @@
       >
         <button
           type="button"
-          class="inline-flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:text-signal"
+          class="zap-transport-btn size-7 shrink-0 cursor-grab touch-none"
           aria-label={`Reorder ${item.title} (arrow keys)`}
           title="Drag to reorder"
           onpointerdown={(e) => startReorder(e, index)}
@@ -250,7 +279,7 @@
         </button>
         <button
           type="button"
-          class={`flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1.5 text-left hover:bg-secondary/40 disabled:opacity-40 ${isCurrent ? "text-signal" : ""}`}
+          class="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1.5 text-left disabled:opacity-40"
           disabled={!item.playable}
           title={item.playable ? `Play from “${item.title}”` : "Not playable"}
           onclick={() => void queue.jump(item.id)}
@@ -263,8 +292,9 @@
             {/if}
           </span>
           <span class="min-w-0 flex-1">
-            <span class={`block truncate text-[13px] ${isCurrent ? "text-signal" : "text-foreground"}`}>{item.title}</span>
+            <span class={`zap-track-title block truncate text-[13px] ${isCurrent ? "text-signal" : "text-foreground"}`}>{item.title}</span>
             <span class="block truncate font-mono text-[10px] text-muted-foreground">{item.artists ?? "Unknown"}</span>
+            <QueueTagMarks tags={item.tags ?? []} />
           </span>
           <span class="shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(item.durationMs)}</span>
         </button>
@@ -301,16 +331,19 @@
         <ul id="queue-played-before" class="max-h-40 space-y-0.5 overflow-y-auto px-3 pb-2" aria-label="Played before">
           {#each pastItems as item (item.id)}
             {@const index = queue.items.findIndex((i) => i.id === item.id)}
-            <li class="group flex items-center gap-1">
+            <li class="zap-queue-row group flex items-center gap-1">
               <button
                 type="button"
-                class="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left text-muted-foreground hover:bg-secondary/40 hover:text-foreground disabled:opacity-40"
+                class="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left text-muted-foreground hover:text-foreground disabled:opacity-40"
                 disabled={!item.playable}
                 title={`Play from “${item.title}”`}
                 onclick={() => void queue.jump(item.id)}
               >
                 <span class="w-6 shrink-0 text-right font-mono text-[10px] tabular-nums">{index + 1}</span>
-                <span class="min-w-0 flex-1 truncate text-[13px]">{item.title}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="zap-track-title block truncate text-[13px]">{item.title}</span>
+                  <QueueTagMarks tags={item.tags ?? []} />
+                </span>
               </button>
               <button
                 type="button"

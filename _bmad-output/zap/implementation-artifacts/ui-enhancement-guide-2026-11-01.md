@@ -299,6 +299,19 @@ Introduced **`.zap-dropdown`** in `design-chrome.css` and applied across Zap men
 
 **Follow-up still open:** playlist detail Play+Queue twin CTAs → single Play-all menu; SettingsMenu → `.zap-menu-item`; remaining boxed primary CTAs on create/follow forms.
 
+### 21. Queue window parity (hover, tags, shuffle/loop, transport)
+
+**Issues noted (apply on every queue surface):**
+
+1. Songs need **accent color on hover** (title / tags) — not a row wash.
+2. Show **tags** on each queued track (Theme display prefs).
+3. **Shuffle** + **loop** (off → all → one) in the personal catalogue queue.
+4. **Prev / next** use `.zap-transport-btn` so hover tints the icon.
+
+**Shipped:** catalogue panel + dock; session queue gets hover + tags. Session shuffle/loop still open.
+
+**Where:** migration `0066_zap_catalog_queue_shuffle_loop.sql`; `CatalogQueuePanel` / `CatalogQueueDockBar`; `QueueTagMarks.svelte`; `SessionQueueList` + session snapshot tags.
+
 ---
 
 ## Emerging principles (draft — not locked)
@@ -420,3 +433,4 @@ Use these as candidates when writing a formal Zap design philosophy:
 - Play all + Save as playlist on Filters row; always-on Play all; drop Add all; filtered menu (replace / next / last / shuffle)  
 - Goal: consistency with Filters, less redundancy, simpler default path  
 - App-wide rollout: borderless shelves, de-card tools, underline search, ink transport, session Play all parity, admin `is-framed`
+- Queue window: accent row hover, tags on items, shuffle + loop (catalogue), prev/next transport hover; session queue tags + hover

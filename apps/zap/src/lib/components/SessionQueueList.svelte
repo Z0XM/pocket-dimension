@@ -2,6 +2,7 @@
   import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
   import XIcon from "@lucide/svelte/icons/x";
   import { formatClock, moveItem } from "$lib/catalog-queue";
+  import QueueTagMarks from "$lib/components/QueueTagMarks.svelte";
   import type { SessionSnapshot, SessionSnapshotQueueItem } from "$lib/server/sessions/types";
 
   let {
@@ -154,7 +155,7 @@
           {@const isCurrent = item.id === currentId}
           <li
             data-qi={index}
-            class={`zap-track group flex items-center gap-1 ${dragFrom === index ? "opacity-40" : ""} ${
+            class={`zap-queue-row zap-track group flex items-center gap-1 ${dragFrom === index ? "opacity-40" : ""} ${
               dragOver === index && dragFrom != null && dragFrom !== index
                 ? dragFrom < index
                   ? "border-b-2 border-signal"
@@ -197,6 +198,7 @@
                 <span class="block truncate font-mono text-[10px] text-muted-foreground"
                   >{item.artists ?? "Unknown"} · {item.addedByDisplayName}</span
                 >
+                <QueueTagMarks tags={item.tags ?? []} />
               </span>
               <span class="shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(item.durationMs)}</span>
             </button>
@@ -223,7 +225,7 @@
         <ul class="zap-track-host max-h-40 space-y-0.5 overflow-y-auto py-1" aria-label="Added in the past">
           {#each pastItems as item (item.id)}
             {@const index = snapshot.queue.findIndex((q) => q.id === item.id)}
-            <li class="zap-track group flex items-center gap-1">
+            <li class="zap-queue-row zap-track group flex items-center gap-1">
               <button
                 type="button"
                 class="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left text-muted-foreground hover:text-foreground disabled:opacity-40"
@@ -232,7 +234,10 @@
                 onclick={() => void playItem(item)}
               >
                 <span class="w-6 shrink-0 text-right font-mono text-[10px] tabular-nums">{index + 1}</span>
-                <span class="min-w-0 flex-1 truncate text-[13px]">{item.title}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="zap-track-title block truncate text-[13px]">{item.title}</span>
+                  <QueueTagMarks tags={item.tags ?? []} />
+                </span>
               </button>
               {#if canRemove}
                 <button

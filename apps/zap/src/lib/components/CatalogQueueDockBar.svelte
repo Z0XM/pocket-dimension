@@ -3,6 +3,9 @@
   import Maximize2Icon from "@lucide/svelte/icons/maximize-2";
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import RepeatIcon from "@lucide/svelte/icons/repeat";
+  import Repeat1Icon from "@lucide/svelte/icons/repeat-1";
+  import ShuffleIcon from "@lucide/svelte/icons/shuffle";
   import SkipBackIcon from "@lucide/svelte/icons/skip-back";
   import SkipForwardIcon from "@lucide/svelte/icons/skip-forward";
   import { formatClock } from "$lib/catalog-queue";
@@ -126,6 +129,31 @@
           onclick={() => void queue.next()}
         >
           <SkipForwardIcon class="size-3.5" />
+        </button>
+        <button
+          type="button"
+          class={`zap-transport-btn hidden size-8 disabled:opacity-40 sm:inline-flex ${queue.shuffle ? "text-signal" : ""}`}
+          aria-label={queue.shuffle ? "Shuffle on" : "Shuffle off"}
+          aria-pressed={queue.shuffle}
+          title={queue.shuffle ? "Shuffle on" : "Shuffle off"}
+          disabled={queue.items.length < 2}
+          onclick={() => void queue.setShuffle(!queue.shuffle)}
+        >
+          <ShuffleIcon class="size-3.5" />
+        </button>
+        <button
+          type="button"
+          class={`zap-transport-btn hidden size-8 disabled:opacity-40 sm:inline-flex ${queue.loop !== "off" ? "text-signal" : ""}`}
+          aria-label={queue.loop === "one" ? "Loop one" : queue.loop === "all" ? "Loop all" : "Loop off"}
+          title={queue.loop === "one" ? "Loop one" : queue.loop === "all" ? "Loop all" : "Loop off"}
+          disabled={queue.items.length === 0}
+          onclick={() => void queue.cycleLoop()}
+        >
+          {#if queue.loop === "one"}
+            <Repeat1Icon class="size-3.5" />
+          {:else}
+            <RepeatIcon class="size-3.5" />
+          {/if}
         </button>
       </div>
     </div>

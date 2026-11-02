@@ -1,8 +1,14 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { effectivePermissions } from "./permissions";
 import { defaultSessionName } from "./session-name";
-import type { SessionSnapshot, SessionSnapshotMember, SessionSnapshotQueueItem, SessionSnapshotSession } from "./types";
+import type {
+  SessionSnapshot,
+  SessionSnapshotMember,
+  SessionSnapshotQueueItem,
+  SessionSnapshotQueueTag,
+  SessionSnapshotSession,
+} from "./types";
 
 function displayName(user: { name: string | null; username: string | null; email: string }): string {
   return user.name?.trim() || user.username?.trim() || user.email;
@@ -74,6 +80,32 @@ export async function buildSessionSnapshot(sessionId: string, viewerUserId?: str
       : [];
   const assetById = new Map(assets.map((a) => [a.id, a]));
 
+  const tagsByAsset = new Map<string, SessionSnapshotQueueTag[]>();
+  if (viewerUserId && assetIds.length > 0) {
+    const links = await db
+      .select({
+        mediaAssetId: schema.mediaAssetTags.mediaAssetId,
+        id: schema.tags.id,
+        name: schema.tags.name,
+        kind: schema.tags.kind,
+        icon: schema.tags.icon,
+      })
+      .from(schema.mediaAssetTags)
+      .innerJoin(schema.tags, eq(schema.mediaAssetTags.tagId, schema.tags.id))
+      .where(
+        and(
+          eq(schema.mediaAssetTags.userId, viewerUserId),
+          inArray(schema.mediaAssetTags.mediaAssetId, assetIds),
+          or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, viewerUserId))
+        )
+      );
+    for (const link of links) {
+      const list = tagsByAsset.get(link.mediaAssetId) ?? [];
+      list.push({ id: link.id, name: link.name, kind: link.kind, icon: link.icon ?? null });
+      tagsByAsset.set(link.mediaAssetId, list);
+    }
+  }
+
   const queue: SessionSnapshotQueueItem[] = queueRows
     .filter((item) => {
       const asset = assetById.get(item.mediaAssetId);
@@ -90,6 +122,7 @@ export async function buildSessionSnapshot(sessionId: string, viewerUserId?: str
         artists: asset?.artists ?? null,
         durationMs: asset?.durationMs ?? null,
         playable: Boolean(asset?.storageKey && asset.status === "ready"),
+        tags: tagsByAsset.get(item.mediaAssetId) ?? [],
         addedByUserId: item.addedByUserId,
         addedByDisplayName: names.get(item.addedByUserId) ?? "Listener",
         createdAt: item.createdAt.toISOString(),

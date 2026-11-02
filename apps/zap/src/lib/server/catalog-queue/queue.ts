@@ -1,5 +1,5 @@
 import { db, schema } from "@pocket-dimension/db";
-import { and, asc, desc, eq, gt, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, or, sql } from "drizzle-orm";
 import {
   MAX_CATALOG_QUEUE_ITEMS,
   PREVIOUS_RESTART_THRESHOLD_MS,
@@ -7,14 +7,20 @@ import {
   defaultOutputEnabled,
   estimatePositionMs,
   insertionIndex,
+  isCatalogLoopMode,
   isPermutation,
   neighbourId,
+  nextCatalogLoopMode,
+  pickNextQueueItemId,
+  shuffleIds,
   type CatalogDevice,
+  type CatalogLoopMode,
   type CatalogPlaybackState,
   type CatalogQueueItem,
   type CatalogQueueRunSummary,
   type CatalogQueueRunTrack,
   type CatalogQueueSnapshot,
+  type CatalogQueueTag,
   type EnqueueMode,
   runTrackDisplayTitle,
 } from "$lib/catalog-queue";
@@ -48,7 +54,35 @@ let seq = 0;
 // Snapshot
 // ---------------------------------------------------------------------------
 
-async function loadItems(conn: Conn, queueId: string): Promise<CatalogQueueItem[]> {
+async function loadTagsForAssets(conn: Conn, userId: string, mediaAssetIds: string[]): Promise<Map<string, CatalogQueueTag[]>> {
+  const tagsByAsset = new Map<string, CatalogQueueTag[]>();
+  if (mediaAssetIds.length === 0) return tagsByAsset;
+  const links = await conn
+    .select({
+      mediaAssetId: schema.mediaAssetTags.mediaAssetId,
+      id: schema.tags.id,
+      name: schema.tags.name,
+      kind: schema.tags.kind,
+      icon: schema.tags.icon,
+    })
+    .from(schema.mediaAssetTags)
+    .innerJoin(schema.tags, eq(schema.mediaAssetTags.tagId, schema.tags.id))
+    .where(
+      and(
+        eq(schema.mediaAssetTags.userId, userId),
+        inArray(schema.mediaAssetTags.mediaAssetId, mediaAssetIds),
+        or(eq(schema.tags.kind, "system"), eq(schema.tags.ownerUserId, userId))
+      )
+    );
+  for (const link of links) {
+    const list = tagsByAsset.get(link.mediaAssetId) ?? [];
+    list.push({ id: link.id, name: link.name, kind: link.kind, icon: link.icon ?? null });
+    tagsByAsset.set(link.mediaAssetId, list);
+  }
+  return tagsByAsset;
+}
+
+async function loadItems(conn: Conn, queueId: string, userId: string): Promise<CatalogQueueItem[]> {
   const rows = await conn
     .select({
       id: schema.catalogQueueItems.id,
@@ -65,18 +99,27 @@ async function loadItems(conn: Conn, queueId: string): Promise<CatalogQueueItem[
     .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.catalogQueueItems.mediaAssetId))
     .where(eq(schema.catalogQueueItems.queueId, queueId))
     .orderBy(asc(schema.catalogQueueItems.position), asc(schema.catalogQueueItems.createdAt));
-  return rows
-    .filter((r) => r.status !== "archived")
-    .map((r) => ({
-      id: r.id,
-      mediaAssetId: r.mediaAssetId,
-      position: r.position,
-      source: r.source,
-      title: r.title,
-      artists: r.artists,
-      durationMs: r.durationMs,
-      playable: r.status === "ready" && Boolean(r.storageKey),
-    }));
+  const visible = rows.filter((r) => r.status !== "archived");
+  const tagsByAsset = await loadTagsForAssets(
+    conn,
+    userId,
+    visible.map((r) => r.mediaAssetId)
+  );
+  return visible.map((r) => ({
+    id: r.id,
+    mediaAssetId: r.mediaAssetId,
+    position: r.position,
+    source: r.source,
+    title: r.title,
+    artists: r.artists,
+    durationMs: r.durationMs,
+    playable: r.status === "ready" && Boolean(r.storageKey),
+    tags: tagsByAsset.get(r.mediaAssetId) ?? [],
+  }));
+}
+
+function queueLoopMode(raw: string | null | undefined): CatalogLoopMode {
+  return isCatalogLoopMode(raw) ? raw : "off";
 }
 
 async function loadDevices(userId: string): Promise<CatalogDevice[]> {
@@ -109,7 +152,10 @@ async function getActiveQueue(conn: Conn, userId: string): Promise<QueueRow | nu
 
 export async function buildCatalogQueueSnapshot(userId: string): Promise<CatalogQueueSnapshot> {
   const queue = await getActiveQueue(db, userId);
-  const [items, devices] = await Promise.all([queue ? loadItems(db, queue.id) : Promise.resolve([]), loadDevices(userId)]);
+  const [items, devices] = await Promise.all([
+    queue ? loadItems(db, queue.id, userId) : Promise.resolve([]),
+    loadDevices(userId),
+  ]);
   const currentItemId = queue?.currentItemId && items.some((i) => i.id === queue.currentItemId) ? queue.currentItemId : null;
   return {
     seq: ++seq,
@@ -122,6 +168,8 @@ export async function buildCatalogQueueSnapshot(userId: string): Promise<Catalog
           positionMs: queue.positionMs,
           positionUpdatedAt: queue.positionUpdatedAt.toISOString(),
           playbackGeneration: queue.playbackGeneration,
+          shuffle: Boolean(queue.shuffleEnabled),
+          loop: queueLoopMode(queue.loopMode),
           createdAt: queue.createdAt.toISOString(),
           updatedAt: queue.updatedAt.toISOString(),
         }
@@ -357,6 +405,36 @@ export async function reorderQueue(userId: string, order: string[]): Promise<Cat
   return publishCatalogQueue(userId);
 }
 
+/** Toggle shuffle. When turning on, reshuffle items after the playhead so the list matches. */
+export async function setShuffle(userId: string, enabled: boolean): Promise<CatalogQueueSnapshot> {
+  await db.transaction(async (tx) => {
+    const queue = await requireActiveQueue(tx, userId);
+    await tx.update(schema.catalogQueues).set({ shuffleEnabled: enabled }).where(eq(schema.catalogQueues.id, queue.id));
+    if (enabled) {
+      const rows = await orderedItems(tx, queue.id);
+      const currentIdx = queue.currentItemId ? rows.findIndex((r) => r.id === queue.currentItemId) : -1;
+      if (rows.length > 1) {
+        const head = currentIdx >= 0 ? rows.slice(0, currentIdx + 1).map((r) => r.id) : [];
+        const rest = shuffleIds((currentIdx >= 0 ? rows.slice(currentIdx + 1) : rows).map((r) => r.id));
+        await writeOrder(tx, [...head, ...rest]);
+      }
+    }
+    await touchQueue(tx, queue.id);
+  });
+  return publishCatalogQueue(userId);
+}
+
+/** Cycle loop mode: off → all → one → off. */
+export async function cycleLoop(userId: string): Promise<CatalogQueueSnapshot> {
+  await db.transaction(async (tx) => {
+    const queue = await requireActiveQueue(tx, userId);
+    const next = nextCatalogLoopMode(queueLoopMode(queue.loopMode));
+    await tx.update(schema.catalogQueues).set({ loopMode: next }).where(eq(schema.catalogQueues.id, queue.id));
+    await touchQueue(tx, queue.id);
+  });
+  return publishCatalogQueue(userId);
+}
+
 /** Stop: the run goes to History (playhead kept for Resume) and the floating player closes. */
 export async function stopQueue(userId: string): Promise<CatalogQueueSnapshot> {
   await db.transaction(async (tx) => {
@@ -382,8 +460,10 @@ export async function transport(
     const queue = await requireActiveQueue(tx, userId);
     const rows = await orderedItems(tx, queue.id);
     const current = queue.currentItemId && rows.some((r) => r.id === queue.currentItemId) ? queue.currentItemId : null;
+    const shuffle = Boolean(queue.shuffleEnabled);
+    const loop = queueLoopMode(queue.loopMode);
     const advance = async (from: string | null) => {
-      const next = neighbourId(rows, from, 1);
+      const next = pickNextQueueItemId(rows, from, { shuffle, loop });
       if (next) {
         await setPlayback(tx, queue.id, { currentItemId: next, positionMs: 0, playbackState: "playing" });
         startedItemId = next;

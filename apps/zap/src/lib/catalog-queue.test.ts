@@ -13,6 +13,8 @@ import {
   moveItem,
   neighbourId,
   runTrackDisplayTitle,
+  nextCatalogLoopMode,
+  pickNextQueueItemId,
   shuffleIds,
   spliceIds,
 } from "./catalog-queue";
@@ -138,6 +140,20 @@ describe("misc", () => {
     expect(once).toHaveLength(ids.length);
     expect([...once].sort()).toEqual([...ids].sort());
     expect(ids).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
+  });
+
+  test("pickNextQueueItemId respects loop and linear order", () => {
+    const rows = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    expect(pickNextQueueItemId(rows, "a", { shuffle: false, loop: "off" })).toBe("b");
+    expect(pickNextQueueItemId(rows, "c", { shuffle: false, loop: "off" })).toBeNull();
+    expect(pickNextQueueItemId(rows, "c", { shuffle: false, loop: "all" })).toBe("a");
+    expect(pickNextQueueItemId(rows, "b", { shuffle: false, loop: "one" })).toBe("b");
+  });
+
+  test("nextCatalogLoopMode cycles", () => {
+    expect(nextCatalogLoopMode("off")).toBe("all");
+    expect(nextCatalogLoopMode("all")).toBe("one");
+    expect(nextCatalogLoopMode("one")).toBe("off");
   });
 
   test("formatClock", () => {

@@ -42,6 +42,13 @@ export type SessionSnapshotMember = {
   volume: number;
 };
 
+export type SessionSnapshotQueueTag = {
+  id: string;
+  name: string;
+  kind: string;
+  icon: string | null;
+};
+
 export type SessionSnapshotQueueItem = {
   id: string;
   sessionId: string;
@@ -51,6 +58,7 @@ export type SessionSnapshotQueueItem = {
   artists: string | null;
   durationMs: number | null;
   playable: boolean;
+  tags: SessionSnapshotQueueTag[];
   addedByUserId: string;
   addedByDisplayName: string;
   createdAt: string;

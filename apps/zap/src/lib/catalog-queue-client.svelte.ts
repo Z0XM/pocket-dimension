@@ -232,6 +232,17 @@ export class CatalogQueueClient {
     return this.command({ action: "ended", itemId, generation });
   }
 
+  setShuffle(enabled: boolean) {
+    return this.command({ action: "setShuffle", shuffle: enabled });
+  }
+
+  cycleLoop() {
+    return this.command({ action: "cycleLoop" });
+  }
+
+  shuffle = $derived(Boolean(this.queue?.shuffle));
+  loop = $derived(this.queue?.loop ?? "off");
+
   // --- editing ------------------------------------------------------------
 
   remove(itemId: string) {

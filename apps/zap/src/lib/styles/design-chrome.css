@@ -322,9 +322,24 @@ html[data-animations="off"] .zap-beat-bg {
   transition: color 160ms ease, background 160ms ease;
 }
 
-.zap-transport-btn:hover:not(:disabled) {
-  color: var(--signal);
-  background: transparent;
+@media (hover: hover) {
+  .zap-transport-btn:hover:not(:disabled) {
+    color: var(--signal);
+    background: transparent;
+  }
+}
+
+/* Queue window rows — accent title/tags on hover (same affordance grammar as catalogue). */
+@media (hover: hover) {
+  .zap-queue-row:hover .zap-track-title {
+    color: var(--signal);
+  }
+
+  .zap-queue-row:hover .zap-tag-chip {
+    border-color: var(--signal);
+    color: var(--signal);
+    background: color-mix(in srgb, var(--signal) 12%, transparent);
+  }
 }
 
 .zap-transport-play {
