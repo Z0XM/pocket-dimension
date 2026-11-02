@@ -61,17 +61,12 @@ html[data-animations="off"] .zap-beat-bg {
   position: relative;
   z-index: 20;
   flex-shrink: 0;
-  margin: 0.75rem 0.75rem 0;
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  margin: 0;
+  border: none;
+  border-radius: 0;
   background: var(--card);
+  /* Soft glow under the bar — same recipe as the login card */
   box-shadow: 0 0 40px color-mix(in srgb, var(--signal) 12%, transparent);
-}
-
-@media (min-width: 640px) {
-  .zap-shell-top {
-    margin-inline: 1.5rem;
-  }
 }
 
 .zap-shell-brand span {
@@ -293,7 +288,7 @@ html[data-animations="off"] .zap-beat-bg {
 
   .zap-catalogue .zap-track:not(.is-current):hover .zap-track-play:not(:disabled),
   .zap-catalogue .zap-track:not(.is-current) .zap-track-play:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--signal) 16%, var(--card));
+    background: var(--card);
     color: var(--signal);
     box-shadow:
       0 2px 8px color-mix(in srgb, #000 35%, transparent),
@@ -371,7 +366,7 @@ html[data-monochrome-icons="on"] .zap-tag-icon {
 .zap-track-play {
   border: none;
   border-radius: 0.35rem;
-  background: color-mix(in srgb, var(--card) 88%, var(--foreground));
+  background: var(--card);
   color: var(--muted-foreground);
   box-shadow:
     0 1px 2px color-mix(in srgb, #000 40%, transparent),
