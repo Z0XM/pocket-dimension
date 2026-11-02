@@ -431,7 +431,7 @@
   {/if}
   {#if playlist.canRename}
     <form
-      class="flex flex-col gap-2 rounded-lg border border-border/70 bg-card p-4 sm:flex-row sm:items-end"
+      class="flex flex-col gap-2 sm:flex-row sm:items-end"
       onsubmit={(e) => {
         e.preventDefault();
         void saveRename();
@@ -439,7 +439,7 @@
     >
       <label class="min-w-0 flex-1 space-y-1">
         <span class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Name</span>
-        <input class="auth-field" bind:value={renameValue} maxlength="80" />
+        <input class="zap-underline-field" bind:value={renameValue} maxlength="80" />
       </label>
       <button
         type="submit"
@@ -452,7 +452,7 @@
   {/if}
 
   {#if playlist.kind === "linked"}
-    <div class="rounded-lg border border-border/70 bg-card p-4">
+    <div class="space-y-2">
       <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Linked sources</p>
       <p class="mb-2 font-mono text-[10px] text-muted-foreground">Tracks refresh automatically when sources gain songs. Manual adds are disabled.</p>
       {#if playlist.sources?.length}
@@ -471,7 +471,7 @@
   {/if}
 
   {#if playlist.canEdit}
-    <div class="space-y-3 rounded-lg border border-border/70 bg-card p-4">
+    <div class="space-y-3">
       <div class="flex flex-wrap items-baseline justify-between gap-2">
         <p class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Build from tags</p>
         {#if playlist.tagQuery}
@@ -512,12 +512,12 @@
   {/if}
 
   {#if playlist.canDelete}
-    <div class="rounded-lg border border-border/70 bg-card p-4">
+    <div class="space-y-2">
       <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
         {playlist.kind === "linked" ? "Add member" : "Add collaborator"}
       </p>
       <div class="flex gap-2">
-        <input class="auth-field flex-1" bind:value={collabQuery} placeholder="email or username" />
+        <input class="zap-underline-field flex-1" bind:value={collabQuery} placeholder="email or username" />
         <button
           type="button"
           class="rounded border border-border px-2 py-1 font-mono text-[10px] disabled:opacity-40"
@@ -583,7 +583,7 @@
       <ListBusyOverlay {busy} label={busyLabel}>
         <ul
           bind:this={listEl}
-          class="max-h-[28rem] min-h-[6rem] space-y-0 overflow-y-auto rounded-lg border border-border/70 bg-card py-1"
+          class="zap-track-host max-h-[28rem] min-h-[6rem] space-y-0 overflow-y-auto py-1"
           aria-label="Playlist tracks"
         >
           {#each playlist.items as item, index (item.id)}
@@ -646,7 +646,7 @@
   {#if playlist.exclusions.length}
     <div>
       <p class="mb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Added in the past</p>
-      <ul class="space-y-1 rounded-lg border border-border/50 bg-card py-1 font-mono text-[11px]">
+      <ul class="zap-track-host space-y-1 py-1 font-mono text-[11px]">
         {#each playlist.exclusions as ex}
           <li class="flex items-center justify-between gap-2 px-2 py-1">
             <span class="min-w-0 truncate text-muted-foreground">{ex.title}</span>

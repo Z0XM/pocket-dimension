@@ -1,9 +1,13 @@
 <script lang="ts">
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import ListEndIcon from "@lucide/svelte/icons/list-end";
+  import ListPlusIcon from "@lucide/svelte/icons/list-plus";
+  import ListStartIcon from "@lucide/svelte/icons/list-start";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import ReplaceIcon from "@lucide/svelte/icons/replace";
+  import ShuffleIcon from "@lucide/svelte/icons/shuffle";
   import CatalogueFilters from "$lib/components/CatalogueFilters.svelte";
-  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import DiscordSinkPanel from "$lib/components/DiscordSinkPanel.svelte";
   import ListBusyOverlay from "$lib/components/ListBusyOverlay.svelte";
   import PageHeader from "$lib/components/PageHeader.svelte";
@@ -13,7 +17,7 @@
   import SessionSetupPanel from "$lib/components/SessionSetupPanel.svelte";
   import TrackListSkeleton from "$lib/components/TrackListSkeleton.svelte";
   import type { CatalogueFilterInput } from "$lib/catalog-queue-client.svelte";
-  import type { EnqueueMode } from "$lib/catalog-queue";
+  import type { BulkEnqueueMode, EnqueueMode } from "$lib/catalog-queue";
   import type { SessionSnapshot } from "$lib/server/sessions/types";
   import type { PageData } from "./$types";
   import { page } from "$app/state";
@@ -40,7 +44,10 @@
   let tagQueryError = $state<string | null>(data.catalogueTagQueryError ?? null);
   let queueBusy = $state(false);
   let bulkBusy = $state(false);
-  let replaceOpen = $state(false);
+  let playAllOpen = $state(false);
+  let playAllTrigger = $state<HTMLButtonElement | null>(null);
+  let playAllPanel = $state<HTMLDivElement | null>(null);
+  let filtersOpen = $state(false);
   let discordSinkActive = $state(false);
   let catalogueFetchGen = 0;
   let playlists = $state(data.playlists ?? []);
@@ -59,8 +66,8 @@
   const filtering = $derived(Boolean(q.trim() || tagQuery.trim() || selectedTagIds.length));
   const scopedPlaylistId = $derived(libraryScope.startsWith("playlist:") ? libraryScope.slice("playlist:".length) : null);
   const scopeLabel = $derived(libraryScopeOptions.find((o) => o.value === libraryScope)?.label.replace(/^▸ /, "") ?? "Your Library");
-  const canAddAll = $derived(canAdd && (filtering || Boolean(scopedPlaylistId)) && catalogue.length > 0 && !tagQueryError);
-  const queueLen = $derived(snapshot.queue?.length ?? 0);
+  const canPlayAll = $derived(canAdd && catalogue.length > 0 && !tagQueryError);
+  const queueActive = $derived((snapshot.queue?.length ?? 0) > 0);
 
   $effect(() => {
     const next = data.snapshot as SessionSnapshot;
@@ -231,12 +238,9 @@
     };
   }
 
-  async function addAllFiltered(mode: "replace" | "last") {
-    if (!snapshot.session || bulkBusy || !canAddAll) return;
-    if (mode === "replace" && queueLen > 0) {
-      replaceOpen = true;
-      return;
-    }
+  async function playAll(mode: BulkEnqueueMode) {
+    if (!snapshot.session || bulkBusy || !canPlayAll) return;
+    playAllOpen = false;
     bulkBusy = true;
     try {
       const res = await fetch(`/api/sessions/${snapshot.session.id}/queue`, {
@@ -249,7 +253,7 @@
       if (!res.ok) throw new Error(body?.message ?? `Enqueue failed (${res.status})`);
       snapshot = body;
       nowSubTab = "queue";
-      toast.success(body.notice ?? (mode === "replace" ? "Playing filtered tracks." : "Added filtered tracks to the queue."));
+      toast.success(body.notice ?? "Queued tracks.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Enqueue failed");
     } finally {
@@ -257,29 +261,82 @@
     }
   }
 
-  async function confirmReplaceAll() {
-    if (!snapshot.session || bulkBusy) return;
-    bulkBusy = true;
-    try {
-      const res = await fetch(`/api/sessions/${snapshot.session.id}/queue`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ action: "enqueueFiltered", filter: filterInput(), mode: "replace" }),
-      });
-      const body = (await res.json().catch(() => ({}))) as SessionSnapshot & { message?: string; notice?: string };
-      if (!res.ok) throw new Error(body?.message ?? `Enqueue failed (${res.status})`);
-      snapshot = body;
-      replaceOpen = false;
-      nowSubTab = "queue";
-      toast.success(body.notice ?? "Playing filtered tracks.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Enqueue failed");
-    } finally {
-      bulkBusy = false;
+  function onPlayAllClick() {
+    if (!canPlayAll || bulkBusy || queueBusy) return;
+    if (!filtering) {
+      void playAll("last");
+      return;
+    }
+    filtersOpen = false;
+    playAllOpen = !playAllOpen;
+  }
+
+  function onPlayAllPointerDown(e: PointerEvent) {
+    if (!playAllOpen || !(e.target instanceof Node)) return;
+    if (playAllTrigger?.contains(e.target) || playAllPanel?.contains(e.target)) return;
+    playAllOpen = false;
+  }
+
+  function onPlayAllKeydown(e: KeyboardEvent) {
+    if (e.key === "Escape" && playAllOpen) {
+      e.preventDefault();
+      playAllOpen = false;
     }
   }
+
+  $effect(() => {
+    if (filtersOpen) playAllOpen = false;
+  });
 </script>
+
+{#snippet sessionPlayAllExtras()}
+  <div class="relative inline-flex shrink-0 items-center gap-3">
+    <button
+      type="button"
+      bind:this={playAllTrigger}
+      class={`zap-meta-disclosure disabled:opacity-40 ${playAllOpen ? "is-open" : ""}`}
+      disabled={!canPlayAll || bulkBusy || queueBusy}
+      aria-expanded={filtering ? playAllOpen : undefined}
+      aria-haspopup={filtering ? "menu" : undefined}
+      aria-controls={filtering ? "session-play-all-menu" : undefined}
+      title={filtering ? "Play filtered tracks…" : `Add all ${scopeLabel} tracks to queue`}
+      onclick={onPlayAllClick}
+    >
+      <PlayIcon class="size-3 shrink-0" aria-hidden="true" />
+      <span>Play all</span>
+      {#if filtering}
+        <ChevronDownIcon class={`size-3 shrink-0 text-muted-foreground transition ${playAllOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+      {/if}
+    </button>
+
+    {#if filtering && playAllOpen}
+      <div
+        id="session-play-all-menu"
+        bind:this={playAllPanel}
+        class="zap-dropdown absolute top-[calc(100%+0.4rem)] left-0 z-[70] w-52 overflow-hidden py-1"
+        role="menu"
+        aria-label="Play all options"
+      >
+        {#if queueActive}
+          <button type="button" role="menuitem" class="zap-menu-item" disabled={bulkBusy} onclick={() => void playAll("replace")}>
+            <ReplaceIcon class="size-3.5" aria-hidden="true" /> Replace current queue
+          </button>
+        {/if}
+        <button type="button" role="menuitem" class="zap-menu-item" disabled={bulkBusy} onclick={() => void playAll("next")}>
+          <ListStartIcon class="size-3.5" aria-hidden="true" /> Play next in queue
+        </button>
+        <button type="button" role="menuitem" class="zap-menu-item" disabled={bulkBusy} onclick={() => void playAll("last")}>
+          <ListEndIcon class="size-3.5" aria-hidden="true" /> Play last in queue
+        </button>
+        <button type="button" role="menuitem" class="zap-menu-item" disabled={bulkBusy} onclick={() => void playAll("shuffle")}>
+          <ShuffleIcon class="size-3.5" aria-hidden="true" /> Shuffle in queue
+        </button>
+      </div>
+    {/if}
+  </div>
+{/snippet}
+
+<svelte:document onpointerdown={onPlayAllPointerDown} onkeydown={onPlayAllKeydown} />
 
 <audio bind:this={audioEl} preload="auto" class="hidden"></audio>
 
@@ -361,10 +418,11 @@
           </div>
 
           {#if nowSubTab === "library" && canAdd}
-            <div class="space-y-3" role="tabpanel" aria-label="Add from library">
+            <div class="zap-catalogue space-y-3" role="tabpanel" aria-label="Add from library">
               <CatalogueFilters
                 compact
                 collapsible
+                bind:open={filtersOpen}
                 bind:libraryScope
                 {libraryScopeOptions}
                 bind:q
@@ -374,87 +432,71 @@
                 topTagIds={data.topTagIds}
                 {tagQueryError}
                 busy={catalogueLoading}
-                onchange={() => void fetchCatalogue({ reset: true })}
+                toolbarExtras={sessionPlayAllExtras}
+                onchange={() => {
+                  playAllOpen = false;
+                  void fetchCatalogue({ reset: true });
+                }}
               />
-              {#if canAddAll}
-                <div class="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                  <span>Add all {filtering ? "filtered" : scopeLabel} tracks{catalogueHasMore ? "" : ` (${catalogue.length})`}:</span>
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1 rounded border border-signal/40 bg-signal/10 px-2 py-0.5 text-[11px] text-signal hover:bg-signal/20 disabled:opacity-40"
-                    disabled={bulkBusy || queueBusy}
-                    title="Replace the session queue with these tracks and play"
-                    onclick={() => void addAllFiltered("replace")}
-                  >
-                    <PlayIcon class="size-3.5" aria-hidden="true" /> Play all
-                  </button>
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-[11px] hover:text-signal disabled:opacity-40"
-                    disabled={bulkBusy || queueBusy}
-                    title="Append these tracks to the end of the session queue"
-                    onclick={() => void addAllFiltered("last")}
-                  >
-                    <ListEndIcon class="size-3.5" aria-hidden="true" /> Add all to queue
-                  </button>
-                </div>
-              {/if}
               {#if catalogueLoading && catalogue.length === 0}
                 <TrackListSkeleton rows={5} compact />
               {:else}
                 <ListBusyOverlay busy={catalogueLoading && catalogue.length > 0} label="Updating…">
                   <ul
                     bind:this={catalogueScrollRoot}
-                    class="max-h-[min(32rem,70vh)] min-h-[8rem] divide-y divide-border/50 overflow-y-auto rounded-lg border border-border/70 bg-card"
+                    class="zap-track-host max-h-[min(32rem,70vh)] min-h-[8rem] overflow-y-auto"
                   >
                     {#if catalogue.length === 0}
-                      <li class="px-4 py-8 text-center text-sm text-muted-foreground">No tracks.</li>
+                      <li class="py-8 text-center text-sm text-muted-foreground">No tracks.</li>
                     {:else}
                       {#each catalogue as track (track.id)}
-                        <li class="flex items-center justify-between gap-2 px-3 py-2">
+                        <li class="zap-track group flex items-center justify-between gap-2 py-1.5">
                           <div class="min-w-0">
-                            <p class="truncate text-sm font-medium {track.available === false ? 'text-muted-foreground' : ''}">{track.title}</p>
+                            <p class="zap-track-title truncate text-sm font-medium {track.available === false ? 'text-muted-foreground' : ''}">{track.title}</p>
                             <p class="truncate font-mono text-[10px] text-muted-foreground">
                               {track.artists ?? "Unknown"}{#if track.available === false}
                                 · <span class="text-destructive">Song not available</span>{/if}
                             </p>
                           </div>
-                          <div class="flex shrink-0 gap-0.5">
+                          <div class="flex shrink-0 items-center gap-0.5">
                             <button
                               type="button"
-                              class="rounded border border-signal/40 px-1.5 py-1 font-mono text-[9px] text-signal hover:bg-signal/10 disabled:opacity-40"
+                              class="zap-transport-btn size-7 disabled:opacity-40"
                               disabled={!track.playable || queueBusy}
                               title="Play next"
+                              aria-label={`Play next: ${track.title}`}
                               onclick={() => void enqueue(track.id, "next")}
                             >
-                              Next
+                              <ListStartIcon class="size-3.5" aria-hidden="true" />
                             </button>
                             <button
                               type="button"
-                              class="rounded border border-border px-1.5 py-1 font-mono text-[9px] text-muted-foreground hover:bg-secondary disabled:opacity-40"
+                              class="zap-transport-btn size-7 disabled:opacity-40"
                               disabled={!track.playable || queueBusy}
                               title="Play last"
+                              aria-label={`Play last: ${track.title}`}
                               onclick={() => void enqueue(track.id, "last")}
                             >
-                              Last
+                              <ListEndIcon class="size-3.5" aria-hidden="true" />
                             </button>
                             <button
                               type="button"
-                              class="rounded border border-border px-1.5 py-1 font-mono text-[9px] text-muted-foreground hover:bg-secondary disabled:opacity-40"
+                              class="zap-transport-btn size-7 disabled:opacity-40"
                               disabled={!track.playable || queueBusy}
                               title="Add to queue"
+                              aria-label={`Add to queue: ${track.title}`}
                               onclick={() => void enqueue(track.id, "queue")}
                             >
-                              Add
+                              <ListPlusIcon class="size-3.5" aria-hidden="true" />
                             </button>
                           </div>
                         </li>
                       {/each}
                       <li bind:this={catalogueSentinel} class="h-4 list-none" aria-hidden="true"></li>
                       {#if catalogueLoadingMore}
-                        <li class="px-4 py-2 text-center font-mono text-[10px] text-muted-foreground">Loading more…</li>
+                        <li class="py-2 text-center font-mono text-[10px] text-muted-foreground">Loading more…</li>
                       {:else if !catalogueHasMore}
-                        <li class="px-4 py-2 text-center font-mono text-[10px] text-muted-foreground">End of list</li>
+                        <li class="py-2 text-center font-mono text-[10px] text-muted-foreground">End of list</li>
                       {/if}
                     {/if}
                   </ul>
@@ -475,7 +517,7 @@
           {/if}
         </div>
       {:else}
-        <p class="text-sm text-muted-foreground">
+        <p class="font-mono text-[11px] text-muted-foreground">
           This session is over.
           <button type="button" class="text-signal hover:underline" onclick={() => goto("/session?stay=1")}>Back to sessions</button>
         </p>
@@ -483,12 +525,3 @@
     {/if}
   </div>
 </section>
-
-<ConfirmDialog
-  bind:open={replaceOpen}
-  title="Replace session queue?"
-  body={`The current queue of ${queueLen} song${queueLen === 1 ? "" : "s"} will be cleared, and these filtered tracks will start playing.`}
-  confirmLabel="Start this queue"
-  busy={bulkBusy}
-  onconfirm={confirmReplaceAll}
-/>

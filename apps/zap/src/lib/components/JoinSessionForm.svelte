@@ -49,7 +49,7 @@
     <label class={`block space-y-1 ${fullWidth ? "w-full sm:min-w-0 sm:flex-1" : "min-w-[10rem] flex-1"}`}>
       <span class="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">Join code</span>
       <input
-        class="auth-field text-center font-mono text-lg tracking-[0.35em] uppercase"
+        class="zap-underline-field text-center font-mono text-lg tracking-[0.35em] uppercase"
         bind:value={code}
         placeholder="K7M2QX"
         autocomplete="off"

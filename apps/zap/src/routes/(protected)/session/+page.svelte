@@ -28,7 +28,7 @@
       {#if live.length}
         <div class="space-y-2">
           <h3 class="font-mono text-[10px] tracking-[0.18em] text-signal uppercase">Live</h3>
-          <ul class="zap-track-host space-y-0 divide-y divide-border/60 px-4 py-2">
+          <ul class="zap-track-host space-y-0 px-4 py-2">
             {#each live as row (row.id)}
               <SessionIndexRow {row} mode="live" onchanged={refresh} />
             {/each}
@@ -39,7 +39,7 @@
       {#if stalePerpetual.length}
         <div class="space-y-2">
           <h3 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Perpetual (idle)</h3>
-          <ul class="zap-track-host space-y-0 divide-y divide-border/60 px-4 py-2">
+          <ul class="zap-track-host space-y-0 px-4 py-2">
             {#each stalePerpetual as row (row.id)}
               <SessionIndexRow {row} mode="stale" onchanged={refresh} />
             {/each}

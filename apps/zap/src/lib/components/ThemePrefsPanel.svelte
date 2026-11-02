@@ -176,7 +176,7 @@
         </button>
       {/each}
     </div>
-    <label class="flex items-center justify-between gap-4 border border-border/70 bg-card p-3">
+    <label class="flex items-center justify-between gap-4">
       <span class="min-w-0">
         <span class="block text-sm text-foreground">Monochrome icons</span>
         <span class="mt-0.5 block font-mono text-[10px] text-muted-foreground">
@@ -201,7 +201,7 @@
       <SparklesIcon class="size-3.5 shrink-0 text-signal" aria-hidden="true" />
       Motion
     </h2>
-    <label class="flex items-center justify-between gap-4 border border-border/70 bg-card p-3">
+    <label class="flex items-center justify-between gap-4">
       <span class="min-w-0">
         <span class="block text-sm text-foreground">Animations</span>
         <span class="mt-0.5 block font-mono text-[10px] text-muted-foreground">
@@ -242,7 +242,7 @@
         </div>
       </div>
 
-      <div class="space-y-3 border border-border/70 bg-card p-3">
+      <div class="space-y-3">
         <label class="block space-y-1.5">
           <span class="flex items-baseline justify-between gap-2">
             <span class="text-sm text-foreground">Card opacity</span>

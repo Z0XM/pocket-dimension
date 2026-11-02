@@ -203,7 +203,7 @@
           void saveAsPlaylist();
         }}
       >
-        <input class="auth-field h-8 py-0 text-xs" bind:value={saveName} maxlength="80" aria-label="Playlist name" />
+        <input class="zap-underline-field h-8 py-0 text-xs" bind:value={saveName} maxlength="80" aria-label="Playlist name" />
         <button
           type="submit"
           class="rounded bg-primary px-2 text-xs text-primary-foreground disabled:opacity-40"
@@ -250,7 +250,7 @@
         </button>
         <button
           type="button"
-          class={`flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1.5 text-left hover:bg-signal/10 disabled:opacity-40 ${isCurrent ? "bg-signal/10" : ""}`}
+          class={`flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1.5 text-left hover:bg-secondary/40 disabled:opacity-40 ${isCurrent ? "text-signal" : ""}`}
           disabled={!item.playable}
           title={item.playable ? `Play from “${item.title}”` : "Not playable"}
           onclick={() => void queue.jump(item.id)}
@@ -304,7 +304,7 @@
             <li class="group flex items-center gap-1">
               <button
                 type="button"
-                class="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left text-muted-foreground hover:bg-signal/10 hover:text-foreground disabled:opacity-40"
+                class="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left text-muted-foreground hover:bg-secondary/40 hover:text-foreground disabled:opacity-40"
                 disabled={!item.playable}
                 title={`Play from “${item.title}”`}
                 onclick={() => void queue.jump(item.id)}

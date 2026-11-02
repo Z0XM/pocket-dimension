@@ -131,7 +131,7 @@
 <div class="flex min-h-0 flex-1 flex-col gap-4">
   <ul class="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4">
     {#each stats as stat (stat.label)}
-      <li class="rounded-lg border border-border/70 bg-card px-3 py-2">
+      <li class="px-1 py-2">
         <p class="font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase">{stat.label}</p>
         <p class="mt-1 text-xl font-semibold tabular-nums">{stat.value}</p>
       </li>
@@ -154,8 +154,8 @@
     {#if activity.length === 0}
       <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">No activity for these filters.</p>
     {:else}
-      <div bind:this={scrollRoot} class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain" role="region" aria-label="Activity log">
-        <ul class="divide-y divide-border/60">
+      <div bind:this={scrollRoot} class="zap-track-host is-framed min-h-0 flex-1 overflow-y-auto overscroll-contain" role="region" aria-label="Activity log">
+        <ul>
           {#each activity as entry (entry.id)}
             <li class="px-4 py-3">
               <div class="flex flex-wrap items-baseline justify-between gap-2">

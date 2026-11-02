@@ -134,7 +134,7 @@
       {#if snapshot.queue.length > 0 && canRemove}
         <button
           type="button"
-          class="ml-auto rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:bg-secondary/60 disabled:opacity-40"
+          class="zap-meta-disclosure ml-auto disabled:opacity-40"
           disabled={locked}
           onclick={() => void queuePost({ action: "clear" })}
         >
@@ -145,27 +145,27 @@
   {/if}
 
   <div class="space-y-2">
-    <ul bind:this={listEl} class="max-h-[min(32rem,70vh)] min-h-[8rem] overflow-y-auto rounded-lg border border-border/70 bg-card py-1" aria-label="Session queue">
+    <ul bind:this={listEl} class="zap-track-host max-h-[min(32rem,70vh)] min-h-[8rem] overflow-y-auto py-1" aria-label="Session queue">
       {#if snapshot.queue.length === 0}
-        <li class="px-4 py-8 text-center text-sm text-muted-foreground">Queue empty — add from the library.</li>
+        <li class="py-8 text-center text-sm text-muted-foreground">Queue empty — add from the library.</li>
       {:else}
         {#each activeItems as item (item.id)}
           {@const index = snapshot.queue.findIndex((q) => q.id === item.id)}
           {@const isCurrent = item.id === currentId}
           <li
             data-qi={index}
-            class={`group flex items-center gap-1 px-1.5 ${dragFrom === index ? "opacity-40" : ""} ${
+            class={`zap-track group flex items-center gap-1 ${dragFrom === index ? "opacity-40" : ""} ${
               dragOver === index && dragFrom != null && dragFrom !== index
                 ? dragFrom < index
                   ? "border-b-2 border-signal"
                   : "border-t-2 border-signal"
                 : ""
-            }`}
+            } ${isCurrent ? "is-current" : ""}`}
           >
             {#if canReorder}
               <button
                 type="button"
-                class="inline-flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:text-signal disabled:opacity-40"
+                class="zap-transport-btn size-7 shrink-0 cursor-grab touch-none disabled:opacity-40"
                 disabled={locked}
                 aria-label={`Reorder ${item.title}`}
                 title="Drag to reorder"
@@ -180,7 +180,7 @@
             {/if}
             <button
               type="button"
-              class={`flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1.5 text-left hover:bg-signal/10 disabled:opacity-40 ${isCurrent ? "bg-signal/10" : ""}`}
+              class="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1.5 text-left disabled:opacity-40"
               disabled={!canPlay || !item.playable || locked}
               title={canPlay && item.playable ? `Play “${item.title}”` : item.title}
               onclick={() => void playItem(item)}
@@ -193,7 +193,7 @@
                 {/if}
               </span>
               <span class="min-w-0 flex-1">
-                <span class={`block truncate text-[13px] ${isCurrent ? "text-signal" : "text-foreground"}`}>{item.title}</span>
+                <span class={`zap-track-title block truncate text-[13px] ${isCurrent ? "text-signal" : "text-foreground"}`}>{item.title}</span>
                 <span class="block truncate font-mono text-[10px] text-muted-foreground"
                   >{item.artists ?? "Unknown"} · {item.addedByDisplayName}</span
                 >
@@ -220,13 +220,13 @@
     {#if pastItems.length}
       <div>
         <p class="mb-1 font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Added in the past</p>
-        <ul class="max-h-40 space-y-0.5 overflow-y-auto rounded-lg border border-border/50 bg-card py-1" aria-label="Added in the past">
+        <ul class="zap-track-host max-h-40 space-y-0.5 overflow-y-auto py-1" aria-label="Added in the past">
           {#each pastItems as item (item.id)}
             {@const index = snapshot.queue.findIndex((q) => q.id === item.id)}
-            <li class="group flex items-center gap-1 px-1.5">
+            <li class="zap-track group flex items-center gap-1">
               <button
                 type="button"
-                class="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left text-muted-foreground hover:bg-signal/10 hover:text-foreground disabled:opacity-40"
+                class="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left text-muted-foreground hover:text-foreground disabled:opacity-40"
                 disabled={!canPlay || !item.playable || locked}
                 title={`Play “${item.title}”`}
                 onclick={() => void playItem(item)}

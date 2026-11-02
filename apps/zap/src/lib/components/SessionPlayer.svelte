@@ -278,7 +278,7 @@
   }
 </script>
 
-<div class="space-y-4 rounded-lg border border-border/70 bg-card p-4">
+<div class="space-y-4">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
       <p class="font-mono text-[10px] tracking-[0.2em] text-signal uppercase">Now playing</p>
@@ -307,7 +307,7 @@
   <div class="flex flex-wrap items-center gap-2">
     <button
       type="button"
-      class="flex size-10 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
+      class="zap-transport-btn size-10 disabled:opacity-40"
       disabled={!canSkip || busy || !current}
       aria-label="Previous"
       title="Previous"
@@ -317,7 +317,7 @@
     </button>
     <button
       type="button"
-      class="flex size-10 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
+      class={`zap-transport-play size-10 disabled:opacity-40 ${session?.playbackState === "playing" ? "is-active" : ""}`}
       disabled={!canPlayPause || busy || !current}
       aria-label={session?.playbackState === "playing" ? "Pause" : "Play"}
       onclick={() => void transport(session?.playbackState === "playing" ? "pause" : "play")}
@@ -330,7 +330,7 @@
     </button>
     <button
       type="button"
-      class="flex size-10 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
+      class="zap-transport-btn size-10 disabled:opacity-40"
       disabled={!canSkip || busy}
       aria-label="Next"
       title="Next"

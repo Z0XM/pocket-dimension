@@ -32,7 +32,7 @@
 </script>
 
 <div class="space-y-6">
-  <div class="space-y-3 border border-border/70 bg-card p-4">
+  <div class="space-y-3">
     <h2 class="font-mono text-xs tracking-[0.18em] text-muted-foreground uppercase">Details</h2>
     {#if !configured}
       <p class="text-sm text-muted-foreground">
@@ -71,7 +71,7 @@
     {#if activity.length === 0}
       <p class="font-mono text-[11px] text-muted-foreground">No Discord activity yet.</p>
     {:else}
-      <ul class="divide-y divide-border/50 border border-border/70 bg-card">
+      <ul class="zap-track-host">
         {#each activity as entry (entry.id)}
           <li class="px-3 py-2.5">
             <p class="text-sm text-foreground">{entry.summary}</p>

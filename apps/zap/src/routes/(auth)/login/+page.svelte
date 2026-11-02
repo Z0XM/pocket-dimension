@@ -124,7 +124,6 @@
   <div class="flex flex-col gap-5">
     <div class="flex flex-col items-center gap-2 text-center">
       <h1 class="text-2xl font-bold">Welcome back</h1>
-      <p class="text-balance text-sm text-muted-foreground">Log in to Zap</p>
     </div>
 
     <div class="flex flex-col gap-2">

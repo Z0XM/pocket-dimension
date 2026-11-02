@@ -15,7 +15,7 @@
 
   <div class="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto overscroll-contain">
     {#if data.liveSessions.length}
-      <div class="rounded border-2 border-signal/40 bg-signal/10 px-4 py-4">
+      <div class="border-l-2 border-signal/30 pl-4">
         <p class="font-mono text-[10px] tracking-[0.18em] text-signal uppercase">Live — pick up where you left off</p>
         <ul class="mt-3 space-y-2">
           {#each data.liveSessions as live (live.id)}
@@ -29,7 +29,7 @@
               </span>
               <a
                 href={`/session/${live.id}`}
-                class="inline-flex items-center gap-1.5 rounded border border-border px-3 py-1.5 font-mono text-[10px] hover:bg-secondary/60"
+                class="zap-meta-disclosure inline-flex items-center gap-1.5"
               >
                 <RadioIcon class="size-3.5" aria-hidden="true" />
                 Resume
@@ -88,7 +88,7 @@
           No playlists yet. <a href="/playlists" class="text-signal hover:underline">Create one</a>.
         </p>
       {:else}
-        <ul class="zap-track-host divide-y divide-border/50">
+        <ul class="zap-track-host">
           {#each data.playlists as pl (pl.id)}
             <li>
               <a href={`/playlists/${pl.id}`} class="block px-4 py-2.5 text-sm hover:text-signal">
@@ -112,7 +112,7 @@
           <h2 class="zap-section-label font-mono text-[10px] tracking-[0.18em] uppercase">Recent plays</h2>
           <a href="/history" class="font-mono text-[10px] text-signal hover:underline">History</a>
         </div>
-        <ul class="zap-track-host divide-y divide-border/50">
+        <ul class="zap-track-host">
           {#each data.playHistory as play (play.id)}
             <li class="px-4 py-2.5 text-sm">
               <span class="font-medium">{play.title}</span>

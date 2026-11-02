@@ -124,9 +124,9 @@
     }}
   >
     <div class="relative min-w-0">
-      <SearchIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+      <SearchIcon class="pointer-events-none absolute top-1/2 left-0 size-4 shrink-0 -translate-y-1/2 text-white" aria-hidden="true" />
       <input
-        class="auth-field w-full pl-9"
+        class="zap-underline-field h-9 w-full py-0 pr-1 pl-7"
         type="search"
         placeholder="Title, artist or source URL"
         aria-label="Search play history"
@@ -135,7 +135,7 @@
       />
     </div>
     <div class="min-w-0">
-      <ZapSelect options={rangeOptions} bind:value={range} placeholder="All time" onChange={(v) => navigate({ range: v })} />
+      <ZapSelect variant="plain" options={rangeOptions} bind:value={range} placeholder="All time" onChange={(v) => navigate({ range: v })} />
     </div>
     <button type="submit" class="auth-btn inline-flex h-auto min-h-10 w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-4 py-2">
       <SearchIcon class="size-3.5 shrink-0" aria-hidden="true" />
@@ -151,12 +151,12 @@
     </p>
   {:else}
     <div bind:this={scrollRoot} class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain" role="region" aria-label="Play history">
-      <ul class="divide-y divide-border/60">
+      <ul>
         {#each entries as entry (entry.id)}
           <li class="flex items-start gap-3 px-4 py-3">
             <button
               type="button"
-              class="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
+              class="zap-track-play mt-0.5 flex size-8 shrink-0 items-center justify-center disabled:opacity-40"
               disabled={!queue || !entry.playable || playingId !== null}
               title={entry.playable ? `Play ${entry.title}` : "Not playable"}
               aria-label={`Play ${entry.title}`}

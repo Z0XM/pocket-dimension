@@ -124,7 +124,7 @@
       No queues yet — press play on a track in the <a href="/catalogue" class="text-signal hover:underline">Catalogue</a>.
     </p>
   {:else}
-    <ul class="divide-y divide-border/60 rounded-lg border border-border/70 bg-card">
+    <ul class="zap-track-host space-y-0">
       {#each data.queueRuns as run (run.id)}
         {@const isActive = run.id === activeRunId}
         <li class="space-y-2 px-4 py-3">
@@ -142,53 +142,53 @@
               · finished
             {/if}
           </p>
-          <div class="flex flex-wrap gap-1.5 font-mono text-[10px]">
+          <div class="flex flex-wrap gap-3 font-mono text-[10px]">
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded border border-border px-2 py-1 hover:text-signal disabled:opacity-40"
+              class={`zap-meta-disclosure disabled:opacity-40 ${viewTracksRunId === run.id ? "is-open" : ""}`}
               disabled={!queue || viewTracksLoading}
               aria-expanded={viewTracksRunId === run.id}
               onclick={() => void toggleViewTracks(run.id)}
             >
-              <ListMusicIcon class="size-3" />
+              <ListMusicIcon class="size-3 shrink-0" />
               {viewTracksRunId === run.id ? "Hide songs" : "View songs"}
-              <ChevronDownIcon class={`size-3 transition ${viewTracksRunId === run.id ? "rotate-180" : ""}`} aria-hidden="true" />
+              <ChevronDownIcon class={`size-3 shrink-0 transition ${viewTracksRunId === run.id ? "rotate-180" : ""}`} aria-hidden="true" />
             </button>
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded border border-signal/40 bg-signal/10 px-2 py-1 text-signal hover:bg-signal/20 disabled:opacity-40"
+              class="zap-meta-disclosure disabled:opacity-40"
               disabled={!queue || busyRunId !== null}
               onclick={() => requestRestart(run.id)}
             >
-              <RotateCcwIcon class="size-3" /> Restart
+              <RotateCcwIcon class="size-3 shrink-0" /> Restart
             </button>
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded border border-border px-2 py-1 hover:text-signal disabled:opacity-40"
+              class="zap-meta-disclosure disabled:opacity-40"
               disabled={!queue || busyRunId !== null || run.currentIndex == null}
               title={run.currentIndex == null ? "This queue played to the end" : "Continue where it stopped"}
               onclick={() => void runAction(run.id, () => queue!.activateRun(run.id, "resume"))}
             >
-              <PlayIcon class="size-3" /> Resume
+              <PlayIcon class="size-3 shrink-0" /> Resume
             </button>
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded border border-border px-2 py-1 hover:text-signal disabled:opacity-40"
+              class="zap-meta-disclosure disabled:opacity-40"
               disabled={!queue || busyRunId !== null}
               onclick={() => openSave(run.id, run.createdAt)}
             >
-              <SaveIcon class="size-3" /> Save as playlist
+              <SaveIcon class="size-3 shrink-0" /> Save as playlist
             </button>
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-muted-foreground hover:text-destructive disabled:opacity-40"
+              class="zap-meta-disclosure text-destructive/80 hover:text-destructive disabled:opacity-40"
               disabled={!queue || busyRunId !== null}
               onclick={() => {
                 deleteRunId = run.id;
                 deleteOpen = true;
               }}
             >
-              <Trash2Icon class="size-3" /> Remove
+              <Trash2Icon class="size-3 shrink-0" /> Remove
             </button>
           </div>
           {#if viewTracksRunId === run.id}
@@ -241,7 +241,7 @@
                 void saveRun(run.id);
               }}
             >
-              <input class="auth-field h-8 py-0 text-xs" bind:value={saveName} maxlength="80" aria-label="Playlist name" />
+              <input class="zap-underline-field h-8 py-0 text-xs" bind:value={saveName} maxlength="80" aria-label="Playlist name" />
               <button
                 type="submit"
                 class="rounded bg-primary px-3 text-xs text-primary-foreground disabled:opacity-40"

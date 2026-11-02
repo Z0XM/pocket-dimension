@@ -119,9 +119,9 @@
     }}
   >
     <div class="relative min-w-0">
-      <SearchIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+      <SearchIcon class="pointer-events-none absolute top-1/2 left-0 size-4 shrink-0 -translate-y-1/2 text-white" aria-hidden="true" />
       <input
-        class="auth-field w-full pl-9"
+        class="zap-underline-field h-9 w-full py-0 pr-1 pl-7"
         type="search"
         placeholder="Title, playlist or source URL"
         aria-label="Search uploads and imports"
@@ -130,7 +130,7 @@
       />
     </div>
     <div class="min-w-0">
-      <ZapSelect options={rangeOptions} bind:value={range} placeholder="All time" onChange={(v) => navigate({ range: v })} />
+      <ZapSelect variant="plain" options={rangeOptions} bind:value={range} placeholder="All time" onChange={(v) => navigate({ range: v })} />
     </div>
     <button type="submit" class="auth-btn inline-flex h-auto min-h-10 w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-4 py-2">
       <SearchIcon class="size-3.5 shrink-0" aria-hidden="true" />
@@ -153,7 +153,7 @@
       role="region"
       aria-label="Uploads and imports"
     >
-      <ul class="divide-y divide-border/60">
+      <ul>
         {#each entries as entry (entry.id)}
           <li class="px-4 py-3">
             <div class="flex flex-wrap items-baseline justify-between gap-2">

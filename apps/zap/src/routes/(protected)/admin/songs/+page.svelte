@@ -166,16 +166,16 @@
 
 <div class="flex min-h-0 flex-1 flex-col gap-4">
   <form
-    class="grid shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card p-4 sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
+    class="grid shrink-0 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_12rem_auto]"
     onsubmit={(e) => {
       e.preventDefault();
       navigate({});
     }}
   >
     <div class="relative min-w-0">
-      <SearchIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+      <SearchIcon class="pointer-events-none absolute top-1/2 left-0 size-4 shrink-0 -translate-y-1/2 text-white" aria-hidden="true" />
       <input
-        class="auth-field w-full pl-9"
+        class="zap-underline-field h-9 w-full py-0 pr-1 pl-7"
         type="search"
         placeholder="Title, artist or source id"
         aria-label="Search songs"
@@ -202,8 +202,8 @@
   {#if songs.length === 0}
     <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">No songs.</p>
   {:else}
-    <div bind:this={scrollRoot} class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain" role="region" aria-label="Songs">
-      <ul class="divide-y divide-border/60">
+    <div bind:this={scrollRoot} class="zap-track-host is-framed min-h-0 flex-1 overflow-y-auto overscroll-contain" role="region" aria-label="Songs">
+      <ul>
         {#each songs as song (song.id)}
           <li class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <button

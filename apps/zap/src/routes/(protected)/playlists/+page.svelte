@@ -229,19 +229,17 @@
     <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
       <label class="flex-1 space-y-1">
         <span class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">New playlist</span>
-        <input class="auth-field" bind:value={newName} placeholder="Name…" maxlength="80" />
+        <input class="zap-underline-field" bind:value={newName} placeholder="Name…" maxlength="80" />
       </label>
       <button
         type="button"
-        class={`inline-flex items-center justify-center gap-1.5 rounded border px-3 py-2 font-mono text-[11px] ${
-          newTagsOpen ? "border-signal/50 text-signal" : "border-border text-muted-foreground hover:text-signal"
-        }`}
+        class={`zap-meta-disclosure ${newTagsOpen ? "is-open" : ""}`}
         aria-expanded={newTagsOpen}
         onclick={() => (newTagsOpen = !newTagsOpen)}
       >
-        <TagsIcon class="size-3.5" aria-hidden="true" />
+        <TagsIcon class="size-3.5 shrink-0" aria-hidden="true" />
         From tags
-        <ChevronDownIcon class={`size-3 transition ${newTagsOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+        <ChevronDownIcon class={`size-3 shrink-0 transition ${newTagsOpen ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       <button
         type="submit"
@@ -284,7 +282,7 @@
     <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
       <label class="flex-1 space-y-1">
         <span class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Follow playlist</span>
-        <input class="auth-field font-mono uppercase" bind:value={followCode} placeholder="Share code…" maxlength="12" />
+        <input class="zap-underline-field font-mono uppercase" bind:value={followCode} placeholder="Share code…" maxlength="12" />
       </label>
       <button
         type="submit"
@@ -301,15 +299,13 @@
   <div class="zap-filters-panel shrink-0 space-y-3 p-3">
     <button
       type="button"
-      class={`inline-flex items-center gap-1.5 rounded border px-3 py-1.5 font-mono text-[11px] ${
-        linkOpen ? "border-signal/50 text-signal" : "border-border text-muted-foreground hover:text-signal"
-      }`}
+      class={`zap-meta-disclosure ${linkOpen ? "is-open" : ""}`}
       aria-expanded={linkOpen}
       onclick={() => (linkOpen = !linkOpen)}
     >
-      <LinkIcon class="size-3.5" aria-hidden="true" />
+      <LinkIcon class="size-3.5 shrink-0" aria-hidden="true" />
       Linked playlist
-      <ChevronDownIcon class={`size-3 transition ${linkOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+      <ChevronDownIcon class={`size-3 shrink-0 transition ${linkOpen ? "rotate-180" : ""}`} aria-hidden="true" />
     </button>
     {#if linkOpen}
       <div class="space-y-3 border-t border-border/50 pt-3">
@@ -319,12 +315,12 @@
         </p>
         <label class="block space-y-1">
           <span class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Name</span>
-          <input class="auth-field" bind:value={linkName} placeholder="Linked mix…" maxlength="80" />
+          <input class="zap-underline-field" bind:value={linkName} placeholder="Linked mix…" maxlength="80" />
         </label>
         <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
           <label class="flex-1 space-y-1">
             <span class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Source share code</span>
-            <input class="auth-field font-mono uppercase" bind:value={linkCodeInput} placeholder="Code…" maxlength="12" />
+            <input class="zap-underline-field font-mono uppercase" bind:value={linkCodeInput} placeholder="Code…" maxlength="12" />
           </label>
           <button
             type="button"
@@ -355,7 +351,7 @@
         {/if}
         <label class="block space-y-1">
           <span class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Members (optional)</span>
-          <input class="auth-field" bind:value={linkMemberQuery} placeholder="email or username, comma-separated" />
+          <input class="zap-underline-field" bind:value={linkMemberQuery} placeholder="email or username, comma-separated" />
         </label>
         <button
           type="button"
@@ -379,7 +375,7 @@
       {#if playlists.length === 0}
         <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">No playlists yet.</p>
       {:else}
-        <ul class="zap-track-host divide-y divide-border/60">
+        <ul class="zap-track-host">
           {#each playlists as pl (pl.id)}
             {@const badge = playlistRelationBadge(pl.relation, pl.kind)}
             <li class="flex items-center gap-2 px-3 py-2.5">
@@ -439,7 +435,7 @@
           None yet — use “Save for later” in a session.
         </p>
       {:else}
-        <ul class="zap-track-host divide-y divide-border/60">
+        <ul class="zap-track-host">
           {#each data.savedQueues as sq (sq.id)}
             <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
               <div>

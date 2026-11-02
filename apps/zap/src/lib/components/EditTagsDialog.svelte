@@ -212,10 +212,10 @@
       {/if}
 
       <div class="relative shrink-0">
-        <SearchIcon class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <SearchIcon class="pointer-events-none absolute top-1/2 left-0 size-3.5 -translate-y-1/2 text-white" aria-hidden="true" />
         <input
           bind:this={filterEl}
-          class="auth-field w-full pl-8 font-mono text-xs"
+          class="zap-underline-field h-9 w-full py-0 pr-1 pl-7 font-mono text-xs"
           type="search"
           placeholder="Search tags… · ↑↓ · Space · Enter"
           aria-label="Search tags"

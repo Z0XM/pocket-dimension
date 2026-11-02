@@ -95,7 +95,7 @@
       <div class="pointer-events-auto flex shrink-0 items-center gap-1">
         <button
           type="button"
-          class="inline-flex size-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
+          class="zap-transport-btn size-8 disabled:opacity-40"
           aria-label="Previous"
           title="Previous"
           disabled={queue.items.length === 0}
@@ -105,7 +105,7 @@
         </button>
         <button
           type="button"
-          class="inline-flex size-9 items-center justify-center rounded border border-signal/40 bg-signal/10 text-signal hover:bg-signal/20 disabled:opacity-40"
+          class={`zap-transport-play size-9 disabled:opacity-40 ${queue.playing ? "is-active" : ""}`}
           aria-label={queue.playing ? "Pause" : "Play"}
           title={queue.playing ? "Pause" : "Play"}
           disabled={queue.items.length === 0}
@@ -119,7 +119,7 @@
         </button>
         <button
           type="button"
-          class="inline-flex size-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-secondary disabled:opacity-40"
+          class="zap-transport-btn size-8 disabled:opacity-40"
           aria-label="Next"
           title="Next"
           disabled={!current}

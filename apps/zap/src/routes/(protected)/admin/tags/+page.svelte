@@ -111,7 +111,7 @@
   <form
     method="POST"
     action="?/create"
-    class="shrink-0 space-y-3 rounded-lg border border-border/70 bg-card p-4"
+    class="zap-filters-panel shrink-0 space-y-3"
     use:enhance={() => {
       busy = true;
       return async ({ result, update }) => {
@@ -138,7 +138,7 @@
       </p>
     </div>
     <div class="flex flex-col gap-2 sm:flex-row">
-      <input class="auth-field sm:max-w-xs" name="name" placeholder="e.g. chill" maxlength="64" autocomplete="off" bind:value={name} />
+      <input class="zap-underline-field sm:max-w-xs" name="name" placeholder="e.g. chill" maxlength="64" autocomplete="off" bind:value={name} />
       <button type="submit" class="auth-btn inline-flex w-fit items-center gap-1.5" disabled={!name.trim() || busy}>
         <PlusIcon class="size-3.5" aria-hidden="true" />
         Add tag
@@ -151,7 +151,7 @@
     {#if tags.length === 0}
       <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">No system tags.</p>
     {:else}
-      <div bind:this={scrollRoot} class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" role="region" aria-label="System tags">
+      <div bind:this={scrollRoot} class="zap-track-host is-framed min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" role="region" aria-label="System tags">
         <ul class="flex flex-wrap gap-2">
           {#each tags as tag (tag.id)}
             <li>

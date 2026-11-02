@@ -69,7 +69,6 @@
   <div class="flex flex-col gap-5">
     <div class="flex flex-col items-center gap-2 text-center">
       <h1 class="text-2xl font-bold">Create your account</h1>
-      <p class="text-balance text-sm text-muted-foreground">Sign up for Zap</p>
     </div>
 
     <div class="grid gap-2">

@@ -209,7 +209,7 @@
     </div>
 
     <input
-      class="auth-field"
+      class="zap-underline-field"
       type="search"
       placeholder={compact ? "Search catalogue…" : "Search title or artists…"}
       bind:value={q}

@@ -101,7 +101,7 @@
     <form
       method="POST"
       action="?/setMode"
-      class="space-y-3 rounded-lg border border-border/70 bg-card p-4"
+      class="space-y-3"
       bind:this={modeForm}
       use:enhance={submitWithBusy}
     >
@@ -119,7 +119,7 @@
     <form
       method="POST"
       action="?/addUser"
-      class="space-y-3 rounded-lg border border-border/70 bg-card p-4"
+      class="space-y-3"
       use:enhance={() => {
         busy = true;
         return async ({ result, update }) => {
@@ -147,16 +147,15 @@
     <div class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <h2 class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase">Accounts ({data.users.length})</h2>
-        <p class="mt-1 text-sm text-muted-foreground">Everyone who has opened Zap or been set by an admin, most recently seen first.</p>
       </div>
-      <input class="auth-field sm:w-64" placeholder="Filter by email or username" bind:value={filter} />
+      <input class="zap-underline-field h-9 w-full py-0 pr-1 sm:w-64" placeholder="Filter by email or username" bind:value={filter} />
     </div>
 
     {#if visibleUsers.length === 0}
       <p class="rounded border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">No accounts.</p>
     {:else}
-      <div class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain" role="region" aria-label="Accounts">
-        <ul class="divide-y divide-border/60">
+      <div class="zap-track-host is-framed min-h-0 flex-1 overflow-y-auto overscroll-contain" role="region" aria-label="Accounts">
+        <ul>
           {#each visibleUsers as u (u.userId)}
             {@const isSelf = u.userId === data.currentUserId}
             <li class="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">

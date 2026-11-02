@@ -282,6 +282,23 @@ Introduced **`.zap-dropdown`** in `design-chrome.css` and applied across Zap men
 
 **Where:** `catalogue/+page.svelte` (`toolbarExtras`), `CatalogueFilters.svelte` (`toolbarExtras` snippet), `catalog-queue.ts` (`shuffleIds`), `api/catalog-queue/+server.ts`.
 
+### 20. App-wide catalogue grammar rollout (2026-11-02)
+
+**Intent:** Same principles as the catalogue revamp — consistency, less redundancy, simpler chrome — on every Zap surface.
+
+| Area | Change |
+| --- | --- |
+| Shared CSS | `.zap-filters-panel` transparent; `.zap-track-host` borderless by default (`is-framed` for admin); affordance hover (not row wash); `.zap-transport-btn` / `.zap-transport-play` / `.zap-meta-disclosure` |
+| Session library | Play all on Filters meta row (always); drop Add all; filtered menu + shuffle; borderless list; icon enqueue actions |
+| Session player / queue / dock | De-card now-playing + queue; ink transport play tiles |
+| Playlists / history / home / sessions / jobs | De-card tool stacks; underline search; borderless shelves; quiet disclosures |
+| Theme / connections / setup / Discord | Flush preference & connection panels; underline connection search |
+| Admin | Framed hosts (`is-framed`); underline filter/search; quieter section chrome |
+| Auth | Drop login/sign-up ledes under titles (auth card shell kept) |
+| Dialogs / pickers | Underline search in Edit tags + Tag icon picker; TrackListSkeleton transparent |
+
+**Follow-up still open:** playlist detail Play+Queue twin CTAs → single Play-all menu; SettingsMenu → `.zap-menu-item`; remaining boxed primary CTAs on create/follow forms.
+
 ---
 
 ## Emerging principles (draft — not locked)
@@ -401,4 +418,5 @@ Use these as candidates when writing a formal Zap design philosophy:
 - Header: flush edges + signal under-glow; shared ink with dock / play tiles  
 - Theme: drop Cards picker + gray pages; accent-tinted dark page backgrounds; fixed ink chrome  
 - Play all + Save as playlist on Filters row; always-on Play all; drop Add all; filtered menu (replace / next / last / shuffle)  
-- Goal: consistency with Filters, less redundancy, simpler default path
+- Goal: consistency with Filters, less redundancy, simpler default path  
+- App-wide rollout: borderless shelves, de-card tools, underline search, ink transport, session Play all parity, admin `is-framed`

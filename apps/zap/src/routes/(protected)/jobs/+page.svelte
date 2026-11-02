@@ -115,7 +115,7 @@
         No running or recent imports. Start one from Add song or Connections → YouTube.
       </p>
     {:else}
-      <ul class="divide-y divide-border/50 border border-border/70 bg-card">
+      <ul class="zap-track-host space-y-0">
         {#each jobs as job (job.id)}
           <li class="space-y-1.5 px-4 py-3">
             <div class="flex flex-wrap items-start justify-between gap-2">
@@ -167,7 +167,7 @@
       No failed song imports.
     </p>
   {:else}
-    <ul class="divide-y divide-border/50 border border-border/70 bg-card">
+    <ul class="zap-track-host space-y-0">
       {#each failedItems as item (item.id)}
         <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div class="min-w-0">
