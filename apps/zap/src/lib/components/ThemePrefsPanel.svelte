@@ -1,6 +1,5 @@
 <script lang="ts">
   import AppWindowIcon from "@lucide/svelte/icons/app-window";
-  import LayoutPanelTopIcon from "@lucide/svelte/icons/layout-panel-top";
   import PaletteIcon from "@lucide/svelte/icons/palette";
   import SparklesIcon from "@lucide/svelte/icons/sparkles";
   import TagsIcon from "@lucide/svelte/icons/tags";
@@ -8,7 +7,6 @@
   import {
     ACCENT_PRESETS,
     ANIMATION_STYLES,
-    CARD_PRESETS,
     CATALOGUE_TAG_DISPLAYS,
     DEFAULT_THEME_PREFS,
     MOTION_ANIM_OPACITY,
@@ -21,7 +19,6 @@
     type AccentId,
     type AnimationLayer,
     type AnimationStyleId,
-    type CardId,
     type CatalogueTagDisplay,
     type PageId,
     type ZapThemePrefs,
@@ -46,10 +43,6 @@
 
   function setPage(id: PageId) {
     patch({ page: id });
-  }
-
-  function setCard(id: CardId) {
-    patch({ card: id });
   }
 
   function setAnimations(on: boolean) {
@@ -126,7 +119,7 @@
       <AppWindowIcon class="size-3.5 shrink-0 text-signal" aria-hidden="true" />
       Page background
     </h2>
-    <div class="grid grid-cols-4 gap-2 sm:grid-cols-7" role="listbox" aria-label="Page background">
+    <div class="grid grid-cols-4 gap-2 sm:grid-cols-5" role="listbox" aria-label="Page background">
       {#each PAGE_PRESETS as preset (preset.id)}
         <button
           type="button"
@@ -137,30 +130,6 @@
             prefs.page === preset.id ? "border-signal" : "border-border hover:border-signal/40"
           }`}
           onclick={() => setPage(preset.id)}
-        >
-          <span class="size-8 border border-white/15" style={`background:${preset.value}`} aria-hidden="true"></span>
-          <span class="text-center font-mono text-[8px] leading-tight text-muted-foreground">{preset.label}</span>
-        </button>
-      {/each}
-    </div>
-  </section>
-
-  <section class="space-y-3">
-    <h2 class="flex items-center gap-2 font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
-      <LayoutPanelTopIcon class="size-3.5 shrink-0 text-signal" aria-hidden="true" />
-      Cards & windows
-    </h2>
-    <div class="grid grid-cols-3 gap-2 sm:grid-cols-6" role="listbox" aria-label="Card background">
-      {#each CARD_PRESETS as preset (preset.id)}
-        <button
-          type="button"
-          role="option"
-          aria-selected={prefs.card === preset.id}
-          title={preset.label}
-          class={`flex flex-col items-center gap-1.5 border p-2 ${
-            prefs.card === preset.id ? "border-signal" : "border-border hover:border-signal/40"
-          }`}
-          onclick={() => setCard(preset.id)}
         >
           <span class="size-8 border border-white/15" style={`background:${preset.value}`} aria-hidden="true"></span>
           <span class="text-center font-mono text-[8px] leading-tight text-muted-foreground">{preset.label}</span>

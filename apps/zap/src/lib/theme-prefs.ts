@@ -14,18 +14,25 @@ export const ACCENT_PRESETS = [
   { id: "blue", label: "Blue", value: "#4a9eff", foreground: "#081018" },
 ] as const;
 
-/** Page grounds — near-black with optional cool tints. */
+/**
+ * Page grounds — near-black neutrals plus dark tints matching each accent
+ * (same depth family as dark purple `#100a16`).
+ * `card` is the paired surface (header / dock / chips) — no separate picker.
+ */
 export const PAGE_PRESETS = [
-  { id: "dark-black", label: "Dark black", value: "#050505" },
-  { id: "black", label: "Black", value: "#0a0a0a" },
-  { id: "light-black", label: "Light black", value: "#121212" },
-  { id: "dark-gray", label: "Dark gray", value: "#1a1a1a" },
-  { id: "gray", label: "Gray", value: "#222222" },
-  { id: "dark-blue", label: "Dark blue", value: "#0a0e16" },
-  { id: "dark-purple", label: "Dark purple", value: "#100a16" },
+  { id: "dark-black", label: "Dark black", value: "#050505", card: "#0f0f0f" },
+  { id: "black", label: "Black", value: "#0a0a0a", card: "#141414" },
+  { id: "dark-coral", label: "Dark coral", value: "#160a08", card: "#1e100c" },
+  { id: "dark-red", label: "Dark red", value: "#160808", card: "#1e0e0e" },
+  { id: "dark-purple", label: "Dark purple", value: "#100a16", card: "#18121e" },
+  { id: "dark-pink", label: "Dark pink", value: "#160a10", card: "#1e1018" },
+  { id: "dark-cream", label: "Dark cream", value: "#12100e", card: "#1a1814" },
+  { id: "dark-yellow", label: "Dark yellow", value: "#161208", card: "#1e1a0e" },
+  { id: "dark-green", label: "Dark green", value: "#08140e", card: "#0e1a14" },
+  { id: "dark-blue", label: "Dark blue", value: "#0a0e16", card: "#10141e" },
 ] as const;
 
-/** Card / dialog / panel surfaces — slightly lifted from page. */
+/** @deprecated Kept for reading old localStorage `card` ids; apply uses page.card. */
 export const CARD_PRESETS = [
   { id: "ink", label: "Ink", value: "#0f0f0f" },
   { id: "charcoal", label: "Charcoal", value: "#111111" },
@@ -208,10 +215,6 @@ function pageById(id: PageId) {
   return PAGE_PRESETS.find((p) => p.id === id) ?? PAGE_PRESETS.find((p) => p.id === DEFAULT_THEME_PREFS.page) ?? PAGE_PRESETS[0];
 }
 
-function cardById(id: CardId) {
-  return CARD_PRESETS.find((p) => p.id === id) ?? CARD_PRESETS.find((p) => p.id === DEFAULT_THEME_PREFS.card) ?? CARD_PRESETS[0];
-}
-
 function mixCard(solid: string, alpha: number) {
   return `color-mix(in srgb, ${solid} ${Math.round(alpha * 100)}%, transparent)`;
 }
@@ -227,7 +230,8 @@ export function applyThemePrefs(prefs: ZapThemePrefs) {
   const root = document.documentElement;
   const accent = accentById(prefs.accent);
   const page = pageById(prefs.page);
-  const card = cardById(prefs.card);
+  // Surfaces follow the page tint; legacy `prefs.card` is ignored for display.
+  const cardSolid = page.card;
   const animationsOn = prefs.animations !== false;
   const cardOpacity = clampCardOpacity(prefs.cardOpacity);
   const animOpacity = clampAnimOpacity(prefs.animationOpacity);
@@ -251,9 +255,9 @@ export function applyThemePrefs(prefs: ZapThemePrefs) {
   root.style.setProperty("--atmosphere", `linear-gradient(180deg, ${page.value} 0%, ${page.value} 100%)`);
   root.style.setProperty("--scrollbar-track", page.value);
 
-  root.style.setProperty("--card-solid", card.value);
-  const cardFill = animationsOn ? mixCard(card.value, cardOpacity) : card.value;
-  const chromeFill = animationsOn ? mixCard(card.value, chromeAlphaFromCard(cardOpacity)) : card.value;
+  root.style.setProperty("--card-solid", cardSolid);
+  const cardFill = animationsOn ? mixCard(cardSolid, cardOpacity) : cardSolid;
+  const chromeFill = animationsOn ? mixCard(cardSolid, chromeAlphaFromCard(cardOpacity)) : cardSolid;
 
   root.style.setProperty("--background-mid", chromeFill);
   root.style.setProperty("--card", cardFill);
