@@ -159,7 +159,7 @@
               <label class="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
                 Volume
                 <input
-                  class="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-border accent-[var(--signal)]"
+                  class="zap-seek h-1.5 flex-1 cursor-pointer appearance-none bg-border"
                   type="range"
                   min="0"
                   max="100"
