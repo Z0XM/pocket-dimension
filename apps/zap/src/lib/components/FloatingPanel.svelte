@@ -161,9 +161,7 @@
     overDrop =
       Boolean(dropLabel) &&
       drag.kind !== "resize" &&
-      (dropAnchor === "corner"
-        ? inCornerDropZone(e.clientX, e.clientY, vp, dropBottomInset)
-        : inDropZone(e.clientY, vp));
+      (dropAnchor === "corner" ? inCornerDropZone(e.clientX, e.clientY, vp, dropBottomInset) : inDropZone(e.clientY, vp));
   }
 
   function endDrag() {
@@ -234,11 +232,7 @@
       } ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
       style={`left:${iconPos.x}px;top:${iconPos.y}px;width:${ICON_SIZE}px;height:${ICON_SIZE}px`}
       aria-label={`Open ${title}`}
-      title={dropLabel
-        ? dropAnchor === "corner"
-          ? `${title} — drag to the bottom-right to dock`
-          : `${title} — drag to the footer to dock`
-        : title}
+      title={dropLabel ? (dropAnchor === "corner" ? `${title} — drag to the bottom-right to dock` : `${title} — drag to the footer to dock`) : title}
       onpointerdown={(e) => startDrag(e, "icon")}
       onpointermove={moveDrag}
       onpointerup={endDrag}
@@ -255,8 +249,8 @@
     </button>
   {:else}
     <div
-      class={`zap-float-panel fixed z-[41] flex flex-col overflow-hidden border border-signal/30 bg-popover/95 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur ${
-        mode === "full" ? "inset-2 rounded-lg sm:inset-6" : "rounded-lg"
+      class={`zap-float-panel fixed flex flex-col overflow-hidden border border-signal/30 bg-popover/95 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur ${
+        mode === "full" ? "inset-0 z-[60] rounded-none border-0 shadow-none" : "z-[41] rounded-lg"
       }`}
       style={mode === "panel" && panel ? `left:${panel.x}px;top:${panel.y}px;width:${panel.w}px;height:${panel.h}px` : undefined}
       role="dialog"

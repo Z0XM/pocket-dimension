@@ -265,9 +265,7 @@
     <!-- Mobile: transport on the right. Desktop: seek + up next + maximize -->
     <div class="flex shrink-0 items-center justify-end gap-1 sm:min-w-0 sm:flex-1 sm:gap-2 sm:pl-[4.5rem]">
       <div class="hidden min-w-0 flex-1 items-center gap-1.5 sm:flex sm:gap-2">
-        <span class="w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums"
-          >{formatClock(scrubMs ?? queue.positionMs)}</span
-        >
+        <span class="w-9 shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(scrubMs ?? queue.positionMs)}</span>
         <SeekBar
           class="h-1.5 w-full min-w-[4rem]"
           valueMs={queue.positionMs}
@@ -276,9 +274,7 @@
           onseek={(ms) => void queue.seek(ms)}
           onscrub={(ms) => (scrubMs = ms)}
         />
-        <span class="w-9 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums"
-          >{formatClock(durationMs)}</span
-        >
+        <span class="w-9 shrink-0 text-right font-mono text-[10px] text-muted-foreground tabular-nums">{formatClock(durationMs)}</span>
       </div>
 
       <div class="hidden min-w-0 max-w-[11rem] md:block">
@@ -290,17 +286,15 @@
         {@render transport()}
       </div>
 
-      {#if !locked}
-        <button
-          type="button"
-          class="zap-transport-btn hidden size-8 shrink-0 sm:inline-flex"
-          aria-label="Maximize queue"
-          title="Maximize queue"
-          onclick={onmaximize}
-        >
-          <Maximize2Icon class="size-3.5" aria-hidden="true" />
-        </button>
-      {/if}
+      <button
+        type="button"
+        class="zap-transport-btn inline-flex size-8 shrink-0"
+        aria-label="Maximize queue"
+        title="Maximize queue"
+        onclick={onmaximize}
+      >
+        <Maximize2Icon class="size-3.5" aria-hidden="true" />
+      </button>
     </div>
   </div>
 </div>
