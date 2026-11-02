@@ -1,8 +1,9 @@
 # Zap · UI enhancement guide
 
 **App:** `apps/zap`  
-**Captured:** 2026-11-01 → 2026-11-02 (session pass — catalogue chrome, filters, search, dropdowns, shell nav, theme defaults, track rows, queue dock defaults)  
-**Purpose:** Durable log of UI/UX decisions so we can later distill a Zap design philosophy / DESIGN.md. Prefer facts + rationale over polish.
+**Captured:** 2026-11-01 → 2026-11-02 (session pass — catalogue chrome, filters, search, dropdowns, shell nav, theme defaults, track rows, queue dock defaults; then tags/icons, seek, header/dock ink, play tiles, Theme simplify)  
+**Purpose:** Durable log of UI/UX decisions so we can later distill a Zap design philosophy / DESIGN.md. Prefer facts + rationale over polish.  
+**Philosophy SoR (store):** `/cursor/stores/self/docs/zap-design-system-v1.md` — Prism Pulse + **Catalogue & shell — shipped philosophy**.
 
 ---
 
@@ -143,11 +144,11 @@ Introduced **`.zap-dropdown`** in `design-chrome.css` and applied across Zap men
 - **No row background** wash on catalogue hover (overrides global `.zap-track:hover` fill).
 - On hover (non-selected rows):
   - **Title** → signal
-  - **Play control** → accent **border + icon color** only (transparent fill; no solid/signal fill on hover)
-  - **Tag chips** → signal border / text / light fill
+  - **Play control** → **icon color** to `--signal` only (ink fill + float shadow stay; **no** accent border / ring on hover — superseded the earlier “accent border” try)
+  - **Tag chips** → signal border / text / light fill (when text/chip mode)
 - **Selected / current row:** play button already has filled accent bg — **do not** re-style play on row hover when `.is-current`.
 - **Where:** `design-chrome.css` (`.zap-catalogue …`), `TrackRow.svelte` (`group` / `group-hover` where needed).
-- **Intent:** Hover points at what you’d interact with (title, play, tags), not a whole-row tint.
+- **Intent:** Hover points at what you’d interact with (title, play glyph, tags), not a whole-row tint.
 
 ---
 
@@ -181,9 +182,85 @@ Introduced **`.zap-dropdown`** in `design-chrome.css` and applied across Zap men
 | Settings / mobile menu | `apps/zap/src/lib/components/SettingsMenu.svelte` |
 | Track row | `apps/zap/src/lib/components/TrackRow.svelte` |
 | Queue dock default | `apps/zap/src/lib/components/CatalogQueueDock.svelte` |
+| Queue dock bar (seek hide) | `apps/zap/src/lib/components/CatalogQueueDockBar.svelte` |
 | Shell layout | `apps/zap/src/routes/(protected)/+layout.svelte` |
 | Catalogue page | `apps/zap/src/routes/(protected)/catalogue/+page.svelte` |
 | Catalogue visibility | `apps/zap/src/lib/server/catalogue.ts` |
+| Tag icon catalog | `apps/zap/src/lib/tag-icons.ts` |
+| Tag icon picker | `apps/zap/src/lib/components/TagIconPicker.svelte` |
+| Theme prefs panel | `apps/zap/src/lib/components/ThemePrefsPanel.svelte` |
+| Tag icon column | `shared/db` migration `0065_zap_tag_icon.sql` |
+
+---
+
+## Changes (follow-on · 2026-11-02)
+
+### 12. Tag system icons
+
+- DB: `zap.tags.icon` (nullable text) — migration `0065_zap_tag_icon.sql`.
+- Curated colorful emoji catalog in `tag-icons.ts` (mood / music / media / anime / classic / eyes / languages·flags / etc.) with keyword search.
+- Admin tags: each system tag chip has an **icon slot** (glyph or blank dashed placeholder). Click opens `TagIconPicker` popup — no separate “Icons & emojis” page section.
+- Filters / pickers / edit-tags: show **icon + text** when an icon is set.
+- **Where:** admin tags UI + server actions, `TrackRow`, `TagQueryEditor`, `TagMultiSelect`, `EditTagsDialog`.
+- **Intent:** Icons are attributes of tags, not a parallel taxonomy UI.
+
+### 13. Catalogue tag display prefs (Theme)
+
+| Pref | Values | Default |
+| --- | --- | --- |
+| Catalogue tags | `text` · `icons` · `both` | **`text`** (text badges) |
+| Monochrome icons | on / off | off |
+
+- `data-catalogue-tags` + `data-monochrome-icons` on the document; CSS drives row rendering.
+- **Icons-only mode:** plain glyphs — **no chip chrome** (no border/fill/radius wrapper).
+- Text / both: keep badge chrome; both = icon inside the chip with the label.
+- **Where:** `theme-prefs.ts`, `ThemePrefsPanel.svelte`, `design-chrome.css`, `TrackRow.svelte`.
+- **Intent:** Listener chooses density of tag chrome; default stays readable text badges.
+
+### 14. Rectangular seek / range controls
+
+- `.zap-seek`: **rectangular** track (not pill / `rounded-full`).
+- Thumb = **vertical rectangle**, not a circle.
+- Applies to playback seek, volume, Theme motion sliders.
+- Queue dock: seek + time clocks **hidden below `sm`** (space for transport).
+- **Intent:** Match the denser catalogue grammar; stop “capsule player” chrome.
+
+### 15. Shell header — flush + signal under-glow
+
+- Header flush to **window edges** (no top/side inset, no rounded corners).
+- Dropped bottom hairline rule; presence = soft **signal under-glow** (`box-shadow` / `color-mix` with `--signal`, same family as login card glow).
+- Tried a floating inset card header, then reverted to flush — keep glow, lose gaps/radius.
+- **Where:** `(protected)/+layout.svelte`, `design-chrome.css`.
+
+### 16. Shared ink chrome surface
+
+| Surface | Fill |
+| --- | --- |
+| Header | fixed ink `--card` (`#0f0f0f` / `DEFAULT_CARD_SURFACE`) |
+| Queue dock + floating queue/devices | same ink |
+| Idle track play tile | same ink + light float shadow |
+| Page canvas | Theme **page background** preset (independent) |
+
+- Page background may be near-black or **accent-tinted dark**; header/dock **do not** follow page tint.
+- Regression: temporarily wired `--card` from page presets → header looked wrong; restored fixed ink and `applyThemePrefs` uses `DEFAULT_CARD_SURFACE`.
+- **Intent:** Chrome reads as one continuous shelf; page tint is atmosphere only.
+
+### 17. Track play tile
+
+- Slightly rounded (`~0.35rem`), **borderless**, soft floating shadow.
+- Idle: ink fill; hover → **icon only** → `--signal` (fill stays ink; no accent ring).
+- Current / playing: solid `--signal` fill + on-accent icon.
+- **Where:** `design-chrome.css` (`.zap-play` / catalogue overrides), `TrackRow.svelte`.
+
+### 18. Theme settings simplify
+
+- **Removed** Cards & windows picker — chrome ink is fixed.
+- **Removed** gray / light-black / dark-gray page options.
+- **Added** dark accent-equivalent page backgrounds (one tint per accent lead).
+- Accent leads unchanged (coral / red / purple / pink / white / yellow / green / blue).
+- Motion defaults from earlier pass still apply (card 100% · anim 40% · layer on top).
+- New prefs: Catalogue tags + Monochrome icons.
+- **Where:** `theme-prefs.ts`, `ThemePrefsPanel.svelte`.
 
 ---
 
@@ -230,6 +307,24 @@ Use these as candidates when writing a formal Zap design philosophy:
 13. **Dock-first listening**  
     Queue defaults to the bottom dock; floating is an escape hatch, not the first impression.
 
+14. **Ink chrome, tinted stage**  
+    Header, dock, and idle play tiles share fixed ink `#0f0f0f`. Page background may tint with the accent; chrome does not.
+
+15. **Flush header, glow not frame**  
+    Presence from soft signal under-glow — not inset cards, not bottom hairlines, not rounded floating bars.
+
+16. **Hover the glyph, not the ring**  
+    Play-tile hover tints the icon only; keep ink fill and float shadow. No accent border chase.
+
+17. **Rectangular ranges**  
+    Seek / volume / theme sliders use rectangular tracks and vertical-rect thumbs — no pills.
+
+18. **Tags are data; display is preference**  
+    Admin attaches icons to tags. Catalogue chooses text / icons / both in Theme. Icons-only never wears chip chrome. Filters stay icon+text for scanability.
+
+19. **Collapse seek before transport on small screens**  
+    Dock hides seek + clocks below `sm`; keep play controls usable.
+
 ---
 
 ## Explicit non-goals (this pass)
@@ -239,6 +334,8 @@ Use these as candidates when writing a formal Zap design philosophy:
 - Did not retarget field-variant `ZapSelect` triggers (admin/history still use boxed triggers); plain variant is the catalogue/toolbar pattern.
 - Did not wire a full `_bmad-output/zap` product SoR / FEATURE-REGISTRY — this guide is an implementation artifact only.
 - Devices dock default left unchanged (still undocked unless stored).
+- Did not restyle session now-playing glass to match catalogue ink header (session still follows Prism Pulse mock glass).
+- Did not add custom user-uploaded tag icons — system emoji catalog only.
 
 ---
 
@@ -247,10 +344,11 @@ Use these as candidates when writing a formal Zap design philosophy:
 - [ ] Apply underline search + plain scope patterns to **session “add from library”** collapsible filters for parity.
 - [ ] Decide whether **field** `ZapSelect` (boxed) should eventually lose the boxed trigger in denser toolbars.
 - [ ] Soft-white hover at 78% — validate on light-ish card fills and on-top animation layer; tweak if contrast fails.
-- [ ] Promote “Emerging principles” → locked `DESIGN.md` once playlists / history toolbars get the same pass.
+- [ ] Promote “Emerging principles” → locked `DESIGN.md` once playlists / history toolbars get the same pass (store philosophy already updated in `zap-design-system-v1.md`).
 - [ ] Optional: extract `.zap-plain-disclosure` shared class for scope + Filters triggers to avoid drift.
 - [ ] Align `TrackListSkeleton` with borderless / no-horizontal-pad catalogue list.
 - [ ] Consider same hover grammar (title / chips, no wash) on playlist track lists.
+- [ ] Consider matching rectangular seek + ink dock language on session transport.
 
 ---
 
@@ -264,6 +362,10 @@ Use these as candidates when writing a formal Zap design philosophy:
 - Interaction: Filters closes when opening scope select  
 - Catalogue list: no host frame / row borders; hidden scrollbar  
 - Track rows: tighter pad; ghost edit-tags; no source; no delete; centered tags  
-- Row hover: accent title / play border / tags — no wash; skip play restyle when selected  
+- Row hover: accent title / play **icon** / tags — no wash; play fill stays ink; skip play restyle when selected  
 - Data: hide unavailable from catalogue  
 - Queue: default docked at bottom  
+- Tags: system icons on tags; Theme catalogue display text/icons/both (default text); optional monochrome; icons-only = no chip  
+- Seek: rectangular track + vertical thumb; dock seek hidden `< sm`  
+- Header: flush edges + signal under-glow; shared ink with dock / play tiles  
+- Theme: drop Cards picker + gray pages; accent-tinted dark page backgrounds; fixed ink chrome 
