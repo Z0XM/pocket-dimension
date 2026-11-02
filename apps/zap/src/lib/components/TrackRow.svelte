@@ -204,9 +204,7 @@
   <div class="flex items-start gap-2 sm:items-center sm:gap-4">
     <button
       type="button"
-      class="zap-track-play flex size-8 shrink-0 items-center justify-center rounded border-2 border-border bg-transparent text-muted-foreground transition-[border-color,color,background] disabled:opacity-40 sm:size-10 {isCurrent
-        ? ''
-        : 'group-hover:border-signal group-hover:text-signal'}"
+      class="zap-track-play flex size-8 shrink-0 items-center justify-center disabled:opacity-40 sm:size-10"
       disabled={!track.playable || !queue || (queue.pending > 0 && !isCurrent)}
       title={unavailable ? "Song not available" : isCurrent ? undefined : queue?.active ? "Play next (insert after current and skip to it)" : "Play"}
       aria-label={unavailable ? "Song not available" : isPlaying ? "Pause" : "Play"}

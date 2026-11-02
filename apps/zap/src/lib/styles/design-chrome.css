@@ -59,9 +59,19 @@ html[data-animations="off"] .zap-beat-bg {
 
 .zap-shell-top {
   position: relative;
+  z-index: 20;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-  background: var(--background-mid);
+  margin: 0.75rem 0.75rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card);
+  box-shadow: 0 0 40px color-mix(in srgb, var(--signal) 12%, transparent);
+}
+
+@media (min-width: 640px) {
+  .zap-shell-top {
+    margin-inline: 1.5rem;
+  }
 }
 
 .zap-shell-brand span {
@@ -283,9 +293,11 @@ html[data-animations="off"] .zap-beat-bg {
 
   .zap-catalogue .zap-track:not(.is-current):hover .zap-track-play:not(:disabled),
   .zap-catalogue .zap-track:not(.is-current) .zap-track-play:hover:not(:disabled) {
-    background: transparent;
-    border-color: var(--signal);
+    background: color-mix(in srgb, var(--signal) 16%, var(--card));
     color: var(--signal);
+    box-shadow:
+      0 2px 8px color-mix(in srgb, #000 35%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--signal) 35%, transparent);
   }
 
   .zap-catalogue .zap-track:hover .zap-tag-chip {
@@ -357,17 +369,26 @@ html[data-monochrome-icons="on"] .zap-tag-icon {
 }
 
 .zap-track-play {
-  border: 2px solid var(--border);
-  background: transparent;
-  color: var(--foreground);
-  border-radius: 0;
+  border: none;
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--card) 88%, var(--foreground));
+  color: var(--muted-foreground);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, #000 40%, transparent),
+    0 2px 6px color-mix(in srgb, #000 22%, transparent);
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .zap-track.is-current .zap-track-play,
 .zap-track-play:hover:not(:disabled) {
   background: var(--signal);
-  border-color: var(--signal);
   color: var(--primary-foreground);
+  box-shadow:
+    0 2px 8px color-mix(in srgb, var(--signal) 35%, transparent),
+    0 1px 2px color-mix(in srgb, #000 30%, transparent);
   transform: none;
 }
 
