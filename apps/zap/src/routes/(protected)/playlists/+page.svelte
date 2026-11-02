@@ -2,6 +2,7 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
   import SearchIcon from "@lucide/svelte/icons/search";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
+  import UserMinusIcon from "@lucide/svelte/icons/user-minus";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import CreateCustomPlaylistDialog from "$lib/components/CreateCustomPlaylistDialog.svelte";
   import CreateLinkedPlaylistDialog from "$lib/components/CreateLinkedPlaylistDialog.svelte";
@@ -38,15 +39,12 @@
   let deleteTarget = $state<{ id: string; name: string; trackCount: number } | null>(null);
   let deleteOpen = $state(false);
   let deleting = $state(false);
+  let unfollowBusyId = $state<string | null>(null);
 
   const searchQ = $derived(searchBySection[section] ?? "");
   const sectionPlaylists = $derived(filterByNameSearch(filterPlaylistsBySection(playlists, section), searchQ));
   const sectionSaved = $derived(filterByNameSearch(data.savedQueues ?? [], searchQ));
   const sectionConnected = $derived(filterByNameSearch(data.connectedPlaylists ?? [], searchQ));
-
-  const createLabel = $derived(
-    section === "following" ? "Follow" : section === "linked" ? "Link" : section === "saved" ? "Save" : section === "connected" ? "Connect" : "Create"
-  );
 
   $effect(() => {
     playlists = data.playlists ?? [];
@@ -100,8 +98,41 @@
     }
   }
 
+  async function unfollow(pl: { id: string; name: string }) {
+    if (unfollowBusyId) return;
+    unfollowBusyId = pl.id;
+    try {
+      const res = await fetch(`/api/playlists/${pl.id}`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unfollow" }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message ?? "Unfollow failed");
+      playlists = playlists.filter((p) => p.id !== pl.id);
+      toast.success(`Unfollowed “${pl.name}”.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unfollow failed");
+    } finally {
+      unfollowBusyId = null;
+    }
+  }
+
+  async function refreshPlaylists() {
+    const res = await fetch("/api/playlists", { credentials: "same-origin" });
+    if (!res.ok) return;
+    const body = await res.json();
+    playlists = body.playlists ?? [];
+  }
+
   function goPlaylist(id: string) {
     window.location.href = `/playlists/${id}`;
+  }
+
+  async function onFollowed(id: string) {
+    await refreshPlaylists();
+    goPlaylist(id);
   }
 </script>
 
@@ -139,7 +170,7 @@
       onclick={onCreate}
     >
       <PlusIcon class="size-3.5" aria-hidden="true" />
-      {createLabel}
+      Create
     </button>
   </div>
 
@@ -201,7 +232,7 @@
         {searchQ.trim()
           ? "No playlists match."
           : section === "following"
-            ? "You’re not following any playlists yet."
+            ? "You’re not following any playlists yet — Create with a share code."
             : section === "linked"
               ? "No linked playlists yet."
               : section === "custom"
@@ -231,7 +262,18 @@
                 </span>
               {/if}
             </a>
-            {#if pl.canDelete}
+            {#if pl.relation === "follower"}
+              <button
+                type="button"
+                class="inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground opacity-70 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 disabled:opacity-40"
+                aria-label={`Unfollow ${pl.name}`}
+                title="Unfollow"
+                disabled={unfollowBusyId === pl.id}
+                onclick={() => void unfollow(pl)}
+              >
+                <UserMinusIcon class="size-3.5" aria-hidden="true" />
+              </button>
+            {:else if pl.canDelete}
               <button
                 type="button"
                 class="inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground opacity-70 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 disabled:opacity-40"
@@ -279,7 +321,7 @@
 </section>
 
 <CreateCustomPlaylistDialog bind:open={createCustomOpen} availableTags={data.availableTags} oncreated={goPlaylist} />
-<FollowPlaylistDialog bind:open={followOpen} onfollowed={goPlaylist} />
+<FollowPlaylistDialog bind:open={followOpen} onfollowed={onFollowed} />
 <CreateLinkedPlaylistDialog bind:open={linkedOpen} oncreated={goPlaylist} />
 
 <ConfirmDialog
