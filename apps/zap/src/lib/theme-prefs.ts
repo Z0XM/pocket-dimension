@@ -235,8 +235,8 @@ export function applyThemePrefs(prefs: ZapThemePrefs) {
   const root = document.documentElement;
   const accent = accentById(prefs.accent);
   const page = pageById(prefs.page);
-  // Surfaces follow the page tint; legacy `prefs.card` is ignored for display.
-  const cardSolid = page.card;
+  // One shared surface for header / dock / cards — not tied to page tint.
+  const cardSolid = DEFAULT_CARD_SURFACE;
   const animationsOn = prefs.animations !== false;
   const cardOpacity = clampCardOpacity(prefs.cardOpacity);
   const animOpacity = clampAnimOpacity(prefs.animationOpacity);
