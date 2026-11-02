@@ -85,6 +85,13 @@
   let suppressClick = false;
   let pendingMode: FloatingMode | null = null;
   let motionTimer: ReturnType<typeof setTimeout> | null = null;
+  let headerEl: HTMLDivElement | null = $state(null);
+
+  /** Swipe-down-to-minimize on the fullscreen header. */
+  let headerSwipeActive = false;
+  let headerSwipeFired = false;
+  let headerSwipeX = 0;
+  let headerSwipeY = 0;
 
   function clearMotionTimer() {
     if (motionTimer != null) {
@@ -97,6 +104,97 @@
     if (!animationsEnabled()) return false;
     if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
     return true;
+  }
+
+  function headerPoint(e: TouchEvent | PointerEvent): { x: number; y: number } | null {
+    if ("touches" in e) {
+      const t = e.touches[0] ?? e.changedTouches[0];
+      return t ? { x: t.clientX, y: t.clientY } : null;
+    }
+    if ("clientX" in e) return { x: e.clientX, y: e.clientY };
+    return null;
+  }
+
+  function beginHeaderSwipe(e: TouchEvent | PointerEvent) {
+    if (mode !== "full" || fullMotion === "out") return;
+    if ((e.target as HTMLElement | null)?.closest?.("button, a, input, [data-no-swipe]")) return;
+    const p = headerPoint(e);
+    if (!p) return;
+    headerSwipeActive = true;
+    headerSwipeFired = false;
+    headerSwipeX = p.x;
+    headerSwipeY = p.y;
+  }
+
+  function moveHeaderSwipe(e: TouchEvent | PointerEvent) {
+    if (!headerSwipeActive || headerSwipeFired || mode !== "full") return;
+    const p = headerPoint(e);
+    if (!p) return;
+    const dx = p.x - headerSwipeX;
+    const dy = p.y - headerSwipeY;
+    if (dy > 36 && Math.abs(dy) > Math.abs(dx)) {
+      headerSwipeFired = true;
+      headerSwipeActive = false;
+      if (e.cancelable) e.preventDefault();
+      setMode("panel");
+    }
+  }
+
+  function endHeaderSwipe() {
+    headerSwipeActive = false;
+    headerSwipeFired = false;
+  }
+
+  // Non-passive touchmove so swipe-down isn't stolen by overscroll.
+  $effect(() => {
+    const el = headerEl;
+    if (!el || mode !== "full") return;
+    const onStart = (e: TouchEvent) => beginHeaderSwipe(e);
+    const onMove = (e: TouchEvent) => {
+      if (!headerSwipeActive) return;
+      if (e.cancelable) e.preventDefault();
+      moveHeaderSwipe(e);
+    };
+    const onEnd = () => endHeaderSwipe();
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  });
+
+  function onHeaderPointerDown(e: PointerEvent) {
+    if (mode === "panel") {
+      startDrag(e, "panel");
+      return;
+    }
+    if (e.pointerType === "touch") return;
+    if (e.button !== 0) return;
+    beginHeaderSwipe(e);
+    if (headerSwipeActive) (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function onHeaderPointerMove(e: PointerEvent) {
+    if (mode === "panel") {
+      moveDrag(e);
+      return;
+    }
+    if (e.pointerType === "touch") return;
+    moveHeaderSwipe(e);
+  }
+
+  function onHeaderPointerUp(e: PointerEvent) {
+    if (mode === "panel") {
+      endDrag();
+      return;
+    }
+    if (e.pointerType === "touch") return;
+    endHeaderSwipe();
   }
 
   function viewport(): Viewport {
@@ -337,12 +435,17 @@
       onanimationend={mode === "full" ? onFullMotionEnd : undefined}
     >
       <div
-        class={`flex shrink-0 items-center gap-2 border-b border-border/60 px-2 py-1.5 select-none ${mode === "panel" ? "cursor-grab touch-none" : ""}`}
-        onpointerdown={(e) => mode === "panel" && startDrag(e, "panel")}
-        onpointermove={moveDrag}
-        onpointerup={endDrag}
-        onpointercancel={endDrag}
+        bind:this={headerEl}
+        class={`flex shrink-0 items-center gap-2 border-b border-border/60 px-2 py-1.5 select-none ${
+          mode === "panel" ? "cursor-grab touch-none" : mode === "full" ? "cursor-grab active:cursor-grabbing" : ""
+        }`}
+        style={mode === "full" ? "touch-action: none; -webkit-user-select: none; user-select: none;" : undefined}
+        onpointerdown={onHeaderPointerDown}
+        onpointermove={onHeaderPointerMove}
+        onpointerup={onHeaderPointerUp}
+        onpointercancel={onHeaderPointerUp}
         role="presentation"
+        aria-label={mode === "full" ? "Queue header. Swipe down to minimize." : undefined}
       >
         {#if mode === "panel"}
           <GripIcon class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />

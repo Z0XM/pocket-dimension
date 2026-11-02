@@ -35,11 +35,8 @@
 
   const current = $derived(queue.currentItem);
   const durationMs = $derived(current?.durationMs ?? 0);
-  /** Queue order before the playhead; display most recently played first. */
-  const pastItems = $derived.by(() => {
-    if (queue.currentIndex <= 0) return [];
-    return queue.items.slice(0, queue.currentIndex).toReversed();
-  });
+  /** Queue order before the playhead; ascending — recently played at the bottom. */
+  const pastItems = $derived(queue.currentIndex > 0 ? queue.items.slice(0, queue.currentIndex) : []);
   /** Up-next only — currently playing lives in the bottom chrome. */
   const upcomingItems = $derived(queue.currentIndex >= 0 ? queue.items.slice(queue.currentIndex + 1) : queue.items);
 
@@ -52,6 +49,18 @@
   let dragFrom = $state<number | null>(null);
   let dragOver = $state<number | null>(null);
   let listEl = $state<HTMLUListElement | null>(null);
+  let pastListEl = $state<HTMLUListElement | null>(null);
+
+  /** When Played before opens (or grows), pin scroll to the most recent track at the bottom. */
+  $effect(() => {
+    if (!pastOpen) return;
+    const el = pastListEl;
+    const n = pastItems.length;
+    if (!el || n === 0) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  });
 
   function startReorder(e: PointerEvent, index: number) {
     if (e.button !== 0) return;
@@ -144,7 +153,7 @@
     {/if}
     <button
       type="button"
-      class={`flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1.5 text-left disabled:opacity-40 ${muted ? "text-muted-foreground hover:text-foreground" : ""}`}
+      class={`flex min-w-0 flex-1 items-center gap-2 px-1 py-0.5 text-left disabled:opacity-40 sm:py-1 ${muted ? "text-muted-foreground hover:text-foreground" : ""}`}
       disabled={!item.playable}
       title={item.playable ? `Play from “${item.title}”` : "Not playable"}
       onclick={() => void queue.jump(item.id)}
@@ -182,7 +191,7 @@
     <div class="shrink-0 border-b border-border/60">
       <button
         type="button"
-        class="flex w-full items-center gap-1.5 px-3 py-2 text-left font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase hover:bg-signal/5 hover:text-signal"
+        class="flex w-full items-center gap-1.5 px-3 py-1.5 text-left font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase hover:bg-signal/5 hover:text-signal"
         aria-expanded={pastOpen}
         aria-controls="queue-played-before"
         onclick={() => (pastOpen = !pastOpen)}
@@ -192,7 +201,12 @@
         <span class="tabular-nums normal-case tracking-normal">{pastItems.length}</span>
       </button>
       {#if pastOpen}
-        <ul id="queue-played-before" class="max-h-36 space-y-0.5 overflow-y-auto px-2 pb-2" aria-label="Played before">
+        <ul
+          bind:this={pastListEl}
+          id="queue-played-before"
+          class="zap-track-host max-h-36 overflow-y-auto overscroll-contain px-1.5 pb-1"
+          aria-label="Played before"
+        >
           {#each pastItems as item (item.id)}
             {@render queueRow(item, true)}
           {/each}
@@ -201,7 +215,7 @@
     </div>
   {/if}
 
-  <ul bind:this={listEl} class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain py-1" aria-label="Up next">
+  <ul bind:this={listEl} class="zap-track-host min-h-0 flex-1 overflow-y-auto overscroll-contain py-0.5" aria-label="Up next">
     {#if upcomingItems.length === 0}
       <li class="px-3 py-4 font-mono text-[11px] text-muted-foreground">
         {queue.items.length === 0 ? "Queue is empty" : current ? "Nothing up next" : "Queue finished"}

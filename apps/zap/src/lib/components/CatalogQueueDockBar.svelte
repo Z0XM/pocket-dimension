@@ -17,7 +17,7 @@
     queue,
     audioBlocked = false,
     localNote = null,
-    /** When true (small screens), dock stays locked — no undock grip / maximize button; swipe up maximizes. */
+    /** When true (small screens), dock stays locked — no undock grip / maximize button; swipe up maximizes. Maximize control stays desktop-only. */
     locked = false,
     onunlock,
     onmaximize,
@@ -286,15 +286,17 @@
         {@render transport()}
       </div>
 
-      <button
-        type="button"
-        class="zap-transport-btn inline-flex size-8 shrink-0"
-        aria-label="Maximize queue"
-        title="Maximize queue"
-        onclick={onmaximize}
-      >
-        <Maximize2Icon class="size-3.5" aria-hidden="true" />
-      </button>
+      {#if !locked}
+        <button
+          type="button"
+          class="zap-transport-btn hidden size-8 shrink-0 sm:inline-flex"
+          aria-label="Maximize queue"
+          title="Maximize queue"
+          onclick={onmaximize}
+        >
+          <Maximize2Icon class="size-3.5" aria-hidden="true" />
+        </button>
+      {/if}
     </div>
   </div>
 </div>
