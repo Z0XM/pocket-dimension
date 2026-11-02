@@ -291,8 +291,8 @@ html[data-animations="off"] .zap-beat-bg {
     background: var(--card);
     color: var(--signal);
     box-shadow:
-      0 2px 8px color-mix(in srgb, #000 35%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--signal) 35%, transparent);
+      0 1px 2px color-mix(in srgb, #000 40%, transparent),
+      0 2px 6px color-mix(in srgb, #000 22%, transparent);
   }
 
   .zap-catalogue .zap-track:hover .zap-tag-chip {

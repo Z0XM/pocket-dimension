@@ -63,7 +63,7 @@
 </script>
 
 <div
-  class={`zap-queue-dock fixed inset-x-0 bottom-0 z-[42] flex border-t border-signal/40 bg-background-mid/95 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur ${
+  class={`zap-queue-dock fixed inset-x-0 bottom-0 z-[42] flex border-t border-signal/40 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] ${
     undockDragging && undockWillLeave ? "opacity-70" : ""
   }`}
   style={`height:${DOCK_BAR_H}px`}
